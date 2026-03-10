@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm install:*)",
+      "Bash(npm -v)",
+      "Bash(npm install:*)",
+      "Read(//Users/vucenovic/.local/share/**)",
+      "Read(//Users/vucenovic/Library/pnpm/**)",
+      "Read(//Users/vucenovic/**)",
+      "Bash(npx --yes tsc --noEmit -p tsconfig.json)",
+      "Bash(lsof -ti:8081)"
+    ]
+  }
+}

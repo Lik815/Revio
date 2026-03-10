@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+.next/
+out/
+
+# Expo / React Native
+.expo/
+*.jsbundle
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Database files
+*.db
+*.db-journal
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# TypeScript build info
+*.tsbuildinfo
+
+# pnpm
+.pnpm-store/
+
+# Old separate app folders (superseded by monorepo)
+AdminRevio/
+revioApp/
