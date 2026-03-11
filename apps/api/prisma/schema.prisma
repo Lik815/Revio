@@ -35,6 +35,9 @@ model Therapist {
   languages         String
   certifications    String       @default("")
   reviewStatus      ReviewStatus @default(PENDING_REVIEW)
+  passwordHash      String?
+  sessionToken      String?      @unique
+  photo             String?
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
   links             TherapistPracticeLink[]

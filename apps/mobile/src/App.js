@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
+  Alert,
   Image,
   Linking,
   Pressable,
@@ -14,6 +15,7 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import * as Location from 'expo-location';
+import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ─── Palette ─────────────────────────────────────────────────────────────────
@@ -191,6 +193,17 @@ const formatDist = (km) =>
 
 // ─── App ──────────────────────────────────────────────────────────────────────
 
+function callPhone(phone) {
+  if (!phone) {
+    Alert.alert('Keine Nummer', 'Für diesen Therapeuten ist keine Telefonnummer hinterlegt.');
+    return;
+  }
+  Alert.alert(phone, 'Jetzt anrufen?', [
+    { text: 'Anrufen', onPress: () => Linking.openURL(`tel:${phone}`) },
+    { text: 'Abbrechen', style: 'cancel' },
+  ]);
+}
+
 export default function App() {
   const systemScheme = useColorScheme();
   const [themeMode, setThemeMode] = useState('light'); // 'light' | 'dark' | 'system'
@@ -243,6 +256,129 @@ export default function App() {
   const toggleRegSpec = (s) => setRegSpecializations(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]);
   const toggleRegLang = (l) => setRegLanguages(prev => prev.includes(l) ? prev.filter(x => x !== l) : [...prev, l]);
   const toggleRegFort = (f) => setRegFortbildungen(prev => prev.includes(f) ? prev.filter(x => x !== f) : [...prev, f]);
+  const [regCustomLanguage, setRegCustomLanguage] = useState('');
+  const [regPracticeMode, setRegPracticeMode] = useState('new'); // 'new' | 'existing' | 'skip'
+  const [regExistingPracticeName, setRegExistingPracticeName] = useState('');
+
+  // Auth state
+  const [authToken, setAuthToken] = useState(null);
+  const [loggedInTherapist, setLoggedInTherapist] = useState(null);
+  const [showLogin, setShowLogin] = useState(false);
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [editBio, setEditBio] = useState('');
+  const [editSpecializations, setEditSpecializations] = useState('');
+  const [editLanguages, setEditLanguages] = useState('');
+  const [editHomeVisit, setEditHomeVisit] = useState(false);
+  const [profileSaving, setProfileSaving] = useState(false);
+
+  useEffect(() => {
+    AsyncStorage.getItem('revio_auth_token').then(async (token) => {
+      if (!token) return;
+      try {
+        const res = await fetch(`${getBaseUrl()}/auth/me`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          setAuthToken(token);
+          setLoggedInTherapist(await res.json());
+        } else {
+          AsyncStorage.removeItem('revio_auth_token');
+        }
+      } catch {}
+    });
+  }, []);
+
+  const handleLogin = async () => {
+    setLoginError('');
+    setLoginLoading(true);
+    try {
+      const res = await fetch(`${getBaseUrl()}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: loginEmail, password: loginPassword }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setLoginError(err.message ?? 'Ungültige Zugangsdaten');
+        return;
+      }
+      const data = await res.json();
+      await AsyncStorage.setItem('revio_auth_token', data.token);
+      setAuthToken(data.token);
+      const profileRes = await fetch(`${getBaseUrl()}/auth/me`, {
+        headers: { Authorization: `Bearer ${data.token}` },
+      });
+      if (profileRes.ok) setLoggedInTherapist(await profileRes.json());
+      setShowLogin(false);
+      setLoginEmail('');
+      setLoginPassword('');
+    } catch {
+      setLoginError('Verbindungsfehler. Bitte prüfe deine Internetverbindung.');
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    if (authToken) {
+      await fetch(`${getBaseUrl()}/auth/logout`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${authToken}` },
+      }).catch(() => {});
+      await AsyncStorage.removeItem('revio_auth_token');
+    }
+    setAuthToken(null);
+    setLoggedInTherapist(null);
+  };
+
+  const handleSaveProfile = async () => {
+    if (!authToken) return;
+    setProfileSaving(true);
+    try {
+      const res = await fetch(`${getBaseUrl()}/auth/me`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({
+          bio: editBio,
+          specializations: editSpecializations.split(',').map(s => s.trim()).filter(Boolean),
+          languages: editLanguages.split(',').map(s => s.trim()).filter(Boolean),
+          homeVisit: editHomeVisit,
+        }),
+      });
+      if (res.ok) {
+        const profileRes = await fetch(`${getBaseUrl()}/auth/me`, {
+          headers: { Authorization: `Bearer ${authToken}` },
+        });
+        if (profileRes.ok) setLoggedInTherapist(await profileRes.json());
+        setEditMode(false);
+      }
+    } catch {}
+    setProfileSaving(false);
+  };
+
+  const handlePickPhoto = async () => {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) return;
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.5,
+      base64: true,
+    });
+    if (result.canceled || !result.assets?.[0]?.base64) return;
+    const photo = `data:image/jpeg;base64,${result.assets[0].base64}`;
+    await fetch(`${getBaseUrl()}/auth/me`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
+      body: JSON.stringify({ photo }),
+    });
+    setLoggedInTherapist(prev => ({ ...prev, photo }));
+  };
 
   // GPS: auto-fill address on mount
   useEffect(() => {
@@ -613,9 +749,9 @@ export default function App() {
               onPress={() => setSelectedPractice(t.practices[0])}
               style={[styles.practiceBtn, { borderColor: c.border, backgroundColor: c.mutedBg }]}
             >
-              <View style={[styles.practiceInitial, { backgroundColor: c.border }]}>
-                <Text style={[styles.practiceInitialText, { color: c.muted }]}>
-                  {t.practices[0].name.charAt(0)}
+              <View style={[styles.practiceInitial, { backgroundColor: c.primary }]}>
+                <Text style={[styles.practiceInitialText, { color: '#FFFFFF' }]}>
+                  {t.practices[0].name.split(' ').filter(w => w.length > 2).map(w => w[0]).join('').toUpperCase().slice(0, 2) || t.practices[0].name.charAt(0).toUpperCase()}
                 </Text>
               </View>
               <View style={{ flex: 1 }}>
@@ -637,8 +773,7 @@ export default function App() {
           <Pressable
             style={[styles.ctaBtn, { backgroundColor: c.accent }]}
             onPress={() => {
-              const phone = t.practices?.[0]?.phone;
-              if (phone) Linking.openURL(`tel:${phone}`);
+              callPhone(t.practices?.[0]?.phone);
             }}
           >
             <Text style={styles.ctaBtnText}>📞 Therapeut kontaktieren</Text>
@@ -677,7 +812,13 @@ export default function App() {
 
         <View style={[styles.practiceHeader, { backgroundColor: c.card, borderColor: c.border }]}>
           <View style={[styles.practiceLogoLarge, { backgroundColor: c.primary }]}>
-            <Text style={styles.practiceLogoText}>{practice.name.charAt(0)}</Text>
+            <View style={styles.practiceLogoCross}>
+              <View style={[styles.plusBarH, { backgroundColor: 'rgba(255,255,255,0.45)' }]} />
+              <View style={[styles.plusBarV, { backgroundColor: 'rgba(255,255,255,0.45)' }]} />
+            </View>
+            <Text style={styles.practiceLogoText}>
+              {practice.name.split(' ').filter(w => w.length > 2).map(w => w[0]).join('').toUpperCase().slice(0, 2) || practice.name.charAt(0).toUpperCase()}
+            </Text>
           </View>
           <Text style={[styles.practiceHeaderName, { color: c.text }]}>{practice.name}</Text>
           <Text style={[styles.practiceHeaderCity, { color: c.muted }]}>{practice.city}</Text>
@@ -721,7 +862,7 @@ export default function App() {
 
         <Pressable
           style={[styles.ctaBtn, { backgroundColor: c.accent, marginTop: 4 }]}
-          onPress={() => { if (practice.phone) Linking.openURL(`tel:${practice.phone}`); }}
+          onPress={() => callPhone(practice.phone)}
         >
           <Text style={styles.ctaBtnText}>📞 Praxis anrufen</Text>
         </Pressable>
@@ -750,7 +891,7 @@ export default function App() {
         </View>
         <Text style={[styles.practiceHeaderCity, { color: c.muted }]}>{t.professionalTitle}</Text>
         <View style={[styles.tagRow, { justifyContent: 'center', marginTop: 8 }]}>
-          {t.languages.map(l => (
+          {(t.languages ?? []).map(l => (
             <View key={l} style={[styles.tag, { backgroundColor: c.mutedBg }]}>
               <Text style={[styles.tagText, { color: c.muted }]}>{l}</Text>
             </View>
@@ -789,7 +930,7 @@ export default function App() {
       <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
         <Text style={[styles.filterSectionTitle, { color: c.muted }]}>Spezialisierungen</Text>
         <View style={styles.tagRow}>
-          {t.specializations.map(s => (
+          {(t.specializations ?? []).map(s => (
             <View key={s} style={[styles.tag, { backgroundColor: c.mutedBg }]}>
               <Text style={[styles.tagText, { color: c.text }]}>{s}</Text>
             </View>
@@ -811,21 +952,36 @@ export default function App() {
         </View>
       )}
 
-      {/* Details: Kassenart, Zeiten, Website */}
+      {/* Details: Kassenart, Entfernung, Zeiten, Website */}
       <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
         <Text style={[styles.filterSectionTitle, { color: c.muted }]}>Details</Text>
-        {[
-          { icon: '💳', label: 'Kassenart', value: t.kassenart.charAt(0).toUpperCase() + t.kassenart.slice(1) },
-          { icon: '🕐', label: 'Verfügbar', value: t.verfügbareZeiten },
-        ].map(row => (
-          <View key={row.label} style={styles.detailInfoRow}>
-            <Text style={styles.detailIcon}>{row.icon}</Text>
+        {t.kassenart ? (
+          <View style={styles.detailInfoRow}>
+            <Text style={styles.detailIcon}>💳</Text>
             <View>
-              <Text style={[styles.detailInfoLabel, { color: c.muted }]}>{row.label}</Text>
-              <Text style={[styles.detailInfoValue, { color: c.text }]}>{row.value}</Text>
+              <Text style={[styles.detailInfoLabel, { color: c.muted }]}>Kassenart</Text>
+              <Text style={[styles.detailInfoValue, { color: c.text }]}>{t.kassenart.charAt(0).toUpperCase() + t.kassenart.slice(1)}</Text>
             </View>
           </View>
-        ))}
+        ) : null}
+        {t.distKm != null && (
+          <View style={styles.detailInfoRow}>
+            <Text style={styles.detailIcon}>📍</Text>
+            <View>
+              <Text style={[styles.detailInfoLabel, { color: c.muted }]}>Entfernung</Text>
+              <Text style={[styles.detailInfoValue, { color: c.text }]}>{formatDist(t.distKm)} entfernt</Text>
+            </View>
+          </View>
+        )}
+        {t.verfügbareZeiten ? (
+          <View style={styles.detailInfoRow}>
+            <Text style={styles.detailIcon}>🕐</Text>
+            <View>
+              <Text style={[styles.detailInfoLabel, { color: c.muted }]}>Verfügbar</Text>
+              <Text style={[styles.detailInfoValue, { color: c.text }]}>{t.verfügbareZeiten}</Text>
+            </View>
+          </View>
+        ) : null}
         {t.website ? (
           <Pressable style={styles.detailInfoRow} onPress={() => Linking.openURL(`https://${t.website}`)}>
             <Text style={styles.detailIcon}>🌐</Text>
@@ -863,14 +1019,204 @@ export default function App() {
       <Pressable
         style={[styles.ctaBtn, { backgroundColor: c.accent, marginTop: 4 }]}
         onPress={() => {
-          const phone = t.practices?.[0]?.phone;
-          if (phone) Linking.openURL(`tel:${phone}`);
+          callPhone(t.practices?.[0]?.phone);
         }}
       >
         <Text style={styles.ctaBtnText}>📞 Praxis anrufen</Text>
       </Pressable>
     </ScrollView>
   );
+
+  // ── Login screen ──────────────────────────────────────────────────────────
+
+  const renderLogin = () => (
+    <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 20 }]}>
+      <Pressable onPress={() => setShowLogin(false)} style={styles.backBtn}>
+        <Text style={[styles.backBtnText, { color: c.primary }]}>‹ Zurück</Text>
+      </Pressable>
+      <View style={styles.header}>
+        <View style={[styles.logoMark, { backgroundColor: c.primary }]}>
+          <Text style={styles.logoText}>R</Text>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.headerTitle, { color: c.text }]}>Anmelden</Text>
+          <Text style={[styles.headerSub, { color: c.muted }]}>Therapeuten-Login</Text>
+        </View>
+      </View>
+
+      <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
+        <Text style={[styles.filterSectionTitle, { color: c.muted }]}>E-Mail</Text>
+        <TextInput
+          style={[styles.inputField, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg }]}
+          value={loginEmail}
+          onChangeText={setLoginEmail}
+          placeholder="deine@email.de"
+          placeholderTextColor={c.muted}
+          autoCapitalize="none"
+          keyboardType="email-address"
+        />
+        <Text style={[styles.filterSectionTitle, { color: c.muted, marginTop: 12 }]}>Passwort</Text>
+        <TextInput
+          style={[styles.inputField, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg }]}
+          value={loginPassword}
+          onChangeText={setLoginPassword}
+          placeholder="••••••••"
+          placeholderTextColor={c.muted}
+          secureTextEntry
+        />
+      </View>
+
+      {loginError ? (
+        <View style={[styles.noticeBox, { backgroundColor: '#FDECEA', borderColor: '#E74C3C', marginBottom: 8 }]}>
+          <Text style={{ color: '#E74C3C', flex: 1 }}>{loginError}</Text>
+        </View>
+      ) : null}
+
+      <Pressable
+        style={[styles.registerBtn, { backgroundColor: loginLoading ? c.border : c.primary }]}
+        onPress={handleLogin}
+        disabled={loginLoading}
+      >
+        <Text style={styles.registerBtnText}>{loginLoading ? 'Anmelden…' : 'Anmelden'}</Text>
+      </Pressable>
+    </ScrollView>
+  );
+
+  // ── Therapist dashboard (logged in) ───────────────────────────────────────
+
+  const renderTherapistDashboard = () => {
+    const t = loggedInTherapist;
+    const initials = t.fullName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+
+    const enterEdit = () => {
+      setEditBio(t.bio ?? '');
+      setEditSpecializations((t.specializations ?? []).join(', '));
+      setEditLanguages((t.languages ?? []).join(', '));
+      setEditHomeVisit(t.homeVisit ?? false);
+      setEditMode(true);
+    };
+
+    return (
+      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 20 }]}>
+        {/* Header */}
+        <View style={[styles.practiceHeader, { backgroundColor: c.card, borderColor: c.border, alignItems: 'center' }]}>
+          <Pressable onPress={handlePickPhoto} style={{ position: 'relative' }}>
+            {t.photo ? (
+              <Image source={{ uri: t.photo }} style={[styles.therapistAvatarLarge, { borderRadius: 48 }]} />
+            ) : (
+              <View style={[styles.therapistAvatarLarge, { borderRadius: 48, backgroundColor: c.primary, alignItems: 'center', justifyContent: 'center' }]}>
+                <Text style={{ color: '#fff', fontSize: 28, fontWeight: '700' }}>{initials}</Text>
+              </View>
+            )}
+            <View style={{ position: 'absolute', bottom: 0, right: 0, backgroundColor: c.accent, borderRadius: 12, padding: 4 }}>
+              <Text style={{ color: '#fff', fontSize: 12 }}>📷</Text>
+            </View>
+          </Pressable>
+          <Text style={[styles.practiceHeaderName, { color: c.text, marginTop: 10 }]}>{t.fullName}</Text>
+          <Text style={[styles.practiceHeaderCity, { color: c.muted }]}>{t.professionalTitle}</Text>
+          <View style={[styles.tag, { backgroundColor: t.reviewStatus === 'APPROVED' ? c.successBg : c.mutedBg, marginTop: 6 }]}>
+            <Text style={{ color: t.reviewStatus === 'APPROVED' ? c.success : c.muted, fontSize: 12 }}>
+              {t.reviewStatus === 'APPROVED' ? '✓ Freigegeben' : '⏳ In Prüfung'}
+            </Text>
+          </View>
+        </View>
+
+        {editMode ? (
+          /* ── Edit form ── */
+          <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
+            <Text style={[styles.filterSectionTitle, { color: c.muted }]}>Über mich</Text>
+            <TextInput
+              style={[styles.inputField, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg, minHeight: 80, textAlignVertical: 'top' }]}
+              value={editBio}
+              onChangeText={setEditBio}
+              placeholder="Kurze Beschreibung…"
+              placeholderTextColor={c.muted}
+              multiline
+            />
+            <Text style={[styles.filterSectionTitle, { color: c.muted, marginTop: 12 }]}>Spezialisierungen (kommagetrennt)</Text>
+            <TextInput
+              style={[styles.inputField, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg }]}
+              value={editSpecializations}
+              onChangeText={setEditSpecializations}
+              placeholder="Rücken, Sport, Neurologie…"
+              placeholderTextColor={c.muted}
+            />
+            <Text style={[styles.filterSectionTitle, { color: c.muted, marginTop: 12 }]}>Sprachen (kommagetrennt)</Text>
+            <TextInput
+              style={[styles.inputField, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg }]}
+              value={editLanguages}
+              onChangeText={setEditLanguages}
+              placeholder="de, en…"
+              placeholderTextColor={c.muted}
+            />
+            <View style={[styles.detailInfoRow, { marginTop: 12 }]}>
+              <Text style={[styles.detailInfoLabel, { color: c.text, flex: 1 }]}>Hausbesuch</Text>
+              <Switch value={editHomeVisit} onValueChange={setEditHomeVisit} trackColor={{ true: c.primary }} />
+            </View>
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
+              <Pressable style={[styles.registerBtn, { flex: 1, backgroundColor: c.border, marginTop: 0 }]} onPress={() => setEditMode(false)}>
+                <Text style={[styles.registerBtnText, { color: c.text }]}>Abbrechen</Text>
+              </Pressable>
+              <Pressable style={[styles.registerBtn, { flex: 1, backgroundColor: profileSaving ? c.border : c.primary, marginTop: 0 }]} onPress={handleSaveProfile} disabled={profileSaving}>
+                <Text style={styles.registerBtnText}>{profileSaving ? 'Speichern…' : 'Speichern'}</Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : (
+          /* ── View mode ── */
+          <>
+            {t.bio ? (
+              <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
+                <Text style={[styles.filterSectionTitle, { color: c.muted }]}>Über mich</Text>
+                <Text style={[styles.infoBody, { color: c.text }]}>{t.bio}</Text>
+              </View>
+            ) : null}
+
+            <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
+              <Text style={[styles.filterSectionTitle, { color: c.muted }]}>Spezialisierungen</Text>
+              <View style={styles.tagRow}>
+                {(t.specializations ?? []).map(s => (
+                  <View key={s} style={[styles.tag, { backgroundColor: c.mutedBg }]}>
+                    <Text style={[styles.tagText, { color: c.text }]}>{s}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+
+            <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
+              <Text style={[styles.filterSectionTitle, { color: c.muted }]}>Sprachen</Text>
+              <View style={styles.tagRow}>
+                {(t.languages ?? []).map(l => (
+                  <View key={l} style={[styles.tag, { backgroundColor: c.mutedBg }]}>
+                    <Text style={[styles.tagText, { color: c.muted }]}>{l}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+
+            <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
+              <View style={styles.detailInfoRow}>
+                <Text style={[styles.detailInfoLabel, { color: c.muted, flex: 1 }]}>Hausbesuch</Text>
+                <Text style={[styles.detailInfoValue, { color: c.text }]}>{t.homeVisit ? 'Ja' : 'Nein'}</Text>
+              </View>
+              <View style={[styles.detailInfoRow, { marginTop: 8 }]}>
+                <Text style={[styles.detailInfoLabel, { color: c.muted, flex: 1 }]}>E-Mail</Text>
+                <Text style={[styles.detailInfoValue, { color: c.text }]}>{t.email}</Text>
+              </View>
+            </View>
+
+            <Pressable style={[styles.registerBtn, { backgroundColor: c.primary }]} onPress={enterEdit}>
+              <Text style={styles.registerBtnText}>✏️ Profil bearbeiten</Text>
+            </Pressable>
+          </>
+        )}
+
+        <Pressable style={[styles.registerBtn, { backgroundColor: c.mutedBg, marginTop: 8 }]} onPress={handleLogout}>
+          <Text style={[styles.registerBtnText, { color: c.muted }]}>Abmelden</Text>
+        </Pressable>
+      </ScrollView>
+    );
+  };
 
   // ── Therapist tab ─────────────────────────────────────────────────────────
 
@@ -925,7 +1271,7 @@ export default function App() {
         <Text style={styles.registerBtnText}>Jetzt registrieren</Text>
       </Pressable>
 
-      <Pressable>
+      <Pressable onPress={() => setShowLogin(true)}>
         <Text style={[styles.loginLink, { color: c.primary }]}>Bereits registriert? Anmelden</Text>
       </Pressable>
     </ScrollView>
@@ -982,6 +1328,25 @@ export default function App() {
           ))}
         </View>
       </View>
+
+      {/* Konto */}
+      {loggedInTherapist ? (
+        <Pressable
+          onPress={handleLogout}
+          style={[styles.optionRow, { backgroundColor: '#FDECEA', borderColor: '#E74C3C' }]}
+        >
+          <Text style={[styles.optionLabel, { color: '#E74C3C' }]}>Abmelden</Text>
+          <Text style={{ color: '#E74C3C' }}>›</Text>
+        </Pressable>
+      ) : (
+        <Pressable
+          onPress={() => { setActiveTab('therapist'); setShowLogin(true); }}
+          style={[styles.optionRow, { backgroundColor: c.card, borderColor: c.border }]}
+        >
+          <Text style={[styles.optionLabel, { color: c.muted }]}>Nicht angemeldet</Text>
+          <Text style={[styles.optionValue, { color: c.primary }]}>Anmelden ›</Text>
+        </Pressable>
+      )}
     </ScrollView>
   );
 
@@ -1143,7 +1508,7 @@ export default function App() {
             <>
               <Text style={[styles.regStepTitle, { color: c.text }]}>Fachliches Profil</Text>
               <Text style={[styles.regStepSub, { color: c.muted }]}>Spezialisierungen, Sprachen & mehr</Text>
-              <Text style={[styles.filterSectionTitle, { color: c.muted }]}>Spezialisierungen</Text>
+              <Text style={[styles.filterSectionTitle, { color: c.muted }]}>Spezialisierungen <Text style={{ fontWeight: '400', textTransform: 'none', letterSpacing: 0, fontSize: 11 }}>(optional)</Text></Text>
               <View style={styles.tagRow}>
                 {regSpecOptions.map(s => {
                   const active = regSpecializations.includes(s);
@@ -1164,8 +1529,34 @@ export default function App() {
                     </Pressable>
                   );
                 })}
+                {regLanguages.filter(l => !languageOptions.includes(l)).map(l => (
+                  <Pressable key={l} onPress={() => toggleRegLang(l)} style={[styles.chip, { backgroundColor: c.primary, borderColor: c.primary }]}>
+                    <Text style={[styles.chipText, { color: '#FFFFFF' }]}>{l} ✕</Text>
+                  </Pressable>
+                ))}
               </View>
-              <Text style={[styles.filterSectionTitle, { color: c.muted, marginTop: 14 }]}>Fortbildungen</Text>
+              <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginTop: 6 }}>
+                <TextInput
+                  value={regCustomLanguage}
+                  onChangeText={setRegCustomLanguage}
+                  placeholder="Andere Sprache (z. B. Farsi, Vietn.)"
+                  placeholderTextColor={c.muted}
+                  style={[styles.regInput, { flex: 1, backgroundColor: c.card, borderColor: c.border, color: c.text, paddingVertical: 8 }]}
+                />
+                <Pressable
+                  onPress={() => {
+                    const lang = regCustomLanguage.trim().toUpperCase().slice(0, 5);
+                    if (lang && !regLanguages.includes(lang)) {
+                      setRegLanguages(prev => [...prev, lang]);
+                      setRegCustomLanguage('');
+                    }
+                  }}
+                  style={[styles.kassenartBtn, { backgroundColor: c.primary, borderColor: c.primary, paddingHorizontal: 18 }]}
+                >
+                  <Text style={[styles.kassenartText, { color: '#FFFFFF' }]}>＋</Text>
+                </Pressable>
+              </View>
+              <Text style={[styles.filterSectionTitle, { color: c.muted, marginTop: 14 }]}>Fortbildungen <Text style={{ fontWeight: '400', textTransform: 'none', letterSpacing: 0, fontSize: 11 }}>(Checkliste)</Text></Text>
               {fortbildungOptions.map(opt => {
                 const checked = regFortbildungen.includes(opt.key);
                 return (
@@ -1190,11 +1581,53 @@ export default function App() {
           return (
             <>
               <Text style={[styles.regStepTitle, { color: c.text }]}>Praxis verbinden</Text>
-              <Text style={[styles.regStepSub, { color: c.muted }]}>In welcher Praxis arbeitest du?</Text>
-              <TextInput value={regPracticeName} onChangeText={setRegPracticeName} placeholder="Praxisname" placeholderTextColor={c.muted} style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text }]} />
-              <TextInput value={regPracticeAddress} onChangeText={setRegPracticeAddress} placeholder="Straße und Hausnummer" placeholderTextColor={c.muted} style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text }]} />
-              <TextInput value={regPracticeCity} onChangeText={setRegPracticeCity} placeholder="Stadt (z. B. Köln)" placeholderTextColor={c.muted} style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text }]} />
-              <TextInput value={regPracticePhone} onChangeText={setRegPracticePhone} placeholder="Telefonnummer" placeholderTextColor={c.muted} keyboardType="phone-pad" style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text }]} />
+              <Text style={[styles.regStepSub, { color: c.muted }]}>In welcher Praxis arbeitest du? (optional)</Text>
+
+              <View style={styles.kassenartRow}>
+                {[
+                  { key: 'new', label: '＋ Neue Praxis' },
+                  { key: 'existing', label: '🔗 Bestehende' },
+                  { key: 'skip', label: 'Überspringen' },
+                ].map(opt => {
+                  const active = regPracticeMode === opt.key;
+                  return (
+                    <Pressable key={opt.key} onPress={() => setRegPracticeMode(opt.key)}
+                      style={[styles.kassenartBtn, active ? { backgroundColor: c.primary, borderColor: c.primary } : { backgroundColor: c.mutedBg, borderColor: c.border }]}>
+                      <Text style={[styles.kassenartText, { color: active ? '#FFFFFF' : c.text }]}>{opt.label}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+
+              {regPracticeMode === 'new' && (
+                <>
+                  <TextInput value={regPracticeName} onChangeText={setRegPracticeName} placeholder="Praxisname" placeholderTextColor={c.muted} style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text }]} />
+                  <TextInput value={regPracticeAddress} onChangeText={setRegPracticeAddress} placeholder="Straße und Hausnummer" placeholderTextColor={c.muted} style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text }]} />
+                  <TextInput value={regPracticeCity} onChangeText={setRegPracticeCity} placeholder="Stadt (z. B. Köln)" placeholderTextColor={c.muted} style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text }]} />
+                  <TextInput value={regPracticePhone} onChangeText={setRegPracticePhone} placeholder="Telefonnummer" placeholderTextColor={c.muted} keyboardType="phone-pad" style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text }]} />
+                </>
+              )}
+
+              {regPracticeMode === 'existing' && (
+                <>
+                  <View style={[styles.noticeBox, { backgroundColor: c.mutedBg, borderColor: c.border }]}>
+                    <Text style={styles.noticeIcon}>ℹ️</Text>
+                    <Text style={[styles.noticeBody, { color: c.muted }]}>
+                      Gib den Namen der Praxis ein. Die Praxis muss deine Anfrage nach der Profilprüfung bestätigen.
+                    </Text>
+                  </View>
+                  <TextInput value={regExistingPracticeName} onChangeText={setRegExistingPracticeName} placeholder="Name der bestehenden Praxis" placeholderTextColor={c.muted} style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text }]} />
+                </>
+              )}
+
+              {regPracticeMode === 'skip' && (
+                <View style={[styles.noticeBox, { backgroundColor: c.mutedBg, borderColor: c.border }]}>
+                  <Text style={styles.noticeIcon}>✓</Text>
+                  <Text style={[styles.noticeBody, { color: c.muted }]}>
+                    Du kannst eine Praxis später in deinen Profileinstellungen hinzufügen.
+                  </Text>
+                </View>
+              )}
             </>
           );
         case 6:
@@ -1276,14 +1709,17 @@ export default function App() {
                     city: regCity,
                     bio: regBio || undefined,
                     homeVisit: regHomeVisit,
-                    specializations: regSpecializations,
-                    languages: regLanguages.map(l => l.toLowerCase()),
+                    specializations: regSpecializations.length > 0 ? regSpecializations : ['Physiotherapie'],
+                    languages: regLanguages.length > 0 ? regLanguages.map(l => l.toLowerCase()) : ['de'],
                     certifications: regFortbildungen,
-                    practice: {
-                      name: regPracticeName,
-                      city: regPracticeCity,
+                    practice: regPracticeMode === 'new' ? {
+                      name: regPracticeName || 'Eigene Praxis',
+                      city: regPracticeCity || regCity,
                       address: regPracticeAddress || undefined,
                       phone: regPracticePhone || undefined,
+                    } : {
+                      name: regPracticeMode === 'existing' ? (regExistingPracticeName || 'Unbekannte Praxis') : 'Ohne Praxis',
+                      city: regCity,
                     },
                   }),
                 });
@@ -1315,7 +1751,11 @@ export default function App() {
     if (selectedTherapist) return renderTherapistProfile(selectedTherapist);
     if (selectedPractice) return renderPracticeProfile(selectedPractice);
     if (activeTab === 'favorites') return renderFavorites();
-    if (activeTab === 'therapist') return renderTherapist();
+    if (activeTab === 'therapist') {
+      if (loggedInTherapist) return renderTherapistDashboard();
+      if (showLogin) return renderLogin();
+      return renderTherapist();
+    }
     if (activeTab === 'options') return renderOptions();
     return renderDiscover();
   };
@@ -1338,6 +1778,7 @@ export default function App() {
               onPress={() => {
                 setSelectedPractice(null);
                 setSelectedTherapist(null);
+                setShowRegister(false);
                 if (tab.key === 'discover') {
                   setQuery('');
                   setActiveChip(null);
@@ -1494,7 +1935,10 @@ const styles = StyleSheet.create({
     width: 64, height: 64, borderRadius: 18,
     alignItems: 'center', justifyContent: 'center', marginBottom: 4
   },
-  practiceLogoText: { color: '#FFFFFF', fontSize: 28, fontWeight: '800' },
+  practiceLogoText: { color: '#FFFFFF', fontSize: 26, fontWeight: '800' },
+  practiceLogoCross: { position: 'absolute', top: 8, right: 8, width: 18, height: 18 },
+  plusBarH: { position: 'absolute', top: '38%', left: 0, right: 0, height: 5, borderRadius: 3 },
+  plusBarV: { position: 'absolute', left: '38%', top: 0, bottom: 0, width: 5, borderRadius: 3 },
   practiceHeaderName: { fontSize: 20, fontWeight: '700' },
   practiceHeaderCity: { fontSize: 14 },
   detailRow: {

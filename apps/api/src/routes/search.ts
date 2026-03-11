@@ -58,6 +58,7 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
           id: link.practice.id,
           name: link.practice.name,
           city: link.practice.city,
+          phone: link.practice.phone ?? undefined,
           lat: link.practice.lat,
           lng: link.practice.lng,
         }));

@@ -1,6 +1,15 @@
 import { PrismaClient } from '@prisma/client';
+import { scrypt, randomBytes } from 'crypto';
+import { promisify } from 'util';
 
+const scryptAsync = promisify(scrypt);
 const prisma = new PrismaClient();
+
+async function hashPassword(password: string): Promise<string> {
+  const salt = randomBytes(16).toString('hex');
+  const derived = (await scryptAsync(password, salt, 64)) as Buffer;
+  return `${salt}:${derived.toString('hex')}`;
+}
 
 async function main() {
   await prisma.therapistPracticeLink.deleteMany();
@@ -69,9 +78,31 @@ async function main() {
     },
   });
 
+  // Test account (dev login)
+  const testPasswordHash = await hashPassword('password');
+  const testTherapist = await prisma.therapist.create({
+    data: {
+      email: 'test@revio.de',
+      fullName: 'Test Therapeut',
+      professionalTitle: 'Physiotherapeut',
+      city: 'Köln',
+      bio: 'Test-Konto für die Entwicklung.',
+      homeVisit: true,
+      specializations: 'Sportphysiotherapie, Rückentherapie',
+      languages: 'de, en',
+      certifications: 'MT',
+      reviewStatus: 'APPROVED',
+      passwordHash: testPasswordHash,
+      links: {
+        create: { practiceId: praxisRheinFit.id, status: 'CONFIRMED' },
+      },
+    },
+  });
+
   console.log('Seed complete.');
   console.log(`  APPROVED: ${annaBecker.fullName} @ ${praxisRheinFit.name}`);
   console.log(`  PENDING:  ${maxKlein.fullName} @ ${neuroMotionLab.name}`);
+  console.log(`  TEST:     ${testTherapist.fullName} — login: test@revio.de / password`);
 }
 
 main()

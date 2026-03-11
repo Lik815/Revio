@@ -7,6 +7,7 @@ import { healthRoutes } from './routes/health.js';
 import { searchRoutes } from './routes/search.js';
 import { registerRoutes } from './routes/register.js';
 import { adminRoutes } from './routes/admin.js';
+import { authRoutes } from './routes/auth.js';
 
 export async function buildApp() {
   const app = Fastify({ logger: true });
@@ -20,6 +21,7 @@ export async function buildApp() {
   await app.register(searchRoutes);
   await app.register(registerRoutes);
   await app.register(adminRoutes, { prefix: '/admin' });
+  await app.register(authRoutes);
 
   return app;
 }

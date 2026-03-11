@@ -1,8 +1,10 @@
 import { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
+import { hashPassword } from './auth.js';
 
 const registerSchema = z.object({
   email: z.string().email(),
+  password: z.string().min(6).optional(),
   fullName: z.string().min(2),
   professionalTitle: z.string().min(2),
   city: z.string().min(1),
@@ -35,15 +37,22 @@ export const registerRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.conflict('A therapist with this email already exists.');
     }
 
+    // In development, auto-approve so the profile immediately appears in search
+    const isDev = process.env.NODE_ENV !== 'production';
+    const reviewStatus = isDev ? 'APPROVED' : 'PENDING_REVIEW';
+    const linkStatus = isDev ? 'CONFIRMED' : 'PROPOSED';
+
     const practice = await fastify.prisma.practice.create({
       data: {
         name: data.practice.name,
         city: data.practice.city,
         address: data.practice.address,
         phone: data.practice.phone,
-        reviewStatus: 'PENDING_REVIEW',
+        reviewStatus,
       },
     });
+
+    const passwordHash = data.password ? await hashPassword(data.password) : undefined;
 
     const therapist = await fastify.prisma.therapist.create({
       data: {
@@ -56,18 +65,21 @@ export const registerRoutes: FastifyPluginAsync = async (fastify) => {
         specializations: data.specializations.join(', '),
         languages: data.languages.join(', '),
         certifications: data.certifications.join(', '),
-        reviewStatus: 'PENDING_REVIEW',
+        passwordHash,
+        reviewStatus,
         links: {
           create: {
             practiceId: practice.id,
-            status: 'PROPOSED',
+            status: linkStatus,
           },
         },
       },
     });
 
     return reply.status(201).send({
-      message: 'Registration submitted successfully. Your profile is under review.',
+      message: isDev
+        ? 'Profile auto-approved (development mode). Visible in search immediately.'
+        : 'Registration submitted successfully. Your profile is under review.',
       therapistId: therapist.id,
     });
   });
