@@ -63,6 +63,11 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     });
     if (!therapist) return reply.unauthorized('Ungültiger Token');
 
+    const adminPractice = await fastify.prisma.practice.findFirst({
+      where: { adminTherapistId: therapist.id } as any,
+      select: { id: true, name: true, city: true },
+    });
+
     return {
       id: therapist.id,
       email: therapist.email,
@@ -76,11 +81,16 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       certifications: splitList(therapist.certifications),
       photo: therapist.photo,
       reviewStatus: therapist.reviewStatus,
+      adminPractice: adminPractice ?? null,
       practices: therapist.links.map((l) => ({
         id: l.practice.id,
         name: l.practice.name,
         city: l.practice.city,
+        address: l.practice.address,
         phone: l.practice.phone,
+        hours: l.practice.hours,
+        lat: l.practice.lat,
+        lng: l.practice.lng,
       })),
     };
   });

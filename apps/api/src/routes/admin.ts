@@ -1,4 +1,5 @@
 import { FastifyPluginAsync } from 'fastify';
+import { z } from 'zod';
 
 const splitList = (value: string) =>
   value.split(',').map((s) => s.trim()).filter(Boolean);
@@ -43,7 +44,36 @@ function mapPractice(p: {
 }
 
 export const adminRoutes: FastifyPluginAsync = async (fastify) => {
-  fastify.addHook('onRequest', fastify.verifyAdmin);
+  const loginSchema = z.object({
+    email: z.string().email(),
+    password: z.string().min(1),
+  });
+
+  fastify.post('/login', async (request, reply) => {
+    const parsed = loginSchema.safeParse(request.body);
+    if (!parsed.success) return reply.badRequest('Ungültige Eingabedaten');
+
+    const envEmail = process.env.REVIO_ADMIN_EMAIL ?? 'admin@revio.de';
+    const envPassword = process.env.REVIO_ADMIN_PASSWORD ?? 'admin123';
+
+    if (parsed.data.email !== envEmail || parsed.data.password !== envPassword) {
+      return reply.unauthorized('Ungültige Zugangsdaten');
+    }
+
+    return {
+      token: process.env.REVIO_ADMIN_TOKEN,
+      admin: {
+        email: envEmail,
+        name: 'Revio Admin',
+        role: 'Super Admin',
+      },
+    };
+  });
+
+  fastify.addHook('onRequest', async (request, reply) => {
+    if (request.url === '/login' || request.url.startsWith('/login?')) return;
+    return fastify.verifyAdmin(request, reply);
+  });
 
   // Stats
   fastify.get('/stats', async () => {

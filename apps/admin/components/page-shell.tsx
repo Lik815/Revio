@@ -3,20 +3,25 @@ import { ReactNode } from 'react';
 export function PageShell({
   title,
   description,
+  eyebrow = 'Prüfablauf',
+  actions,
   children,
 }: {
   title: string;
   description: string;
+  eyebrow?: string;
+  actions?: ReactNode;
   children: ReactNode;
 }) {
   return (
-    <section>
-      <div className="page-header">
+    <section className="page-shell">
+      <div className="page-header sticky-page-header">
         <div>
-          <div className="kicker">Prüfablauf</div>
-          <h2 style={{ margin: '6px 0 8px', fontSize: '2rem' }}>{title}</h2>
-          <p style={{ margin: 0, color: 'var(--muted)', maxWidth: 760 }}>{description}</p>
+          <div className="kicker">{eyebrow}</div>
+          <h2 className="page-title">{title}</h2>
+          <p className="page-description">{description}</p>
         </div>
+        {actions ? <div className="page-actions">{actions}</div> : null}
       </div>
       {children}
     </section>

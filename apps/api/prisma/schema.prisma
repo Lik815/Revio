@@ -41,6 +41,7 @@ model Therapist {
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
   links             TherapistPracticeLink[]
+  adminOfPractice   Practice?    @relation("PracticeAdmin")
 }
 
 model Practice {
@@ -56,6 +57,10 @@ model Practice {
   adminEmail        String?      @unique
   adminPasswordHash String?
   adminSessionToken String?      @unique
+  adminTherapistId  String?      @unique
+  adminTherapist    Therapist?   @relation("PracticeAdmin", fields: [adminTherapistId], references: [id])
+  logo              String?
+  photos            String?
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
   links             TherapistPracticeLink[]

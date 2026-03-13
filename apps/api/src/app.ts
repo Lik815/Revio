@@ -9,9 +9,10 @@ import { registerRoutes } from './routes/register.js';
 import { adminRoutes } from './routes/admin.js';
 import { authRoutes } from './routes/auth.js';
 import { practiceAuthRoutes } from './routes/practice-auth.js';
+import { practiceRoutes } from './routes/practice.js';
 
 export async function buildApp() {
-  const app = Fastify({ logger: true });
+  const app = Fastify({ logger: true, bodyLimit: 10 * 1024 * 1024 }); // 10MB for photo uploads
 
   await app.register(cors, { origin: true });
   await app.register(sensible);
@@ -24,6 +25,7 @@ export async function buildApp() {
   await app.register(adminRoutes, { prefix: '/admin' });
   await app.register(authRoutes);
   await app.register(practiceAuthRoutes);
+  await app.register(practiceRoutes);
 
   return app;
 }

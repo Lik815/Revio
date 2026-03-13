@@ -1,16 +1,63 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
-const ADMIN_TOKEN = process.env.ADMIN_TOKEN ?? '';
+
+async function getAdminToken() {
+  const cookieStore = await cookies();
+  return cookieStore.get('revio_admin_token')?.value ?? process.env.ADMIN_TOKEN ?? '';
+}
 
 async function adminPost(path: string) {
+  const token = await getAdminToken();
   const res = await fetch(`${API_URL}${path}`, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${ADMIN_TOKEN}` },
+    headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) throw new Error(`API ${res.status}: ${path}`);
+}
+
+export async function loginAdmin(formData: FormData) {
+  const email = String(formData.get('email') ?? '');
+  const password = String(formData.get('password') ?? '');
+
+  const res = await fetch(`${API_URL}/admin/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+    cache: 'no-store',
+  });
+
+  if (!res.ok) {
+    throw new Error('E-Mail oder Passwort ist falsch.');
+  }
+
+  const data = await res.json();
+  const cookieStore = await cookies();
+  cookieStore.set('revio_admin_token', data.token, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: false,
+    path: '/',
+  });
+  cookieStore.set('revio_admin_user', JSON.stringify(data.admin), {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: false,
+    path: '/',
+  });
+
+  redirect('/');
+}
+
+export async function logoutAdmin() {
+  const cookieStore = await cookies();
+  cookieStore.delete('revio_admin_token');
+  cookieStore.delete('revio_admin_user');
+  redirect('/login');
 }
 
 // Therapist actions

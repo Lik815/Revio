@@ -61,9 +61,13 @@ export interface SearchPractice {
   id: string;
   name: string;
   city: string;
+  address?: string;
   phone?: string;
+  hours?: string;
   lat: number;
   lng: number;
+  logo?: string;
+  photos?: string[];
 }
 
 export interface SearchTherapist {
@@ -75,6 +79,7 @@ export interface SearchTherapist {
   homeVisit: boolean;
   city: string;
   bio?: string;
+  photo?: string;
   relevance: number;
   practices: SearchPractice[];
 }

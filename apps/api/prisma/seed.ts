@@ -133,6 +133,10 @@ async function main() {
     const adminEmail = i === 0 ? 'test@revio.de' : `admin@${practiceSlug}.de`;
     const adminPwHash = await hashPassword(i === 0 ? 'password' : 'praxis123');
 
+    // Deterministic picsum photo IDs (offset to get clinic/interior-ish images)
+    const photoId1 = 200 + (i * 17) % 800;
+    const photoId2 = 201 + (i * 23) % 800;
+
     const p = await prisma.practice.create({
       data: {
         name: PRACTICE_NAMES[i],
@@ -145,6 +149,10 @@ async function main() {
         reviewStatus: 'APPROVED',
         adminEmail,
         adminPasswordHash: adminPwHash,
+        photos: JSON.stringify([
+          `https://picsum.photos/id/${photoId1}/600/400`,
+          `https://picsum.photos/id/${photoId2}/600/400`,
+        ]),
       },
     });
     practiceRecords.push({ id: p.id, city: cityName });
@@ -191,7 +199,7 @@ async function main() {
 
   // ── Test-Account ──────────────────────────────────────────────────────────
   const testPasswordHash = await hashPassword('password');
-  await prisma.therapist.create({
+  const testTherapist = await prisma.therapist.create({
     data: {
       email: 'test@revio.de',
       fullName: 'Test Therapeut',
@@ -208,6 +216,12 @@ async function main() {
         create: { practiceId: practiceRecords[0].id, status: 'CONFIRMED' },
       },
     },
+  });
+
+  // Set test therapist as admin of the first practice
+  await prisma.practice.update({
+    where: { id: practiceRecords[0].id },
+    data: { adminTherapistId: testTherapist.id } as any,
   });
 
   // ── Pending-Eintrag für Admin-Queue ───────────────────────────────────────

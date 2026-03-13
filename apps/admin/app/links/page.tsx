@@ -21,8 +21,10 @@ export default async function LinksPage() {
     <PageShell
       title="Verknüpfungsübersicht"
       description="Prüfe vorgeschlagene und umstrittene Verknüpfungen zwischen Therapeut:innen und Praxen, damit nur bestätigte Beziehungen in der öffentlichen Suche sichtbar werden."
+      eyebrow="Review-Konflikte"
+      actions={<div className="hero-pill">{links.length} Verknüpfungen</div>}
     >
-      <table className="table">
+      <table className="table table--elevated">
         <thead>
           <tr>
             <th>Therapeut:in</th>

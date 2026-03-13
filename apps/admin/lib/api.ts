@@ -4,13 +4,19 @@ import type {
   PracticeWithLinks,
   LinkWithEntities,
 } from '@revio/shared';
+import { cookies } from 'next/headers';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
-const ADMIN_TOKEN = process.env.ADMIN_TOKEN ?? '';
+
+async function getAdminToken() {
+  const cookieStore = await cookies();
+  return cookieStore.get('revio_admin_token')?.value ?? process.env.ADMIN_TOKEN ?? '';
+}
 
 async function adminFetch<T>(path: string): Promise<T> {
+  const token = await getAdminToken();
   const res = await fetch(`${API_URL}${path}`, {
-    headers: { Authorization: `Bearer ${ADMIN_TOKEN}` },
+    headers: { Authorization: `Bearer ${token}` },
     cache: 'no-store',
   });
   if (!res.ok) throw new Error(`API ${res.status}: ${path}`);

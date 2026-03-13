@@ -98,16 +98,24 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
         const specializations = splitList(t.specializations);
         const relevance = scoreTherapist(t, input.query);
 
-        const practices: SearchPractice[] = t.links.map((link) => ({
-          id: link.practice.id,
-          name: link.practice.name,
-          city: link.practice.city,
-          address: link.practice.address ?? undefined,
-          phone: link.practice.phone ?? undefined,
-          hours: link.practice.hours ?? undefined,
-          lat: link.practice.lat,
-          lng: link.practice.lng,
-        }));
+        const practices: SearchPractice[] = t.links.map((link) => {
+          let photos: string[] | undefined;
+          if (link.practice.photos) {
+            try { photos = JSON.parse(link.practice.photos); } catch {}
+          }
+          return {
+            id: link.practice.id,
+            name: link.practice.name,
+            city: link.practice.city,
+            address: link.practice.address ?? undefined,
+            phone: link.practice.phone ?? undefined,
+            hours: link.practice.hours ?? undefined,
+            lat: link.practice.lat,
+            lng: link.practice.lng,
+            logo: link.practice.logo ?? undefined,
+            photos,
+          };
+        });
 
         return {
           id: t.id,
@@ -118,6 +126,7 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
           homeVisit: t.homeVisit,
           city: t.city,
           bio: t.bio ?? undefined,
+          photo: t.photo ?? undefined,
           relevance,
           practices,
         };

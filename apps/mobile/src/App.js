@@ -168,15 +168,18 @@ const mapApiTherapist = (t) => ({
   behandlungsbereiche: t.specializations ?? [],
   verfügbareZeiten: '',
   website: '',
-  photo: `https://i.pravatar.cc/96?u=${t.id}`,
+  photo: t.photo || `https://i.pravatar.cc/96?u=${t.id}`,
   practices: (t.practices ?? []).map(p => ({
     id: p.id,
     name: p.name,
     city: p.city,
     address: p.address ?? '',
     phone: p.phone ?? '',
+    hours: p.hours ?? '',
     lat: p.lat,
     lng: p.lng,
+    logo: p.logo ?? null,
+    photos: p.photos ?? [],
   })),
 });
 
@@ -279,6 +282,30 @@ export default function App() {
   const [editHomeVisit, setEditHomeVisit] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
 
+  // Practice management state
+  const [showCreatePractice, setShowCreatePractice] = useState(false);
+  const [showPracticeSearch, setShowPracticeSearch] = useState(false);
+  const [showPracticeAdmin, setShowPracticeAdmin] = useState(false);
+  const [adminPracticeDetail, setAdminPracticeDetail] = useState(null);
+  const [createPracticeName, setCreatePracticeName] = useState('');
+  const [createPracticeCity, setCreatePracticeCity] = useState('');
+  const [createPracticeAddress, setCreatePracticeAddress] = useState('');
+  const [createPracticePhone, setCreatePracticePhone] = useState('');
+  const [createPracticeHours, setCreatePracticeHours] = useState('');
+  const [createPracticeLoading, setCreatePracticeLoading] = useState(false);
+  const [practiceSearchQuery, setPracticeSearchQuery] = useState('');
+  const [practiceSearchResults, setPracticeSearchResults] = useState([]);
+  const [practiceSearchLoading, setPracticeSearchLoading] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [editPracticeName, setEditPracticeName] = useState('');
+  const [editPracticeCity, setEditPracticeCity] = useState('');
+  const [editPracticeAddress, setEditPracticeAddress] = useState('');
+  const [editPracticePhone, setEditPracticePhone] = useState('');
+  const [editPracticeHours, setEditPracticeHours] = useState('');
+  const [practiceEditSaving, setPracticeEditSaving] = useState(false);
+  const [editPracticeLogo, setEditPracticeLogo] = useState(null);
+  const [editPracticePhotos, setEditPracticePhotos] = useState([]);
+
   useEffect(() => {
     AsyncStorage.getItem('revio_auth_token').then(async (token) => {
       if (!token) return;
@@ -377,7 +404,7 @@ export default function App() {
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 0.5,
+      quality: 0.3,
       base64: true,
     });
     if (result.canceled || !result.assets?.[0]?.base64) return;
@@ -390,11 +417,189 @@ export default function App() {
       });
       if (res.ok) {
         setLoggedInTherapist(prev => ({ ...prev, photo }));
+        Alert.alert('Erfolg', 'Profilbild gespeichert.');
       } else {
-        Alert.alert('Fehler', 'Foto konnte nicht hochgeladen werden.');
+        const status = res.status;
+        Alert.alert('Fehler', `Foto konnte nicht hochgeladen werden (${status}).`);
       }
     } catch {
       Alert.alert('Verbindungsfehler', 'Bitte prüfe deine Internetverbindung.');
+    }
+  };
+
+  // Practice: create new practice
+  const handleCreatePractice = async () => {
+    if (!authToken || !createPracticeName.trim() || !createPracticeCity.trim()) {
+      Alert.alert('Fehlende Angaben', 'Name und Stadt sind Pflichtfelder.');
+      return;
+    }
+    setCreatePracticeLoading(true);
+    try {
+      const res = await fetch(`${getBaseUrl()}/practice`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({
+          name: createPracticeName.trim(),
+          city: createPracticeCity.trim(),
+          address: createPracticeAddress.trim() || undefined,
+          phone: createPracticePhone.trim() || undefined,
+          hours: createPracticeHours.trim() || undefined,
+        }),
+      });
+      if (res.ok) {
+        const profileRes = await fetch(`${getBaseUrl()}/auth/me`, {
+          headers: { Authorization: `Bearer ${authToken}` },
+        });
+        if (profileRes.ok) setLoggedInTherapist(await profileRes.json());
+        setCreatePracticeName(''); setCreatePracticeCity('');
+        setCreatePracticeAddress(''); setCreatePracticePhone(''); setCreatePracticeHours('');
+        setShowCreatePractice(false);
+        Alert.alert('Praxis erstellt', 'Deine Praxis wurde erfolgreich erstellt.');
+      } else {
+        const err = await res.json().catch(() => ({}));
+        Alert.alert('Fehler', err.message ?? 'Praxis konnte nicht erstellt werden.');
+      }
+    } catch {
+      Alert.alert('Verbindungsfehler', 'Bitte prüfe deine Internetverbindung.');
+    } finally {
+      setCreatePracticeLoading(false);
+    }
+  };
+
+  // Practice: search practices
+  const handleSearchPractices = async () => {
+    setPracticeSearchLoading(true);
+    try {
+      const res = await fetch(
+        `${getBaseUrl()}/practice/search?q=${encodeURIComponent(practiceSearchQuery)}`,
+        { headers: authToken ? { Authorization: `Bearer ${authToken}` } : {} },
+      );
+      if (res.ok) setPracticeSearchResults((await res.json()).practices ?? []);
+    } catch {}
+    finally { setPracticeSearchLoading(false); }
+  };
+
+  // Practice: send connection request
+  const handleConnectToPractice = async (practiceId) => {
+    if (!authToken) return;
+    try {
+      const res = await fetch(`${getBaseUrl()}/practice/${practiceId}/connect`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${authToken}` },
+      });
+      if (res.ok) {
+        Alert.alert('Anfrage gesendet', 'Deine Verbindungsanfrage wurde gesendet. Die Praxis muss sie bestätigen.');
+      } else {
+        const err = await res.json().catch(() => ({}));
+        Alert.alert('Hinweis', err.message ?? 'Anfrage konnte nicht gesendet werden.');
+      }
+    } catch {
+      Alert.alert('Verbindungsfehler', 'Bitte prüfe deine Internetverbindung.');
+    }
+  };
+
+  // Practice: load full admin practice detail
+  const loadAdminPracticeDetail = async () => {
+    if (!authToken) return;
+    try {
+      const res = await fetch(`${getBaseUrl()}/my/practice`, {
+        headers: { Authorization: `Bearer ${authToken}` },
+      });
+      if (res.ok) setAdminPracticeDetail((await res.json()).practice);
+    } catch {}
+  };
+
+  // Practice: accept/reject connection request
+  const handleLinkAction = async (linkId, action) => {
+    if (!authToken) return;
+    try {
+      const res = await fetch(`${getBaseUrl()}/my/practice/links/${linkId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({ action }),
+      });
+      if (res.ok) await loadAdminPracticeDetail();
+    } catch {}
+  };
+
+  // Practice: invite therapist by email
+  const handleInviteTherapist = async () => {
+    if (!inviteEmail.trim()) return;
+    try {
+      const res = await fetch(`${getBaseUrl()}/my/practice/invite`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({ email: inviteEmail.trim() }),
+      });
+      if (res.ok) {
+        setInviteEmail('');
+        Alert.alert('Einladung gesendet', 'Der Therapeut wurde eingeladen.');
+        await loadAdminPracticeDetail();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        Alert.alert('Fehler', err.message ?? 'Einladung konnte nicht gesendet werden.');
+      }
+    } catch {
+      Alert.alert('Verbindungsfehler', 'Bitte prüfe deine Internetverbindung.');
+    }
+  };
+
+  // Practice: save edited practice data
+  const handleSavePractice = async () => {
+    if (!authToken) return;
+    setPracticeEditSaving(true);
+    try {
+      const body = {};
+      if (editPracticeName.trim()) body.name = editPracticeName.trim();
+      if (editPracticeCity.trim()) body.city = editPracticeCity.trim();
+      if (editPracticeAddress.trim() !== undefined) body.address = editPracticeAddress.trim();
+      if (editPracticePhone.trim() !== undefined) body.phone = editPracticePhone.trim();
+      if (editPracticeHours.trim() !== undefined) body.hours = editPracticeHours.trim();
+      if (editPracticeLogo !== null) body.logo = editPracticeLogo;
+      if (editPracticePhotos.length > 0) body.photos = JSON.stringify(editPracticePhotos);
+
+      const res = await fetch(`${getBaseUrl()}/my/practice`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify(body),
+      });
+      if (res.ok) {
+        Alert.alert('Gespeichert', 'Praxisdaten wurden aktualisiert.');
+        await loadAdminPracticeDetail();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        Alert.alert('Fehler', err.message ?? 'Speichern fehlgeschlagen.');
+      }
+    } catch {
+      Alert.alert('Verbindungsfehler', 'Bitte prüfe deine Internetverbindung.');
+    } finally {
+      setPracticeEditSaving(false);
+    }
+  };
+
+  // Practice: pick logo
+  const handlePickPracticeLogo = async () => {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) { Alert.alert('Kein Zugriff', 'Bitte Fotobibliothek erlauben.'); return; }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true, aspect: [1, 1], quality: 0.5, base64: true,
+    });
+    if (!result.canceled && result.assets?.[0]?.base64) {
+      setEditPracticeLogo(`data:image/jpeg;base64,${result.assets[0].base64}`);
+    }
+  };
+
+  // Practice: add a photo
+  const handleAddPracticePhoto = async () => {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) { Alert.alert('Kein Zugriff', 'Bitte Fotobibliothek erlauben.'); return; }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true, quality: 0.4, base64: true,
+    });
+    if (!result.canceled && result.assets?.[0]?.base64) {
+      setEditPracticePhotos(prev => [...prev, `data:image/jpeg;base64,${result.assets[0].base64}`]);
     }
   };
 
@@ -842,15 +1047,19 @@ export default function App() {
         </Pressable>
 
         <View style={[styles.practiceHeader, { backgroundColor: c.card, borderColor: c.border }]}>
-          <View style={[styles.practiceLogoLarge, { backgroundColor: c.primary }]}>
-            <View style={styles.practiceLogoCross}>
-              <View style={[styles.plusBarH, { backgroundColor: 'rgba(255,255,255,0.45)' }]} />
-              <View style={[styles.plusBarV, { backgroundColor: 'rgba(255,255,255,0.45)' }]} />
+          {practice.logo ? (
+            <Image source={{ uri: practice.logo }} style={[styles.practiceLogoLarge, { borderRadius: 12 }]} />
+          ) : (
+            <View style={[styles.practiceLogoLarge, { backgroundColor: c.primary }]}>
+              <View style={styles.practiceLogoCross}>
+                <View style={[styles.plusBarH, { backgroundColor: 'rgba(255,255,255,0.45)' }]} />
+                <View style={[styles.plusBarV, { backgroundColor: 'rgba(255,255,255,0.45)' }]} />
+              </View>
+              <Text style={styles.practiceLogoText}>
+                {practice.name.split(' ').filter(w => w.length > 2).map(w => w[0]).join('').toUpperCase().slice(0, 2) || practice.name.charAt(0).toUpperCase()}
+              </Text>
             </View>
-            <Text style={styles.practiceLogoText}>
-              {practice.name.split(' ').filter(w => w.length > 2).map(w => w[0]).join('').toUpperCase().slice(0, 2) || practice.name.charAt(0).toUpperCase()}
-            </Text>
-          </View>
+          )}
           <Text style={[styles.practiceHeaderName, { color: c.text }]}>{practice.name}</Text>
           <Text style={[styles.practiceHeaderCity, { color: c.muted }]}>{practice.city}</Text>
         </View>
@@ -866,11 +1075,21 @@ export default function App() {
           </Pressable>
         ))}
 
+        {/* Praxisfotos */}
+        {practice.photos?.length > 0 && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: 4 }}
+            contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}>
+            {practice.photos.map((uri, idx) => (
+              <Image key={idx} source={{ uri }} style={{ width: 220, height: 145, borderRadius: 10 }} />
+            ))}
+          </ScrollView>
+        )}
+
         <Text style={[styles.sectionLabel, { color: c.text, marginTop: 4 }]}>
           Therapeuten ({therapists.length})
         </Text>
         {therapists.map((t) => (
-          <View key={t.id} style={[styles.miniCard, { backgroundColor: c.card, borderColor: c.border }]}>
+          <Pressable key={t.id} onPress={() => setSelectedTherapist(t)} style={[styles.miniCard, { backgroundColor: c.card, borderColor: c.border }]}>
             <Image source={{ uri: t.photo }} style={styles.miniAvatar} />
             <View style={{ flex: 1 }}>
               <Text style={[styles.cardName, { color: c.text }]}>{t.fullName}</Text>
@@ -888,7 +1107,8 @@ export default function App() {
                 )}
               </View>
             </View>
-          </View>
+            <Text style={[styles.practiceArrow, { color: c.muted }]}>›</Text>
+          </Pressable>
         ))}
 
         <Pressable
@@ -911,7 +1131,15 @@ export default function App() {
 
       {/* Header */}
       <View style={[styles.practiceHeader, { backgroundColor: c.card, borderColor: c.border }]}>
-        <Image source={{ uri: t.photo }} style={styles.therapistAvatarLarge} />
+        {t.photo ? (
+          <Image source={{ uri: t.photo }} style={styles.therapistAvatarLarge} />
+        ) : (
+          <View style={[styles.therapistAvatarLarge, { backgroundColor: c.primary, alignItems: 'center', justifyContent: 'center' }]}>
+            <Text style={{ color: '#fff', fontSize: 28, fontWeight: '700' }}>
+              {t.fullName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+            </Text>
+          </View>
+        )}
         <View style={styles.profileNameRow}>
           <Text style={[styles.practiceHeaderName, { color: c.text }]}>{t.fullName}</Text>
           {t.verifiziert && (
@@ -1237,12 +1465,66 @@ export default function App() {
             <Pressable style={[styles.registerBtn, { backgroundColor: c.primary }]} onPress={enterEdit}>
               <Text style={styles.registerBtnText}>✏️ Profil bearbeiten</Text>
             </Pressable>
+
+            {/* Verbundene Praxen */}
+            {(t.practices ?? []).length > 0 && (
+              <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
+                <Text style={[styles.filterSectionTitle, { color: c.muted }]}>Praxis</Text>
+                {(t.practices ?? []).map(p => (
+                  <View key={p.id} style={[styles.practiceBtn, { borderColor: c.border, backgroundColor: c.mutedBg }]}>
+                    <View style={[styles.practiceInitial, { backgroundColor: c.border }]}>
+                      <Text style={[styles.practiceInitialText, { color: c.muted }]}>{p.name.charAt(0)}</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.practiceName, { color: c.text }]}>{p.name}</Text>
+                      <Text style={[styles.practiceCity, { color: c.muted }]}>{p.city}</Text>
+                      {p.phone ? <Text style={[styles.practiceCity, { color: c.muted }]}>{p.phone}</Text> : null}
+                    </View>
+                    {t.adminPractice?.id === p.id && (
+                      <View style={[styles.tag, { backgroundColor: c.successBg }]}>
+                        <Text style={{ color: c.success, fontSize: 11 }}>Admin</Text>
+                      </View>
+                    )}
+                  </View>
+                ))}
+                {t.adminPractice && (
+                  <Pressable
+                    onPress={() => { loadAdminPracticeDetail(); setShowPracticeAdmin(true); }}
+                    style={[styles.kassenartBtn, { backgroundColor: c.primary, borderColor: c.primary, alignSelf: 'flex-start', marginTop: 4 }]}
+                  >
+                    <Text style={[styles.kassenartText, { color: '#fff' }]}>Praxis verwalten</Text>
+                  </Pressable>
+                )}
+              </View>
+            )}
+
+            {/* Praxis-Verbindung */}
+            {(t.practices ?? []).length === 0 && (
+              <View style={[styles.noticeBox, { backgroundColor: c.mutedBg, borderColor: c.border }]}>
+                <Text style={styles.noticeIcon}>🏥</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.noticeTitle, { color: c.text }]}>Keine Praxis verknüpft</Text>
+                  <Text style={[styles.noticeBody, { color: c.muted }]}>Verbinde dich mit einer Praxis oder erstelle deine eigene.</Text>
+                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+                    <Pressable
+                      onPress={() => { setPracticeSearchQuery(''); setPracticeSearchResults([]); setShowPracticeSearch(true); }}
+                      style={[styles.kassenartBtn, { backgroundColor: c.primary, borderColor: c.primary, flex: 1 }]}
+                    >
+                      <Text style={[styles.kassenartText, { color: '#fff' }]}>Praxis suchen</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => setShowCreatePractice(true)}
+                      style={[styles.kassenartBtn, { backgroundColor: c.mutedBg, borderColor: c.border, flex: 1 }]}
+                    >
+                      <Text style={[styles.kassenartText, { color: c.text }]}>Neue Praxis</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              </View>
+            )}
           </>
         )}
 
-        <Pressable style={[styles.registerBtn, { backgroundColor: c.mutedBg, marginTop: 8 }]} onPress={handleLogout}>
-          <Text style={[styles.registerBtnText, { color: c.muted }]}>Abmelden</Text>
-        </Pressable>
       </ScrollView>
     );
   };
@@ -1307,74 +1589,441 @@ export default function App() {
   // ── Optionen tab ──────────────────────────────────────────────────────────
 
   const renderOptions = () => (
-    <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 20 }]}>
+    <View style={{ flex: 1 }}>
+      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 20 }]}>
+        <View style={styles.header}>
+          <View style={[styles.logoMark, { backgroundColor: c.primary }]}><Text style={styles.logoText}>R</Text></View>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.headerTitle, { color: c.text }]}>Optionen</Text>
+            <Text style={[styles.headerSub, { color: c.muted }]}>Einstellungen & Informationen</Text>
+          </View>
+        </View>
+
+        {[
+          { label: 'Sprache', value: 'Deutsch' },
+          { label: 'Datenschutz', value: 'Bald verfügbar' },
+          { label: 'Impressum', value: 'Bald verfügbar' },
+          { label: 'App-Version', value: '0.1.0 MVP' }
+        ].map((item) => (
+          <Pressable key={item.label} style={[styles.optionRow, { backgroundColor: c.card, borderColor: c.border }]}>
+            <Text style={[styles.optionLabel, { color: c.text }]}>{item.label}</Text>
+            <Text style={[styles.optionValue, { color: c.muted }]}>{item.value} ›</Text>
+          </Pressable>
+        ))}
+
+        {/* Erscheinungsbild toggle */}
+        <View style={[styles.optionRow, { backgroundColor: c.card, borderColor: c.border }]}>
+          <Text style={[styles.optionLabel, { color: c.text }]}>Erscheinungsbild</Text>
+          <View style={styles.themeToggleRow}>
+            {[
+              { key: 'light',  label: 'Hell' },
+              { key: 'dark',   label: 'Dunkel' },
+              { key: 'system', label: 'System' }
+            ].map(({ key, label }) => (
+              <Pressable
+                key={key}
+                onPress={() => setThemeMode(key)}
+                style={[
+                  styles.themeBtn,
+                  themeMode === key
+                    ? { backgroundColor: c.primary, borderColor: c.primary }
+                    : { backgroundColor: c.mutedBg, borderColor: c.border }
+                ]}
+              >
+                <Text style={[styles.themeBtnText, { color: themeMode === key ? '#FFFFFF' : c.muted }]}>
+                  {label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+
+        {loggedInTherapist && (
+          <>
+            <Text style={[styles.filterSectionTitle, { color: c.muted, marginTop: 4 }]}>MEINE PRAXIS</Text>
+            {loggedInTherapist.adminPractice ? (
+              <Pressable
+                onPress={() => { loadAdminPracticeDetail(); setShowPracticeAdmin(true); }}
+                style={[styles.optionRow, { backgroundColor: c.card, borderColor: c.border }]}
+              >
+                <View>
+                  <Text style={[styles.optionLabel, { color: c.text }]}>{loggedInTherapist.adminPractice.name}</Text>
+                  <Text style={[{ fontSize: 12, color: c.muted }]}>{loggedInTherapist.adminPractice.city}</Text>
+                </View>
+                <Text style={[styles.optionValue, { color: c.primary }]}>Verwalten ›</Text>
+              </Pressable>
+            ) : (
+              <>
+                <Pressable
+                  onPress={() => setShowCreatePractice(true)}
+                  style={[styles.optionRow, { backgroundColor: c.card, borderColor: c.border }]}
+                >
+                  <Text style={[styles.optionLabel, { color: c.text }]}>Neue Praxis erstellen</Text>
+                  <Text style={[styles.optionValue, { color: c.primary }]}>＋</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => { setPracticeSearchQuery(''); setPracticeSearchResults([]); setShowPracticeSearch(true); }}
+                  style={[styles.optionRow, { backgroundColor: c.card, borderColor: c.border }]}
+                >
+                  <Text style={[styles.optionLabel, { color: c.text }]}>Praxis vernetzen</Text>
+                  <Text style={[styles.optionValue, { color: c.primary }]}>🔗</Text>
+                </Pressable>
+              </>
+            )}
+          </>
+        )}
+
+        {!loggedInTherapist && (
+          <Pressable
+            onPress={() => { setActiveTab('therapist'); setShowLogin(true); }}
+            style={[styles.optionRow, { backgroundColor: c.card, borderColor: c.border }]}
+          >
+            <Text style={[styles.optionLabel, { color: c.muted }]}>Nicht angemeldet</Text>
+            <Text style={[styles.optionValue, { color: c.primary }]}>Anmelden ›</Text>
+          </Pressable>
+        )}
+      </ScrollView>
+
+      {/* Abmelden — fixed am unteren Rand */}
+      {loggedInTherapist && (
+        <Pressable
+          onPress={handleLogout}
+          style={{ backgroundColor: 'transparent', margin: 16, borderRadius: 12, paddingVertical: 14, alignItems: 'center', borderWidth: 1.5, borderColor: '#E74C3C' }}
+        >
+          <Text style={{ color: '#E74C3C', fontSize: 16, fontWeight: '600' }}>Abmelden</Text>
+        </Pressable>
+      )}
+    </View>
+  );
+
+  // ── Neue Praxis erstellen ─────────────────────────────────────────────────
+
+  const renderCreatePractice = () => (
+    <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 20 }]} keyboardShouldPersistTaps="handled">
+      <Pressable onPress={() => setShowCreatePractice(false)} style={styles.backBtn}>
+        <Text style={[styles.backBtnText, { color: c.primary }]}>‹ Zurück</Text>
+      </Pressable>
       <View style={styles.header}>
         <View style={[styles.logoMark, { backgroundColor: c.primary }]}><Text style={styles.logoText}>R</Text></View>
         <View style={{ flex: 1 }}>
-          <Text style={[styles.headerTitle, { color: c.text }]}>Optionen</Text>
-          <Text style={[styles.headerSub, { color: c.muted }]}>Einstellungen & Informationen</Text>
+          <Text style={[styles.headerTitle, { color: c.text }]}>Neue Praxis</Text>
+          <Text style={[styles.headerSub, { color: c.muted }]}>Erstelle und verwalte deine Praxis</Text>
         </View>
       </View>
 
-      {[
-        { label: 'Sprache', value: 'Deutsch' },
-        { label: 'Datenschutz', value: 'Bald verfügbar' },
-        { label: 'Impressum', value: 'Bald verfügbar' },
-        { label: 'App-Version', value: '0.1.0 MVP' }
-      ].map((item) => (
-        <Pressable key={item.label} style={[styles.optionRow, { backgroundColor: c.card, borderColor: c.border }]}>
-          <Text style={[styles.optionLabel, { color: c.text }]}>{item.label}</Text>
-          <Text style={[styles.optionValue, { color: c.muted }]}>{item.value} ›</Text>
-        </Pressable>
-      ))}
-
-      {/* Erscheinungsbild toggle */}
-      <View style={[styles.optionRow, { backgroundColor: c.card, borderColor: c.border }]}>
-        <Text style={[styles.optionLabel, { color: c.text }]}>Erscheinungsbild</Text>
-        <View style={styles.themeToggleRow}>
-          {[
-            { key: 'light',  label: 'Hell' },
-            { key: 'dark',   label: 'Dunkel' },
-            { key: 'system', label: 'System' }
-          ].map(({ key, label }) => (
-            <Pressable
-              key={key}
-              onPress={() => setThemeMode(key)}
-              style={[
-                styles.themeBtn,
-                themeMode === key
-                  ? { backgroundColor: c.primary, borderColor: c.primary }
-                  : { backgroundColor: c.mutedBg, borderColor: c.border }
-              ]}
-            >
-              <Text style={[styles.themeBtnText, { color: themeMode === key ? '#FFFFFF' : c.muted }]}>
-                {label}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
+      <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
+        <Text style={[styles.filterSectionTitle, { color: c.muted }]}>Praxisname *</Text>
+        <TextInput
+          style={[styles.inputField, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg }]}
+          value={createPracticeName} onChangeText={setCreatePracticeName}
+          placeholder="z. B. Physio am Markt" placeholderTextColor={c.muted}
+        />
+        <Text style={[styles.filterSectionTitle, { color: c.muted, marginTop: 12 }]}>Stadt *</Text>
+        <TextInput
+          style={[styles.inputField, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg }]}
+          value={createPracticeCity} onChangeText={setCreatePracticeCity}
+          placeholder="z. B. Köln" placeholderTextColor={c.muted}
+        />
+        <Text style={[styles.filterSectionTitle, { color: c.muted, marginTop: 12 }]}>Adresse</Text>
+        <TextInput
+          style={[styles.inputField, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg }]}
+          value={createPracticeAddress} onChangeText={setCreatePracticeAddress}
+          placeholder="Straße und Hausnummer" placeholderTextColor={c.muted}
+        />
+        <Text style={[styles.filterSectionTitle, { color: c.muted, marginTop: 12 }]}>Telefon</Text>
+        <TextInput
+          style={[styles.inputField, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg }]}
+          value={createPracticePhone} onChangeText={setCreatePracticePhone}
+          placeholder="+49 221 …" placeholderTextColor={c.muted} keyboardType="phone-pad"
+        />
+        <Text style={[styles.filterSectionTitle, { color: c.muted, marginTop: 12 }]}>Öffnungszeiten</Text>
+        <TextInput
+          style={[styles.inputField, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg }]}
+          value={createPracticeHours} onChangeText={setCreatePracticeHours}
+          placeholder="Mo–Fr 8:00–18:00" placeholderTextColor={c.muted}
+        />
       </View>
 
-      {/* Konto */}
-      {loggedInTherapist ? (
-        <Pressable
-          onPress={handleLogout}
-          style={[styles.optionRow, { backgroundColor: '#FDECEA', borderColor: '#E74C3C' }]}
-        >
-          <Text style={[styles.optionLabel, { color: '#E74C3C' }]}>Abmelden</Text>
-          <Text style={{ color: '#E74C3C' }}>›</Text>
-        </Pressable>
-      ) : (
-        <Pressable
-          onPress={() => { setActiveTab('therapist'); setShowLogin(true); }}
-          style={[styles.optionRow, { backgroundColor: c.card, borderColor: c.border }]}
-        >
-          <Text style={[styles.optionLabel, { color: c.muted }]}>Nicht angemeldet</Text>
-          <Text style={[styles.optionValue, { color: c.primary }]}>Anmelden ›</Text>
-        </Pressable>
-      )}
+      <Pressable
+        style={[styles.registerBtn, { backgroundColor: createPracticeLoading ? c.border : c.primary }]}
+        onPress={handleCreatePractice}
+        disabled={createPracticeLoading}
+      >
+        <Text style={styles.registerBtnText}>{createPracticeLoading ? 'Wird erstellt…' : 'Praxis erstellen'}</Text>
+      </Pressable>
     </ScrollView>
   );
+
+  // ── Praxis suchen & vernetzen ─────────────────────────────────────────────
+
+  const renderPracticeSearch = () => (
+    <View style={{ flex: 1 }}>
+      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 20 }]} keyboardShouldPersistTaps="handled">
+        <Pressable onPress={() => setShowPracticeSearch(false)} style={styles.backBtn}>
+          <Text style={[styles.backBtnText, { color: c.primary }]}>‹ Zurück</Text>
+        </Pressable>
+        <View style={styles.header}>
+          <View style={[styles.logoMark, { backgroundColor: c.primary }]}><Text style={styles.logoText}>R</Text></View>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.headerTitle, { color: c.text }]}>Praxis vernetzen</Text>
+            <Text style={[styles.headerSub, { color: c.muted }]}>Finde deine Praxis und sende eine Anfrage</Text>
+          </View>
+        </View>
+
+        <View style={[styles.searchBox, { backgroundColor: c.card, borderColor: c.border }]}>
+          <TextInput
+            style={[{ flex: 1, color: c.text, fontSize: 16 }]}
+            value={practiceSearchQuery}
+            onChangeText={setPracticeSearchQuery}
+            onSubmitEditing={handleSearchPractices}
+            placeholder="Praxisname oder Stadt…"
+            placeholderTextColor={c.muted}
+            returnKeyType="search"
+          />
+          <Pressable onPress={handleSearchPractices}>
+            <Text style={{ fontSize: 20, color: c.primary }}>⌕</Text>
+          </Pressable>
+        </View>
+
+        {practiceSearchLoading && (
+          <Text style={[styles.infoBody, { color: c.muted, textAlign: 'center' }]}>Suche…</Text>
+        )}
+
+        {practiceSearchResults.map(p => (
+          <View key={p.id} style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border, gap: 8 }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <View style={[styles.practiceInitial, { backgroundColor: c.border }]}>
+                <Text style={[styles.practiceInitialText, { color: c.muted }]}>{p.name.charAt(0)}</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.practiceName, { color: c.text }]}>{p.name}</Text>
+                <Text style={[styles.practiceCity, { color: c.muted }]}>{p.city}{p.address ? ` · ${p.address}` : ''}</Text>
+                <Text style={[{ fontSize: 12, color: c.muted }]}>{p.links?.length ?? 0} Therapeuten</Text>
+              </View>
+            </View>
+            <Pressable
+              onPress={() => handleConnectToPractice(p.id)}
+              style={[styles.kassenartBtn, { backgroundColor: c.primary, borderColor: c.primary, alignSelf: 'flex-start' }]}
+            >
+              <Text style={[styles.kassenartText, { color: '#fff' }]}>Anfrage senden</Text>
+            </Pressable>
+          </View>
+        ))}
+
+        {!practiceSearchLoading && practiceSearchResults.length === 0 && practiceSearchQuery.length > 0 && (
+          <View style={[styles.emptyState, { backgroundColor: c.card, borderColor: c.border }]}>
+            <Text style={styles.emptyIcon}>🏥</Text>
+            <Text style={[styles.emptyTitle, { color: c.text }]}>Keine Praxis gefunden</Text>
+            <Text style={[styles.emptyBody, { color: c.muted }]}>Erstelle eine neue Praxis in den Optionen.</Text>
+          </View>
+        )}
+      </ScrollView>
+    </View>
+  );
+
+  // ── Praxis-Admin Dashboard ────────────────────────────────────────────────
+
+  const renderPracticeAdmin = () => {
+    const p = adminPracticeDetail;
+    if (!p) return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+        <Text style={[styles.infoBody, { color: c.muted }]}>Wird geladen…</Text>
+      </View>
+    );
+    const confirmed = p.links?.filter(l => l.status === 'CONFIRMED') ?? [];
+    const pending = p.links?.filter(l => l.status === 'PROPOSED') ?? [];
+
+    // Pre-fill edit fields from loaded practice (only when empty/first open)
+    if (editPracticeName === '' && p.name) {
+      setEditPracticeName(p.name);
+      setEditPracticeCity(p.city ?? '');
+      setEditPracticeAddress(p.address ?? '');
+      setEditPracticePhone(p.phone ?? '');
+      setEditPracticeHours(p.hours ?? '');
+      if (p.logo) setEditPracticeLogo(p.logo);
+      if (p.photos) {
+        try { setEditPracticePhotos(JSON.parse(p.photos)); } catch {}
+      }
+    }
+
+    return (
+      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 20 }]}>
+        <Pressable onPress={() => { setShowPracticeAdmin(false); setEditPracticeName(''); setEditPracticeLogo(null); setEditPracticePhotos([]); }} style={styles.backBtn}>
+          <Text style={[styles.backBtnText, { color: c.primary }]}>‹ Zurück</Text>
+        </Pressable>
+
+        {/* Praxis-Header */}
+        <View style={[styles.practiceHeader, { backgroundColor: c.card, borderColor: c.border }]}>
+          {p.logo ? (
+            <Image source={{ uri: p.logo }} style={[styles.practiceHeaderInitial, { borderRadius: 12 }]} />
+          ) : (
+            <View style={[styles.practiceHeaderInitial, { backgroundColor: c.primary }]}>
+              <Text style={styles.practiceHeaderInitialText}>{p.name.charAt(0)}</Text>
+              <Text style={{ color: '#fff', fontSize: 12 }}>✚</Text>
+            </View>
+          )}
+          <Text style={[styles.practiceHeaderName, { color: c.text, marginTop: 10 }]}>{p.name}</Text>
+          <Text style={[styles.practiceHeaderCity, { color: c.muted }]}>{p.city}</Text>
+          {p.address ? <Text style={[styles.practiceHeaderCity, { color: c.muted }]}>{p.address}</Text> : null}
+          {p.phone ? <Text style={[styles.practiceHeaderCity, { color: c.muted }]}>{p.phone}</Text> : null}
+        </View>
+
+        {/* Ausstehende Anfragen */}
+        {pending.length > 0 && (
+          <>
+            <Text style={[styles.sectionLabel, { color: c.text }]}>Anfragen ({pending.length})</Text>
+            {pending.map(link => (
+              <View key={link.id} style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border, gap: 10 }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <View style={[styles.therapistAvatarSmall, { borderRadius: 20, backgroundColor: c.border, alignItems: 'center', justifyContent: 'center' }]}>
+                    <Text style={{ color: c.muted, fontWeight: '700' }}>{link.therapist.fullName.charAt(0)}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.therapistName, { color: c.text }]}>{link.therapist.fullName}</Text>
+                    <Text style={[styles.therapistTitle, { color: c.muted }]}>{link.therapist.professionalTitle}</Text>
+                  </View>
+                </View>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <Pressable
+                    onPress={() => handleLinkAction(link.id, 'accept')}
+                    style={[styles.kassenartBtn, { backgroundColor: c.success, borderColor: c.success, flex: 1 }]}
+                  >
+                    <Text style={[styles.kassenartText, { color: '#fff' }]}>✓ Annehmen</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => handleLinkAction(link.id, 'reject')}
+                    style={[styles.kassenartBtn, { backgroundColor: 'transparent', borderColor: '#E74C3C', flex: 1 }]}
+                  >
+                    <Text style={[styles.kassenartText, { color: '#E74C3C' }]}>✕ Ablehnen</Text>
+                  </Pressable>
+                </View>
+              </View>
+            ))}
+          </>
+        )}
+
+        {/* Bestätigte Therapeuten */}
+        <Text style={[styles.sectionLabel, { color: c.text }]}>Therapeuten ({confirmed.length})</Text>
+        {confirmed.map(link => (
+          <View key={link.id} style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <View style={[styles.therapistAvatarSmall, { borderRadius: 20, backgroundColor: c.border, alignItems: 'center', justifyContent: 'center' }]}>
+                <Text style={{ color: c.muted, fontWeight: '700' }}>{link.therapist.fullName.charAt(0)}</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.therapistName, { color: c.text }]}>{link.therapist.fullName}</Text>
+                <Text style={[styles.therapistTitle, { color: c.muted }]}>{link.therapist.professionalTitle}</Text>
+                <Text style={[{ fontSize: 12, color: c.muted }]}>{link.therapist.email}</Text>
+              </View>
+            </View>
+          </View>
+        ))}
+
+        {confirmed.length === 0 && pending.length === 0 && (
+          <View style={[styles.emptyState, { backgroundColor: c.card, borderColor: c.border }]}>
+            <Text style={styles.emptyIcon}>👥</Text>
+            <Text style={[styles.emptyTitle, { color: c.text }]}>Noch keine Therapeuten</Text>
+            <Text style={[styles.emptyBody, { color: c.muted }]}>Lade Therapeuten per E-Mail ein.</Text>
+          </View>
+        )}
+
+        {/* Praxisdaten bearbeiten */}
+        <Text style={[styles.sectionLabel, { color: c.text }]}>Praxisdaten bearbeiten</Text>
+        <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border, gap: 10 }]}>
+          {[
+            { label: 'Name *', value: editPracticeName, setter: setEditPracticeName, placeholder: 'Praxisname' },
+            { label: 'Stadt *', value: editPracticeCity, setter: setEditPracticeCity, placeholder: 'Stadt' },
+            { label: 'Adresse', value: editPracticeAddress, setter: setEditPracticeAddress, placeholder: 'Straße Nr, PLZ Stadt' },
+            { label: 'Telefon', value: editPracticePhone, setter: setEditPracticePhone, placeholder: '+49 …', keyboard: 'phone-pad' },
+            { label: 'Öffnungszeiten', value: editPracticeHours, setter: setEditPracticeHours, placeholder: 'Mo–Fr 8:00–18:00' },
+          ].map(({ label, value, setter, placeholder, keyboard }) => (
+            <View key={label}>
+              <Text style={[styles.filterSectionTitle, { color: c.muted }]}>{label}</Text>
+              <TextInput
+                style={[styles.inputField, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg }]}
+                value={value}
+                onChangeText={setter}
+                placeholder={placeholder}
+                placeholderTextColor={c.muted}
+                keyboardType={keyboard ?? 'default'}
+              />
+            </View>
+          ))}
+          {/* Logo */}
+          <Text style={[styles.filterSectionTitle, { color: c.muted }]}>Logo</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            {editPracticeLogo ? (
+              <Image source={{ uri: editPracticeLogo }} style={{ width: 64, height: 64, borderRadius: 8 }} />
+            ) : (
+              <View style={{ width: 64, height: 64, borderRadius: 8, backgroundColor: c.primary, alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ color: '#fff', fontSize: 22, fontWeight: '700' }}>{editPracticeName.charAt(0) || '?'}</Text>
+                <Text style={{ color: '#fff', fontSize: 10 }}>✚</Text>
+              </View>
+            )}
+            <Pressable onPress={handlePickPracticeLogo} style={[styles.kassenartBtn, { backgroundColor: c.mutedBg, borderColor: c.border }]}>
+              <Text style={[styles.kassenartText, { color: c.text }]}>📷 Logo ändern</Text>
+            </Pressable>
+            {editPracticeLogo && (
+              <Pressable onPress={() => setEditPracticeLogo(null)} style={[styles.kassenartBtn, { backgroundColor: 'transparent', borderColor: '#E74C3C' }]}>
+                <Text style={[styles.kassenartText, { color: '#E74C3C' }]}>Entfernen</Text>
+              </Pressable>
+            )}
+          </View>
+
+          {/* Praxisfotos */}
+          <Text style={[styles.filterSectionTitle, { color: c.muted, marginTop: 4 }]}>Praxisfotos</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            {editPracticePhotos.map((photo, idx) => (
+              <View key={idx} style={{ position: 'relative' }}>
+                <Image source={{ uri: photo }} style={{ width: 80, height: 80, borderRadius: 6 }} />
+                <Pressable
+                  onPress={() => setEditPracticePhotos(prev => prev.filter((_, i) => i !== idx))}
+                  style={{ position: 'absolute', top: -6, right: -6, backgroundColor: '#E74C3C', borderRadius: 10, width: 20, height: 20, alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>✕</Text>
+                </Pressable>
+              </View>
+            ))}
+            <Pressable
+              onPress={handleAddPracticePhoto}
+              style={{ width: 80, height: 80, borderRadius: 6, borderWidth: 1, borderColor: c.border, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', backgroundColor: c.mutedBg }}
+            >
+              <Text style={{ color: c.muted, fontSize: 28 }}>＋</Text>
+            </Pressable>
+          </View>
+
+          <Pressable
+            onPress={handleSavePractice}
+            style={[styles.kassenartBtn, { backgroundColor: c.primary, borderColor: c.primary, marginTop: 4 }]}
+          >
+            <Text style={[styles.kassenartText, { color: '#fff' }]}>
+              {practiceEditSaving ? 'Wird gespeichert…' : 'Speichern'}
+            </Text>
+          </Pressable>
+        </View>
+
+        {/* Therapeuten einladen */}
+        <Text style={[styles.sectionLabel, { color: c.text }]}>Therapeuten einladen</Text>
+        <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
+          <Text style={[styles.filterSectionTitle, { color: c.muted }]}>E-Mail des Therapeuten</Text>
+          <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+            <TextInput
+              style={[styles.inputField, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg, flex: 1 }]}
+              value={inviteEmail} onChangeText={setInviteEmail}
+              placeholder="therapeut@email.de" placeholderTextColor={c.muted}
+              autoCapitalize="none" keyboardType="email-address"
+            />
+            <Pressable
+              onPress={handleInviteTherapist}
+              style={[styles.kassenartBtn, { backgroundColor: c.primary, borderColor: c.primary }]}
+            >
+              <Text style={[styles.kassenartText, { color: '#fff' }]}>Einladen</Text>
+            </Pressable>
+          </View>
+        </View>
+      </ScrollView>
+    );
+  };
 
   // ── Favorites tab ─────────────────────────────────────────────────────────
 
@@ -1753,6 +2402,9 @@ export default function App() {
   // ── Layout ────────────────────────────────────────────────────────────────
 
   const renderTab = () => {
+    if (showCreatePractice) return renderCreatePractice();
+    if (showPracticeSearch) return renderPracticeSearch();
+    if (showPracticeAdmin) return renderPracticeAdmin();
     if (showRegister) return renderRegister();
     if (selectedTherapist) return renderTherapistProfile(selectedTherapist);
     if (selectedPractice) return renderPracticeProfile(selectedPractice);
@@ -1785,6 +2437,9 @@ export default function App() {
                 setSelectedPractice(null);
                 setSelectedTherapist(null);
                 setShowRegister(false);
+                setShowCreatePractice(false);
+                setShowPracticeSearch(false);
+                setShowPracticeAdmin(false);
                 if (tab.key === 'discover') {
                   setQuery('');
                   setActiveChip(null);
@@ -2004,6 +2659,9 @@ const styles = StyleSheet.create({
 
   // Therapist profile
   therapistAvatarLarge: { width: 80, height: 80, borderRadius: 40, marginBottom: 4 },
+  therapistAvatarSmall: { width: 40, height: 40 },
+  practiceHeaderInitial: { width: 64, height: 64, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  practiceHeaderInitialText: { color: '#fff', fontSize: 24, fontWeight: '800' },
   infoSection: { borderWidth: 1, borderRadius: 16, padding: 16, gap: 10 },
   profileNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'center' },
   verifiedBadge: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 },
