@@ -44,18 +44,21 @@ model Therapist {
 }
 
 model Practice {
-  id           String       @id @default(cuid())
-  name         String
-  city         String
-  address      String?
-  phone        String?
-  hours        String?
-  lat          Float        @default(0)
-  lng          Float        @default(0)
-  reviewStatus ReviewStatus @default(PENDING_REVIEW)
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
-  links        TherapistPracticeLink[]
+  id                String       @id @default(cuid())
+  name              String
+  city              String
+  address           String?
+  phone             String?
+  hours             String?
+  lat               Float        @default(0)
+  lng               Float        @default(0)
+  reviewStatus      ReviewStatus @default(PENDING_REVIEW)
+  adminEmail        String?      @unique
+  adminPasswordHash String?
+  adminSessionToken String?      @unique
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  links             TherapistPracticeLink[]
 }
 
 model TherapistPracticeLink {

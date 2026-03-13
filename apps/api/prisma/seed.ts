@@ -124,6 +124,15 @@ async function main() {
     const num = (i * 7 + 3) % 120 + 1;
     const postal = 10000 + (i * 137) % 900;
 
+    // Generate practice admin credentials
+    // First practice (Physio & Motion) gets the test therapist as admin
+    const practiceSlug = PRACTICE_NAMES[i].toLowerCase()
+      .replace(/\s+/g, '-')
+      .replace(/[äÄ]/g, 'ae').replace(/[öÖ]/g, 'oe').replace(/[üÜ]/g, 'ue').replace(/ß/g, 'ss')
+      .replace(/&/g, 'und').replace(/[^a-z0-9-]/g, '');
+    const adminEmail = i === 0 ? 'test@revio.de' : `admin@${practiceSlug}.de`;
+    const adminPwHash = await hashPassword(i === 0 ? 'password' : 'praxis123');
+
     const p = await prisma.practice.create({
       data: {
         name: PRACTICE_NAMES[i],
@@ -134,6 +143,8 @@ async function main() {
         lat: jitter(lat, i * 17),
         lng: jitter(lng, i * 31),
         reviewStatus: 'APPROVED',
+        adminEmail,
+        adminPasswordHash: adminPwHash,
       },
     });
     practiceRecords.push({ id: p.id, city: cityName });
@@ -232,10 +243,11 @@ async function main() {
   });
 
   console.log('Seed complete.');
-  console.log('  30 Praxen (APPROVED)');
+  console.log('  30 Praxen (APPROVED) mit Admin-Login');
   console.log('  100 Therapeuten (APPROVED) über 10 Städte verteilt');
   console.log('  1  Therapeut PENDING (Max Klein)');
-  console.log('  TEST: test@revio.de / password');
+  console.log('  TEST: test@revio.de / password (Therapeut + Praxis-Admin von "Physio & Motion")');
+  console.log('  (Übrige Praxen: admin@<praxis-slug>.de / praxis123)');
 }
 
 main()
