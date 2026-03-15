@@ -89,6 +89,7 @@ const searchBodySchema = z.object({
   language: z.string().optional(),
   homeVisit: z.boolean().optional(),
   specialization: z.string().optional(),
+  kassenart: z.string().optional(),
 });
 
 export const searchRoutes: FastifyPluginAsync = async (fastify) => {
@@ -126,6 +127,7 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
         if (input.language && !languages.includes(input.language.toLowerCase())) return false;
         if (typeof input.homeVisit === 'boolean' && t.homeVisit !== input.homeVisit) return false;
         if (input.specialization && !specializations.includes(input.specialization.toLowerCase())) return false;
+        if (input.kassenart && (t as any).kassenart && (t as any).kassenart !== input.kassenart) return false;
 
         return true;
       })
@@ -160,6 +162,8 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
           professionalTitle: t.professionalTitle,
           specializations,
           languages: splitList(t.languages),
+          certifications: splitList(t.certifications),
+          kassenart: (t as any).kassenart ?? '',
           homeVisit: t.homeVisit,
           city: t.city,
           bio: t.bio ?? undefined,

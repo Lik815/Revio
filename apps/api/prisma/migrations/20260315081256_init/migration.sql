@@ -10,6 +10,7 @@ CREATE TABLE "Therapist" (
     "specializations" TEXT NOT NULL,
     "languages" TEXT NOT NULL,
     "certifications" TEXT NOT NULL DEFAULT '',
+    "kassenart" TEXT NOT NULL DEFAULT '',
     "reviewStatus" TEXT NOT NULL DEFAULT 'PENDING_REVIEW',
     "passwordHash" TEXT,
     "sessionToken" TEXT,
@@ -33,9 +34,23 @@ CREATE TABLE "Practice" (
     "adminPasswordHash" TEXT,
     "adminSessionToken" TEXT,
     "adminTherapistId" TEXT,
+    "description" TEXT,
+    "inviteToken" TEXT,
+    "logo" TEXT,
+    "photos" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
     CONSTRAINT "Practice_adminTherapistId_fkey" FOREIGN KEY ("adminTherapistId") REFERENCES "Therapist" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "SearchSuggestion" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "text" TEXT NOT NULL,
+    "normalized" TEXT NOT NULL,
+    "type" TEXT NOT NULL,
+    "entityId" TEXT,
+    "weight" INTEGER NOT NULL DEFAULT 1
 );
 
 -- CreateTable
@@ -44,6 +59,7 @@ CREATE TABLE "TherapistPracticeLink" (
     "therapistId" TEXT NOT NULL,
     "practiceId" TEXT NOT NULL,
     "status" TEXT NOT NULL DEFAULT 'PROPOSED',
+    "initiatedBy" TEXT NOT NULL DEFAULT 'THERAPIST',
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "TherapistPracticeLink_therapistId_fkey" FOREIGN KEY ("therapistId") REFERENCES "Therapist" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT "TherapistPracticeLink_practiceId_fkey" FOREIGN KEY ("practiceId") REFERENCES "Practice" ("id") ON DELETE CASCADE ON UPDATE CASCADE
@@ -63,6 +79,12 @@ CREATE UNIQUE INDEX "Practice_adminSessionToken_key" ON "Practice"("adminSession
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Practice_adminTherapistId_key" ON "Practice"("adminTherapistId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Practice_inviteToken_key" ON "Practice"("inviteToken");
+
+-- CreateIndex
+CREATE INDEX "SearchSuggestion_normalized_idx" ON "SearchSuggestion"("normalized");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "TherapistPracticeLink_therapistId_practiceId_key" ON "TherapistPracticeLink"("therapistId", "practiceId");

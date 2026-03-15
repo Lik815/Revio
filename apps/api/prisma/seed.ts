@@ -64,6 +64,8 @@ const ALL_SPECS = [
 
 const ALL_CERTS = ['MT', 'KGG', 'Bobath', 'Vojta', 'MDT', 'PNF', 'DNS', 'FDM', 'OMT', 'Kinesiotaping'];
 
+const KASSENART_OPTIONS = ['gesetzlich', 'privat', 'selbstzahler'];
+
 const ALL_LANGS = ['de', 'en', 'tr', 'ru', 'ar', 'fr', 'it', 'es', 'pl', 'hr'];
 
 const BIOS = [
@@ -206,6 +208,7 @@ async function main() {
         specializations: specs.join(', '),
         languages: langs.join(', '),
         certifications: certs.join(', '),
+        kassenart: KASSENART_OPTIONS[i % KASSENART_OPTIONS.length],
         reviewStatus: 'APPROVED',
         links: {
           create: { practiceId: practice.id, status: 'CONFIRMED' },
@@ -227,6 +230,7 @@ async function main() {
       specializations: 'Sportphysiotherapie, Rückentherapie',
       languages: 'de, en',
       certifications: 'MT',
+      kassenart: 'gesetzlich',
       reviewStatus: 'APPROVED',
       passwordHash: testPasswordHash,
       links: {
@@ -266,6 +270,7 @@ async function main() {
       specializations: 'Neurologische Rehabilitation, Bobath-Therapie',
       languages: 'de',
       certifications: 'Bobath',
+      kassenart: 'gesetzlich',
       reviewStatus: 'PENDING_REVIEW',
       links: {
         create: { practiceId: pendingPractice.id, status: 'PROPOSED' },

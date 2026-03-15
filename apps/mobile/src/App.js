@@ -173,7 +173,7 @@ const mapApiTherapist = (t) => ({
   homeVisit: t.homeVisit ?? false,
   city: t.city ?? '',
   bio: t.bio ?? '',
-  kassenart: null,
+  kassenart: t.kassenart ?? null,
   fortbildungen: parseStringOrArray(t.certifications),
   verifiziert: true,
   behandlungsbereiche: parseStringOrArray(t.specializations),
@@ -884,6 +884,7 @@ export default function App() {
           query: q || 'physiotherapie',
           city: effectiveCity,
           homeVisit: homeVisit || undefined,
+          kassenart: kassenart || undefined,
         }),
       });
       if (!response.ok) throw new Error('failed');

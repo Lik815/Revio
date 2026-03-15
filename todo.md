@@ -16,7 +16,7 @@
 - [x] **Optionen-Seite vervollständigen** — `Datenschutz` und `Impressum` als „Bald verfügbar" gekennzeichnet. _(App.js)_
 - [x] **Standortabfrage nutzerfreundlicher** — Standort wird nicht mehr beim Mount angefragt; stattdessen 📍-Button neben Ortsfeld. _(App.js)_
 - [ ] **Review-/Freigabelogik konsistenter machen** — Therapeut kann auf `APPROVED` gesetzt werden, zugehörige Praxis bleibt `PENDING_REVIEW`, Link bleibt `PROPOSED`. Sichtbarkeit an bestätigte Beziehungen koppeln, Admin-Oberfläche mit Hinweisen erweitern. _(admin.ts, register.ts)_
-- [ ] **Such-UI und API-Filter abstimmen** — UI bietet Kassenart + Fortbildungen als Filter, API verarbeitet diese nicht. Entweder API erweitern oder UI vereinfachen. _(App.js, search.ts)_
+- [x] **Such-UI und API-Filter abstimmen** — `kassenart` in DB/API/App; `certifications` → `fortbildungen` korrekt gemappt; Filter funktioniert Ende-zu-Ende. _(search.ts, App.js, schema.prisma, shared/index.ts)_
 - [ ] **Therapeuten-Profil leere Felder bereinigen** — `kassenart`, `verfügbareZeiten`, `website`, `behandlungsbereiche` sind oft leer oder künstlich. Leere Sektionen nicht rendern; redundante Felder reduzieren. _(App.js)_
 - [ ] **Dev/Prod-Meldung im Registrierungsflow** — UI sagt „48 Stunden Prüfung", API gibt in Dev `auto-approved`. UX-Text je nach Environment anpassen. _(App.js, register.ts)_
 
@@ -24,7 +24,7 @@
 
 - [x] **CTA-Texte präzisieren** — „Therapeut kontaktieren" → „Praxis anrufen" in Suchergebnissen und Favoriten. _(App.js)_
 - [x] **Theme `system` ergänzen** — „System"-Option im Erscheinungsbild-Toggle hinzugefügt. _(App.js)_
-- [ ] **Favoriten-Strategie kommunizieren** — Favoriten sind nur lokal in AsyncStorage, kein Sync. Entweder klar labeln (`Nur auf diesem Gerät`) oder Backend-Sync einplanen. _(App.js)_
+- [x] **Favoriten-Strategie kommunizieren** — Favoriten sind nur lokal in AsyncStorage, kein Sync. Hinweis „🔒 Lokal gespeichert · nicht synchronisiert · nur für dich sichtbar" ist bereits im Favoriten-Tab vorhanden. _(App.js)_
 - [ ] **Bild-Upload langfristig lösen** — Foto wird als Base64-Data-URL direkt an `PATCH /auth/me` gesendet. Für MVP okay, aber große Payloads / DB-Aufblähung. Langfristig: Upload-/Storage-Lösung (S3 o.ä.). _(App.js, auth.ts)_
 
 ---

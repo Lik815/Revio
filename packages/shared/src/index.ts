@@ -55,6 +55,7 @@ export interface SearchInput {
   language?: string;
   homeVisit?: boolean;
   specialization?: string;
+  kassenart?: string;
 }
 
 export interface SearchPractice {
@@ -77,6 +78,8 @@ export interface SearchTherapist {
   professionalTitle: string;
   specializations: string[];
   languages: string[];
+  certifications: string[];
+  kassenart: string;
   homeVisit: boolean;
   city: string;
   bio?: string;
