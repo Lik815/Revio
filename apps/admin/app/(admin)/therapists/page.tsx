@@ -1,13 +1,13 @@
-import { PageShell } from '../../components/page-shell';
-import { TherapistActions } from '../../components/action-buttons';
-import { DeadlineTimer } from '../../components/deadline-timer';
-import { api } from '../../lib/api';
+import { PageShell } from '../../../components/page-shell';
+import { TherapistActions } from '../../../components/action-buttons';
+import { DeadlineTimer } from '../../../components/deadline-timer';
+import { api } from '../../../lib/api';
 import {
   approveTherapist,
   rejectTherapist,
   requestChangesTherapist,
   suspendTherapist,
-} from '../../lib/actions';
+} from '../../../lib/actions';
 
 type SearchParams = Promise<{ status?: string; q?: string; city?: string }>;
 

@@ -158,19 +158,25 @@ const getBaseUrl = () => BASE_URL;
 
 // ─── Map API therapist → UI format ────────────────────────────────────────────
 
+const parseStringOrArray = (val) => {
+  if (Array.isArray(val)) return val;
+  if (typeof val === 'string') { try { return JSON.parse(val); } catch { return []; } }
+  return [];
+};
+
 const mapApiTherapist = (t) => ({
   id: t.id,
   fullName: t.fullName,
   professionalTitle: t.professionalTitle,
-  specializations: t.specializations ?? [],
-  languages: (t.languages ?? []).map(l => l.toUpperCase()),
+  specializations: parseStringOrArray(t.specializations),
+  languages: parseStringOrArray(t.languages).map(l => l.toUpperCase()),
   homeVisit: t.homeVisit ?? false,
-  city: t.city,
+  city: t.city ?? '',
   bio: t.bio ?? '',
   kassenart: null,
-  fortbildungen: t.certifications ?? [],
+  fortbildungen: parseStringOrArray(t.certifications),
   verifiziert: true,
-  behandlungsbereiche: t.specializations ?? [],
+  behandlungsbereiche: parseStringOrArray(t.specializations),
   verfügbareZeiten: '',
   website: '',
   photo: t.photo || `https://i.pravatar.cc/96?u=${t.id}`,
@@ -254,9 +260,11 @@ export default function App() {
     });
   }, []);
   const toggleFavoritePractice = (practice) => {
+    const therapists = allApiTherapists.filter(t => t.practices?.some(pr => pr.id === practice.id));
+    const practiceWithTherapists = { ...practice, therapists };
     setFavoritePractices(prev => {
       const exists = prev.some(f => f.id === practice.id);
-      const next = exists ? prev.filter(f => f.id !== practice.id) : [...prev, practice];
+      const next = exists ? prev.filter(f => f.id !== practice.id) : [...prev, practiceWithTherapists];
       AsyncStorage.setItem('revio_fav_practices', JSON.stringify(next));
       return next;
     });
@@ -558,6 +566,16 @@ export default function App() {
   };
 
   // Practice: load full admin practice detail
+  const openTherapistById = async (therapistId) => {
+    try {
+      const res = await fetch(`${getBaseUrl()}/therapist/${therapistId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setSelectedTherapist(mapApiTherapist(data.therapist));
+      }
+    } catch {}
+  };
+
   const loadAdminPracticeDetail = async () => {
     if (!authToken) return;
     try {
@@ -2385,15 +2403,18 @@ export default function App() {
             <Text style={[styles.sectionLabel, { color: c.text }]}>Anfragen ({pending.length})</Text>
             {pending.map(link => (
               <View key={link.id} style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border, gap: 10 }]}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                  <View style={[styles.therapistAvatarSmall, { borderRadius: 20, backgroundColor: c.border, alignItems: 'center', justifyContent: 'center' }]}>
-                    <Text style={{ color: c.muted, fontWeight: '700' }}>{link.therapist.fullName.charAt(0)}</Text>
-                  </View>
+                <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}
+                  onPress={() => openTherapistById(link.therapist.id)}>
+                  <Image
+                    source={{ uri: link.therapist.photo || `https://i.pravatar.cc/96?u=${link.therapist.id}` }}
+                    style={[styles.therapistAvatarSmall, { borderRadius: 20 }]}
+                  />
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.therapistName, { color: c.text }]}>{link.therapist.fullName}</Text>
                     <Text style={[styles.therapistTitle, { color: c.muted }]}>{link.therapist.professionalTitle}</Text>
                   </View>
-                </View>
+                  <Text style={[styles.practiceArrow, { color: c.muted }]}>›</Text>
+                </Pressable>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
                   <Pressable
                     onPress={() => handleLinkAction(link.id, 'accept')}
@@ -2416,18 +2437,21 @@ export default function App() {
         {/* Bestätigte Therapeuten */}
         <Text style={[styles.sectionLabel, { color: c.text }]}>Therapeuten ({confirmed.length})</Text>
         {confirmed.map(link => (
-          <View key={link.id} style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
+          <Pressable key={link.id} style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}
+            onPress={() => openTherapistById(link.therapist.id)}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <View style={[styles.therapistAvatarSmall, { borderRadius: 20, backgroundColor: c.border, alignItems: 'center', justifyContent: 'center' }]}>
-                <Text style={{ color: c.muted, fontWeight: '700' }}>{link.therapist.fullName.charAt(0)}</Text>
-              </View>
+              <Image
+                source={{ uri: link.therapist.photo || `https://i.pravatar.cc/96?u=${link.therapist.id}` }}
+                style={[styles.therapistAvatarSmall, { borderRadius: 20 }]}
+              />
               <View style={{ flex: 1 }}>
                 <Text style={[styles.therapistName, { color: c.text }]}>{link.therapist.fullName}</Text>
                 <Text style={[styles.therapistTitle, { color: c.muted }]}>{link.therapist.professionalTitle}</Text>
                 <Text style={[{ fontSize: 12, color: c.muted }]}>{link.therapist.email}</Text>
               </View>
+              <Text style={[styles.practiceArrow, { color: c.muted }]}>›</Text>
             </View>
-          </View>
+          </Pressable>
         ))}
 
         {confirmed.length === 0 && pending.length === 0 && (
@@ -2625,9 +2649,12 @@ export default function App() {
       {favoritePractices.length > 0 && (
         <>
           <Text style={[styles.sectionLabel, { color: c.text, marginTop: favorites.length > 0 ? 8 : 0 }]}>Praxen</Text>
-          {favoritePractices.map((p) => (
-            <Pressable key={p.id} onPress={() => setSelectedPractice(p)} style={[styles.resultCard, { backgroundColor: c.card, borderColor: c.border }]}>
-              <View style={styles.cardTop}>
+          {favoritePractices.map((p) => {
+            const practiceTherapists = p.therapists ?? [];
+            if (practiceTherapists.length === 0) return null;
+            return (
+            <View key={p.id} style={[styles.resultCard, { backgroundColor: c.card, borderColor: c.border }]}>
+              <Pressable onPress={() => setSelectedPractice(p)} style={styles.cardTop}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
                   {p.logo ? (
                     <Image source={{ uri: p.logo }} style={[styles.avatar, { borderRadius: 10 }]} />
@@ -2647,17 +2674,29 @@ export default function App() {
                 <Pressable onPress={(e) => { e.stopPropagation(); toggleFavoritePractice(p); }} hitSlop={10}>
                   <Ionicons name="heart" size={22} color="#E05A77" />
                 </Pressable>
-              </View>
+              </Pressable>
+              {practiceTherapists.map(t => (
+                <Pressable key={t.id} onPress={() => setSelectedTherapist(t)}
+                  style={[styles.practiceBtn, { borderColor: c.border, backgroundColor: c.mutedBg }]}>
+                  <Image source={{ uri: t.photo }} style={[styles.practiceInitial, { borderRadius: 20 }]} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.practiceName, { color: c.text }]}>{t.fullName}</Text>
+                    <Text style={[styles.practiceCity, { color: c.muted }]}>{t.professionalTitle}</Text>
+                  </View>
+                  <Text style={[styles.practiceArrow, { color: c.muted }]}>›</Text>
+                </Pressable>
+              ))}
               {p.phone && (
                 <Pressable
                   style={[styles.ctaBtn, { backgroundColor: c.accent }]}
-                  onPress={(e) => { e.stopPropagation(); callPhone(p.phone); }}
+                  onPress={() => callPhone(p.phone)}
                 >
                   <Text style={styles.ctaBtnText}>📞 Praxis anrufen</Text>
                 </Pressable>
               )}
-            </Pressable>
-          ))}
+            </View>
+            );
+          })}
         </>
       )}
     </ScrollView>
@@ -2973,13 +3012,13 @@ export default function App() {
   // ── Layout ────────────────────────────────────────────────────────────────
 
   const renderTab = () => {
+    if (selectedTherapist) return renderTherapistProfile(selectedTherapist);
+    if (selectedPractice) return renderPracticeProfile(selectedPractice);
     if (showCreatePractice) return renderCreatePractice();
     if (showPracticeSearch) return renderPracticeSearch();
     if (showInvitePage) return renderInvitePage();
     if (showPracticeAdmin) return renderPracticeAdmin();
     if (showRegister) return renderRegister();
-    if (selectedTherapist) return renderTherapistProfile(selectedTherapist);
-    if (selectedPractice) return renderPracticeProfile(selectedPractice);
     if (activeTab === 'favorites') return renderFavorites();
     if (activeTab === 'therapist') {
       if (loggedInTherapist) return renderTherapistDashboard();

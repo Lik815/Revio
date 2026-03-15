@@ -8,7 +8,7 @@ export function PageShell({
   children,
 }: {
   title: string;
-  description: string;
+  description?: string;
   eyebrow?: string;
   actions?: ReactNode;
   children: ReactNode;
@@ -19,7 +19,7 @@ export function PageShell({
         <div>
           <div className="kicker">{eyebrow}</div>
           <h2 className="page-title">{title}</h2>
-          <p className="page-description">{description}</p>
+          {description && <p className="page-description">{description}</p>}
         </div>
         {actions ? <div className="page-actions">{actions}</div> : null}
       </div>

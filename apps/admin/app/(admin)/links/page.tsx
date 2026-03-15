@@ -1,7 +1,7 @@
-import { PageShell } from '../../components/page-shell';
-import { LinkActions } from '../../components/action-buttons';
-import { api } from '../../lib/api';
-import { confirmLink, rejectLink, disputeLink } from '../../lib/actions';
+import { PageShell } from '../../../components/page-shell';
+import { LinkActions } from '../../../components/action-buttons';
+import { api } from '../../../lib/api';
+import { confirmLink, rejectLink, disputeLink } from '../../../lib/actions';
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });

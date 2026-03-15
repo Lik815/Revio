@@ -8,7 +8,6 @@ const links = [
   { href: '/therapists', label: 'Therapeut:innen', icon: '◌' },
   { href: '/practices', label: 'Praxen', icon: '◪' },
   { href: '/links', label: 'Verknüpfungen', icon: '⇄' },
-  { href: '/profiles', label: 'Profile', icon: '⌕' },
 ];
 
 export function Sidebar({

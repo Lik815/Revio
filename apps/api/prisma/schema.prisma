@@ -41,6 +41,7 @@ model Therapist {
   specializations   String
   languages         String
   certifications    String       @default("")
+  kassenart         String       @default("")
   reviewStatus      ReviewStatus @default(PENDING_REVIEW)
   passwordHash      String?
   sessionToken      String?      @unique

@@ -1,7 +1,7 @@
 import Link from 'next/link';
-import { PageShell } from '../components/page-shell';
-import { MilestoneModal } from '../components/milestone-modal';
-import { api } from '../lib/api';
+import { PageShell } from '../../components/page-shell';
+import { MilestoneModal } from '../../components/milestone-modal';
+import { api } from '../../lib/api';
 
 export default async function HomePage() {
   const stats = await api.getStats();

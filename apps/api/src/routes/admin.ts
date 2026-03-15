@@ -76,6 +76,11 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
     return fastify.verifyAdmin(request, reply);
   });
 
+  // Visibility issues: always returns empty since APPROVED therapists are always visible
+  fastify.get('/visibility-issues', async () => {
+    return { count: 0, issues: [] };
+  });
+
   // Stats
   fastify.get('/stats', async () => {
     const [tCounts, pCounts, lCounts] = await Promise.all([
@@ -113,9 +118,33 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
 
   fastify.post('/therapists/:id/approve', async (request, reply) => {
     const { id } = request.params as { id: string };
-    const t = await fastify.prisma.therapist.update({ where: { id }, data: { reviewStatus: 'APPROVED' } }).catch(() => null);
+    const t = await fastify.prisma.therapist.update({
+      where: { id },
+      data: { reviewStatus: 'APPROVED' },
+      include: { links: { include: { practice: true } } },
+    }).catch(() => null);
     if (!t) return reply.notFound('Therapist not found');
-    return { message: 'Therapist approved.' };
+
+    // Cascade: approve PENDING_REVIEW practices and PROPOSED links for this therapist
+    const practiceIds = t.links.map((l) => l.practiceId);
+    const [updatedPractices, updatedLinks] = await Promise.all([
+      fastify.prisma.practice.updateMany({
+        where: { id: { in: practiceIds }, reviewStatus: { in: ['PENDING_REVIEW', 'DRAFT'] } },
+        data: { reviewStatus: 'APPROVED' },
+      }),
+      fastify.prisma.therapistPracticeLink.updateMany({
+        where: { therapistId: id, status: 'PROPOSED' },
+        data: { status: 'CONFIRMED' },
+      }),
+    ]);
+
+    return {
+      message: 'Therapeut freigegeben.',
+      sideEffects: {
+        practicesApproved: updatedPractices.count,
+        linksConfirmed: updatedLinks.count,
+      },
+    };
   });
 
   fastify.post('/therapists/:id/reject', async (request, reply) => {

@@ -1,8 +1,8 @@
-import { PageShell } from '../../components/page-shell';
-import { PracticeActions } from '../../components/action-buttons';
-import { DeadlineTimer } from '../../components/deadline-timer';
-import { api } from '../../lib/api';
-import { approvePractice, rejectPractice, suspendPractice } from '../../lib/actions';
+import { PageShell } from '../../../components/page-shell';
+import { PracticeActions } from '../../../components/action-buttons';
+import { DeadlineTimer } from '../../../components/deadline-timer';
+import { api } from '../../../lib/api';
+import { approvePractice, rejectPractice, suspendPractice } from '../../../lib/actions';
 
 type SearchParams = Promise<{ status?: string; q?: string; city?: string }>;
 

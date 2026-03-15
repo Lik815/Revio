@@ -101,7 +101,7 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
 
     const input: SearchInput = parsed.data;
 
-    // Load all approved therapists with their confirmed/approved practices
+    // Load all approved therapists — always visible, practices are optional
     const therapists = await fastify.prisma.therapist.findMany({
       where: { reviewStatus: 'APPROVED' },
       include: {
@@ -176,6 +176,43 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
     return {
       therapists: results,
       practices: Array.from(practiceMap.values()),
+    };
+  });
+
+  // ── GET /therapist/:id ────────────────────────────────────────────────────
+
+  fastify.get('/therapist/:id', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const t = await fastify.prisma.therapist.findUnique({
+      where: { id },
+      include: {
+        links: {
+          where: { status: 'CONFIRMED' },
+          include: { practice: true },
+        },
+      },
+    });
+    if (!t) return reply.notFound('Therapeut nicht gefunden');
+    const practices = t.links.map((link) => {
+      let photos: string[] | undefined;
+      if (link.practice.photos) { try { photos = JSON.parse(link.practice.photos); } catch {} }
+      return {
+        id: link.practice.id, name: link.practice.name, city: link.practice.city,
+        address: link.practice.address ?? undefined, phone: link.practice.phone ?? undefined,
+        hours: link.practice.hours ?? undefined, description: link.practice.description ?? undefined,
+        lat: link.practice.lat, lng: link.practice.lng,
+        logo: link.practice.logo ?? undefined, photos,
+      };
+    });
+    return {
+      therapist: {
+        id: t.id, fullName: t.fullName, professionalTitle: t.professionalTitle,
+        specializations: splitList(t.specializations),
+        languages: splitList(t.languages),
+        certifications: splitList(t.certifications),
+        homeVisit: t.homeVisit, city: t.city, bio: t.bio ?? undefined,
+        photo: t.photo ?? undefined, practices,
+      },
     };
   });
 

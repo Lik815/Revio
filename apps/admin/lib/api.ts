@@ -23,9 +23,23 @@ async function adminFetch<T>(path: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+export type VisibilityIssue = {
+  therapistId: string;
+  fullName: string;
+  visible: boolean;
+  pendingPractices: { id: string; name: string; status: string }[];
+  pendingLinks: { id: string; practiceId: string; status: string }[];
+};
+
+export type VisibilityIssues = {
+  count: number;
+  issues: VisibilityIssue[];
+};
+
 export const api = {
   getStats: () => adminFetch<AdminStats>('/admin/stats'),
   getTherapists: () => adminFetch<TherapistWithLinks[]>('/admin/therapists'),
   getPractices: () => adminFetch<PracticeWithLinks[]>('/admin/practices'),
   getLinks: () => adminFetch<LinkWithEntities[]>('/admin/links'),
+  getVisibilityIssues: () => adminFetch<VisibilityIssues>('/admin/visibility-issues'),
 };
