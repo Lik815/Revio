@@ -1,4 +1,22 @@
 {
-  "compilerOptions": {},
+  "compilerOptions": {
+    "skipLibCheck": true,
+    "allowJs": true,
+    "moduleResolution": "node",
+    "noEmit": true,
+    "strict": false,
+    "target": "es2015",
+    "downlevelIteration": true,
+    "lib": [
+      "es2015",
+      "dom"
+    ]
+  },
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": [
+    "node_modules"
+  ],
   "extends": "expo/tsconfig.base"
 }

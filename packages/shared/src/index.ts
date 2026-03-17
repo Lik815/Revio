@@ -80,6 +80,7 @@ export interface SearchTherapist {
   languages: string[];
   certifications: string[];
   kassenart: string;
+  availability?: string;
   homeVisit: boolean;
   city: string;
   bio?: string;

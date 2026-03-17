@@ -66,6 +66,19 @@ const ALL_CERTS = ['MT', 'KGG', 'Bobath', 'Vojta', 'MDT', 'PNF', 'DNS', 'FDM', '
 
 const KASSENART_OPTIONS = ['gesetzlich', 'privat', 'selbstzahler'];
 
+const AVAILABILITY_OPTIONS = [
+  'Mo–Fr 8:00–18:00 Uhr',
+  'Mo–Fr 7:30–19:00 Uhr',
+  'Mo–Fr 8:00–17:00, Sa 9:00–13:00 Uhr',
+  'Mo–Do 8:00–18:00, Fr 8:00–17:00 Uhr',
+  'Mo–Fr 9:00–18:00 Uhr',
+  'Mo–Mi 8:00–18:00, Do–Fr 8:00–16:00 Uhr',
+  'Di–Sa 9:00–18:00 Uhr',
+  'Mo–Fr 8:30–18:30 Uhr',
+  '',
+  '',
+];
+
 const ALL_LANGS = ['de', 'en', 'tr', 'ru', 'ar', 'fr', 'it', 'es', 'pl', 'hr'];
 
 const BIOS = [
@@ -209,6 +222,7 @@ async function main() {
         languages: langs.join(', '),
         certifications: certs.join(', '),
         kassenart: KASSENART_OPTIONS[i % KASSENART_OPTIONS.length],
+        availability: pick(AVAILABILITY_OPTIONS, i * 13),
         reviewStatus: 'APPROVED',
         links: {
           create: { practiceId: practice.id, status: 'CONFIRMED' },
@@ -231,6 +245,7 @@ async function main() {
       languages: 'de, en',
       certifications: 'MT',
       kassenart: 'gesetzlich',
+      availability: 'Mo–Fr 8:00–18:00 Uhr',
       reviewStatus: 'APPROVED',
       passwordHash: testPasswordHash,
       links: {
@@ -243,6 +258,34 @@ async function main() {
   await prisma.practice.update({
     where: { id: practiceRecords[0].id },
     data: { adminTherapistId: testTherapist.id } as any,
+  });
+
+  // ── Notification für Test-User: Beitrittsanfrage an seine Praxis ──────────
+  // Erstelle einen Therapeuten der eine Anfrage an "Physio & Motion" stellt
+  const notifTherapist = await prisma.therapist.create({
+    data: {
+      email: 'sarah.mueller.notif@example.com',
+      fullName: 'Sarah Müller',
+      professionalTitle: 'Physiotherapeutin',
+      city: 'Köln',
+      bio: 'Schwerpunkt manuelle Therapie und Faszienbehandlung.',
+      homeVisit: true,
+      specializations: 'Manuelle Therapie, Faszientherapie',
+      languages: 'de, en',
+      certifications: 'MT, Faszientherapie',
+      kassenart: 'Alle Kassen',
+      availability: 'Mo–Fr 9:00–17:00 Uhr',
+      reviewStatus: 'APPROVED',
+    },
+  });
+  // PROPOSED-Link mit initiatedBy=THERAPIST → erscheint als JOIN_REQUEST für Test-User
+  await prisma.therapistPracticeLink.create({
+    data: {
+      therapistId: notifTherapist.id,
+      practiceId: practiceRecords[0].id,
+      status: 'PROPOSED',
+      initiatedBy: 'THERAPIST',
+    },
   });
 
   // ── Pending-Eintrag für Admin-Queue ───────────────────────────────────────
@@ -321,6 +364,7 @@ async function main() {
   console.log('  30 Praxen (APPROVED) mit Admin-Login');
   console.log('  100 Therapeuten (APPROVED) über 10 Städte verteilt');
   console.log('  1  Therapeut PENDING (Max Klein)');
+  console.log('  1  Beitrittsanfrage (Sarah Müller → Physio & Motion) als Notification');
   console.log('  TEST: test@revio.de / password (Therapeut + Praxis-Admin von "Physio & Motion")');
   console.log('  (Übrige Praxen: admin@<praxis-slug>.de / praxis123)');
 }

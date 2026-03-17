@@ -36,3 +36,6 @@ npm-debug.log*
 # Old separate app folders (superseded by monorepo)
 AdminRevio/
 revioApp/
+
+# Uploaded user files (use S3/CDN in production)
+apps/api/uploads/

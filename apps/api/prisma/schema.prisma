@@ -31,25 +31,32 @@ enum SuggestionType {
 }
 
 model Therapist {
-  id                String       @id @default(cuid())
-  email             String       @unique
-  fullName          String
-  professionalTitle String
-  city              String
-  bio               String?
-  homeVisit         Boolean      @default(false)
-  specializations   String
-  languages         String
-  certifications    String       @default("")
-  kassenart         String       @default("")
-  reviewStatus      ReviewStatus @default(PENDING_REVIEW)
-  passwordHash      String?
-  sessionToken      String?      @unique
-  photo             String?
-  createdAt         DateTime     @default(now())
-  updatedAt         DateTime     @updatedAt
-  links             TherapistPracticeLink[]
-  adminOfPractice   Practice?    @relation("PracticeAdmin")
+  id                    String       @id @default(cuid())
+  email                 String       @unique
+  fullName              String
+  professionalTitle     String
+  city                  String
+  bio                   String?
+  homeVisit             Boolean      @default(false)
+  specializations       String
+  languages             String
+  certifications        String       @default("")
+  kassenart             String       @default("")
+  availability          String       @default("")
+  isVisible             Boolean      @default(true)
+  reviewStatus          ReviewStatus @default(PENDING_REVIEW)
+  passwordHash          String?
+  sessionToken          String?      @unique
+  photo                 String?
+  invitedByPracticeId   String?
+  onboardingStatus      String       @default("none")
+  visibilityPreference  String       @default("hidden")
+  isPublished           Boolean      @default(false)
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+  links                 TherapistPracticeLink[]
+  adminOfPractice       Practice?    @relation("PracticeAdmin")
+  invitations           Invitation[]
 }
 
 model Practice {
@@ -74,6 +81,20 @@ model Practice {
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
   links             TherapistPracticeLink[]
+  invitations       Invitation[]
+}
+
+model Invitation {
+  id          String    @id @default(cuid())
+  token       String    @unique
+  therapistId String
+  practiceId  String
+  email       String
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdAt   DateTime  @default(now())
+  therapist   Therapist @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+  practice    Practice  @relation(fields: [practiceId], references: [id], onDelete: Cascade)
 }
 
 model SearchSuggestion {

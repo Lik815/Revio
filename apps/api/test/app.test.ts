@@ -596,3 +596,305 @@ describe('End-to-End: Register → Admin Approve → Visible in Search', () => {
     expect(results[0].practices[0].name).toBe('E2E Praxis');
   });
 });
+
+// ─── Invite Flow ──────────────────────────────────────────────────────────────
+
+describe('Invite Flow: practice manager creates therapist profile', () => {
+  let practiceId: string;
+  let practiceAdminToken: string; // adminSessionToken for practice-auth routes
+
+  beforeEach(async () => {
+    // Create a practice with its own admin credentials (for /invite/therapist route)
+    const practice = await prisma.practice.create({
+      data: {
+        name: 'Einlade-Praxis',
+        city: 'München',
+        reviewStatus: 'APPROVED',
+        adminEmail: 'praxis@test.de',
+        adminPasswordHash: 'hash',
+        adminSessionToken: 'practice-session-token',
+      },
+    });
+    practiceId = practice.id;
+    practiceAdminToken = 'practice-session-token';
+  });
+
+  const PRACTICE_AUTH = { authorization: `Bearer practice-session-token` };
+
+  it('creates therapist with invited status, not published', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/invite/therapist',
+      headers: PRACTICE_AUTH,
+      payload: {
+        fullName: 'Invited Therapeut',
+        professionalTitle: 'Physiotherapeut',
+        email: 'invited@test.de',
+        specializations: ['rücken'],
+        languages: ['de'],
+      },
+    });
+    expect(res.statusCode).toBe(201);
+    const body = res.json();
+    expect(body.therapistId).toBeTruthy();
+    expect(body.inviteToken).toBeTruthy();
+
+    const therapist = await prisma.therapist.findUnique({ where: { id: body.therapistId } });
+    expect(therapist?.onboardingStatus).toBe('invited');
+    expect(therapist?.isPublished).toBe(false);
+    expect(therapist?.invitedByPracticeId).toBe(practiceId);
+  });
+
+  it('invited therapist is NOT visible in search before claiming', async () => {
+    const createRes = await app.inject({
+      method: 'POST',
+      url: '/invite/therapist',
+      headers: PRACTICE_AUTH,
+      payload: {
+        fullName: 'Hidden Therapeut',
+        professionalTitle: 'PT',
+        email: 'hidden@test.de',
+        specializations: ['rücken'],
+        languages: ['de'],
+      },
+    });
+    expect(createRes.statusCode).toBe(201);
+
+    const searchRes = await app.inject({
+      method: 'POST',
+      url: '/search',
+      payload: { query: 'rücken', city: 'München' },
+    });
+    expect(searchRes.statusCode).toBe(200);
+    expect(searchRes.json().therapists).toHaveLength(0);
+  });
+
+  it('validate invite token returns therapist and practice info', async () => {
+    const createRes = await app.inject({
+      method: 'POST',
+      url: '/invite/therapist',
+      headers: PRACTICE_AUTH,
+      payload: {
+        fullName: 'Validate Test',
+        professionalTitle: 'PT',
+        email: 'validate@test.de',
+        specializations: [],
+        languages: [],
+      },
+    });
+    const { inviteToken } = createRes.json();
+
+    const res = await app.inject({
+      method: 'GET',
+      url: `/invite/validate?token=${inviteToken}`,
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.valid).toBe(true);
+    expect(body.therapist.fullName).toBe('Validate Test');
+    expect(body.practice.name).toBe('Einlade-Praxis');
+  });
+
+  it('claim sets password and returns session token; profile still NOT published', async () => {
+    const createRes = await app.inject({
+      method: 'POST',
+      url: '/invite/therapist',
+      headers: PRACTICE_AUTH,
+      payload: {
+        fullName: 'Claimer',
+        professionalTitle: 'PT',
+        email: 'claimer@test.de',
+        specializations: ['rücken'],
+        languages: ['de'],
+      },
+    });
+    const { therapistId, inviteToken } = createRes.json();
+
+    const claimRes = await app.inject({
+      method: 'POST',
+      url: '/invite/claim',
+      payload: { token: inviteToken, password: 'password123' },
+    });
+    expect(claimRes.statusCode).toBe(200);
+    const claimBody = claimRes.json();
+    expect(claimBody.token).toBeTruthy();
+    expect(claimBody.therapistId).toBe(therapistId);
+
+    // Profile still not published after claim alone
+    const therapist = await prisma.therapist.findUnique({ where: { id: therapistId } });
+    expect(therapist?.onboardingStatus).toBe('claimed');
+    expect(therapist?.isPublished).toBe(false);
+
+    // Still not in search
+    const searchRes = await app.inject({
+      method: 'POST',
+      url: '/search',
+      payload: { query: 'rücken', city: 'München' },
+    });
+    expect(searchRes.json().therapists).toHaveLength(0);
+  });
+
+  it('incomplete profile cannot be published: PATCH /invite/visibility returns isPublished: false', async () => {
+    const createRes = await app.inject({
+      method: 'POST',
+      url: '/invite/therapist',
+      headers: PRACTICE_AUTH,
+      payload: {
+        fullName: 'Incomplete',
+        professionalTitle: 'PT',
+        email: 'incomplete@test.de',
+        specializations: [],   // missing — required for profile completion
+        languages: [],         // missing
+      },
+    });
+    const { inviteToken } = createRes.json();
+
+    const claimRes = await app.inject({
+      method: 'POST',
+      url: '/invite/claim',
+      payload: { token: inviteToken, password: 'password123' },
+    });
+    const { token: sessionToken } = claimRes.json();
+
+    // Try to set visible — should stay unpublished due to missing fields
+    const visRes = await app.inject({
+      method: 'PATCH',
+      url: '/invite/visibility',
+      headers: { authorization: `Bearer ${sessionToken}` },
+      payload: { visibilityPreference: 'visible' },
+    });
+    expect(visRes.statusCode).toBe(200);
+    const visBody = visRes.json();
+    expect(visBody.isPublished).toBe(false);
+    expect(visBody.profileComplete).toBe(false);
+    expect(visBody.missingFields.length).toBeGreaterThan(0);
+  });
+
+  it('full invite flow: create → claim → complete profile → confirm → visible in search', async () => {
+    const createRes = await app.inject({
+      method: 'POST',
+      url: '/invite/therapist',
+      headers: PRACTICE_AUTH,
+      payload: {
+        fullName: 'Full Flow',
+        professionalTitle: 'Physiotherapeutin',
+        email: 'fullflow@test.de',
+        specializations: ['rücken'],
+        languages: ['de'],
+      },
+    });
+    expect(createRes.statusCode).toBe(201);
+    const { therapistId, inviteToken } = createRes.json();
+
+    // Claim
+    const claimRes = await app.inject({
+      method: 'POST',
+      url: '/invite/claim',
+      payload: { token: inviteToken, password: 'secret123' },
+    });
+    const { token: sessionToken } = claimRes.json();
+    const SESSION = { authorization: `Bearer ${sessionToken}` };
+
+    // Complete profile (bio is required)
+    await app.inject({
+      method: 'PATCH',
+      url: '/auth/me',
+      headers: SESSION,
+      payload: { bio: 'Erfahrene Physiotherapeutin.' },
+    });
+
+    // Confirm visibility
+    const visRes = await app.inject({
+      method: 'PATCH',
+      url: '/invite/visibility',
+      headers: SESSION,
+      payload: { visibilityPreference: 'visible' },
+    });
+    expect(visRes.statusCode).toBe(200);
+    expect(visRes.json().isPublished).toBe(true);
+
+    // Now visible in search
+    const searchRes = await app.inject({
+      method: 'POST',
+      url: '/search',
+      payload: { query: 'rücken', city: 'München' },
+    });
+    expect(searchRes.statusCode).toBe(200);
+    const therapists = searchRes.json().therapists;
+    expect(therapists).toHaveLength(1);
+    expect(therapists[0].fullName).toBe('Full Flow');
+  });
+
+  it('resend invite invalidates old token and creates new one', async () => {
+    const createRes = await app.inject({
+      method: 'POST',
+      url: '/invite/therapist',
+      headers: PRACTICE_AUTH,
+      payload: {
+        fullName: 'Resend Test',
+        professionalTitle: 'PT',
+        email: 'resend@test.de',
+        specializations: [],
+        languages: [],
+      },
+    });
+    const { therapistId, inviteToken: oldToken } = createRes.json();
+
+    const resendRes = await app.inject({
+      method: 'POST',
+      url: '/invite/resend',
+      headers: PRACTICE_AUTH,
+      payload: { therapistId },
+    });
+    expect(resendRes.statusCode).toBe(200);
+    const { inviteToken: newToken } = resendRes.json();
+    expect(newToken).not.toBe(oldToken);
+
+    // Old token is now invalid
+    const oldValidate = await app.inject({ method: 'GET', url: `/invite/validate?token=${oldToken}` });
+    expect(oldValidate.statusCode).toBe(400);
+
+    // New token is valid
+    const newValidate = await app.inject({ method: 'GET', url: `/invite/validate?token=${newToken}` });
+    expect(newValidate.statusCode).toBe(200);
+  });
+
+  it('duplicate email returns 409', async () => {
+    await app.inject({
+      method: 'POST',
+      url: '/invite/therapist',
+      headers: PRACTICE_AUTH,
+      payload: { fullName: 'First', professionalTitle: 'PT', email: 'dup@test.de', specializations: [], languages: [] },
+    });
+    const res = await app.inject({
+      method: 'POST',
+      url: '/invite/therapist',
+      headers: PRACTICE_AUTH,
+      payload: { fullName: 'Second', professionalTitle: 'PT', email: 'dup@test.de', specializations: [], languages: [] },
+    });
+    expect(res.statusCode).toBe(409);
+  });
+
+  it('expired token cannot be claimed', async () => {
+    const createRes = await app.inject({
+      method: 'POST',
+      url: '/invite/therapist',
+      headers: PRACTICE_AUTH,
+      payload: { fullName: 'Expired', professionalTitle: 'PT', email: 'expired@test.de', specializations: [], languages: [] },
+    });
+    const { therapistId, inviteToken } = createRes.json();
+
+    // Manually expire the invitation
+    await prisma.invitation.updateMany({
+      where: { therapistId },
+      data: { expiresAt: new Date(Date.now() - 1000) },
+    });
+
+    const claimRes = await app.inject({
+      method: 'POST',
+      url: '/invite/claim',
+      payload: { token: inviteToken, password: 'pass123' },
+    });
+    expect(claimRes.statusCode).toBe(400);
+  });
+});

@@ -12,17 +12,33 @@
       "backgroundColor": "#2F3E46"
     },
     "ios": {
-      "supportsTablet": false
+      "supportsTablet": false,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Revio benötigt deinen Standort, um Therapeuten in deiner Nähe zu finden.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Revio benötigt deinen Standort, um Therapeuten in deiner Nähe zu finden."
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#2F3E46"
-      }
+      },
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
+      ]
     },
     "web": {
       "bundler": "metro"
     },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Revio benötigt deinen Standort, um Therapeuten in deiner Nähe zu finden."
+        }
+      ]
+    ],
     "extra": {
       "eas": {
         "projectId": "453d86fe-08c1-4852-ae2a-a9991f64c845"

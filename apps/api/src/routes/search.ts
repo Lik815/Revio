@@ -102,9 +102,18 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
 
     const input: SearchInput = parsed.data;
 
-    // Load all approved therapists — always visible, practices are optional
+    // Load all approved therapists — always visible, practices are optional.
+    // Invited therapists (invitedByPracticeId != null) must also have isPublished: true
+    // to prevent profiles from showing before the therapist has confirmed publication.
     const therapists = await fastify.prisma.therapist.findMany({
-      where: { reviewStatus: 'APPROVED' },
+      where: {
+        reviewStatus: 'APPROVED',
+        isVisible: true,
+        OR: [
+          { invitedByPracticeId: null },
+          { isPublished: true },
+        ],
+      },
       include: {
         links: {
           where: {
@@ -164,6 +173,7 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
           languages: splitList(t.languages),
           certifications: splitList(t.certifications),
           kassenart: (t as any).kassenart ?? '',
+          availability: (t as any).availability ?? '',
           homeVisit: t.homeVisit,
           city: t.city,
           bio: t.bio ?? undefined,
@@ -172,6 +182,7 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
           practices,
         };
       })
+      .filter((t) => t.relevance > 0.5) // 0.5 = base score with no actual match
       .sort((a, b) => b.relevance - a.relevance);
 
     const practiceMap = new Map<string, SearchPractice>();
@@ -220,6 +231,54 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
     };
   });
 
+  // ── GET /practice-detail/:id ─────────────────────────────────────────────
+
+  fastify.get('/practice-detail/:id', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const practice = await fastify.prisma.practice.findUnique({
+      where: { id },
+      include: {
+        links: {
+          where: {
+            status: 'CONFIRMED',
+            therapist: { reviewStatus: 'APPROVED', isVisible: true },
+          },
+          include: {
+            therapist: {
+              select: {
+                id: true, fullName: true, professionalTitle: true,
+                photo: true, specializations: true, city: true,
+                homeVisit: true, bio: true,
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!practice) return reply.notFound('Praxis nicht gefunden');
+    let photos: string[] | undefined;
+    if (practice.photos) { try { photos = JSON.parse(practice.photos); } catch {} }
+    return {
+      practice: {
+        id: practice.id, name: practice.name, city: practice.city,
+        address: practice.address ?? undefined, phone: practice.phone ?? undefined,
+        hours: practice.hours ?? undefined, description: practice.description ?? undefined,
+        lat: practice.lat, lng: practice.lng,
+        logo: practice.logo ?? undefined, photos,
+      },
+      therapists: practice.links.map((l) => ({
+        id: l.therapist.id,
+        fullName: l.therapist.fullName,
+        professionalTitle: l.therapist.professionalTitle,
+        photo: l.therapist.photo ?? undefined,
+        specializations: splitList(l.therapist.specializations),
+        city: l.therapist.city,
+        homeVisit: l.therapist.homeVisit,
+        bio: l.therapist.bio ?? undefined,
+      })),
+    };
+  });
+
   // ── GET /suggest ──────────────────────────────────────────────────────────
   // Returns autosuggest grouped by type. Requires at least 3 characters.
 
@@ -258,5 +317,29 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     return { suggestions: Array.from(groups.values()) };
+  });
+
+  // ── GET /practices/search?q=... ──────────────────────────────────────────
+  // Used during registration to find an existing practice by name/city
+
+  fastify.get('/practices/search', async (request, reply) => {
+    const { q } = request.query as { q?: string };
+    if (!q || q.trim().length < 2) return { practices: [] };
+
+    const term = q.trim().toLowerCase();
+    const practices = await fastify.prisma.practice.findMany({
+      where: {
+        reviewStatus: 'APPROVED',
+        OR: [
+          { name: { contains: term } },
+          { city: { contains: term } },
+        ],
+      },
+      select: { id: true, name: true, city: true, address: true, phone: true },
+      take: 10,
+      orderBy: { name: 'asc' },
+    });
+
+    return { practices };
   });
 };

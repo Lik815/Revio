@@ -15,6 +15,8 @@ const updateMeSchema = z.object({
   professionalTitle: z.string().min(2).optional(),
   bio: z.string().optional(),
   homeVisit: z.boolean().optional(),
+  isVisible: z.boolean().optional(),
+  availability: z.string().optional(),
   specializations: z.array(z.string()).optional(),
   languages: z.array(z.string()).optional(),
   certifications: z.array(z.string()).optional(),
@@ -80,6 +82,8 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       languages: splitList(therapist.languages),
       certifications: splitList(therapist.certifications),
       photo: therapist.photo,
+      isVisible: therapist.isVisible,
+      availability: therapist.availability,
       reviewStatus: therapist.reviewStatus,
       adminPractice: adminPractice ?? null,
       practices: therapist.links.map((l) => ({
@@ -113,6 +117,8 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     if (data.professionalTitle !== undefined) updateData.professionalTitle = data.professionalTitle;
     if (data.bio !== undefined) updateData.bio = data.bio;
     if (data.homeVisit !== undefined) updateData.homeVisit = data.homeVisit;
+    if (data.isVisible !== undefined) updateData.isVisible = data.isVisible;
+    if (data.availability !== undefined) updateData.availability = data.availability;
     if (data.specializations !== undefined) updateData.specializations = data.specializations.join(', ');
     if (data.languages !== undefined) updateData.languages = data.languages.join(', ');
     if (data.certifications !== undefined) updateData.certifications = data.certifications.join(', ');
@@ -124,6 +130,20 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     });
 
     return { success: true, fullName: updated.fullName };
+  });
+
+  fastify.delete('/auth/me', async (request, reply) => {
+    const token = getToken(request);
+    if (!token) return reply.unauthorized('Kein Token');
+
+    const therapist = await fastify.prisma.therapist.findUnique({
+      where: { sessionToken: token },
+    });
+    if (!therapist) return reply.unauthorized('Ungültiger Token');
+
+    await fastify.prisma.therapist.delete({ where: { id: therapist.id } });
+
+    return { success: true };
   });
 
   fastify.post('/auth/logout', async (request, reply) => {

@@ -1,6 +1,7 @@
 import { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { hashPassword } from './auth.js';
+import { geocodeAddress } from '../utils/geocode.js';
 
 const registerSchema = z.object({
   email: z.string().email(),
@@ -19,6 +20,7 @@ const registerSchema = z.object({
     address: z.string().optional(),
     phone: z.string().optional(),
   }).optional(),
+  existingPracticeId: z.string().optional(),
 });
 
 export const registerRoutes: FastifyPluginAsync = async (fastify) => {
@@ -43,16 +45,26 @@ export const registerRoutes: FastifyPluginAsync = async (fastify) => {
     const linkStatus = isDev ? 'CONFIRMED' : 'PROPOSED';
 
     const practice = data.practice
-      ? await fastify.prisma.practice.create({
-          data: {
-            name: data.practice.name,
-            city: data.practice.city,
-            address: data.practice.address,
-            phone: data.practice.phone,
-            reviewStatus,
-          },
-        })
+      ? await (async () => {
+          const geo = await geocodeAddress(data.practice!.address ?? '', data.practice!.city);
+          return fastify.prisma.practice.create({
+            data: {
+              name: data.practice!.name,
+              city: data.practice!.city,
+              address: data.practice!.address,
+              phone: data.practice!.phone,
+              reviewStatus,
+              ...(geo ? { lat: geo.lat, lng: geo.lng } : {}),
+            },
+          });
+        })()
+      : data.existingPracticeId
+      ? await fastify.prisma.practice.findUnique({ where: { id: data.existingPracticeId } })
       : null;
+
+    if (data.existingPracticeId && !practice) {
+      return reply.badRequest('Praxis nicht gefunden.');
+    }
 
     const passwordHash = data.password ? await hashPassword(data.password) : undefined;
 
@@ -73,7 +85,8 @@ export const registerRoutes: FastifyPluginAsync = async (fastify) => {
           links: {
             create: {
               practiceId: practice.id,
-              status: linkStatus,
+              // existing practice links start as PROPOSED (need practice admin confirmation)
+              status: data.existingPracticeId ? 'PROPOSED' : linkStatus,
             },
           },
         } : {}),

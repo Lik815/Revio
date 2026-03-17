@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import * as Sharing from 'expo-sharing';
 import {
+  ActivityIndicator,
   Alert,
   Image,
   Linking,
@@ -55,6 +56,171 @@ const palette = {
   }
 };
 
+// ─── Translations ─────────────────────────────────────────────────────────────
+
+const translations = {
+  de: {
+    // Search/Discover tab
+    heroTitle: 'Den richtigen Physio\nfür dein Problem finden.',
+    heroSub: 'Geprüfte Physiotherapeuten in deiner Nähe — nach Beschwerde suchen, nicht nach Name.',
+    searchPlaceholder: 'Wobei brauchst du Hilfe?',
+    searchBtn: 'Suchen',
+    resultsLabel: 'Ergebnis',
+    resultsLabelPlural: 'Ergebnisse',
+    verifiedOnly: 'Nur geprüfte Profile',
+    noResults: 'Keine Ergebnisse',
+    noResultsBody: 'Versuche einen anderen Suchbegriff oder erweitere den Umkreis.',
+    loading: 'Suche läuft…',
+    homeVisitLabel: 'Hausbesuche',
+    homeVisitToggle: 'Nur Therapeuten mit Hausbesuchen',
+    homeVisitTag: 'Hausbesuch',
+    filterTitle: 'Filter',
+    kassenartLabel: 'Kassenart',
+    languageFilter: 'Sprache',
+    fortbildungLabel: 'Fortbildungen',
+    allOption: 'Alle',
+    locationPlaceholder: 'Standort wählen',
+    callPractice: '📞 Praxis anrufen',
+    // Tabs
+    tabSearch: 'Suchen',
+    tabFavorites: 'Favoriten',
+    tabTherapist: 'Therapeuten',
+    tabOptions: 'Optionen',
+    // Favorites
+    favoritesTitle: 'Favoriten',
+    favoritesEmpty: 'Noch keine Favoriten',
+    favoritesEmptyBody: 'Tippe auf das Herz-Symbol bei einem Therapeuten oder einer Praxis, um sie hier zu speichern.',
+    favoritesHint: 'Lokal gespeichert · nicht synchronisiert · nur für dich sichtbar',
+    favoritesTherapists: 'Therapeuten',
+    favoritesPractices: 'Praxen',
+    // Options
+    optionsTitle: 'Optionen',
+    optionsSubtitle: 'Einstellungen & Informationen',
+    languageOption: 'Sprache',
+    privacyOption: 'Datenschutz',
+    imprintOption: 'Impressum',
+    appVersionOption: 'App-Version',
+    comingSoon: 'Bald verfügbar',
+    appearanceOption: 'Erscheinungsbild',
+    themeLight: 'Hell',
+    themeDark: 'Dunkel',
+    themeSystem: 'System',
+    logoutBtn: 'Abmelden',
+    deleteAccount: 'Konto löschen',
+    deleteAccountConfirmTitle: 'Konto wirklich löschen?',
+    deleteAccountConfirmMsg: 'Dein Profil und alle Daten werden dauerhaft gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.',
+    deleteAccountConfirmBtn: 'Endgültig löschen',
+    myPractice: 'MEINE PRAXIS',
+    managePractice: 'Verwalten',
+    newPractice: 'Neue Praxis erstellen',
+    linkPractice: 'Praxis vernetzen',
+    notLoggedIn: 'Nicht angemeldet',
+    loginAction: 'Anmelden',
+    // Practice / Therapist profile
+    backBtn: 'Zurück',
+    openInMaps: 'In Karte öffnen',
+    distanceLabel: 'Entfernung',
+    hoursLabel: 'Öffnungszeiten',
+    addressLabel: 'Adresse',
+    availabilityLabel: 'Sprechzeiten',
+    insuranceLabel: 'Kassenart',
+    specsLabel: 'Spezialisierungen',
+    certsLabel: 'Fortbildungen',
+    aboutLabel: 'Über mich',
+    practicesLabel: 'Praxis',
+    therapistsLabel: 'Therapeuten',
+    behandlungLabel: 'Behandlungsbereiche',
+    detailsLabel: 'Details',
+    // Location sheet
+    locationTitle: 'Wo suchst du?',
+    locationSub: 'Wir brauchen deinen Standort, um Therapeuten in deiner Nähe zu finden.',
+    useGPS: 'Aktuellen Standort verwenden',
+    gpsLoading: 'Standort wird ermittelt …',
+    locationDivider: 'oder Stadt eingeben',
+    confirmLocation: 'Weiter',
+  },
+  en: {
+    // Search/Discover tab
+    heroTitle: 'Find the right physio\nfor your problem.',
+    heroSub: 'Verified physiotherapists near you — search by condition, not by name.',
+    searchPlaceholder: 'What do you need help with?',
+    searchBtn: 'Search',
+    resultsLabel: 'Result',
+    resultsLabelPlural: 'Results',
+    verifiedOnly: 'Verified profiles only',
+    noResults: 'No results',
+    noResultsBody: 'Try a different search term or expand the radius.',
+    loading: 'Searching…',
+    homeVisitLabel: 'Home visits',
+    homeVisitToggle: 'Only therapists with home visits',
+    homeVisitTag: 'Home visit',
+    filterTitle: 'Filter',
+    kassenartLabel: 'Insurance type',
+    languageFilter: 'Language',
+    fortbildungLabel: 'Qualifications',
+    allOption: 'All',
+    locationPlaceholder: 'Select location',
+    callPractice: '📞 Call practice',
+    // Tabs
+    tabSearch: 'Search',
+    tabFavorites: 'Favorites',
+    tabTherapist: 'Therapists',
+    tabOptions: 'Options',
+    // Favorites
+    favoritesTitle: 'Favorites',
+    favoritesEmpty: 'No favorites yet',
+    favoritesEmptyBody: 'Tap the heart icon on a therapist or practice to save them here.',
+    favoritesHint: 'Saved locally · not synced · only visible to you',
+    favoritesTherapists: 'Therapists',
+    favoritesPractices: 'Practices',
+    // Options
+    optionsTitle: 'Options',
+    optionsSubtitle: 'Settings & Information',
+    languageOption: 'Language',
+    privacyOption: 'Privacy',
+    imprintOption: 'Imprint',
+    appVersionOption: 'App Version',
+    comingSoon: 'Coming soon',
+    appearanceOption: 'Appearance',
+    themeLight: 'Light',
+    themeDark: 'Dark',
+    themeSystem: 'System',
+    logoutBtn: 'Log out',
+    deleteAccount: 'Delete account',
+    deleteAccountConfirmTitle: 'Delete account?',
+    deleteAccountConfirmMsg: 'Your profile and all data will be permanently deleted. This action cannot be undone.',
+    deleteAccountConfirmBtn: 'Delete permanently',
+    myPractice: 'MY PRACTICE',
+    managePractice: 'Manage',
+    newPractice: 'Create new practice',
+    linkPractice: 'Link practice',
+    notLoggedIn: 'Not logged in',
+    loginAction: 'Log in',
+    // Practice / Therapist profile
+    backBtn: 'Back',
+    openInMaps: 'Open in Maps',
+    distanceLabel: 'Distance',
+    hoursLabel: 'Opening hours',
+    addressLabel: 'Address',
+    availabilityLabel: 'Office hours',
+    insuranceLabel: 'Insurance',
+    specsLabel: 'Specializations',
+    certsLabel: 'Qualifications',
+    aboutLabel: 'About',
+    practicesLabel: 'Practice',
+    therapistsLabel: 'Therapists',
+    behandlungLabel: 'Treatment areas',
+    detailsLabel: 'Details',
+    // Location sheet
+    locationTitle: 'Where are you searching?',
+    locationSub: 'We need your location to find therapists near you.',
+    useGPS: 'Use current location',
+    gpsLoading: 'Detecting location …',
+    locationDivider: 'or enter a city',
+    confirmLocation: 'Continue',
+  },
+};
+
 // ─── Autocomplete suggestions ─────────────────────────────────────────────────
 
 const allSuggestions = [
@@ -81,10 +247,10 @@ const quickChips = [
 // ─── Nav tabs ─────────────────────────────────────────────────────────────────
 
 const tabs = [
-  { key: 'discover',  label: 'Suchen',    icon: '⌕' },
-  { key: 'favorites', label: 'Favoriten', icon: '♡' },
-  { key: 'therapist', label: 'Therapeuten', icon: '＋' },
-  { key: 'options',   label: 'Optionen',  icon: '☰' }
+  { key: 'discover',  labelKey: 'tabSearch',     icon: '⌕' },
+  { key: 'favorites', labelKey: 'tabFavorites',  icon: '♡' },
+  { key: 'therapist', labelKey: 'tabTherapist',  icon: '＋' },
+  { key: 'options',   labelKey: 'tabOptions',    icon: '☰' }
 ];
 
 // ─── Filter options ───────────────────────────────────────────────────────────
@@ -171,6 +337,8 @@ const mapApiTherapist = (t) => ({
   specializations: parseStringOrArray(t.specializations),
   languages: parseStringOrArray(t.languages).map(l => l.toUpperCase()),
   homeVisit: t.homeVisit ?? false,
+  isVisible: t.isVisible ?? true,
+  availability: t.availability ?? '',
   city: t.city ?? '',
   bio: t.bio ?? '',
   kassenart: t.kassenart ?? null,
@@ -225,14 +393,20 @@ function callPhone(phone) {
 
 export default function App() {
   const systemScheme = useColorScheme();
-  const [themeMode, setThemeMode] = useState('light'); // 'light' | 'dark' | 'system'
+  const [themeMode, setThemeMode] = useState('system'); // 'light' | 'dark' | 'system'
   const scheme = themeMode === 'system'
     ? (systemScheme === 'dark' ? 'dark' : 'light')
     : themeMode;
   const c = palette[scheme];
 
+  const [appLanguage, setAppLanguage] = useState('de'); // 'de' | 'en'
+  const t = (key) => translations[appLanguage]?.[key] ?? translations['de'][key];
+
   const [activeTab, setActiveTab] = useState('discover');
   const [selectedPractice, setSelectedPractice] = useState(null);
+  const [selectedPracticeTherapists, setSelectedPracticeTherapists] = useState([]);
+  const [selectedPracticeLoading, setSelectedPracticeLoading] = useState(false);
+  const [selectedPracticeError, setSelectedPracticeError] = useState('');
   const [selectedTherapist, setSelectedTherapist] = useState(null);
 
   // Favorites — stored locally on device only
@@ -260,11 +434,11 @@ export default function App() {
     });
   }, []);
   const toggleFavoritePractice = (practice) => {
-    const therapists = allApiTherapists.filter(t => t.practices?.some(pr => pr.id === practice.id));
-    const practiceWithTherapists = { ...practice, therapists };
+    // Store only practice metadata — therapists are always fetched live via openPractice()
+    const { therapists: _drop, ...practiceData } = practice;
     setFavoritePractices(prev => {
       const exists = prev.some(f => f.id === practice.id);
-      const next = exists ? prev.filter(f => f.id !== practice.id) : [...prev, practiceWithTherapists];
+      const next = exists ? prev.filter(f => f.id !== practice.id) : [...prev, practiceData];
       AsyncStorage.setItem('revio_fav_practices', JSON.stringify(next));
       return next;
     });
@@ -297,6 +471,9 @@ export default function App() {
   const [regCustomLanguage, setRegCustomLanguage] = useState('');
   const [regPracticeMode, setRegPracticeMode] = useState('new'); // 'new' | 'existing' | 'skip'
   const [regExistingPracticeName, setRegExistingPracticeName] = useState('');
+  const [regExistingPracticeId, setRegExistingPracticeId] = useState(null);
+  const [regPracticeSearchResults, setRegPracticeSearchResults] = useState([]);
+  const [regPracticeSearching, setRegPracticeSearching] = useState(false);
 
   // Auth state
   const [authToken, setAuthToken] = useState(null);
@@ -311,6 +488,8 @@ export default function App() {
   const [editSpecializations, setEditSpecializations] = useState('');
   const [editLanguages, setEditLanguages] = useState('');
   const [editHomeVisit, setEditHomeVisit] = useState(false);
+  const [editIsVisible, setEditIsVisible] = useState(true);
+  const [editAvailability, setEditAvailability] = useState('');
   const [profileSaving, setProfileSaving] = useState(false);
 
   // Practice management state
@@ -321,7 +500,6 @@ export default function App() {
   const practiceAdminScrollRef = React.useRef(null);
   const inviteSectionY = React.useRef(0);
   const [showInvitePage, setShowInvitePage] = useState(false);
-  const [inviteTab, setInviteTab] = useState('search'); // 'search' | 'link'
   const [inviteSearchQuery, setInviteSearchQuery] = useState('');
   const [inviteSearchResults, setInviteSearchResults] = useState([]);
   const [inviteSearchLoading, setInviteSearchLoading] = useState(false);
@@ -342,7 +520,6 @@ export default function App() {
   const [practiceSearchQuery, setPracticeSearchQuery] = useState('');
   const [practiceSearchResults, setPracticeSearchResults] = useState([]);
   const [practiceSearchLoading, setPracticeSearchLoading] = useState(false);
-  const [inviteEmail, setInviteEmail] = useState('');
   const [editPracticeName, setEditPracticeName] = useState('');
   const [editPracticeCity, setEditPracticeCity] = useState('');
   const [editPracticeAddress, setEditPracticeAddress] = useState('');
@@ -352,6 +529,25 @@ export default function App() {
   const [practiceEditSaving, setPracticeEditSaving] = useState(false);
   const [editPracticeLogo, setEditPracticeLogo] = useState(null);
   const [editPracticePhotos, setEditPracticePhotos] = useState([]);
+
+  // Create-therapist-profile form state (practice admin)
+  const [invitePageTab, setInvitePageTab] = useState('link'); // 'new' | 'link'
+  const [createTherapistName, setCreateTherapistName] = useState('');
+  const [createTherapistEmail, setCreateTherapistEmail] = useState('');
+  const [createTherapistTitle, setCreateTherapistTitle] = useState('');
+  const [createTherapistLoading, setCreateTherapistLoading] = useState(false);
+  const [createTherapistError, setCreateTherapistError] = useState('');
+
+  // Invite claim flow state
+  const [showInviteClaim, setShowInviteClaim] = useState(false);
+  const [inviteClaimToken, setInviteClaimToken] = useState(null);
+  const [inviteClaimData, setInviteClaimData] = useState(null); // { therapist, practice }
+  const [inviteClaimLoading, setInviteClaimLoading] = useState(false);
+  const [inviteClaimError, setInviteClaimError] = useState('');
+  const [inviteClaimPassword, setInviteClaimPassword] = useState('');
+  const [inviteClaimPasswordConfirm, setInviteClaimPasswordConfirm] = useState('');
+  const [showVisibilityModal, setShowVisibilityModal] = useState(false);
+  const [visibilityLoading, setVisibilityLoading] = useState(false);
 
   useEffect(() => {
     AsyncStorage.getItem('revio_auth_token').then(async (token) => {
@@ -368,6 +564,45 @@ export default function App() {
         }
       } catch {}
     });
+  }, []);
+
+  // Deep-link / initial URL handling for invite token
+  useEffect(() => {
+    const handleUrl = async (url) => {
+      if (!url) return;
+      try {
+        const match = url.match(/[?&]token=([^&]+)/);
+        if (!match) return;
+        const token = decodeURIComponent(match[1]);
+        setInviteClaimLoading(true);
+        setInviteClaimError('');
+        try {
+          const res = await fetch(`${getBaseUrl()}/invite/validate?token=${encodeURIComponent(token)}`);
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            setInviteClaimError(err.message ?? 'Ungültige Einladung');
+            setShowInviteClaim(true);
+            return;
+          }
+          const data = await res.json();
+          setInviteClaimToken(token);
+          setInviteClaimData(data);
+          setInviteClaimPassword('');
+          setInviteClaimPasswordConfirm('');
+          setInviteClaimError('');
+          setShowInviteClaim(true);
+        } catch {
+          setInviteClaimError('Verbindungsfehler beim Validieren der Einladung.');
+          setShowInviteClaim(true);
+        } finally {
+          setInviteClaimLoading(false);
+        }
+      } catch {}
+    };
+
+    Linking.getInitialURL().then(handleUrl);
+    const sub = Linking.addEventListener('url', (e) => handleUrl(e.url));
+    return () => sub.remove();
   }, []);
 
   // Poll notifications every 30s when logged in
@@ -433,6 +668,66 @@ export default function App() {
     setLoggedInTherapist(null);
   };
 
+  const deleteAccountConfirmed = async () => {
+    try {
+      await fetch(`${getBaseUrl()}/auth/me`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${authToken}` },
+      });
+    } catch {}
+    await AsyncStorage.removeItem('revio_auth_token');
+    setAuthToken(null);
+    setLoggedInTherapist(null);
+  };
+
+  const handleDeleteAccount = () => {
+    if (loggedInTherapist?.adminPractice) {
+      const msg = `Du bist Admin von „${loggedInTherapist.adminPractice.name}". Bitte lösche zuerst die Praxis, bevor du dein Konto löschst.`;
+      if (Platform.OS === 'web') { window.alert(`Praxis zuerst löschen\n\n${msg}`); }
+      else { Alert.alert('Praxis zuerst löschen', msg, [{ text: 'OK' }]); }
+      return;
+    }
+    const msg = t('deleteAccountConfirmMsg');
+    if (Platform.OS === 'web') {
+      if (window.confirm(`${t('deleteAccountConfirmTitle')}\n\n${msg}`)) deleteAccountConfirmed();
+    } else {
+      Alert.alert(t('deleteAccountConfirmTitle'), msg, [
+        { text: t('cancelBtn') ?? 'Abbrechen', style: 'cancel' },
+        { text: t('deleteAccountConfirmBtn'), style: 'destructive', onPress: deleteAccountConfirmed },
+      ]);
+    }
+  };
+
+  const deletePracticeConfirmed = async () => {
+    try {
+      const res = await fetch(`${getBaseUrl()}/my/practice`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${authToken}` },
+      });
+      if (res.ok) {
+        setShowPracticeAdmin(false);
+        setAdminPracticeDetail(null);
+        const meRes = await fetch(`${getBaseUrl()}/auth/me`, {
+          headers: { Authorization: `Bearer ${authToken}` },
+        });
+        if (meRes.ok) setLoggedInTherapist(await meRes.json());
+      }
+    } catch {}
+  };
+
+  const handleDeletePractice = () => {
+    const practiceName = loggedInTherapist?.adminPractice?.name ?? 'diese Praxis';
+    const msg = `„${practiceName}" wird dauerhaft gelöscht. Alle verknüpften Therapeuten werden getrennt. Diese Aktion kann nicht rückgängig gemacht werden.`;
+    if (Platform.OS === 'web') {
+      if (window.confirm(`Praxis löschen?\n\n${msg}`)) deletePracticeConfirmed();
+    } else {
+      Alert.alert('Praxis löschen', msg, [
+        { text: 'Abbrechen', style: 'cancel' },
+        { text: 'Endgültig löschen', style: 'destructive', onPress: deletePracticeConfirmed },
+      ]);
+    }
+  };
+
   const handleSaveProfile = async () => {
     if (!authToken) return;
     setProfileSaving(true);
@@ -445,6 +740,8 @@ export default function App() {
           specializations: editSpecializations.split(',').map(s => s.trim()).filter(Boolean),
           languages: editLanguages.split(',').map(s => s.trim()).filter(Boolean),
           homeVisit: editHomeVisit,
+          isVisible: editIsVisible,
+          availability: editAvailability,
         }),
       });
       if (res.ok) {
@@ -471,22 +768,29 @@ export default function App() {
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 0.3,
-      base64: true,
+      quality: 0.7,
+      base64: false,
     });
-    if (result.canceled || !result.assets?.[0]?.base64) return;
-    const photo = `data:image/jpeg;base64,${result.assets[0].base64}`;
+    if (result.canceled || !result.assets?.[0]?.uri) return;
+    const asset = result.assets[0];
+    const uri = asset.uri;
+    const filename = uri.split('/').pop() || 'photo.jpg';
+    const mimeType = asset.mimeType || 'image/jpeg';
     try {
-      const res = await fetch(`${getBaseUrl()}/auth/me`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
-        body: JSON.stringify({ photo }),
+      const formData = new FormData();
+      formData.append('photo', { uri, name: filename, type: mimeType });
+      const uploadRes = await fetch(`${getBaseUrl()}/upload/photo`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${authToken}` },
+        body: formData,
       });
-      if (res.ok) {
-        setLoggedInTherapist(prev => ({ ...prev, photo }));
+      if (uploadRes.ok) {
+        const { url } = await uploadRes.json();
+        const fullUrl = `${getBaseUrl()}${url}`;
+        setLoggedInTherapist(prev => ({ ...prev, photo: fullUrl }));
         Alert.alert('Erfolg', 'Profilbild gespeichert.');
       } else {
-        const status = res.status;
+        const status = uploadRes.status;
         Alert.alert('Fehler', `Foto konnte nicht hochgeladen werden (${status}).`);
       }
     } catch {
@@ -599,22 +903,54 @@ export default function App() {
     } catch {}
   };
 
-  // Practice: invite therapist by email
-  const handleInviteTherapist = async () => {
-    if (!inviteEmail.trim()) return;
+  // Practice: create new therapist profile and send invitation
+  const handleCreateTherapist = async () => {
+    if (!createTherapistName.trim() || !createTherapistEmail.trim() || !createTherapistTitle.trim()) {
+      setCreateTherapistError('Bitte alle Pflichtfelder ausfüllen.');
+      return;
+    }
+    setCreateTherapistLoading(true);
+    setCreateTherapistError('');
     try {
-      const res = await fetch(`${getBaseUrl()}/my/practice/invite`, {
+      const res = await fetch(`${getBaseUrl()}/my/practice/create-therapist`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
-        body: JSON.stringify({ email: inviteEmail.trim() }),
+        body: JSON.stringify({
+          fullName: createTherapistName.trim(),
+          email: createTherapistEmail.trim(),
+          professionalTitle: createTherapistTitle.trim(),
+        }),
       });
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
-        setInviteEmail('');
-        Alert.alert('Einladung gesendet', 'Der Therapeut wurde eingeladen.');
+        setCreateTherapistName('');
+        setCreateTherapistEmail('');
+        setCreateTherapistTitle('');
+        setCreateTherapistError('');
+        Alert.alert('Profil erstellt', 'Eine Einladungs-E-Mail wurde verschickt.');
         await loadAdminPracticeDetail();
       } else {
+        setCreateTherapistError(data.message ?? 'Profil konnte nicht erstellt werden.');
+      }
+    } catch {
+      setCreateTherapistError('Verbindungsfehler. Bitte prüfe deine Internetverbindung.');
+    } finally {
+      setCreateTherapistLoading(false);
+    }
+  };
+
+  // Practice: resend invitation to an invited therapist
+  const handleResendInvite = async (therapistId) => {
+    try {
+      const res = await fetch(`${getBaseUrl()}/my/practice/resend-invite/${therapistId}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${authToken}` },
+      });
+      if (res.ok) {
+        Alert.alert('Einladung erneut gesendet', 'Eine neue Einladungs-E-Mail wurde verschickt.');
+      } else {
         const err = await res.json().catch(() => ({}));
-        Alert.alert('Fehler', err.message ?? 'Einladung konnte nicht gesendet werden.');
+        Alert.alert('Fehler', err.message ?? 'Einladung konnte nicht erneut gesendet werden.');
       }
     } catch {
       Alert.alert('Verbindungsfehler', 'Bitte prüfe deine Internetverbindung.');
@@ -798,6 +1134,7 @@ export default function App() {
         AsyncStorage.setItem('savedLocationLabel', label);
       }
       setUserCoords({ lat: loc.coords.latitude, lng: loc.coords.longitude });
+      AsyncStorage.setItem('savedCoords', JSON.stringify({ lat: loc.coords.latitude, lng: loc.coords.longitude }));
     } catch {
       Alert.alert('Fehler', 'Standort konnte nicht ermittelt werden.');
     }
@@ -828,6 +1165,7 @@ export default function App() {
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationSuggestions, setLocationSuggestions] = useState([]);
   const locationDebounceRef = React.useRef(null);
+  const pendingGPSResult = React.useRef(null); // stores { city, coords, label } from GPS detection
 
   // Autocomplete: suggestions matching current input
   const acSuggestions = query.length >= 2
@@ -841,6 +1179,14 @@ export default function App() {
       prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
     );
   };
+
+  // Auto-refresh search when filters change (only if a search has already been run)
+  const searchedRef = React.useRef(false);
+  useEffect(() => { searchedRef.current = searched; }, [searched]);
+  useEffect(() => {
+    if (!searchedRef.current) return;
+    runSearchWith(query, userCoords);
+  }, [homeVisit, kassenart, fortbildungen]);
 
   const applyFilters = (list) => {
     return list.filter(t => {
@@ -916,6 +1262,7 @@ export default function App() {
 
   const fetchLocationSuggestions = (text) => {
     setLocationSheetCity(text);
+    pendingGPSResult.current = null; // user is typing manually — discard GPS result
     setLocationSuggestions([]);
     if (locationDebounceRef.current) clearTimeout(locationDebounceRef.current);
     if (text.length < 3) return;
@@ -943,16 +1290,59 @@ export default function App() {
   const confirmLocationAndSearch = (resolvedCity, coords, label) => {
     setCity(resolvedCity);
     setLocationLabel(label || resolvedCity);
-    if (coords) setUserCoords(coords);
+    if (coords) {
+      setUserCoords(coords);
+      AsyncStorage.setItem('savedCoords', JSON.stringify(coords));
+    }
     AsyncStorage.setItem('savedCity', resolvedCity);
     AsyncStorage.setItem('savedLocationLabel', label || resolvedCity);
     setShowLocationSheet(false);
-    runSearchWith(pendingQuery, coords, resolvedCity);
+    if (pendingQuery !== null) runSearchWith(pendingQuery, coords, resolvedCity);
     setPendingQuery(null);
   };
 
   const handleLocationSheetGPS = async () => {
     setLocationLoading(true);
+
+    if (Platform.OS === 'web') {
+      if (!navigator?.geolocation) {
+        Alert.alert('Fehler', 'Standortzugriff wird in diesem Browser nicht unterstützt.');
+        setLocationLoading(false);
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          try {
+            const { latitude, longitude } = position.coords;
+            const res = await fetch(
+              `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&accept-language=de`
+            );
+            const data = await res.json();
+            const addr = data?.address || {};
+            const detectedCity = addr.city || addr.town || addr.village || addr.municipality || '';
+            if (!detectedCity) {
+              Alert.alert('Fehler', 'Stadt konnte nicht erkannt werden. Bitte manuell eingeben.');
+              setLocationLoading(false);
+              return;
+            }
+            const streetParts = [addr.road, addr.house_number].filter(Boolean).join(' ');
+            const label = streetParts ? `${streetParts}, ${detectedCity}` : detectedCity;
+            pendingGPSResult.current = { city: detectedCity, coords: { lat: latitude, lng: longitude }, label };
+            setLocationSheetCity(label);
+          } catch {
+            Alert.alert('Fehler', 'Standort konnte nicht ermittelt werden.');
+          }
+          setLocationLoading(false);
+        },
+        () => {
+          Alert.alert('Kein Zugriff', 'Bitte erlaube den Standortzugriff im Browser.');
+          setLocationLoading(false);
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+      return;
+    }
+
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
@@ -971,7 +1361,8 @@ export default function App() {
       // Build display label: "Straße Hausnr., Stadt"
       const streetParts = [geo.street, geo.streetNumber].filter(Boolean).join(' ');
       const label = streetParts ? `${streetParts}, ${detectedCity}` : detectedCity;
-      confirmLocationAndSearch(detectedCity, { lat: loc.coords.latitude, lng: loc.coords.longitude }, label);
+      pendingGPSResult.current = { city: detectedCity, coords: { lat: loc.coords.latitude, lng: loc.coords.longitude }, label };
+      setLocationSheetCity(label);
     } catch {
       Alert.alert('Fehler', 'Standort konnte nicht ermittelt werden.');
     }
@@ -981,20 +1372,50 @@ export default function App() {
   const handleLocationSheetManual = async () => {
     const input = locationSheetCity.trim();
     if (!input) return;
+    // If GPS already detected this exact location, use it directly — no re-geocoding needed
+    if (pendingGPSResult.current && pendingGPSResult.current.label === input) {
+      const { city: gpsCity, coords: gpsCoords, label: gpsLabel } = pendingGPSResult.current;
+      pendingGPSResult.current = null;
+      confirmLocationAndSearch(gpsCity, gpsCoords, gpsLabel);
+      return;
+    }
     setLocationLoading(true);
     try {
-      // Try to geocode the input to get coordinates + normalized city
-      const results = await Location.geocodeAsync(input);
-      if (results.length > 0) {
-        const { latitude, longitude } = results[0];
-        const [geo] = await Location.reverseGeocodeAsync({ latitude, longitude });
-        const resolvedCity = geo?.city || input;
-        const streetParts = [geo?.street, geo?.streetNumber].filter(Boolean).join(' ');
-        const label = streetParts ? `${streetParts}, ${resolvedCity}` : resolvedCity;
-        confirmLocationAndSearch(resolvedCity, { lat: latitude, lng: longitude }, label);
+      if (Platform.OS === 'web') {
+        // Use Nominatim for geocoding on web
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(input)}&format=json&limit=1&accept-language=de`
+        );
+        const data = await res.json();
+        if (data.length > 0) {
+          const { lat, lon, display_name } = data[0];
+          // Extract city from display_name or use input
+          const revRes = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=de`
+          );
+          const revData = await revRes.json();
+          const addr = revData?.address || {};
+          const resolvedCity = addr.city || addr.town || addr.village || addr.municipality || input;
+          const streetParts = [addr.road, addr.house_number].filter(Boolean).join(' ');
+          const label = streetParts ? `${streetParts}, ${resolvedCity}` : resolvedCity;
+          confirmLocationAndSearch(resolvedCity, { lat: parseFloat(lat), lng: parseFloat(lon) }, label);
+        } else {
+          confirmLocationAndSearch(input, null, input);
+        }
       } else {
-        // Fallback: use input as-is (last word as city heuristic)
-        confirmLocationAndSearch(input, null, input);
+        // Try to geocode the input to get coordinates + normalized city
+        const results = await Location.geocodeAsync(input);
+        if (results.length > 0) {
+          const { latitude, longitude } = results[0];
+          const [geo] = await Location.reverseGeocodeAsync({ latitude, longitude });
+          const resolvedCity = geo?.city || input;
+          const streetParts = [geo?.street, geo?.streetNumber].filter(Boolean).join(' ');
+          const label = streetParts ? `${streetParts}, ${resolvedCity}` : resolvedCity;
+          confirmLocationAndSearch(resolvedCity, { lat: latitude, lng: longitude }, label);
+        } else {
+          // Fallback: use input as-is (last word as city heuristic)
+          confirmLocationAndSearch(input, null, input);
+        }
       }
     } catch {
       confirmLocationAndSearch(input, null, input);
@@ -1002,17 +1423,54 @@ export default function App() {
     setLocationLoading(false);
   };
 
-  // Load saved city + label from AsyncStorage on mount
+  // Load saved city + label + language from AsyncStorage on mount
   useEffect(() => {
     Promise.all([
       AsyncStorage.getItem('savedCity'),
       AsyncStorage.getItem('savedLocationLabel'),
-    ]).then(([savedCity, savedLabel]) => {
+      AsyncStorage.getItem('appLanguage'),
+      AsyncStorage.getItem('savedCoords'),
+    ]).then(([savedCity, savedLabel, savedLang, savedCoords]) => {
       if (savedCity) setCity(savedCity);
       if (savedLabel) setLocationLabel(savedLabel);
+      if (savedLang === 'de' || savedLang === 'en') setAppLanguage(savedLang);
+      if (savedCoords) {
+        try { setUserCoords(JSON.parse(savedCoords)); } catch {}
+      }
     });
   }, []);
 
+
+
+  // ── Open practice (always loads fresh therapist data) ─────────────────────
+
+  const openPractice = async (practice) => {
+    setSelectedPracticeTherapists([]);
+    setSelectedPracticeLoading(true);
+    setSelectedPracticeError('');
+    setSelectedPractice(practice);
+    try {
+      const res = await fetch(`${getBaseUrl()}/practice-detail/${practice.id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setSelectedPracticeTherapists((data.therapists ?? []).map(th => ({
+          ...th,
+          photo: th.photo
+            ? (th.photo.startsWith('http') ? th.photo : `${BASE_URL}${th.photo}`)
+            : `https://i.pravatar.cc/96?u=${th.id}`,
+          specializations: Array.isArray(th.specializations) ? th.specializations : [],
+        })));
+      } else {
+        const body = await res.json().catch(() => ({}));
+        console.error('[openPractice] status:', res.status, 'body:', JSON.stringify(body));
+        setSelectedPracticeError(`Fehler ${res.status}: ${body.message ?? 'Therapeuten konnten nicht geladen werden.'}`);
+      }
+    } catch {
+      setSelectedPracticeError('Verbindungsfehler beim Laden der Therapeuten.');
+    } finally {
+      setSelectedPracticeLoading(false);
+    }
+  };
 
   // ── Discover tab ──────────────────────────────────────────────────────────
 
@@ -1029,11 +1487,10 @@ export default function App() {
           <Text style={[styles.brandName, { color: c.text }]}>evio</Text>
         </View>
         {authToken && (
-          <Pressable onPress={() => setShowNotifications(true)} style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: 'transparent', borderWidth: 2, borderColor: '#A7B6BE', alignItems: 'center', justifyContent: 'center' }}>
+          <Pressable onPress={() => setShowNotifications(true)} style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: 'transparent', borderWidth: 2, borderColor: c.muted, alignItems: 'center', justifyContent: 'center' }}>
+            <Ionicons name="notifications-outline" size={16} color={c.muted} />
             {notifications.length > 0 && (
-              <Text style={{ color: '#E74C3C', fontSize: 13, fontWeight: '700', lineHeight: 16 }}>
-                {notifications.length > 9 ? '9+' : notifications.length}
-              </Text>
+              <View style={{ position: 'absolute', top: -3, right: -3, width: 10, height: 10, borderRadius: 5, backgroundColor: '#E74C3C' }} />
             )}
           </Pressable>
         )}
@@ -1042,79 +1499,76 @@ export default function App() {
       {/* Hero — nur vor erster Suche */}
       {!searched && (
         <View style={styles.hero}>
-          <Text style={[styles.heroTitle, { color: c.text }]}>Den richtigen Physio{'\n'}für dein Problem finden.</Text>
-          <Text style={[styles.heroSub, { color: c.muted }]}>Geprüfte Physiotherapeuten in deiner Nähe — nach Beschwerde suchen, nicht nach Name.</Text>
+          <Text style={[styles.heroTitle, { color: c.text }]}>{t('heroTitle')}</Text>
+          <Text style={[styles.heroSub, { color: c.muted }]}>{t('heroSub')}</Text>
         </View>
       )}
 
-      {/* Search input + filter icon */}
-      <View style={{ zIndex: 10, flexDirection: 'row', gap: 8, alignItems: 'flex-start' }}>
-        <View style={{ flex: 1 }}>
-          <View style={[
-            styles.searchBox,
-            { backgroundColor: c.card, borderColor: (showAutocomplete && acSuggestions.length > 0) ? c.primary : c.border }
-          ]}>
-            <Text style={[styles.searchIcon, { color: c.muted }]}>⌕</Text>
-            <TextInput
-              value={query}
-              onChangeText={(text) => {
-                setQuery(text);
-                setShowAutocomplete(true);
-                setActiveChip(null);
-              }}
-              onSubmitEditing={() => runSearch()}
-              onFocus={() => setShowAutocomplete(true)}
-              onBlur={() => setTimeout(() => setShowAutocomplete(false), 150)}
-              returnKeyType="search"
-              placeholder="Wobei brauchst du Hilfe?"
-              placeholderTextColor={c.muted}
-              style={[styles.searchInput, { color: c.text }]}
-            />
-            {query.length > 0 && (
-              <Pressable onPress={() => { setQuery(''); setShowAutocomplete(false); }} hitSlop={8}>
-                <Text style={[styles.clearIcon, { color: c.muted }]}>✕</Text>
-              </Pressable>
-            )}
-          </View>
-
-          {/* Autocomplete dropdown */}
-          {showAutocomplete && acSuggestions.length > 0 && (
-            <View style={[styles.autocompleteBox, { backgroundColor: c.card, borderColor: c.primary }]}>
-              {acSuggestions.map((s, i) => (
-                <Pressable
-                  key={s}
-                  onPress={() => selectSuggestion(s)}
-                  style={[
-                    styles.acItem,
-                    i < acSuggestions.length - 1 && { borderBottomWidth: 1, borderBottomColor: c.border }
-                  ]}
-                >
-                  <Text style={[styles.acSearchIcon, { color: c.muted }]}>⌕</Text>
-                  <Text style={[styles.acItemText, { color: c.text }]}>{s}</Text>
-                </Pressable>
-              ))}
-            </View>
+      {/* Search input + filter icon — unified bar */}
+      <View style={{ zIndex: 10 }}>
+        <View style={[
+          styles.searchBox,
+          { backgroundColor: c.card, borderColor: (showAutocomplete && acSuggestions.length > 0) ? c.primary : c.border }
+        ]}>
+          {/* Left: search icon + input + clear */}
+          <Ionicons name="search-outline" size={18} color={c.muted} />
+          <TextInput
+            value={query}
+            onChangeText={(text) => {
+              setQuery(text);
+              setShowAutocomplete(true);
+              setActiveChip(null);
+            }}
+            onSubmitEditing={() => runSearch()}
+            onFocus={() => setShowAutocomplete(true)}
+            onBlur={() => setTimeout(() => setShowAutocomplete(false), 150)}
+            returnKeyType="search"
+            placeholder={t('searchPlaceholder')}
+            placeholderTextColor={c.muted}
+            style={[styles.searchInput, { color: c.text }]}
+          />
+          {query.length > 0 && (
+            <Pressable onPress={() => { setQuery(''); setShowAutocomplete(false); }} hitSlop={8}>
+              <Ionicons name="close-circle" size={16} color={c.muted} />
+            </Pressable>
           )}
+
+          {/* Divider */}
+          <View style={[styles.searchDivider, { backgroundColor: c.border }]} />
+
+          {/* Right: filter area */}
+          <Pressable onPress={() => setShowFilters(!showFilters)} style={styles.searchFilterArea} hitSlop={4}>
+            <Ionicons
+              name="options-outline"
+              size={20}
+              color={showFilters || activeFilterCount > 0 ? c.primary : c.muted}
+            />
+            {activeFilterCount > 0 && (
+              <View style={[styles.filterBadge, { backgroundColor: c.accent }]}>
+                <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
+              </View>
+            )}
+          </Pressable>
         </View>
 
-        {/* Filter icon button */}
-        <Pressable
-          onPress={() => setShowFilters(!showFilters)}
-          style={[
-            styles.filterIconBtn,
-            {
-              backgroundColor: showFilters ? c.primary : c.card,
-              borderColor: showFilters ? c.primary : c.border
-            }
-          ]}
-        >
-          <Text style={[styles.filterIconText, { color: showFilters ? '#FFFFFF' : c.muted }]}>⚙</Text>
-          {activeFilterCount > 0 && (
-            <View style={[styles.filterBadge, { backgroundColor: c.accent }]}>
-              <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
-            </View>
-          )}
-        </Pressable>
+        {/* Autocomplete dropdown */}
+        {showAutocomplete && acSuggestions.length > 0 && (
+          <View style={[styles.autocompleteBox, { backgroundColor: c.card, borderColor: c.primary }]}>
+            {acSuggestions.map((s, i) => (
+              <Pressable
+                key={s}
+                onPress={() => selectSuggestion(s)}
+                style={[
+                  styles.acItem,
+                  i < acSuggestions.length - 1 && { borderBottomWidth: 1, borderBottomColor: c.border }
+                ]}
+              >
+                <Text style={[styles.acSearchIcon, { color: c.muted }]}>⌕</Text>
+                <Text style={[styles.acItemText, { color: c.text }]}>{s}</Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
       </View>
 
       {/* Quick chips */}
@@ -1154,7 +1608,7 @@ export default function App() {
       >
         <Ionicons name="navigate-sharp" size={13} color="#2b6877" />
         <Text numberOfLines={1} style={{ fontSize: 13, color: city ? c.text : c.muted, fontWeight: city ? '500' : '400', flexShrink: 1 }}>
-          {locationLabel || city || 'Standort wählen'}
+          {locationLabel || city || t('locationPlaceholder')}
         </Text>
         <Text style={{ fontSize: 11, color: c.muted }}>▾</Text>
       </Pressable>
@@ -1164,7 +1618,7 @@ export default function App() {
         <View style={[styles.filterPanel, { backgroundColor: c.card, borderColor: c.border }]}>
 
           {/* Kassenart */}
-          <Text style={[styles.filterSectionTitle, { color: c.muted }]}>Kassenart</Text>
+          <Text style={[styles.filterSectionTitle, { color: c.muted }]}>{t('kassenartLabel')}</Text>
           <View style={styles.kassenartRow}>
             {kassenartOptions.map(opt => {
               const active = kassenart === opt.key;
@@ -1188,7 +1642,7 @@ export default function App() {
           </View>
 
           {/* Fortbildungen */}
-          <Text style={[styles.filterSectionTitle, { color: c.muted, marginTop: 14 }]}>Fortbildungen</Text>
+          <Text style={[styles.filterSectionTitle, { color: c.muted, marginTop: 14 }]}>{t('fortbildungLabel')}</Text>
           {fortbildungOptions.map(opt => {
             const checked = fortbildungen.includes(opt.key);
             return (
@@ -1211,8 +1665,8 @@ export default function App() {
           {/* Hausbesuche */}
           <View style={[styles.switchRow, { marginTop: 14, paddingTop: 14, borderTopWidth: 1, borderTopColor: c.border }]}>
             <View>
-              <Text style={[styles.switchTitle, { color: c.text }]}>Hausbesuche</Text>
-              <Text style={[styles.switchLabel, { color: c.muted }]}>Nur Therapeuten mit Hausbesuchen</Text>
+              <Text style={[styles.switchTitle, { color: c.text }]}>{t('homeVisitLabel')}</Text>
+              <Text style={[styles.switchLabel, { color: c.muted }]}>{t('homeVisitToggle')}</Text>
             </View>
             <Switch
               value={homeVisit}
@@ -1227,57 +1681,59 @@ export default function App() {
       {searched || results.length > 0 ? (
         <View style={styles.sectionRow}>
           <Text style={[styles.sectionLabel, { color: c.text }]}>
-            {searched ? `${results.length} Ergebnis${results.length !== 1 ? 'se' : ''}` : 'Vorschläge'}
+            {searched ? `${results.length} ${results.length !== 1 ? t('resultsLabelPlural') : t('resultsLabel')}` : 'Vorschläge'}
           </Text>
-          <View style={[styles.approvedPill, { backgroundColor: c.successBg }]}>
-            <Text style={[styles.approvedPillText, { color: c.success }]}>Nur geprüfte Profile</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <View style={[styles.approvedPill, { backgroundColor: c.successBg }]}>
+              <Text style={[styles.approvedPillText, { color: c.success }]}>{t('verifiedOnly')}</Text>
+            </View>
           </View>
         </View>
       ) : null}
 
       {/* Result cards */}
-      {results.map((t) => (
-        <View key={t.id} style={[styles.resultCard, { backgroundColor: c.card, borderColor: c.border }]}>
+      {results.map((th) => (
+        <View key={th.id} style={[styles.resultCard, { backgroundColor: c.card, borderColor: c.border }]}>
           {/* Top row: avatar + name — tappable to open profile */}
           <View style={styles.cardTop}>
-            <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }} onPress={() => setSelectedTherapist(t)}>
-              <Image source={{ uri: t.photo }} style={styles.avatar} />
+            <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }} onPress={() => setSelectedTherapist(th)}>
+              <Image source={{ uri: th.photo }} style={styles.avatar} />
               <View style={{ flex: 1 }}>
-                <Text style={[styles.cardName, { color: c.text }]}>{t.fullName}</Text>
-                <Text style={[styles.cardTitle, { color: c.muted }]}>{t.professionalTitle}</Text>
+                <Text style={[styles.cardName, { color: c.text }]}>{th.fullName}</Text>
+                <Text style={[styles.cardTitle, { color: c.muted }]}>{th.professionalTitle}</Text>
               </View>
               <Text style={[styles.practiceArrow, { color: c.muted }]}>›</Text>
             </Pressable>
-            <Pressable onPress={() => toggleFavorite(t)} hitSlop={10}>
-              <Text style={{ fontSize: 22, color: isFavorite(t.id) ? '#E05A77' : c.muted }}>
-                {isFavorite(t.id) ? '♥' : '♡'}
+            <Pressable onPress={() => toggleFavorite(th)} hitSlop={10}>
+              <Text style={{ fontSize: 22, color: isFavorite(th.id) ? '#E05A77' : c.muted }}>
+                {isFavorite(th.id) ? '♥' : '♡'}
               </Text>
             </Pressable>
           </View>
 
           {/* Tags: Spezialisierungen + Sprachen + Hausbesuch */}
           <View style={styles.tagRow}>
-            {t.specializations.map((s) => (
+            {th.specializations.map((s) => (
               <View key={s} style={[styles.tag, { backgroundColor: c.mutedBg }]}>
                 <Text style={[styles.tagText, { color: c.text }]}>{s}</Text>
               </View>
             ))}
-            {t.languages.map((l) => (
+            {th.languages.map((l) => (
               <View key={l} style={[styles.tag, { backgroundColor: c.mutedBg }]}>
                 <Text style={[styles.tagText, { color: c.muted }]}>{l}</Text>
               </View>
             ))}
-            {t.homeVisit && (
+            {th.homeVisit && (
               <View style={[styles.tag, { backgroundColor: c.successBg }]}>
-                <Text style={[styles.tagText, { color: c.success }]}>Hausbesuch</Text>
+                <Text style={[styles.tagText, { color: c.success }]}>{t('homeVisitTag')}</Text>
               </View>
             )}
           </View>
 
           {/* Fortbildungen badges */}
-          {t.fortbildungen?.length > 0 && (
+          {th.fortbildungen?.length > 0 && (
             <View style={styles.tagRow}>
-              {t.fortbildungen.map(f => (
+              {th.fortbildungen.map(f => (
                 <View key={f} style={[styles.tag, { backgroundColor: c.successBg, borderWidth: 1, borderColor: c.success }]}>
                   <Text style={[styles.tagText, { color: c.success }]}>{f}</Text>
                 </View>
@@ -1286,24 +1742,24 @@ export default function App() {
           )}
 
           {/* Praxis-Link */}
-          {t.practices?.length > 0 && (
+          {th.practices?.length > 0 && (
             <Pressable
-              onPress={() => setSelectedPractice(t.practices[0])}
+              onPress={() => openPractice(th.practices[0])}
               style={[styles.practiceBtn, { borderColor: c.border, backgroundColor: c.mutedBg }]}
             >
               <View style={[styles.practiceInitial, { backgroundColor: c.primary }]}>
                 <Text style={[styles.practiceInitialText, { color: '#FFFFFF' }]}>
-                  {t.practices[0].name.split(' ').filter(w => w.length > 2).map(w => w[0]).join('').toUpperCase().slice(0, 2) || t.practices[0].name.charAt(0).toUpperCase()}
+                  {th.practices[0].name.split(' ').filter(w => w.length > 2).map(w => w[0]).join('').toUpperCase().slice(0, 2) || th.practices[0].name.charAt(0).toUpperCase()}
                 </Text>
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={[styles.practiceName, { color: c.text }]}>{t.practices[0].name}</Text>
-                <Text style={[styles.practiceCity, { color: c.muted }]}>{t.practices[0].city}</Text>
+                <Text style={[styles.practiceName, { color: c.text }]}>{th.practices[0].name}</Text>
+                <Text style={[styles.practiceCity, { color: c.muted }]}>{th.practices[0].city}</Text>
               </View>
-              {t.distKm != null && (
+              {th.distKm != null && (
                 <View style={[styles.distBadge, { backgroundColor: c.successBg }]}>
                   <Text style={[styles.distBadgeText, { color: c.success }]}>
-                    {formatDist(t.distKm)}
+                    {formatDist(th.distKm)}
                   </Text>
                 </View>
               )}
@@ -1315,10 +1771,10 @@ export default function App() {
           <Pressable
             style={[styles.ctaBtn, { backgroundColor: c.accent }]}
             onPress={() => {
-              callPhone(t.practices?.[0]?.phone);
+              callPhone(th.practices?.[0]?.phone);
             }}
           >
-            <Text style={styles.ctaBtnText}>📞 Praxis anrufen</Text>
+            <Text style={styles.ctaBtnText}>{t('callPractice')}</Text>
           </Pressable>
         </View>
       ))}
@@ -1326,17 +1782,15 @@ export default function App() {
       {searchLoading && (
         <View style={[styles.emptyState, { backgroundColor: c.card, borderColor: c.border }]}>
           <Text style={[styles.emptyIcon]}>⏳</Text>
-          <Text style={[styles.emptyTitle, { color: c.text }]}>Suche läuft…</Text>
+          <Text style={[styles.emptyTitle, { color: c.text }]}>{t('loading')}</Text>
         </View>
       )}
 
       {!searchLoading && results.length === 0 && searched && (
         <View style={[styles.emptyState, { backgroundColor: c.card, borderColor: c.border }]}>
           <Text style={[styles.emptyIcon]}>🔍</Text>
-          <Text style={[styles.emptyTitle, { color: c.text }]}>Keine Ergebnisse</Text>
-          <Text style={[styles.emptyBody, { color: c.muted }]}>
-            Versuche einen anderen Suchbegriff oder erweitere den Umkreis.
-          </Text>
+          <Text style={[styles.emptyTitle, { color: c.text }]}>{t('noResults')}</Text>
+          <Text style={[styles.emptyBody, { color: c.muted }]}>{t('noResultsBody')}</Text>
         </View>
       )}
     </ScrollView>
@@ -1356,12 +1810,12 @@ export default function App() {
   };
 
   const renderPracticeProfile = (practice) => {
-    const therapists = allApiTherapists.filter((t) => t.practices.some((p) => p.id === practice.id));
+    const therapists = selectedPracticeTherapists;
     return (
       <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 20 }]}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <Pressable onPress={() => setSelectedPractice(null)} style={styles.backBtn}>
-            <Text style={[styles.backBtnText, { color: c.primary }]}>‹ Zurück</Text>
+            <Text style={[styles.backBtnText, { color: c.primary }]}>‹ {t('backBtn')}</Text>
           </Pressable>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <Pressable onPress={() => toggleFavoritePractice(practice)} style={{ paddingHorizontal: 10, paddingVertical: 10 }}>
@@ -1421,36 +1875,47 @@ export default function App() {
         )}
 
         <Text style={[styles.sectionLabel, { color: c.text, marginTop: 4 }]}>
-          Therapeuten ({therapists.length})
+          {t('therapistsLabel')}{!selectedPracticeLoading && !selectedPracticeError ? ` (${therapists.length})` : ''}
         </Text>
-        {therapists.map((t) => (
-          <Pressable key={t.id} onPress={() => setSelectedTherapist(t)} style={[styles.miniCard, { backgroundColor: c.card, borderColor: c.border }]}>
-            <Image source={{ uri: t.photo }} style={styles.miniAvatar} />
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.cardName, { color: c.text }]}>{t.fullName}</Text>
-              <Text style={[styles.cardTitle, { color: c.muted }]}>{t.professionalTitle}</Text>
-              <View style={[styles.tagRow, { marginTop: 6 }]}>
-                {t.specializations.slice(0, 2).map((s) => (
-                  <View key={s} style={[styles.tag, { backgroundColor: c.mutedBg }]}>
-                    <Text style={[styles.tagText, { color: c.text }]}>{s}</Text>
-                  </View>
-                ))}
-                {t.homeVisit && (
-                  <View style={[styles.tag, { backgroundColor: c.successBg }]}>
-                    <Text style={[styles.tagText, { color: c.success }]}>Hausbesuch</Text>
-                  </View>
-                )}
+        {selectedPracticeLoading ? (
+          <View style={{ alignItems: 'center', paddingVertical: 16 }}>
+            <ActivityIndicator color={c.primary} />
+            <Text style={{ color: c.muted, marginTop: 8, fontSize: 13 }}>Lade Therapeuten…</Text>
+          </View>
+        ) : selectedPracticeError ? (
+          <Text style={{ color: c.muted, fontSize: 13, paddingVertical: 8, marginHorizontal: 16 }}>{selectedPracticeError}</Text>
+        ) : therapists.length === 0 ? (
+          <Text style={{ color: c.muted, fontSize: 13, paddingVertical: 8, marginHorizontal: 16 }}>Keine Therapeuten gefunden</Text>
+        ) : (
+          therapists.map((th) => (
+            <Pressable key={th.id} onPress={() => setSelectedTherapist(th)} style={[styles.miniCard, { backgroundColor: c.card, borderColor: c.border }]}>
+              <Image source={{ uri: th.photo }} style={styles.miniAvatar} />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.cardName, { color: c.text }]}>{th.fullName}</Text>
+                <Text style={[styles.cardTitle, { color: c.muted }]}>{th.professionalTitle}</Text>
+                <View style={[styles.tagRow, { marginTop: 6 }]}>
+                  {th.specializations.slice(0, 2).map((s) => (
+                    <View key={s} style={[styles.tag, { backgroundColor: c.mutedBg }]}>
+                      <Text style={[styles.tagText, { color: c.text }]}>{s}</Text>
+                    </View>
+                  ))}
+                  {th.homeVisit && (
+                    <View style={[styles.tag, { backgroundColor: c.successBg }]}>
+                      <Text style={[styles.tagText, { color: c.success }]}>{t('homeVisitTag')}</Text>
+                    </View>
+                  )}
+                </View>
               </View>
-            </View>
-            <Text style={[styles.practiceArrow, { color: c.muted }]}>›</Text>
-          </Pressable>
-        ))}
+              <Text style={[styles.practiceArrow, { color: c.muted }]}>›</Text>
+            </Pressable>
+          ))
+        )}
 
         <Pressable
           style={[styles.ctaBtn, { backgroundColor: c.accent, marginTop: 4 }]}
           onPress={() => callPhone(practice.phone)}
         >
-          <Text style={styles.ctaBtnText}>📞 Praxis anrufen</Text>
+          <Text style={styles.ctaBtnText}>{t('callPractice')}</Text>
         </Pressable>
       </ScrollView>
     );
@@ -1469,17 +1934,17 @@ export default function App() {
     }
   };
 
-  const renderTherapistProfile = (t) => (
+  const renderTherapistProfile = (th) => (
     <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 20 }]}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <Pressable onPress={() => setSelectedTherapist(null)} style={styles.backBtn}>
-          <Text style={[styles.backBtnText, { color: c.primary }]}>‹ Zurück</Text>
+          <Text style={[styles.backBtnText, { color: c.primary }]}>‹ {t('backBtn')}</Text>
         </Pressable>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <Pressable onPress={() => toggleFavorite(t)} style={{ paddingHorizontal: 10, paddingVertical: 10 }}>
-            <Ionicons name={isFavorite(t.id) ? 'heart' : 'heart-outline'} size={22} color={isFavorite(t.id) ? '#E05A77' : c.muted} />
+          <Pressable onPress={() => toggleFavorite(th)} style={{ paddingHorizontal: 10, paddingVertical: 10 }}>
+            <Ionicons name={isFavorite(th.id) ? 'heart' : 'heart-outline'} size={22} color={isFavorite(th.id) ? '#E05A77' : c.muted} />
           </Pressable>
-          <Pressable onPress={() => shareTherapist(t)} style={{ paddingHorizontal: 12, paddingVertical: 10 }}>
+          <Pressable onPress={() => shareTherapist(th)} style={{ paddingHorizontal: 12, paddingVertical: 10 }}>
             <Ionicons name="share-outline" size={22} color={c.primary} />
           </Pressable>
         </View>
@@ -1487,52 +1952,49 @@ export default function App() {
 
       {/* Header */}
       <View style={[styles.practiceHeader, { backgroundColor: c.card, borderColor: c.border }]}>
-        {t.photo ? (
-          <Image source={{ uri: t.photo }} style={styles.therapistAvatarLarge} />
+        {th.photo ? (
+          <Image source={{ uri: th.photo }} style={styles.therapistAvatarLarge} />
         ) : (
           <View style={[styles.therapistAvatarLarge, { backgroundColor: c.primary, alignItems: 'center', justifyContent: 'center' }]}>
             <Text style={{ color: '#fff', fontSize: 28, fontWeight: '700' }}>
-              {t.fullName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+              {th.fullName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
             </Text>
           </View>
         )}
         <View style={styles.profileNameRow}>
-          <Text style={[styles.practiceHeaderName, { color: c.text }]}>{t.fullName}</Text>
-          {t.verifiziert && (
-            <View style={[styles.verifiedBadge, { backgroundColor: c.successBg }]}>
-              <Text style={[styles.verifiedText, { color: c.success }]}>✓ Geprüft</Text>
-            </View>
-          )}
+          <Text style={[styles.practiceHeaderName, { color: c.text }]}>{th.fullName}</Text>
         </View>
-        <Text style={[styles.practiceHeaderCity, { color: c.muted }]}>{t.professionalTitle}</Text>
-        <View style={[styles.tagRow, { justifyContent: 'center', marginTop: 8 }]}>
-          {(t.languages ?? []).map(l => (
-            <View key={l} style={[styles.tag, { backgroundColor: c.mutedBg }]}>
-              <Text style={[styles.tagText, { color: c.muted }]}>{l}</Text>
-            </View>
-          ))}
-          {t.homeVisit && (
-            <View style={[styles.tag, { backgroundColor: c.successBg }]}>
-              <Text style={[styles.tagText, { color: c.success }]}>Hausbesuch</Text>
-            </View>
-          )}
-        </View>
+        <Text style={[styles.practiceHeaderCity, { color: c.muted }]}>{th.professionalTitle}</Text>
+        {((th.languages ?? []).length > 0 || th.homeVisit) && (
+          <View style={[styles.tagRow, { justifyContent: 'center', marginTop: 8 }]}>
+            {(th.languages ?? []).map(l => (
+              <View key={l} style={[styles.tag, { backgroundColor: c.mutedBg }]}>
+                <Text style={[styles.tagText, { color: c.muted }]}>{l}</Text>
+              </View>
+            ))}
+            {th.homeVisit && (
+              <View style={[styles.tag, { backgroundColor: c.successBg }]}>
+                <Text style={[styles.tagText, { color: c.success }]}>{t('homeVisitTag')}</Text>
+              </View>
+            )}
+          </View>
+        )}
       </View>
 
       {/* Über mich */}
-      {t.bio ? (
+      {th.bio ? (
         <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
-          <Text style={[styles.filterSectionTitle, { color: c.muted }]}>Über mich</Text>
-          <Text style={[styles.infoBody, { color: c.text, fontSize: 15 }]}>{t.bio}</Text>
+          <Text style={[styles.filterSectionTitle, { color: c.muted }]}>{t('aboutLabel')}</Text>
+          <Text style={[styles.infoBody, { color: c.text, fontSize: 15 }]}>{th.bio}</Text>
         </View>
       ) : null}
 
       {/* Behandlungsbereiche */}
-      {t.behandlungsbereiche?.length > 0 && (
+      {th.behandlungsbereiche?.length > 0 && (
         <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
-          <Text style={[styles.filterSectionTitle, { color: c.muted }]}>Behandlungsbereiche</Text>
+          <Text style={[styles.filterSectionTitle, { color: c.muted }]}>{t('behandlungLabel')}</Text>
           <View style={styles.tagRow}>
-            {t.behandlungsbereiche.map(b => (
+            {th.behandlungsbereiche.map(b => (
               <View key={b} style={[styles.tag, { backgroundColor: c.mutedBg }]}>
                 <Text style={[styles.tagText, { color: c.text }]}>{b}</Text>
               </View>
@@ -1542,23 +2004,25 @@ export default function App() {
       )}
 
       {/* Spezialisierungen */}
-      <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
-        <Text style={[styles.filterSectionTitle, { color: c.muted }]}>Spezialisierungen</Text>
-        <View style={styles.tagRow}>
-          {(t.specializations ?? []).map(s => (
-            <View key={s} style={[styles.tag, { backgroundColor: c.mutedBg }]}>
-              <Text style={[styles.tagText, { color: c.text }]}>{s}</Text>
-            </View>
-          ))}
+      {(th.specializations ?? []).length > 0 && (
+        <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
+          <Text style={[styles.filterSectionTitle, { color: c.muted }]}>{t('specsLabel')}</Text>
+          <View style={styles.tagRow}>
+            {th.specializations.map(s => (
+              <View key={s} style={[styles.tag, { backgroundColor: c.mutedBg }]}>
+                <Text style={[styles.tagText, { color: c.text }]}>{s}</Text>
+              </View>
+            ))}
+          </View>
         </View>
-      </View>
+      )}
 
       {/* Fortbildungen */}
-      {t.fortbildungen?.length > 0 && (
+      {th.fortbildungen?.length > 0 && (
         <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
-          <Text style={[styles.filterSectionTitle, { color: c.muted }]}>Fortbildungen</Text>
+          <Text style={[styles.filterSectionTitle, { color: c.muted }]}>{t('certsLabel')}</Text>
           <View style={styles.tagRow}>
-            {t.fortbildungen.map(f => (
+            {th.fortbildungen.map(f => (
               <View key={f} style={[styles.tag, { backgroundColor: c.successBg, borderWidth: 1, borderColor: c.success }]}>
                 <Text style={[styles.tagText, { color: c.success }]}>{f}</Text>
               </View>
@@ -1568,54 +2032,56 @@ export default function App() {
       )}
 
       {/* Details: Kassenart, Entfernung, Zeiten, Website */}
-      <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
-        <Text style={[styles.filterSectionTitle, { color: c.muted }]}>Details</Text>
-        {t.kassenart ? (
-          <View style={styles.detailInfoRow}>
-            <Text style={styles.detailIcon}>💳</Text>
-            <View>
-              <Text style={[styles.detailInfoLabel, { color: c.muted }]}>Kassenart</Text>
-              <Text style={[styles.detailInfoValue, { color: c.text }]}>{t.kassenart.charAt(0).toUpperCase() + t.kassenart.slice(1)}</Text>
+      {(th.kassenart || th.distKm != null || th.availability || th.website) && (
+        <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
+          <Text style={[styles.filterSectionTitle, { color: c.muted }]}>{t('detailsLabel')}</Text>
+          {th.kassenart ? (
+            <View style={styles.detailInfoRow}>
+              <Text style={styles.detailIcon}>💳</Text>
+              <View>
+                <Text style={[styles.detailInfoLabel, { color: c.muted }]}>{t('insuranceLabel')}</Text>
+                <Text style={[styles.detailInfoValue, { color: c.text }]}>{th.kassenart.charAt(0).toUpperCase() + th.kassenart.slice(1)}</Text>
+              </View>
             </View>
-          </View>
-        ) : null}
-        {t.distKm != null && (
-          <View style={styles.detailInfoRow}>
-            <Text style={styles.detailIcon}>📍</Text>
-            <View>
-              <Text style={[styles.detailInfoLabel, { color: c.muted }]}>Entfernung</Text>
-              <Text style={[styles.detailInfoValue, { color: c.text }]}>{formatDist(t.distKm)} entfernt</Text>
+          ) : null}
+          {th.distKm != null && (
+            <View style={styles.detailInfoRow}>
+              <Text style={styles.detailIcon}>📍</Text>
+              <View>
+                <Text style={[styles.detailInfoLabel, { color: c.muted }]}>{t('distanceLabel')}</Text>
+                <Text style={[styles.detailInfoValue, { color: c.text }]}>{formatDist(th.distKm)} entfernt</Text>
+              </View>
             </View>
-          </View>
-        )}
-        {t.verfügbareZeiten ? (
-          <View style={styles.detailInfoRow}>
-            <Text style={styles.detailIcon}>🕐</Text>
-            <View>
-              <Text style={[styles.detailInfoLabel, { color: c.muted }]}>Verfügbar</Text>
-              <Text style={[styles.detailInfoValue, { color: c.text }]}>{t.verfügbareZeiten}</Text>
+          )}
+          {th.availability ? (
+            <View style={styles.detailInfoRow}>
+              <Text style={styles.detailIcon}>🕐</Text>
+              <View>
+                <Text style={[styles.detailInfoLabel, { color: c.muted }]}>{t('availabilityLabel')}</Text>
+                <Text style={[styles.detailInfoValue, { color: c.text }]}>{th.availability}</Text>
+              </View>
             </View>
-          </View>
-        ) : null}
-        {t.website ? (
-          <Pressable style={styles.detailInfoRow} onPress={() => Linking.openURL(`https://${t.website}`)}>
-            <Text style={styles.detailIcon}>🌐</Text>
-            <View>
-              <Text style={[styles.detailInfoLabel, { color: c.muted }]}>Website</Text>
-              <Text style={[styles.detailInfoValue, { color: c.primary }]}>{t.website}</Text>
-            </View>
-          </Pressable>
-        ) : null}
-      </View>
+          ) : null}
+          {th.website ? (
+            <Pressable style={styles.detailInfoRow} onPress={() => Linking.openURL(`https://${th.website}`)}>
+              <Text style={styles.detailIcon}>🌐</Text>
+              <View>
+                <Text style={[styles.detailInfoLabel, { color: c.muted }]}>Website</Text>
+                <Text style={[styles.detailInfoValue, { color: c.primary }]}>{th.website}</Text>
+              </View>
+            </Pressable>
+          ) : null}
+        </View>
+      )}
 
       {/* Praxis */}
-      {t.practices?.length > 0 && (
+      {th.practices?.length > 0 && (
         <>
-          <Text style={[styles.sectionLabel, { color: c.text }]}>Praxis</Text>
-          {t.practices.map(p => (
+          <Text style={[styles.sectionLabel, { color: c.text }]}>{t('practicesLabel')}</Text>
+          {th.practices.map(p => (
             <Pressable
               key={p.id}
-              onPress={() => { setSelectedTherapist(null); setSelectedPractice(p); }}
+              onPress={() => { setSelectedTherapist(null); openPractice(p); }}
               style={[styles.practiceBtn, { borderColor: c.border, backgroundColor: c.mutedBg }]}
             >
               <View style={[styles.practiceInitial, { backgroundColor: c.border }]}>
@@ -1634,10 +2100,10 @@ export default function App() {
       <Pressable
         style={[styles.ctaBtn, { backgroundColor: c.accent, marginTop: 4 }]}
         onPress={() => {
-          callPhone(t.practices?.[0]?.phone);
+          callPhone(th.practices?.[0]?.phone);
         }}
       >
-        <Text style={styles.ctaBtnText}>📞 Praxis anrufen</Text>
+        <Text style={styles.ctaBtnText}>{t('callPractice')}</Text>
       </Pressable>
     </ScrollView>
   );
@@ -1647,7 +2113,7 @@ export default function App() {
   const renderLogin = () => (
     <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 20 }]}>
       <Pressable onPress={() => setShowLogin(false)} style={styles.backBtn}>
-        <Text style={[styles.backBtnText, { color: c.primary }]}>‹ Zurück</Text>
+        <Text style={[styles.backBtnText, { color: c.primary }]}>‹ {t('backBtn')}</Text>
       </Pressable>
       <View style={styles.header}>
         <View style={[styles.logoMark, { backgroundColor: c.primary }]}><Text style={styles.logoText}>R</Text></View>
@@ -1698,14 +2164,16 @@ export default function App() {
   // ── Therapist dashboard (logged in) ───────────────────────────────────────
 
   const renderTherapistDashboard = () => {
-    const t = loggedInTherapist;
-    const initials = t.fullName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+    const th = loggedInTherapist;
+    const initials = th.fullName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
 
     const enterEdit = () => {
-      setEditBio(t.bio ?? '');
-      setEditSpecializations((t.specializations ?? []).join(', '));
-      setEditLanguages((t.languages ?? []).join(', '));
-      setEditHomeVisit(t.homeVisit ?? false);
+      setEditBio(th.bio ?? '');
+      setEditSpecializations((th.specializations ?? []).join(', '));
+      setEditLanguages((th.languages ?? []).join(', '));
+      setEditHomeVisit(th.homeVisit ?? false);
+      setEditIsVisible(th.isVisible ?? true);
+      setEditAvailability(th.availability ?? '');
       setEditMode(true);
     };
 
@@ -1714,8 +2182,8 @@ export default function App() {
         {/* Header */}
         <View style={[styles.practiceHeader, { backgroundColor: c.card, borderColor: c.border, alignItems: 'center' }]}>
           <Pressable onPress={handlePickPhoto} style={{ position: 'relative' }}>
-            {t.photo ? (
-              <Image source={{ uri: t.photo }} style={[styles.therapistAvatarLarge, { borderRadius: 48 }]} />
+            {th.photo ? (
+              <Image source={{ uri: th.photo }} style={[styles.therapistAvatarLarge, { borderRadius: 48 }]} />
             ) : (
               <View style={[styles.therapistAvatarLarge, { borderRadius: 48, backgroundColor: c.primary, alignItems: 'center', justifyContent: 'center' }]}>
                 <Text style={{ color: '#fff', fontSize: 28, fontWeight: '700' }}>{initials}</Text>
@@ -1725,11 +2193,11 @@ export default function App() {
               <Text style={{ color: '#fff', fontSize: 12 }}>📷</Text>
             </View>
           </Pressable>
-          <Text style={[styles.practiceHeaderName, { color: c.text, marginTop: 10 }]}>{t.fullName}</Text>
-          <Text style={[styles.practiceHeaderCity, { color: c.muted }]}>{t.professionalTitle}</Text>
-          <View style={[styles.tag, { backgroundColor: t.reviewStatus === 'APPROVED' ? c.successBg : c.mutedBg, marginTop: 6 }]}>
-            <Text style={{ color: t.reviewStatus === 'APPROVED' ? c.success : c.muted, fontSize: 12 }}>
-              {t.reviewStatus === 'APPROVED' ? '✓ Freigegeben' : '⏳ In Prüfung'}
+          <Text style={[styles.practiceHeaderName, { color: c.text, marginTop: 10 }]}>{th.fullName}</Text>
+          <Text style={[styles.practiceHeaderCity, { color: c.muted }]}>{th.professionalTitle}</Text>
+          <View style={[styles.tag, { backgroundColor: th.reviewStatus === 'APPROVED' ? c.successBg : c.mutedBg, marginTop: 6 }]}>
+            <Text style={{ color: th.reviewStatus === 'APPROVED' ? c.success : c.muted, fontSize: 12 }}>
+              {th.reviewStatus === 'APPROVED' ? '✓ Freigegeben' : '⏳ In Prüfung'}
             </Text>
           </View>
         </View>
@@ -1766,6 +2234,39 @@ export default function App() {
               <Text style={[styles.detailInfoLabel, { color: c.text, flex: 1 }]}>Hausbesuch</Text>
               <Switch value={editHomeVisit} onValueChange={setEditHomeVisit} trackColor={{ true: c.primary }} />
             </View>
+            <View style={[styles.detailInfoRow, { marginTop: 12 }]}>
+              <Text style={[styles.detailInfoLabel, { color: c.text, flex: 1 }]}>In Suche sichtbar</Text>
+              <Switch
+                value={editIsVisible}
+                onValueChange={async (val) => {
+                  setEditIsVisible(val);
+                  if (authToken) {
+                    const pref = val ? 'visible' : 'hidden';
+                    try {
+                      const res = await fetch(`${getBaseUrl()}/invite/visibility`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
+                        body: JSON.stringify({ visibilityPreference: pref }),
+                      });
+                      const data = await res.json().catch(() => ({}));
+                      if (res.ok && val && !data.isPublished && data.missingFields?.length > 0) {
+                        const fields = data.missingFields.join(', ');
+                        Alert.alert('Profil unvollständig', `Fülle noch folgende Felder aus, damit dein Profil sichtbar wird: ${fields}`);
+                      }
+                    } catch {}
+                  }
+                }}
+                trackColor={{ true: c.primary }}
+              />
+            </View>
+            <Text style={[styles.detailInfoLabel, { color: c.muted, marginTop: 14, marginBottom: 4 }]}>Sprechzeiten</Text>
+            <TextInput
+              style={[styles.registerInput, { color: c.text, borderColor: c.border, backgroundColor: c.card }]}
+              value={editAvailability}
+              onChangeText={setEditAvailability}
+              placeholder="z.B. Mo–Fr 8:00–18:00 Uhr"
+              placeholderTextColor={c.muted}
+            />
             <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
               <Pressable style={[styles.registerBtn, { flex: 1, backgroundColor: c.border, marginTop: 0 }]} onPress={() => setEditMode(false)}>
                 <Text style={[styles.registerBtnText, { color: c.text }]}>Abbrechen</Text>
@@ -1778,17 +2279,17 @@ export default function App() {
         ) : (
           /* ── View mode ── */
           <>
-            {t.bio ? (
+            {th.bio ? (
               <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
-                <Text style={[styles.filterSectionTitle, { color: c.muted }]}>Über mich</Text>
-                <Text style={[styles.infoBody, { color: c.text }]}>{t.bio}</Text>
+                <Text style={[styles.filterSectionTitle, { color: c.muted }]}>{t('aboutLabel')}</Text>
+                <Text style={[styles.infoBody, { color: c.text }]}>{th.bio}</Text>
               </View>
             ) : null}
 
             <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
-              <Text style={[styles.filterSectionTitle, { color: c.muted }]}>Spezialisierungen</Text>
+              <Text style={[styles.filterSectionTitle, { color: c.muted }]}>{t('specsLabel')}</Text>
               <View style={styles.tagRow}>
-                {(t.specializations ?? []).map(s => (
+                {(th.specializations ?? []).map(s => (
                   <View key={s} style={[styles.tag, { backgroundColor: c.mutedBg }]}>
                     <Text style={[styles.tagText, { color: c.text }]}>{s}</Text>
                   </View>
@@ -1799,7 +2300,7 @@ export default function App() {
             <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
               <Text style={[styles.filterSectionTitle, { color: c.muted }]}>Sprachen</Text>
               <View style={styles.tagRow}>
-                {(t.languages ?? []).map(l => (
+                {(th.languages ?? []).map(l => (
                   <View key={l} style={[styles.tag, { backgroundColor: c.mutedBg }]}>
                     <Text style={[styles.tagText, { color: c.muted }]}>{l}</Text>
                   </View>
@@ -1809,12 +2310,18 @@ export default function App() {
 
             <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
               <View style={styles.detailInfoRow}>
-                <Text style={[styles.detailInfoLabel, { color: c.muted, flex: 1 }]}>Hausbesuch</Text>
-                <Text style={[styles.detailInfoValue, { color: c.text }]}>{t.homeVisit ? 'Ja' : 'Nein'}</Text>
+                <Text style={[styles.detailInfoLabel, { color: c.muted, flex: 1 }]}>{t('homeVisitLabel')}</Text>
+                <Text style={[styles.detailInfoValue, { color: c.text }]}>{th.homeVisit ? 'Ja' : 'Nein'}</Text>
               </View>
+              {th.availability ? (
+                <View style={[styles.detailInfoRow, { marginTop: 8 }]}>
+                  <Text style={[styles.detailInfoLabel, { color: c.muted, flex: 1 }]}>{t('availabilityLabel')}</Text>
+                  <Text style={[styles.detailInfoValue, { color: c.text }]}>{th.availability}</Text>
+                </View>
+              ) : null}
               <View style={[styles.detailInfoRow, { marginTop: 8 }]}>
                 <Text style={[styles.detailInfoLabel, { color: c.muted, flex: 1 }]}>E-Mail</Text>
-                <Text style={[styles.detailInfoValue, { color: c.text }]}>{t.email}</Text>
+                <Text style={[styles.detailInfoValue, { color: c.text }]}>{th.email}</Text>
               </View>
             </View>
 
@@ -1823,11 +2330,11 @@ export default function App() {
             </Pressable>
 
             {/* Verbundene Praxen */}
-            {(t.practices ?? []).length > 0 && (
+            {(th.practices ?? []).length > 0 && (
               <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
-                <Text style={[styles.filterSectionTitle, { color: c.muted }]}>Praxis</Text>
-                {(t.practices ?? []).map(p => (
-                  <View key={p.id} style={[styles.practiceBtn, { borderColor: c.border, backgroundColor: c.mutedBg }]}>
+                <Text style={[styles.filterSectionTitle, { color: c.muted }]}>{t('practicesLabel')}</Text>
+                {(th.practices ?? []).map(p => (
+                  <Pressable key={p.id} onPress={() => openPractice(p)} style={[styles.practiceBtn, { borderColor: c.border, backgroundColor: c.mutedBg }]}>
                     <View style={[styles.practiceInitial, { backgroundColor: c.border }]}>
                       <Text style={[styles.practiceInitialText, { color: c.muted }]}>{p.name.charAt(0)}</Text>
                     </View>
@@ -1836,53 +2343,34 @@ export default function App() {
                       <Text style={[styles.practiceCity, { color: c.muted }]}>{p.city}</Text>
                       {p.phone ? <Text style={[styles.practiceCity, { color: c.muted }]}>{p.phone}</Text> : null}
                     </View>
-                    {t.adminPractice?.id === p.id && (
-                      <View style={[styles.tag, { backgroundColor: c.successBg }]}>
-                        <Text style={{ color: c.success, fontSize: 11 }}>Admin</Text>
-                      </View>
+                    {th.adminPractice?.id === p.id && (
+                      <>
+                        <View style={[styles.tag, { backgroundColor: c.successBg }]}>
+                          <Text style={{ color: c.success, fontSize: 11 }}>Admin</Text>
+                        </View>
+                        <Pressable
+                          onPress={() => { setInvitePageTab('new'); if (!inviteToken) handleLoadInviteToken(); setShowInvitePage(true); }}
+                          style={{ padding: 6 }}
+                          hitSlop={8}
+                        >
+                          <Ionicons name="person-add-outline" size={18} color={c.primary} />
+                        </Pressable>
+                        <Pressable
+                          onPress={() => { setAdminPracticeDetail(null); loadAdminPracticeDetail(); setShowPracticeAdmin(true); }}
+                          style={{ padding: 6 }}
+                          hitSlop={8}
+                        >
+                          <Ionicons name="settings-outline" size={18} color={c.primary} />
+                        </Pressable>
+                      </>
                     )}
-                  </View>
+                  </Pressable>
                 ))}
-                {t.adminPractice && (
-                  <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
-                    <Pressable
-                      onPress={() => { loadAdminPracticeDetail(); setShowPracticeAdmin(true); }}
-                      style={[styles.kassenartBtn, { backgroundColor: c.primary, borderColor: c.primary }]}
-                    >
-                      <Text style={[styles.kassenartText, { color: '#fff' }]}>Praxis verwalten</Text>
-                    </Pressable>
-                    <Pressable
-                      onPress={async () => {
-                        setInviteSearchQuery(''); setInviteSearchResults([]); setInviteTab('search'); setShowInvitePage(true);
-                        // Load existing PROPOSED links so Ausstehend state is correct
-                        try {
-                          const res = await fetch(`${getBaseUrl()}/my/practice`, { headers: { Authorization: `Bearer ${authToken}` } });
-                          if (res.ok) {
-                            const data = await res.json();
-                            const proposed = {};
-                            const list = [];
-                            for (const link of (data.practice?.links ?? [])) {
-                              if (link.status === 'PROPOSED') {
-                                proposed[link.therapist.id] = link.id;
-                                list.push({ ...link.therapist, linkId: link.id });
-                              }
-                            }
-                            setPendingInvites(proposed);
-                            setPendingTherapistsList(list);
-                          }
-                        } catch {}
-                      }}
-                      style={[styles.kassenartBtn, { backgroundColor: 'transparent', borderColor: c.primary }]}
-                    >
-                      <Text style={[styles.kassenartText, { color: c.primary }]}>+ Therapeut einladen</Text>
-                    </Pressable>
-                  </View>
-                )}
               </View>
             )}
 
             {/* Praxis-Verbindung */}
-            {(t.practices ?? []).length === 0 && (
+            {(th.practices ?? []).length === 0 && (
               <View style={[styles.noticeBox, { backgroundColor: c.mutedBg, borderColor: c.border }]}>
                 <Text style={styles.noticeIcon}>🏥</Text>
                 <View style={{ flex: 1 }}>
@@ -1924,22 +2412,14 @@ export default function App() {
         </View>
       </View>
 
-      <View style={[styles.noticeBox, { backgroundColor: c.successBg, borderColor: c.success }]}>
-        <Text style={styles.noticeIcon}>⚕️</Text>
+      <View style={[styles.infoCard, { backgroundColor: c.card, borderColor: c.border, flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 }]}>
+        <Text style={{ fontSize: 28 }}>⚕️</Text>
         <View style={{ flex: 1 }}>
-          <Text style={[styles.noticeTitle, { color: c.text }]}>Nur für Physiotherapeuten</Text>
+          <Text style={[styles.infoTitle, { color: c.text, marginBottom: 2 }]}>Werde auf Revio sichtbar</Text>
           <Text style={[styles.noticeBody, { color: c.muted }]}>
-            Revio ist ausschließlich für zugelassene Physiotherapeuten. Dein Profil wird vor der Veröffentlichung manuell geprüft.
+            Nur für zugelassene Physiotherapeuten. Dein Profil wird vor der Veröffentlichung manuell geprüft.
           </Text>
         </View>
-      </View>
-
-      <View style={[styles.infoCard, { backgroundColor: c.card, borderColor: c.border }]}>
-        <Text style={[styles.infoTitle, { color: c.text }]}>Werde auf Revio sichtbar</Text>
-        <Text style={[styles.infoBody, { color: c.muted }]}>
-          Erstelle dein geprüftes Therapeuten-Profil und lass Patienten in Köln dich gezielt nach
-          deinen Spezialisierungen finden.
-        </Text>
       </View>
 
       {[
@@ -1977,16 +2457,15 @@ export default function App() {
         <View style={styles.header}>
           <View style={[styles.logoMark, { backgroundColor: c.primary }]}><Text style={styles.logoText}>R</Text></View>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.headerTitle, { color: c.text }]}>Optionen</Text>
-            <Text style={[styles.headerSub, { color: c.muted }]}>Einstellungen & Informationen</Text>
+            <Text style={[styles.headerTitle, { color: c.text }]}>{t('optionsTitle')}</Text>
+            <Text style={[styles.headerSub, { color: c.muted }]}>{t('optionsSubtitle')}</Text>
           </View>
         </View>
 
         {[
-          { label: 'Sprache', value: 'Deutsch' },
-          { label: 'Datenschutz', value: 'Bald verfügbar' },
-          { label: 'Impressum', value: 'Bald verfügbar' },
-          { label: 'App-Version', value: '0.1.0 MVP' }
+          { label: t('privacyOption'), value: t('comingSoon') },
+          { label: t('imprintOption'), value: t('comingSoon') },
+          { label: t('appVersionOption'), value: '0.1.0 MVP' }
         ].map((item) => (
           <Pressable key={item.label} style={[styles.optionRow, { backgroundColor: c.card, borderColor: c.border }]}>
             <Text style={[styles.optionLabel, { color: c.text }]}>{item.label}</Text>
@@ -1994,14 +2473,43 @@ export default function App() {
           </Pressable>
         ))}
 
-        {/* Erscheinungsbild toggle */}
+        {/* Sprache toggle */}
         <View style={[styles.optionRow, { backgroundColor: c.card, borderColor: c.border }]}>
-          <Text style={[styles.optionLabel, { color: c.text }]}>Erscheinungsbild</Text>
+          <Text style={[styles.optionLabel, { color: c.text }]}>{t('languageOption')}</Text>
           <View style={styles.themeToggleRow}>
             {[
-              { key: 'light',  label: 'Hell' },
-              { key: 'dark',   label: 'Dunkel' },
-              { key: 'system', label: 'System' }
+              { key: 'de', label: 'DE' },
+              { key: 'en', label: 'EN' },
+            ].map(({ key, label }) => (
+              <Pressable
+                key={key}
+                onPress={() => {
+                  setAppLanguage(key);
+                  AsyncStorage.setItem('appLanguage', key);
+                }}
+                style={[
+                  styles.themeBtn,
+                  appLanguage === key
+                    ? { backgroundColor: c.primary, borderColor: c.primary }
+                    : { backgroundColor: c.mutedBg, borderColor: c.border }
+                ]}
+              >
+                <Text style={[styles.themeBtnText, { color: appLanguage === key ? '#FFFFFF' : c.muted }]}>
+                  {label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+
+        {/* Erscheinungsbild toggle */}
+        <View style={[styles.optionRow, { backgroundColor: c.card, borderColor: c.border }]}>
+          <Text style={[styles.optionLabel, { color: c.text }]}>{t('appearanceOption')}</Text>
+          <View style={styles.themeToggleRow}>
+            {[
+              { key: 'light',  label: t('themeLight') },
+              { key: 'dark',   label: t('themeDark') },
+              { key: 'system', label: t('themeSystem') }
             ].map(({ key, label }) => (
               <Pressable
                 key={key}
@@ -2023,17 +2531,17 @@ export default function App() {
 
         {loggedInTherapist && (
           <>
-            <Text style={[styles.filterSectionTitle, { color: c.muted, marginTop: 4 }]}>MEINE PRAXIS</Text>
+            <Text style={[styles.filterSectionTitle, { color: c.muted, marginTop: 4 }]}>{t('myPractice')}</Text>
             {loggedInTherapist.adminPractice ? (
               <Pressable
-                onPress={() => { loadAdminPracticeDetail(); setShowPracticeAdmin(true); }}
+                onPress={() => { setAdminPracticeDetail(null); loadAdminPracticeDetail(); setShowPracticeAdmin(true); }}
                 style={[styles.optionRow, { backgroundColor: c.card, borderColor: c.border }]}
               >
                 <View>
                   <Text style={[styles.optionLabel, { color: c.text }]}>{loggedInTherapist.adminPractice.name}</Text>
                   <Text style={[{ fontSize: 12, color: c.muted }]}>{loggedInTherapist.adminPractice.city}</Text>
                 </View>
-                <Text style={[styles.optionValue, { color: c.primary }]}>Verwalten ›</Text>
+                <Text style={[styles.optionValue, { color: c.primary }]}>{t('managePractice')} ›</Text>
               </Pressable>
             ) : (
               <>
@@ -2041,14 +2549,14 @@ export default function App() {
                   onPress={() => setShowCreatePractice(true)}
                   style={[styles.optionRow, { backgroundColor: c.card, borderColor: c.border }]}
                 >
-                  <Text style={[styles.optionLabel, { color: c.text }]}>Neue Praxis erstellen</Text>
+                  <Text style={[styles.optionLabel, { color: c.text }]}>{t('newPractice')}</Text>
                   <Text style={[styles.optionValue, { color: c.primary }]}>＋</Text>
                 </Pressable>
                 <Pressable
                   onPress={() => { setPracticeSearchQuery(''); setPracticeSearchResults([]); setShowPracticeSearch(true); }}
                   style={[styles.optionRow, { backgroundColor: c.card, borderColor: c.border }]}
                 >
-                  <Text style={[styles.optionLabel, { color: c.text }]}>Praxis vernetzen</Text>
+                  <Text style={[styles.optionLabel, { color: c.text }]}>{t('linkPractice')}</Text>
                   <Text style={[styles.optionValue, { color: c.primary }]}>🔗</Text>
                 </Pressable>
               </>
@@ -2061,20 +2569,28 @@ export default function App() {
             onPress={() => { setActiveTab('therapist'); setShowLogin(true); }}
             style={[styles.optionRow, { backgroundColor: c.card, borderColor: c.border }]}
           >
-            <Text style={[styles.optionLabel, { color: c.muted }]}>Nicht angemeldet</Text>
-            <Text style={[styles.optionValue, { color: c.primary }]}>Anmelden ›</Text>
+            <Text style={[styles.optionLabel, { color: c.muted }]}>{t('notLoggedIn')}</Text>
+            <Text style={[styles.optionValue, { color: c.primary }]}>{t('loginAction')} ›</Text>
           </Pressable>
         )}
       </ScrollView>
 
-      {/* Abmelden — fixed am unteren Rand */}
+      {/* Abmelden + Konto löschen — fixed am unteren Rand */}
       {loggedInTherapist && (
-        <Pressable
-          onPress={handleLogout}
-          style={{ backgroundColor: 'transparent', margin: 16, borderRadius: 12, paddingVertical: 14, alignItems: 'center', borderWidth: 1.5, borderColor: '#E74C3C' }}
-        >
-          <Text style={{ color: '#E74C3C', fontSize: 16, fontWeight: '600' }}>Abmelden</Text>
-        </Pressable>
+        <View style={{ marginHorizontal: 16, marginBottom: 16, gap: 10 }}>
+          <Pressable
+            onPress={handleLogout}
+            style={{ borderRadius: 12, paddingVertical: 14, alignItems: 'center', borderWidth: 1.5, borderColor: '#E74C3C' }}
+          >
+            <Text style={{ color: '#E74C3C', fontSize: 16, fontWeight: '600' }}>{t('logoutBtn')}</Text>
+          </Pressable>
+          <Pressable
+            onPress={handleDeleteAccount}
+            style={{ borderRadius: 12, paddingVertical: 14, alignItems: 'center' }}
+          >
+            <Text style={{ color: c.muted, fontSize: 14 }}>{t('deleteAccount')}</Text>
+          </Pressable>
+        </View>
       )}
     </View>
   );
@@ -2084,7 +2600,7 @@ export default function App() {
   const renderCreatePractice = () => (
     <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 20 }]} keyboardShouldPersistTaps="handled">
       <Pressable onPress={() => setShowCreatePractice(false)} style={styles.backBtn}>
-        <Text style={[styles.backBtnText, { color: c.primary }]}>‹ Zurück</Text>
+        <Text style={[styles.backBtnText, { color: c.primary }]}>‹ {t('backBtn')}</Text>
       </Pressable>
       <View style={styles.header}>
         <View style={[styles.logoMark, { backgroundColor: c.primary }]}><Text style={styles.logoText}>R</Text></View>
@@ -2143,7 +2659,7 @@ export default function App() {
     <View style={{ flex: 1 }}>
       <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 20 }]} keyboardShouldPersistTaps="handled">
         <Pressable onPress={() => setShowPracticeSearch(false)} style={styles.backBtn}>
-          <Text style={[styles.backBtnText, { color: c.primary }]}>‹ Zurück</Text>
+          <Text style={[styles.backBtnText, { color: c.primary }]}>‹ {t('backBtn')}</Text>
         </Pressable>
         <View style={styles.header}>
           <View style={[styles.logoMark, { backgroundColor: c.primary }]}><Text style={styles.logoText}>R</Text></View>
@@ -2209,103 +2725,66 @@ export default function App() {
   const renderInvitePage = () => (
     <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 40 }]} keyboardShouldPersistTaps="handled">
       <Pressable onPress={() => setShowInvitePage(false)} style={styles.backBtn}>
-        <Text style={[styles.backBtnText, { color: c.primary }]}>‹ Zurück</Text>
+        <Text style={[styles.backBtnText, { color: c.primary }]}>‹ {t('backBtn')}</Text>
       </Pressable>
-      <Text style={[styles.profileName, { color: c.text, marginBottom: 4 }]}>Therapeuten einladen</Text>
-      <Text style={[styles.infoBody, { color: c.muted, marginBottom: 16 }]}>Suche nach Therapeuten oder teile einen Einladungslink.</Text>
+      <Text style={[styles.profileName, { color: c.text, marginBottom: 16 }]}>Therapeuten einladen</Text>
 
-      {/* Tabs */}
-      <View style={{ flexDirection: 'row', borderRadius: 10, overflow: 'hidden', borderWidth: 1, borderColor: c.border, marginBottom: 20 }}>
-        {[{ key: 'search', label: 'Suchen' }, { key: 'link', label: 'Einladungslink' }].map(tab => (
+      {/* Tab bar */}
+      <View style={{ flexDirection: 'row', backgroundColor: c.mutedBg, borderRadius: 12, padding: 3, marginBottom: 20 }}>
+        {[{ key: 'new', label: 'Neuer Therapeut' }, { key: 'link', label: 'Einladungslink' }].map(tab => (
           <Pressable
             key={tab.key}
-            onPress={() => { setInviteTab(tab.key); if (tab.key === 'link' && !inviteToken) handleLoadInviteToken(); }}
-            style={{ flex: 1, paddingVertical: 10, alignItems: 'center', backgroundColor: inviteTab === tab.key ? c.primary : c.card }}
+            onPress={() => setInvitePageTab(tab.key)}
+            style={{ flex: 1, paddingVertical: 9, borderRadius: 10, alignItems: 'center',
+              backgroundColor: invitePageTab === tab.key ? c.card : 'transparent' }}
           >
-            <Text style={{ color: inviteTab === tab.key ? '#fff' : c.muted, fontWeight: '600', fontSize: 14 }}>{tab.label}</Text>
+            <Text style={{ fontSize: 14, fontWeight: invitePageTab === tab.key ? '700' : '500',
+              color: invitePageTab === tab.key ? c.text : c.muted }}>
+              {tab.label}
+            </Text>
           </Pressable>
         ))}
       </View>
 
-      {/* Tab: Suchen */}
-      {inviteTab === 'search' && (
+      {invitePageTab === 'new' ? (
+        /* ── Neuer Therapeut tab ── */
         <View style={{ gap: 12 }}>
-
-          {/* Search box always at top */}
-          <View style={[styles.searchBox, { backgroundColor: c.card, borderColor: c.border }]}>
-            <Text style={[styles.searchIcon, { color: c.muted }]}>⌕</Text>
-            <TextInput
-              value={inviteSearchQuery}
-              onChangeText={handleInviteSearch}
-              placeholder="Name oder E-Mail"
-              placeholderTextColor={c.muted}
-              style={[styles.searchInput, { color: c.text }]}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-            {inviteSearchLoading && <Text style={{ color: c.muted, fontSize: 12, paddingRight: 8 }}>…</Text>}
-          </View>
-
-          {inviteSearchResults.length === 0 && inviteSearchQuery.length >= 2 && !inviteSearchLoading && (
-            <Text style={[styles.infoBody, { color: c.muted, textAlign: 'center' }]}>Keine Therapeuten gefunden.</Text>
-          )}
-
-          {/* Search results — shown only while actively searching */}
-          {/* Persistent pending invites — hidden while search query is active */}
-          {inviteSearchQuery.length === 0 && pendingTherapistsList.length > 0 && (
-            <View style={{ gap: 8 }}>
-              <Text style={[styles.filterSectionTitle, { color: c.muted, marginBottom: 0 }]}>Ausstehende Einladungen</Text>
-              {pendingTherapistsList.map(t => (
-                <View key={t.id} style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border, flexDirection: 'row', alignItems: 'center', gap: 12 }]}>
-                  <Image source={{ uri: t.photo || `https://i.pravatar.cc/48?u=${t.id}` }} style={{ width: 44, height: 44, borderRadius: 22 }} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ color: c.text, fontWeight: '600', fontSize: 14 }}>{t.fullName}</Text>
-                    <Text style={{ color: c.muted, fontSize: 12 }}>{t.professionalTitle} · {t.city}</Text>
-                  </View>
-                  <Pressable
-                    onPress={() => handleCancelInvite(t.id, t.fullName)}
-                    style={{ borderWidth: 1.5, borderColor: c.muted, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8 }}
-                  >
-                    <Text style={{ color: c.muted, fontSize: 13, fontWeight: '600' }}>Ausstehend</Text>
-                  </Pressable>
-                </View>
-              ))}
-            </View>
-          )}
-
-          {/* Search results — shown only while actively searching */}
-          {inviteSearchResults.map(t => {
-            const isPending = !!pendingInvites[t.id];
-            return (
-              <View key={t.id} style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border, flexDirection: 'row', alignItems: 'center', gap: 12 }]}>
-                <Image source={{ uri: t.photo || `https://i.pravatar.cc/48?u=${t.id}` }} style={{ width: 44, height: 44, borderRadius: 22 }} />
-                <View style={{ flex: 1 }}>
-                  <Text style={{ color: c.text, fontWeight: '600', fontSize: 14 }}>{t.fullName}</Text>
-                  <Text style={{ color: c.muted, fontSize: 12 }}>{t.professionalTitle} · {t.city}</Text>
-                </View>
-                <Pressable
-                  onPress={() => isPending ? handleCancelInvite(t.id, t.fullName) : handleInviteBySearch(t)}
-                  style={{
-                    backgroundColor: isPending ? 'transparent' : c.primary,
-                    borderRadius: 8,
-                    paddingHorizontal: 14,
-                    paddingVertical: 8,
-                    borderWidth: isPending ? 1.5 : 0,
-                    borderColor: isPending ? c.muted : undefined,
-                  }}
-                >
-                  <Text style={{ color: isPending ? c.muted : '#fff', fontSize: 13, fontWeight: '600' }}>
-                    {isPending ? 'Ausstehend' : 'Einladen'}
-                  </Text>
-                </Pressable>
+          <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border, gap: 10 }]}>
+            <Text style={[styles.filterSectionTitle, { color: c.muted }]}>PROFIL ERSTELLEN & EINLADEN</Text>
+            {[
+              { label: 'Name *', value: createTherapistName, setter: setCreateTherapistName, placeholder: 'Max Mustermann' },
+              { label: 'E-Mail *', value: createTherapistEmail, setter: setCreateTherapistEmail, placeholder: 'therapeut@email.de', keyboard: 'email-address', lower: true },
+              { label: 'Berufsbezeichnung *', value: createTherapistTitle, setter: setCreateTherapistTitle, placeholder: 'Physiotherapeut/in' },
+            ].map(({ label, value, setter, placeholder, keyboard, lower }) => (
+              <View key={label}>
+                <Text style={[styles.filterSectionTitle, { color: c.muted }]}>{label}</Text>
+                <TextInput
+                  style={[styles.inputField, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg }]}
+                  value={value}
+                  onChangeText={setter}
+                  placeholder={placeholder}
+                  placeholderTextColor={c.muted}
+                  keyboardType={keyboard ?? 'default'}
+                  autoCapitalize={lower ? 'none' : 'words'}
+                />
               </View>
-            );
-          })}
+            ))}
+            {!!createTherapistError && (
+              <Text style={{ color: '#E74C3C', fontSize: 13 }}>{createTherapistError}</Text>
+            )}
+            <Pressable
+              onPress={handleCreateTherapist}
+              disabled={createTherapistLoading}
+              style={{ backgroundColor: createTherapistLoading ? c.border : c.primary, borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginTop: 4 }}
+            >
+              <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>
+                {createTherapistLoading ? 'Wird erstellt…' : 'Profil erstellen & einladen'}
+              </Text>
+            </Pressable>
+          </View>
         </View>
-      )}
-
-      {/* Tab: Einladungslink */}
-      {inviteTab === 'link' && (
+      ) : (
+        /* ── Einladungslink tab ── */
         <View style={{ gap: 16 }}>
           {inviteTokenLoading ? (
             <Text style={[styles.infoBody, { color: c.muted, textAlign: 'center' }]}>Link wird erstellt…</Text>
@@ -2379,7 +2858,7 @@ export default function App() {
         }}
       >
         <Pressable onPress={() => { setShowPracticeAdmin(false); setEditPracticeName(''); setEditPracticeLogo(null); setEditPracticePhotos([]); }} style={styles.backBtn}>
-          <Text style={[styles.backBtnText, { color: c.primary }]}>‹ Zurück</Text>
+          <Text style={[styles.backBtnText, { color: c.primary }]}>‹ {t('backBtn')}</Text>
         </Pressable>
 
         {/* Praxis-Header */}
@@ -2437,23 +2916,49 @@ export default function App() {
 
         {/* Bestätigte Therapeuten */}
         <Text style={[styles.sectionLabel, { color: c.text }]}>Therapeuten ({confirmed.length})</Text>
-        {confirmed.map(link => (
-          <Pressable key={link.id} style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}
-            onPress={() => openTherapistById(link.therapist.id)}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <Image
-                source={{ uri: link.therapist.photo || `https://i.pravatar.cc/96?u=${link.therapist.id}` }}
-                style={[styles.therapistAvatarSmall, { borderRadius: 20 }]}
-              />
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.therapistName, { color: c.text }]}>{link.therapist.fullName}</Text>
-                <Text style={[styles.therapistTitle, { color: c.muted }]}>{link.therapist.professionalTitle}</Text>
-                <Text style={[{ fontSize: 12, color: c.muted }]}>{link.therapist.email}</Text>
-              </View>
-              <Text style={[styles.practiceArrow, { color: c.muted }]}>›</Text>
+        {confirmed.map(link => {
+          const th = link.therapist;
+          const isInvited = th.invitedByPracticeId === p.id;
+          const statusLabel = isInvited
+            ? th.onboardingStatus === 'invited' ? 'Einladung ausstehend'
+              : th.onboardingStatus === 'claimed' ? 'Profil wird ausgefüllt'
+              : th.isPublished ? 'Veröffentlicht' : 'Profil vollständig'
+            : null;
+          const statusColor = th.onboardingStatus === 'invited' ? '#F59E0B'
+            : th.onboardingStatus === 'claimed' ? '#3B82F6'
+            : '#10B981';
+          return (
+            <View key={link.id} style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border, gap: 0 }]}>
+              <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}
+                onPress={() => openTherapistById(th.id)}>
+                <Image
+                  source={{ uri: th.photo || `https://i.pravatar.cc/96?u=${th.id}` }}
+                  style={[styles.therapistAvatarSmall, { borderRadius: 20 }]}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.therapistName, { color: c.text }]}>{th.fullName}</Text>
+                  <Text style={[styles.therapistTitle, { color: c.muted }]}>{th.professionalTitle}</Text>
+                  <Text style={{ fontSize: 12, color: c.muted }}>{th.email}</Text>
+                  {statusLabel && (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                      <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: statusColor }} />
+                      <Text style={{ fontSize: 11, color: statusColor, fontWeight: '600' }}>{statusLabel}</Text>
+                    </View>
+                  )}
+                </View>
+                <Text style={[styles.practiceArrow, { color: c.muted }]}>›</Text>
+              </Pressable>
+              {isInvited && th.onboardingStatus === 'invited' && (
+                <Pressable
+                  onPress={() => handleResendInvite(th.id)}
+                  style={{ marginTop: 10, paddingVertical: 8, alignItems: 'center', borderTopWidth: 1, borderTopColor: c.border }}
+                >
+                  <Text style={{ fontSize: 13, color: c.primary, fontWeight: '600' }}>Einladung erneut senden</Text>
+                </Pressable>
+              )}
             </View>
-          </Pressable>
-        ))}
+          );
+        })}
 
         {confirmed.length === 0 && pending.length === 0 && (
           <View style={[styles.emptyState, { backgroundColor: c.card, borderColor: c.border }]}>
@@ -2552,27 +3057,21 @@ export default function App() {
         </View>
 
         {/* Therapeuten einladen */}
-        <Text
+        <Pressable
           onLayout={e => { inviteSectionY.current = e.nativeEvent.layout.y; }}
-          style={[styles.sectionLabel, { color: c.text }]}
-        >Therapeuten einladen</Text>
-        <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
-          <Text style={[styles.filterSectionTitle, { color: c.muted }]}>E-Mail des Therapeuten</Text>
-          <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-            <TextInput
-              style={[styles.inputField, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg, flex: 1 }]}
-              value={inviteEmail} onChangeText={setInviteEmail}
-              placeholder="therapeut@email.de" placeholderTextColor={c.muted}
-              autoCapitalize="none" keyboardType="email-address"
-            />
-            <Pressable
-              onPress={handleInviteTherapist}
-              style={[styles.kassenartBtn, { backgroundColor: c.primary, borderColor: c.primary }]}
-            >
-              <Text style={[styles.kassenartText, { color: '#fff' }]}>Einladen</Text>
-            </Pressable>
-          </View>
-        </View>
+          onPress={() => { setInvitePageTab('new'); if (!inviteToken) handleLoadInviteToken(); setShowInvitePage(true); }}
+          style={[styles.kassenartBtn, { backgroundColor: 'transparent', borderColor: c.border, alignSelf: 'flex-start', marginBottom: 8 }]}
+        >
+          <Text style={[styles.kassenartText, { color: c.muted }]}>+ Therapeut einladen</Text>
+        </Pressable>
+
+        {/* Praxis löschen */}
+        <Pressable
+          onPress={handleDeletePractice}
+          style={{ marginTop: 8, marginBottom: 8, alignItems: 'center', paddingVertical: 14 }}
+        >
+          <Text style={{ color: c.muted, fontSize: 14 }}>Praxis löschen</Text>
+        </Pressable>
       </ScrollView>
     );
   };
@@ -2583,64 +3082,64 @@ export default function App() {
     <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 20 }]} showsVerticalScrollIndicator={false}>
       <View style={styles.header}>
         <View style={[styles.logoMark, { backgroundColor: c.primary }]}><Text style={styles.logoText}>R</Text></View>
-        <Text style={[styles.headerTitle, { color: c.text }]}>Favoriten</Text>
+        <Text style={[styles.headerTitle, { color: c.text }]}>{t('favoritesTitle')}</Text>
       </View>
 
       <View style={[styles.noticeBox, { backgroundColor: c.mutedBg, borderColor: c.border, marginBottom: 4 }]}>
-        <Text style={styles.noticeIcon}>🔒</Text>
-        <Text style={[styles.noticeBody, { color: c.muted }]}>
-          Lokal gespeichert · nicht synchronisiert · nur für dich sichtbar
-        </Text>
+        <View style={styles.lockBadge}>
+          <Ionicons name="accessibility" size={16} color="#6b8fa0" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.noticeBody, { color: c.muted, flex: 0 }]}>{t('favoritesHint')}</Text>
+        </View>
       </View>
 
       {favorites.length === 0 && favoritePractices.length === 0 ? (
         <View style={[styles.emptyState, { backgroundColor: c.card, borderColor: c.border }]}>
           <Text style={styles.emptyIcon}>♡</Text>
-          <Text style={[styles.emptyTitle, { color: c.text }]}>Noch keine Favoriten</Text>
-          <Text style={[styles.emptyBody, { color: c.muted }]}>
-            Tippe auf das Herz-Symbol bei einem Therapeuten oder einer Praxis, um sie hier zu speichern.
-          </Text>
+          <Text style={[styles.emptyTitle, { color: c.text }]}>{t('favoritesEmpty')}</Text>
+          <Text style={[styles.emptyBody, { color: c.muted }]}>{t('favoritesEmptyBody')}</Text>
         </View>
       ) : null}
 
       {favorites.length > 0 && (
         <>
-          <Text style={[styles.sectionLabel, { color: c.text }]}>Therapeuten</Text>
-          {favorites.map((t) => (
-            <View key={t.id} style={[styles.resultCard, { backgroundColor: c.card, borderColor: c.border }]}>
+          <Text style={[styles.sectionLabel, { color: c.text }]}>{t('favoritesTherapists')}</Text>
+          {favorites.map((fav) => (
+            <View key={fav.id} style={[styles.resultCard, { backgroundColor: c.card, borderColor: c.border }]}>
               <View style={styles.cardTop}>
-                <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }} onPress={() => setSelectedTherapist(t)}>
-                  <Image source={{ uri: t.photo }} style={styles.avatar} />
+                <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }} onPress={() => setSelectedTherapist(fav)}>
+                  <Image source={{ uri: fav.photo }} style={styles.avatar} />
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.cardName, { color: c.text }]}>{t.fullName}</Text>
-                    <Text style={[styles.cardTitle, { color: c.muted }]}>{t.professionalTitle}</Text>
+                    <Text style={[styles.cardName, { color: c.text }]}>{fav.fullName}</Text>
+                    <Text style={[styles.cardTitle, { color: c.muted }]}>{fav.professionalTitle}</Text>
                   </View>
                   <Text style={[styles.practiceArrow, { color: c.muted }]}>›</Text>
                 </Pressable>
-                <Pressable onPress={() => toggleFavorite(t)} hitSlop={10}>
+                <Pressable onPress={() => toggleFavorite(fav)} hitSlop={10}>
                   <Ionicons name="heart" size={22} color="#E05A77" />
                 </Pressable>
               </View>
-              {t.practices?.length > 0 && (
+              {fav.practices?.length > 0 && (
                 <Pressable
-                  onPress={() => setSelectedPractice(t.practices[0])}
+                  onPress={() => openPractice(fav.practices[0])}
                   style={[styles.practiceBtn, { borderColor: c.border, backgroundColor: c.mutedBg }]}
                 >
                   <View style={[styles.practiceInitial, { backgroundColor: c.border }]}>
-                    <Text style={[styles.practiceInitialText, { color: c.muted }]}>{t.practices[0].name.charAt(0)}</Text>
+                    <Text style={[styles.practiceInitialText, { color: c.muted }]}>{fav.practices[0].name.charAt(0)}</Text>
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.practiceName, { color: c.text }]}>{t.practices[0].name}</Text>
-                    <Text style={[styles.practiceCity, { color: c.muted }]}>{t.practices[0].city}</Text>
+                    <Text style={[styles.practiceName, { color: c.text }]}>{fav.practices[0].name}</Text>
+                    <Text style={[styles.practiceCity, { color: c.muted }]}>{fav.practices[0].city}</Text>
                   </View>
                   <Text style={[styles.practiceArrow, { color: c.muted }]}>›</Text>
                 </Pressable>
               )}
               <Pressable
                 style={[styles.ctaBtn, { backgroundColor: c.accent }]}
-                onPress={() => callPhone(t.practices?.[0]?.phone)}
+                onPress={() => callPhone(fav.practices?.[0]?.phone)}
               >
-                <Text style={styles.ctaBtnText}>📞 Praxis anrufen</Text>
+                <Text style={styles.ctaBtnText}>{t('callPractice')}</Text>
               </Pressable>
             </View>
           ))}
@@ -2649,13 +3148,11 @@ export default function App() {
 
       {favoritePractices.length > 0 && (
         <>
-          <Text style={[styles.sectionLabel, { color: c.text, marginTop: favorites.length > 0 ? 8 : 0 }]}>Praxen</Text>
+          <Text style={[styles.sectionLabel, { color: c.text, marginTop: favorites.length > 0 ? 8 : 0 }]}>{t('favoritesPractices')}</Text>
           {favoritePractices.map((p) => {
-            const practiceTherapists = p.therapists ?? [];
-            if (practiceTherapists.length === 0) return null;
             return (
             <View key={p.id} style={[styles.resultCard, { backgroundColor: c.card, borderColor: c.border }]}>
-              <Pressable onPress={() => setSelectedPractice(p)} style={styles.cardTop}>
+              <Pressable onPress={() => openPractice(p)} style={styles.cardTop}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
                   {p.logo ? (
                     <Image source={{ uri: p.logo }} style={[styles.avatar, { borderRadius: 10 }]} />
@@ -2676,23 +3173,12 @@ export default function App() {
                   <Ionicons name="heart" size={22} color="#E05A77" />
                 </Pressable>
               </Pressable>
-              {practiceTherapists.map(t => (
-                <Pressable key={t.id} onPress={() => setSelectedTherapist(t)}
-                  style={[styles.practiceBtn, { borderColor: c.border, backgroundColor: c.mutedBg }]}>
-                  <Image source={{ uri: t.photo }} style={[styles.practiceInitial, { borderRadius: 20 }]} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.practiceName, { color: c.text }]}>{t.fullName}</Text>
-                    <Text style={[styles.practiceCity, { color: c.muted }]}>{t.professionalTitle}</Text>
-                  </View>
-                  <Text style={[styles.practiceArrow, { color: c.muted }]}>›</Text>
-                </Pressable>
-              ))}
               {p.phone && (
                 <Pressable
                   style={[styles.ctaBtn, { backgroundColor: c.accent }]}
                   onPress={() => callPhone(p.phone)}
                 >
-                  <Text style={styles.ctaBtnText}>📞 Praxis anrufen</Text>
+                  <Text style={styles.ctaBtnText}>{t('callPractice')}</Text>
                 </Pressable>
               )}
             </View>
@@ -2715,7 +3201,7 @@ export default function App() {
             <Text style={[styles.infoBody, { color: c.muted, textAlign: 'center', marginTop: 8 }]}>
               {__DEV__
                 ? 'Entwicklungsmodus: Dein Profil wurde automatisch freigegeben und ist sofort in der Suche sichtbar.'
-                : 'Dein Profil wird innerhalb von 48 Stunden manuell geprüft. Du erhältst eine E-Mail, sobald dein Profil freigeschaltet ist.'}
+                : 'Dein Profil wird innerhalb von 48 Stunden manuell geprüft. Den Status kannst du jederzeit in der App unter „Für Therapeuten" einsehen.'}
             </Text>
             <Pressable
               style={[styles.registerBtn, { backgroundColor: c.primary, marginTop: 24, paddingHorizontal: 32 }]}
@@ -2740,8 +3226,20 @@ export default function App() {
     );
 
     const canProceed = () => {
-      if (regStep === 1) return regEmail.length > 3 && regPassword.length >= 6 && regPassword === regPasswordConfirm;
-      return true;
+      switch (regStep) {
+        case 1:
+          return regEmail.length > 3 && regPassword.length >= 6 && regPassword === regPasswordConfirm;
+        case 2:
+          return regFirstName.trim().length > 0 && regLastName.trim().length > 0 && regCity.trim().length > 0;
+        case 3:
+          return regLanguages.length > 0;
+        case 4:
+          if (regPracticeMode === 'new') return regPracticeName.trim().length > 0 && regPracticeCity.trim().length > 0;
+          if (regPracticeMode === 'existing') return !!regExistingPracticeId;
+          return true; // skip
+        default:
+          return true;
+      }
     };
 
     const renderStepContent = () => {
@@ -2880,10 +3378,46 @@ export default function App() {
                   <View style={[styles.noticeBox, { backgroundColor: c.mutedBg, borderColor: c.border }]}>
                     <Text style={styles.noticeIcon}>ℹ️</Text>
                     <Text style={[styles.noticeBody, { color: c.muted }]}>
-                      Gib den Namen der Praxis ein. Die Praxis muss deine Anfrage nach der Profilprüfung bestätigen.
+                      Suche nach der Praxis. Der Praxis-Admin muss deine Anfrage anschließend bestätigen.
                     </Text>
                   </View>
-                  <TextInput value={regExistingPracticeName} onChangeText={setRegExistingPracticeName} placeholder="Name der bestehenden Praxis" placeholderTextColor={c.muted} style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text }]} />
+                  <TextInput
+                    value={regExistingPracticeName}
+                    onChangeText={async (text) => {
+                      setRegExistingPracticeName(text);
+                      setRegExistingPracticeId(null);
+                      if (text.length < 2) { setRegPracticeSearchResults([]); return; }
+                      setRegPracticeSearching(true);
+                      try {
+                        const res = await fetch(`${getBaseUrl()}/practices/search?q=${encodeURIComponent(text)}`);
+                        if (res.ok) { const d = await res.json(); setRegPracticeSearchResults(d.practices ?? []); }
+                      } catch { /* ignore */ } finally { setRegPracticeSearching(false); }
+                    }}
+                    placeholder="Praxisname oder Stadt suchen…"
+                    placeholderTextColor={c.muted}
+                    style={[styles.regInput, { backgroundColor: c.card, borderColor: regExistingPracticeId ? c.primary : c.border, color: c.text }]}
+                  />
+                  {regPracticeSearching && <Text style={[styles.regStepSub, { color: c.muted }]}>Suche…</Text>}
+                  {regPracticeSearchResults.length > 0 && !regExistingPracticeId && (
+                    <View style={[{ borderRadius: 10, overflow: 'hidden', borderWidth: 1, borderColor: c.border, marginTop: 4 }]}>
+                      {regPracticeSearchResults.map((p, i) => (
+                        <Pressable
+                          key={p.id}
+                          onPress={() => { setRegExistingPracticeId(p.id); setRegExistingPracticeName(`${p.name} – ${p.city}`); setRegPracticeSearchResults([]); }}
+                          style={[{ padding: 12, backgroundColor: c.card, borderTopWidth: i > 0 ? 1 : 0, borderColor: c.border }]}
+                        >
+                          <Text style={[styles.practiceName, { color: c.text }]}>{p.name}</Text>
+                          <Text style={[styles.practiceCity, { color: c.muted }]}>{p.city}{p.address ? ` · ${p.address}` : ''}</Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  )}
+                  {regExistingPracticeId && (
+                    <View style={[styles.noticeBox, { backgroundColor: c.successBg, borderColor: c.success }]}>
+                      <Text style={styles.noticeIcon}>✅</Text>
+                      <Text style={[styles.noticeBody, { color: c.success }]}>Praxis ausgewählt. Anfrage wird nach Registrierung gestellt.</Text>
+                    </View>
+                  )}
                 </>
               )}
 
@@ -2909,8 +3443,8 @@ export default function App() {
                 { label: 'Spezialisierungen', value: regSpecializations.join(', ') || '—' },
                 { label: 'Sprachen', value: regLanguages.join(', ') || '—' },
                 { label: 'Hausbesuche', value: regHomeVisit ? 'Ja' : 'Nein' },
-                { label: 'Praxis', value: regPracticeName || '—' },
-                { label: 'Adresse', value: [regPracticeAddress, regPracticeCity].filter(Boolean).join(', ') || '—' },
+                { label: 'Praxis', value: regPracticeMode === 'new' ? (regPracticeName || '—') : regPracticeMode === 'existing' ? (regExistingPracticeName || '—') : 'Keine Praxis' },
+                ...(regPracticeMode === 'new' ? [{ label: 'Adresse', value: [regPracticeAddress, regPracticeCity].filter(Boolean).join(', ') || '—' }] : []),
               ].map(row => (
                 <View key={row.label} style={[styles.previewRow, { borderBottomColor: c.border }]}>
                   <Text style={[styles.previewLabel, { color: c.muted }]}>{row.label}</Text>
@@ -2926,7 +3460,7 @@ export default function App() {
               <View style={[styles.noticeBox, { backgroundColor: c.mutedBg, borderColor: c.border }]}>
                 <Text style={styles.noticeIcon}>ℹ️</Text>
                 <Text style={[styles.noticeBody, { color: c.muted }]}>
-                  Dein Profil wird nach dem Einreichen manuell geprüft. Du wirst per E-Mail benachrichtigt.
+                  Dein Profil wird nach dem Einreichen manuell geprüft. Den Status kannst du jederzeit in der App einsehen.
                 </Text>
               </View>
             </>
@@ -2942,7 +3476,7 @@ export default function App() {
           onPress={() => { if (regStep === 1) setShowRegister(false); else setRegStep(s => s - 1); }}
           style={styles.backBtn}
         >
-          <Text style={[styles.backBtnText, { color: c.primary }]}>‹ {regStep === 1 ? 'Abbrechen' : 'Zurück'}</Text>
+          <Text style={[styles.backBtnText, { color: c.primary }]}>‹ {regStep === 1 ? 'Abbrechen' : t('backBtn')}</Text>
         </Pressable>
 
         <View style={styles.header}>
@@ -2971,6 +3505,7 @@ export default function App() {
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
                     email: regEmail,
+                    password: regPassword,
                     fullName: `${regFirstName} ${regLastName}`.trim(),
                     professionalTitle: 'Physiotherapeut/in',
                     city: regCity,
@@ -2986,6 +3521,8 @@ export default function App() {
                         address: regPracticeAddress || undefined,
                         phone: regPracticePhone || undefined,
                       },
+                    } : regPracticeMode === 'existing' && regExistingPracticeId ? {
+                      existingPracticeId: regExistingPracticeId,
                     } : {}),
                   }),
                 });
@@ -3010,9 +3547,186 @@ export default function App() {
     );
   };
 
+  // ── Invite Claim Screen ───────────────────────────────────────────────────
+
+  const handleVisibilityChoice = async (preference) => {
+    if (!authToken) return;
+    setVisibilityLoading(true);
+    try {
+      const res = await fetch(`${getBaseUrl()}/invite/visibility`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({ visibilityPreference: preference }),
+      });
+      const data = await res.json().catch(() => ({}));
+      setShowVisibilityModal(false);
+      if (res.ok) {
+        // Refresh profile
+        const profileRes = await fetch(`${getBaseUrl()}/auth/me`, {
+          headers: { Authorization: `Bearer ${authToken}` },
+        });
+        if (profileRes.ok) setLoggedInTherapist(await profileRes.json());
+
+        if (preference === 'visible') {
+          if (data.isPublished) {
+            Alert.alert('Profil sichtbar', 'Dein Profil ist jetzt öffentlich sichtbar.');
+          } else if (data.missingFields && data.missingFields.length > 0) {
+            const fields = data.missingFields.join(', ');
+            Alert.alert(
+              'Profil unvollständig',
+              `Bevor dein Profil sichtbar wird, fülle bitte noch folgende Felder aus: ${fields}`,
+              [{ text: 'Profil bearbeiten', onPress: () => setActiveTab('therapist') }, { text: 'Später', style: 'cancel' }]
+            );
+          }
+        } else {
+          Alert.alert('Profil versteckt', 'Dein Profil ist jetzt nicht öffentlich sichtbar.');
+        }
+      } else {
+        Alert.alert('Fehler', data.message ?? 'Einstellung konnte nicht gespeichert werden.');
+      }
+    } catch {
+      setShowVisibilityModal(false);
+      Alert.alert('Verbindungsfehler', 'Bitte prüfe deine Internetverbindung.');
+    } finally {
+      setVisibilityLoading(false);
+    }
+  };
+
+  const renderInviteClaimScreen = () => {
+    if (inviteClaimLoading && !inviteClaimData) {
+      return (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: c.background }}>
+          <Text style={{ color: c.muted, fontSize: 15 }}>Einladung wird geprüft…</Text>
+        </View>
+      );
+    }
+
+    if (inviteClaimError && !inviteClaimData) {
+      return (
+        <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 40 }]}>
+          <View style={[styles.infoCard, { backgroundColor: c.card, borderColor: c.border, marginTop: 40 }]}>
+            <Ionicons name="alert-circle-outline" size={40} color="#E74C3C" style={{ alignSelf: 'center' }} />
+            <Text style={[styles.infoTitle, { color: c.text, textAlign: 'center' }]}>Ungültige Einladung</Text>
+            <Text style={[styles.infoBody, { color: c.muted, textAlign: 'center' }]}>{inviteClaimError}</Text>
+            <Pressable
+              style={[styles.registerBtn, { backgroundColor: c.primary, marginTop: 8 }]}
+              onPress={() => { setShowInviteClaim(false); setInviteClaimError(''); }}
+            >
+              <Text style={styles.registerBtnText}>Zur App</Text>
+            </Pressable>
+          </View>
+        </ScrollView>
+      );
+    }
+
+    if (!inviteClaimData) return null;
+
+    const { therapist: inviteTherapist, practice: invitePractice } = inviteClaimData;
+
+    const handleClaim = async () => {
+      if (!inviteClaimPassword || inviteClaimPassword.length < 6) {
+        setInviteClaimError('Das Passwort muss mindestens 6 Zeichen lang sein.');
+        return;
+      }
+      if (inviteClaimPassword !== inviteClaimPasswordConfirm) {
+        setInviteClaimError('Die Passwörter stimmen nicht überein.');
+        return;
+      }
+      setInviteClaimLoading(true);
+      setInviteClaimError('');
+      try {
+        const res = await fetch(`${getBaseUrl()}/invite/claim`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: inviteClaimToken, password: inviteClaimPassword }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setInviteClaimError(data.message ?? 'Fehler beim Aktivieren des Kontos.');
+          return;
+        }
+        // Store token and load profile
+        await AsyncStorage.setItem('revio_auth_token', data.token);
+        setAuthToken(data.token);
+        const profileRes = await fetch(`${getBaseUrl()}/auth/me`, {
+          headers: { Authorization: `Bearer ${data.token}` },
+        });
+        if (profileRes.ok) setLoggedInTherapist(await profileRes.json());
+        setShowInviteClaim(false);
+        setInviteClaimToken(null);
+        setInviteClaimData(null);
+        setInviteClaimPassword('');
+        setInviteClaimPasswordConfirm('');
+        // Show visibility modal
+        setShowVisibilityModal(true);
+      } catch {
+        setInviteClaimError('Verbindungsfehler. Bitte prüfe deine Internetverbindung.');
+      } finally {
+        setInviteClaimLoading(false);
+      }
+    };
+
+    return (
+      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 40 }]} keyboardShouldPersistTaps="handled">
+        <View style={[styles.infoCard, { backgroundColor: c.card, borderColor: c.border, marginTop: 20, alignItems: 'center' }]}>
+          <View style={[styles.logoMark, { backgroundColor: c.primary, width: 56, height: 56, borderRadius: 16 }]}>
+            <Text style={[styles.logoText, { fontSize: 24 }]}>R</Text>
+          </View>
+          <Text style={[styles.infoTitle, { color: c.text, textAlign: 'center', marginTop: 8 }]}>Du wurdest eingeladen!</Text>
+          <Text style={[styles.infoBody, { color: c.muted, textAlign: 'center' }]}>
+            {invitePractice.name} hat ein Profil für dich erstellt. Setze jetzt ein Passwort, um dein Konto zu aktivieren.
+          </Text>
+        </View>
+
+        <View style={[styles.infoCard, { backgroundColor: c.card, borderColor: c.border }]}>
+          <Text style={[styles.filterSectionTitle, { color: c.muted }]}>DEIN PROFIL</Text>
+          <Text style={[styles.detailInfoValue, { color: c.text, fontWeight: '700', fontSize: 17 }]}>{inviteTherapist.fullName}</Text>
+          <Text style={[styles.detailInfoValue, { color: c.muted }]}>{inviteTherapist.professionalTitle}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+            <Ionicons name="business-outline" size={14} color={c.muted} />
+            <Text style={[styles.detailInfoValue, { color: c.muted }]}>{invitePractice.name}, {invitePractice.city}</Text>
+          </View>
+        </View>
+
+        <View style={[styles.infoCard, { backgroundColor: c.card, borderColor: c.border }]}>
+          <Text style={[styles.filterSectionTitle, { color: c.muted }]}>PASSWORT SETZEN</Text>
+          <TextInput
+            style={[styles.regInput, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg, marginTop: 6 }]}
+            value={inviteClaimPassword}
+            onChangeText={setInviteClaimPassword}
+            placeholder="Passwort (mind. 6 Zeichen)"
+            placeholderTextColor={c.muted}
+            secureTextEntry
+            autoCapitalize="none"
+          />
+          <TextInput
+            style={[styles.regInput, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg, marginTop: 10 }]}
+            value={inviteClaimPasswordConfirm}
+            onChangeText={setInviteClaimPasswordConfirm}
+            placeholder="Passwort wiederholen"
+            placeholderTextColor={c.muted}
+            secureTextEntry
+            autoCapitalize="none"
+          />
+          {!!inviteClaimError && (
+            <Text style={{ color: '#E74C3C', fontSize: 13, marginTop: 8 }}>{inviteClaimError}</Text>
+          )}
+          <Pressable
+            style={[styles.registerBtn, { backgroundColor: inviteClaimLoading ? c.border : c.primary, marginTop: 16 }]}
+            onPress={handleClaim}
+            disabled={inviteClaimLoading}
+          >
+            <Text style={styles.registerBtnText}>{inviteClaimLoading ? 'Aktivieren…' : 'Konto aktivieren'}</Text>
+          </Pressable>
+        </View>
+      </ScrollView>
+    );
+  };
+
   // ── Layout ────────────────────────────────────────────────────────────────
 
   const renderTab = () => {
+    if (showInviteClaim) return renderInviteClaimScreen();
     if (selectedTherapist) return renderTherapistProfile(selectedTherapist);
     if (selectedPractice) return renderPracticeProfile(selectedPractice);
     if (showCreatePractice) return renderCreatePractice();
@@ -3058,14 +3772,44 @@ export default function App() {
         </View>
       </Modal>
 
+      {/* ── Visibility Modal ───────────────────────────────────────────────── */}
+      <Modal visible={showVisibilityModal} transparent animationType="fade" onRequestClose={() => setShowVisibilityModal(false)}>
+        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', padding: 24 }} onPress={() => setShowVisibilityModal(false)}>
+          <Pressable onPress={(e) => e.stopPropagation()}>
+            <View style={{ backgroundColor: c.card, borderRadius: 20, padding: 24, gap: 16 }}>
+              <Text style={{ fontSize: 20, fontWeight: '800', color: c.text, textAlign: 'center' }}>Profil sichtbar machen?</Text>
+              <Text style={{ fontSize: 14, color: c.muted, textAlign: 'center', lineHeight: 20 }}>
+                Soll dein Profil öffentlich sichtbar sein? Du kannst das jederzeit ändern.
+              </Text>
+              <Pressable
+                style={{ backgroundColor: c.primary, borderRadius: 14, paddingVertical: 14, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, opacity: visibilityLoading ? 0.6 : 1 }}
+                onPress={() => handleVisibilityChoice('visible')}
+                disabled={visibilityLoading}
+              >
+                <Ionicons name="eye-outline" size={20} color="#fff" />
+                <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>Sichtbar</Text>
+              </Pressable>
+              <Pressable
+                style={{ backgroundColor: c.mutedBg, borderRadius: 14, paddingVertical: 14, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, borderWidth: 1, borderColor: c.border, opacity: visibilityLoading ? 0.6 : 1 }}
+                onPress={() => handleVisibilityChoice('hidden')}
+                disabled={visibilityLoading}
+              >
+                <Ionicons name="eye-off-outline" size={20} color={c.text} />
+                <Text style={{ color: c.text, fontSize: 16, fontWeight: '600' }}>Versteckt</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
       {/* ── Location Sheet ─────────────────────────────────────────────────── */}
       <Modal visible={showLocationSheet} transparent animationType="slide" onRequestClose={() => setShowLocationSheet(false)}>
         <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' }} onPress={() => setShowLocationSheet(false)} />
         <View style={{ backgroundColor: c.background, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, paddingBottom: 40, gap: 16 }}>
           <View style={{ width: 36, height: 4, backgroundColor: c.border, borderRadius: 2, alignSelf: 'center', marginBottom: 4 }} />
-          <Text style={{ fontSize: 20, fontWeight: '700', color: c.text, textAlign: 'center' }}>Wo suchst du?</Text>
+          <Text style={{ fontSize: 20, fontWeight: '700', color: c.text, textAlign: 'center' }}>{t('locationTitle')}</Text>
           <Text style={{ fontSize: 14, color: c.muted, textAlign: 'center', marginTop: -8 }}>
-            Wir brauchen deinen Standort, um Therapeuten in deiner Nähe zu finden.
+            {t('locationSub')}
           </Text>
 
           {/* GPS Button */}
@@ -3076,14 +3820,14 @@ export default function App() {
           >
             <Ionicons name="navigate-sharp" size={18} color="#fff" />
             <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>
-              {locationLoading ? 'Standort wird ermittelt …' : 'Aktuellen Standort verwenden'}
+              {locationLoading ? t('gpsLoading') : t('useGPS')}
             </Text>
           </Pressable>
 
           {/* Divider */}
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
             <View style={{ flex: 1, height: 1, backgroundColor: c.border }} />
-            <Text style={{ color: c.muted, fontSize: 12 }}>oder Stadt eingeben</Text>
+            <Text style={{ color: c.muted, fontSize: 12 }}>{t('locationDivider')}</Text>
             <View style={{ flex: 1, height: 1, backgroundColor: c.border }} />
           </View>
 
@@ -3105,7 +3849,7 @@ export default function App() {
                 onPress={handleLocationSheetManual}
                 style={{ backgroundColor: locationSheetCity.trim() ? c.primary : c.mutedBg, borderRadius: 10, paddingHorizontal: 18, justifyContent: 'center' }}
               >
-                <Text style={{ color: locationSheetCity.trim() ? '#fff' : c.muted, fontSize: 15, fontWeight: '600' }}>Weiter</Text>
+                <Text style={{ color: locationSheetCity.trim() ? '#fff' : c.muted, fontSize: 15, fontWeight: '600' }}>{t('confirmLocation')}</Text>
               </Pressable>
             </View>
 
@@ -3155,8 +3899,6 @@ export default function App() {
                   setSearched(false);
                   setShowAutocomplete(false);
                   setShowFilters(false);
-                  setCity('Köln');
-                  setUserCoords(null);
                 }
                 setActiveTab(tab.key);
               }}
@@ -3168,7 +3910,7 @@ export default function App() {
                 </Text>
               </View>
               <Text style={[styles.navLabel, { color: active ? c.primary : c.muted }]}>
-                {tab.label}
+                {t(tab.labelKey)}
               </Text>
             </Pressable>
           );
@@ -3206,13 +3948,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    gap: 10
+    paddingLeft: 14,
+    paddingRight: 4,
+    paddingVertical: 0,
+    height: 52,
+    gap: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
   },
-  searchIcon: { fontSize: 18 },
   searchInput: { flex: 1, fontSize: 16 },
-  clearIcon: { fontSize: 14 },
+  searchDivider: { width: 1, height: 24, opacity: 0.5 },
+  searchFilterArea: { paddingHorizontal: 12, paddingVertical: 14, position: 'relative' },
 
   // Autocomplete
   autocompleteBox: {
@@ -3336,12 +4085,22 @@ const styles = StyleSheet.create({
 
   // Therapist tab
   noticeBox: {
-    flexDirection: 'row', alignItems: 'flex-start', gap: 12,
-    borderWidth: 1, borderRadius: 16, padding: 14
+    flexDirection: 'row', alignItems: 'flex-start', gap: 10,
+    borderWidth: 1, borderRadius: 16, padding: 14,
+    width: '100%'
   },
-  noticeIcon: { fontSize: 22, marginTop: 1 },
+  lockBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F7F9FA',
+    marginTop: 1,
+  },
+  noticeIcon: { fontSize: 20, marginTop: 1, width: 24, textAlign: 'center' },
   noticeTitle: { fontSize: 14, fontWeight: '700', marginBottom: 3 },
-  noticeBody: { fontSize: 13, lineHeight: 18 },
+  noticeBody: { fontSize: 13, lineHeight: 18, flex: 1, flexShrink: 1 },
   infoCard: { borderWidth: 1, borderRadius: 20, padding: 20, gap: 8 },
   infoTitle: { fontSize: 20, fontWeight: '700' },
   infoBody: { fontSize: 15, lineHeight: 22 },

@@ -2,6 +2,8 @@ import { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { randomBytes } from 'crypto';
 import { getToken } from './auth-utils.js';
+import { geocodeAddress } from '../utils/geocode.js';
+import { sendInviteEmail, sendReinviteEmail } from '../utils/mailer.js';
 
 async function getAuthedTherapist(request: any, fastify: any) {
   const token = getToken(request);
@@ -31,11 +33,15 @@ export const practiceRoutes: FastifyPluginAsync = async (fastify) => {
     const parsed = schema.safeParse(request.body);
     if (!parsed.success) return reply.badRequest(parsed.error.flatten().toString());
 
+    const d = parsed.data;
+    const geo = await geocodeAddress(d.address ?? '', d.city);
+
     const practice = await fastify.prisma.practice.create({
       data: {
-        ...parsed.data,
+        ...d,
         adminTherapistId: therapist.id,
         reviewStatus: process.env.NODE_ENV === 'production' ? 'PENDING_REVIEW' : 'APPROVED',
+        ...(geo ? { lat: geo.lat, lng: geo.lng } : {}),
       },
     });
 
@@ -116,6 +122,9 @@ export const practiceRoutes: FastifyPluginAsync = async (fastify) => {
                 photo: true,
                 specializations: true,
                 email: true,
+                onboardingStatus: true,
+                isPublished: true,
+                invitedByPracticeId: true,
               },
             },
           },
@@ -151,9 +160,21 @@ export const practiceRoutes: FastifyPluginAsync = async (fastify) => {
     const parsed = schema.safeParse(request.body);
     if (!parsed.success) return reply.badRequest(parsed.error.flatten().toString());
 
+    const d = parsed.data;
+
+    // Re-geocode if address or city changed
+    const needsGeocode = d.address !== undefined || d.city !== undefined;
+    let geoUpdate = {};
+    if (needsGeocode) {
+      const newAddress = d.address ?? practice.address ?? '';
+      const newCity = d.city ?? practice.city;
+      const geo = await geocodeAddress(newAddress, newCity);
+      if (geo) geoUpdate = { lat: geo.lat, lng: geo.lng };
+    }
+
     const updated = await fastify.prisma.practice.update({
       where: { id: practice.id },
-      data: parsed.data,
+      data: { ...d, ...geoUpdate },
     });
     return { practice: updated };
   });
@@ -309,6 +330,147 @@ export const practiceRoutes: FastifyPluginAsync = async (fastify) => {
 
     await fastify.prisma.therapistPracticeLink.delete({ where: { id: linkId } });
     return { success: true };
+  });
+
+  // DELETE /my/practice — delete the practice this therapist admins
+  fastify.delete('/my/practice', async (request, reply) => {
+    const therapist = await getAuthedTherapist(request, fastify);
+    if (!therapist) return reply.unauthorized('Kein Token');
+
+    const practice = await fastify.prisma.practice.findFirst({
+      where: { adminTherapistId: therapist.id },
+    });
+    if (!practice) return reply.notFound('Keine eigene Praxis');
+
+    await fastify.prisma.practice.delete({ where: { id: practice.id } });
+
+    return { success: true };
+  });
+
+  // POST /my/practice/create-therapist — create a new therapist profile and send invitation
+  fastify.post('/my/practice/create-therapist', async (request, reply) => {
+    const admin = await getAuthedTherapist(request, fastify);
+    if (!admin) return reply.unauthorized('Kein Token');
+
+    const practice = await fastify.prisma.practice.findFirst({
+      where: { adminTherapistId: admin.id },
+    });
+    if (!practice) return reply.forbidden('Kein Praxis-Admin');
+
+    const schema = z.object({
+      fullName: z.string().min(2),
+      professionalTitle: z.string().min(2),
+      email: z.string().email(),
+      specializations: z.array(z.string()).optional().default([]),
+      languages: z.array(z.string()).optional().default([]),
+    });
+    const parsed = schema.safeParse(request.body);
+    if (!parsed.success) return reply.badRequest(parsed.error.flatten().toString());
+
+    const { fullName, professionalTitle, email, specializations, languages } = parsed.data;
+
+    const existing = await fastify.prisma.therapist.findUnique({ where: { email } });
+    if (existing) return reply.conflict('Ein Therapeut mit dieser E-Mail-Adresse existiert bereits.');
+
+    const isDev = process.env.NODE_ENV !== 'production';
+    const reviewStatus = isDev ? 'APPROVED' : 'PENDING_REVIEW';
+
+    const newTherapist = await fastify.prisma.therapist.create({
+      data: {
+        email,
+        fullName,
+        professionalTitle,
+        city: practice.city,
+        specializations: specializations.join(', '),
+        languages: languages.join(', '),
+        reviewStatus,
+        onboardingStatus: 'invited',
+        visibilityPreference: 'hidden',
+        isPublished: false,
+        invitedByPracticeId: practice.id,
+      },
+    });
+
+    await fastify.prisma.therapistPracticeLink.create({
+      data: {
+        therapistId: newTherapist.id,
+        practiceId: practice.id,
+        status: 'CONFIRMED',
+        initiatedBy: 'ADMIN',
+      } as any,
+    });
+
+    const inviteToken = randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+    await fastify.prisma.invitation.create({
+      data: {
+        token: inviteToken,
+        therapistId: newTherapist.id,
+        practiceId: practice.id,
+        email,
+        expiresAt,
+      },
+    });
+
+    const baseUrl = process.env.MOBILE_URL ?? 'http://localhost:8081';
+    const inviteLink = `${baseUrl}/invite?token=${inviteToken}`;
+
+    try {
+      await sendInviteEmail({ to: email, therapistName: fullName, practiceName: practice.name, inviteLink });
+    } catch (err) {
+      fastify.log.warn({ err }, 'Failed to send invite email');
+    }
+
+    return reply.status(201).send({ therapistId: newTherapist.id, inviteToken, inviteLink });
+  });
+
+  // POST /my/practice/resend-invite/:therapistId — resend invitation to an invited therapist
+  fastify.post('/my/practice/resend-invite/:therapistId', async (request, reply) => {
+    const admin = await getAuthedTherapist(request, fastify);
+    if (!admin) return reply.unauthorized('Kein Token');
+
+    const practice = await fastify.prisma.practice.findFirst({
+      where: { adminTherapistId: admin.id },
+    });
+    if (!practice) return reply.forbidden('Kein Praxis-Admin');
+
+    const { therapistId } = request.params as { therapistId: string };
+
+    const link = await fastify.prisma.therapistPracticeLink.findUnique({
+      where: { therapistId_practiceId: { therapistId, practiceId: practice.id } },
+    });
+    if (!link) return reply.notFound('Therapeut ist nicht mit dieser Praxis verknüpft');
+
+    const target = await fastify.prisma.therapist.findUnique({ where: { id: therapistId } });
+    if (!target) return reply.notFound('Therapeut nicht gefunden');
+    if (target.onboardingStatus !== 'invited') {
+      return reply.badRequest('Einladung kann nur erneut gesendet werden, wenn der Therapeut noch nicht eingeloggt ist.');
+    }
+
+    // Invalidate old pending invitations
+    await fastify.prisma.invitation.updateMany({
+      where: { therapistId, practiceId: practice.id, usedAt: null },
+      data: { usedAt: new Date() },
+    });
+
+    const inviteToken = randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+    await fastify.prisma.invitation.create({
+      data: { token: inviteToken, therapistId, practiceId: practice.id, email: target.email, expiresAt },
+    });
+
+    const baseUrl = process.env.MOBILE_URL ?? 'http://localhost:8081';
+    const inviteLink = `${baseUrl}/invite?token=${inviteToken}`;
+
+    try {
+      await sendReinviteEmail({ to: target.email, therapistName: target.fullName, practiceName: practice.name, inviteLink });
+    } catch (err) {
+      fastify.log.warn({ err }, 'Failed to resend invite email');
+    }
+
+    return { inviteToken, inviteLink };
   });
 
   // GET /notifications — returns pending notifications for the logged-in therapist

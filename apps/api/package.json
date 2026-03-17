@@ -15,11 +15,14 @@
   },
   "dependencies": {
     "@fastify/cors": "^10.0.2",
+    "@fastify/multipart": "^9.4.0",
     "@fastify/sensible": "^6.0.3",
+    "@fastify/static": "^9.0.0",
     "@prisma/client": "^6.5.0",
     "@revio/shared": "workspace:*",
     "fastify": "^5.2.1",
     "fastify-plugin": "^5.0.1",
+    "resend": "^6.9.4",
     "zod": "^3.24.2"
   },
   "devDependencies": {

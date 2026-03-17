@@ -1,6 +1,7 @@
 import { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { getEnv } from '../env.js';
+import { geocodeAddress } from '../utils/geocode.js';
 
 const splitList = (value: string) =>
   value.split(',').map((s) => s.trim()).filter(Boolean);
@@ -244,5 +245,32 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
     const l = await fastify.prisma.therapistPracticeLink.update({ where: { id }, data: { status: 'DISPUTED' } }).catch(() => null);
     if (!l) return reply.notFound('Link not found');
     return { message: 'Link disputed.' };
+  });
+
+  // POST /admin/practices/geocode-all — geocode all practices with lat=0 lng=0
+  fastify.post('/practices/geocode-all', async (_request, reply) => {
+    const practices = await fastify.prisma.practice.findMany({
+      where: { lat: 0, lng: 0 },
+    });
+
+    let updated = 0;
+    let failed = 0;
+
+    for (const p of practices) {
+      // Nominatim rate limit: 1 req/sec
+      await new Promise((r) => setTimeout(r, 1100));
+      const geo = await geocodeAddress(p.address ?? '', p.city);
+      if (geo) {
+        await fastify.prisma.practice.update({
+          where: { id: p.id },
+          data: { lat: geo.lat, lng: geo.lng },
+        });
+        updated++;
+      } else {
+        failed++;
+      }
+    }
+
+    return { total: practices.length, updated, failed };
   });
 };
