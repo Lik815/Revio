@@ -695,6 +695,9 @@ export default function App() {
           setInviteClaimPassword('');
           setInviteClaimPasswordConfirm('');
           setInviteClaimError('');
+          setActiveTab('therapist');
+          setShowLogin(false);
+          setShowRegister(false);
           setShowInviteClaim(true);
         } catch {
           setInviteClaimError('Verbindungsfehler beim Validieren der Einladung.');
@@ -2687,7 +2690,7 @@ export default function App() {
           </>
         )}
 
-        {!loggedInTherapist && (
+        {!loggedInTherapist && accountType !== 'manager' && (
           <Pressable
             onPress={() => { setActiveTab('therapist'); setShowLogin(true); }}
             style={[styles.optionRow, { backgroundColor: c.card, borderColor: c.border }]}
@@ -4393,19 +4396,19 @@ export default function App() {
   // ── Layout ────────────────────────────────────────────────────────────────
 
   const renderTab = () => {
-    if (accountType === 'manager' && loggedInManager) return renderManagerDashboard();
-    if (showInviteClaim) return renderInviteClaimScreen();
     if (selectedTherapist) return renderTherapistProfile(selectedTherapist);
     if (selectedPractice) return renderPracticeProfile(selectedPractice);
     if (showCreatePractice) return renderCreatePractice();
     if (showPracticeSearch) return renderPracticeSearch();
     if (showInvitePage) return renderInvitePage();
     if (showPracticeAdmin) return renderPracticeAdmin();
-    if (showRegister) return renderRegister();
     if (activeTab === 'favorites') return renderFavorites();
     if (activeTab === 'therapist') {
+      if (accountType === 'manager' && loggedInManager) return renderManagerDashboard();
+      if (showInviteClaim) return renderInviteClaimScreen();
       if (loggedInTherapist) return renderTherapistDashboard();
       if (showLogin) return renderLogin();
+      if (showRegister) return renderRegister();
       return renderTherapist();
     }
     if (activeTab === 'options') return renderOptions();
@@ -4555,11 +4558,15 @@ export default function App() {
               onPress={() => {
                 setSelectedPractice(null);
                 setSelectedTherapist(null);
-                setShowRegister(false);
                 setShowCreatePractice(false);
                 setShowPracticeSearch(false);
                 setShowPracticeAdmin(false);
                 setShowInvitePage(false);
+                if (tab.key !== 'therapist') {
+                  setShowLogin(false);
+                  setShowRegister(false);
+                  setShowInviteClaim(false);
+                }
                 if (tab.key === 'discover') {
                   setQuery('');
                   setActiveChip(null);
