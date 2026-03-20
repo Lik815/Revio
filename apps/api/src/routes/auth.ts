@@ -2,6 +2,7 @@ import { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { randomBytes } from 'crypto';
 import { hashPassword, verifyPassword, getToken } from './auth-utils.js';
+import { getTherapistProfileCompletion, getTherapistPublicationState } from '../utils/profile-completeness.js';
 
 export { hashPassword, verifyPassword, getToken };
 
@@ -58,7 +59,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
           where: { id: manager.id },
           data: { sessionToken: token },
         });
-        const practice = await fastify.prisma.practice.findUnique({ where: { id: manager.practiceId } });
+        const practice = manager.practiceId ? await fastify.prisma.practice.findUnique({ where: { id: manager.practiceId } }) : null;
         return {
           token,
           userId: user.id,
@@ -143,7 +144,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
           where: { id: manager.id },
           data: { sessionToken: token, userId: manager.userId ?? ensuredUser.id },
         });
-        const practice = await fastify.prisma.practice.findUnique({ where: { id: manager.practiceId } });
+        const practice = manager.practiceId ? await fastify.prisma.practice.findUnique({ where: { id: manager.practiceId } }) : null;
 
         return {
           token,
@@ -193,9 +194,9 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
 
     const managerAccount = await fastify.prisma.practiceManager.findUnique({
       where: { therapistId: therapist.id },
-      include: { practice: { select: { id: true, name: true, city: true } } },
+      include: { assignments: { include: { practice: { select: { id: true, name: true, city: true } } }, take: 1 } },
     });
-    const adminPractice = managerAccount?.practice ?? null;
+    const adminPractice = managerAccount?.assignments[0]?.practice ?? null;
 
     return {
       id: therapist.id,
@@ -212,6 +213,10 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       isVisible: therapist.isVisible,
       availability: therapist.availability,
       reviewStatus: therapist.reviewStatus,
+      visibilityPreference: therapist.visibilityPreference,
+      isPublished: therapist.isPublished,
+      onboardingStatus: therapist.onboardingStatus,
+      ...getTherapistPublicationState(therapist),
       adminPractice: adminPractice ?? null,
       practices: therapist.links.map((l: any) => ({
         id: l.practice.id,
@@ -241,6 +246,13 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
         where: { sessionToken: token },
       });
     }
+    // Also allow manager token to edit their linked therapist profile
+    if (!therapist) {
+      const manager = await fastify.prisma.practiceManager.findUnique({ where: { sessionToken: token } });
+      if (manager?.therapistId) {
+        therapist = await fastify.prisma.therapist.findUnique({ where: { id: manager.therapistId } });
+      }
+    }
     if (!therapist) return reply.unauthorized('Ungültiger Token');
 
     const parsed = updateMeSchema.safeParse(request.body);
@@ -259,12 +271,29 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     if (data.certifications !== undefined) updateData.certifications = data.certifications.join(', ');
     if (data.photo !== undefined) updateData.photo = data.photo;
 
+    const nextTherapist = {
+      ...therapist,
+      ...updateData,
+    };
+    const completion = getTherapistProfileCompletion(nextTherapist);
+    if (therapist.visibilityPreference === 'visible') {
+      updateData.isPublished = completion.complete;
+      if (!completion.complete && therapist.onboardingStatus === 'complete') {
+        updateData.onboardingStatus = 'claimed';
+      }
+    }
+
     const updated = await fastify.prisma.therapist.update({
       where: { id: therapist.id },
       data: updateData,
     });
 
-    return { success: true, fullName: updated.fullName };
+    return {
+      success: true,
+      fullName: updated.fullName,
+      isPublished: updated.isPublished,
+      ...getTherapistPublicationState(updated),
+    };
   });
 
   fastify.delete('/auth/me', async (request, reply) => {

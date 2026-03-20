@@ -77,6 +77,16 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
     return fastify.verifyAdmin(request, reply);
   });
 
+  fastify.get('/me', async () => {
+    return {
+      admin: {
+        email: env.REVIO_ADMIN_EMAIL,
+        name: 'Revio Admin',
+        role: 'Super Admin',
+      },
+    };
+  });
+
   // Visibility issues: always returns empty since APPROVED therapists are always visible
   fastify.get('/visibility-issues', async () => {
     return { count: 0, issues: [] };
@@ -251,12 +261,12 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get('/managers', async () => {
     const managers = await fastify.prisma.practiceManager.findMany({
       include: {
-        practice: { select: { id: true, name: true, city: true, reviewStatus: true } },
+        assignments: { include: { practice: { select: { id: true, name: true, city: true, reviewStatus: true } } }, take: 1 },
         therapist: { select: { id: true, fullName: true, email: true, reviewStatus: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
-    return { managers };
+    return { managers: managers.map(m => ({ ...m, practice: m.assignments[0]?.practice ?? null })) };
   });
 
   // POST /admin/practices/geocode-all — geocode all practices with lat=0 lng=0

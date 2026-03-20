@@ -19,10 +19,22 @@ const updatePracticeSchema = z.object({
 });
 
 async function getManagerByToken(fastify: any, token: string) {
-  return fastify.prisma.practiceManager.findUnique({
+  const manager = await fastify.prisma.practiceManager.findUnique({
     where: { sessionToken: token },
-    include: { practice: true },
+    include: {
+      assignments: {
+        include: { practice: true },
+        orderBy: { createdAt: 'asc' },
+        take: 1,
+      },
+    },
   });
+  if (!manager) return null;
+  const practice = manager.assignments[0]?.practice
+    ?? (manager.practiceId
+      ? await fastify.prisma.practice.findUnique({ where: { id: manager.practiceId } })
+      : null);
+  return { ...manager, practice };
 }
 
 export const practiceAuthRoutes: FastifyPluginAsync = async (fastify) => {
@@ -40,7 +52,7 @@ export const practiceAuthRoutes: FastifyPluginAsync = async (fastify) => {
     const token = randomBytes(32).toString('hex');
     await fastify.prisma.practiceManager.update({ where: { id: manager.id }, data: { sessionToken: token } });
 
-    const practice = await fastify.prisma.practice.findUnique({ where: { id: manager.practiceId } });
+    const practice = await fastify.prisma.practice.findUnique({ where: { id: manager.practiceId ?? undefined } });
     return { token, practiceId: manager.practiceId, name: practice?.name };
   });
 

@@ -11,11 +11,13 @@ async function getAuthedTherapist(request: any, fastify: any) {
   return fastify.prisma.therapist.findUnique({ where: { sessionToken: token } });
 }
 
-// Returns the practice managed by this therapist (via PracticeManager), or null
+// Returns the first practice assigned to the manager linked to this therapist, or null
 async function getAdminPractice(fastify: any, therapistId: string) {
-  const manager = await fastify.prisma.practiceManager.findUnique({ where: { therapistId } });
-  if (!manager) return null;
-  return fastify.prisma.practice.findUnique({ where: { id: manager.practiceId } });
+  const assignment = await fastify.prisma.managerPracticeAssignment.findFirst({
+    where: { manager: { therapistId } },
+    include: { practice: true },
+  });
+  return assignment?.practice ?? null;
 }
 
 export const practiceRoutes: FastifyPluginAsync = async (fastify) => {
@@ -112,7 +114,7 @@ export const practiceRoutes: FastifyPluginAsync = async (fastify) => {
     if (!manager) return reply.notFound('Keine eigene Praxis');
 
     const practice = await fastify.prisma.practice.findUnique({
-      where: { id: manager.practiceId },
+      where: { id: manager.practiceId ?? undefined },
       include: {
         links: {
           include: {
@@ -409,44 +411,76 @@ export const practiceRoutes: FastifyPluginAsync = async (fastify) => {
     return { inviteToken, inviteLink };
   });
 
-  // GET /notifications — pending notifications for the logged-in therapist
+  // GET /notifications — pending notifications for the logged-in user (therapist or manager)
   fastify.get('/notifications', async (request, reply) => {
-    const therapist = await getAuthedTherapist(request, fastify);
-    if (!therapist) return reply.unauthorized('Kein Token');
+    const token = getToken(request);
+    if (!token) return reply.unauthorized('Kein Token');
 
     const notifications: { id: string; type: string; message: string; createdAt: Date }[] = [];
 
-    // Admin notifications: join requests for this manager's practice
-    const adminPractice = await getAdminPractice(fastify, therapist.id);
-    if (adminPractice) {
-      const joinRequests = await fastify.prisma.therapistPracticeLink.findMany({
-        where: { practiceId: adminPractice.id, status: 'PROPOSED', initiatedBy: 'THERAPIST' } as any,
-        include: { therapist: { select: { id: true, fullName: true } } },
+    // Try therapist token first
+    const therapist = await fastify.prisma.therapist.findUnique({ where: { sessionToken: token } });
+    if (therapist) {
+      // Therapist-as-admin: join requests for their managed practice
+      const adminPractice = await getAdminPractice(fastify, therapist.id);
+      if (adminPractice) {
+        const joinRequests = await fastify.prisma.therapistPracticeLink.findMany({
+          where: { practiceId: adminPractice.id, status: 'PROPOSED', initiatedBy: 'THERAPIST' } as any,
+          include: { therapist: { select: { id: true, fullName: true } } },
+          orderBy: { createdAt: 'desc' },
+        });
+        for (const link of joinRequests) {
+          notifications.push({
+            id: link.id, type: 'JOIN_REQUEST',
+            message: `${link.therapist.fullName} möchte deiner Praxis beitreten.`,
+            createdAt: link.createdAt,
+          });
+        }
+      }
+      // Therapist invites
+      const invites = await (fastify.prisma as any).therapistPracticeLink.findMany({
+        where: { therapistId: therapist.id, status: 'PROPOSED', initiatedBy: 'ADMIN' },
+        include: { practice: { select: { id: true, name: true } } },
         orderBy: { createdAt: 'desc' },
       });
-      for (const link of joinRequests) {
+      for (const link of invites) {
         notifications.push({
-          id: link.id, type: 'JOIN_REQUEST',
-          message: `${link.therapist.fullName} möchte deiner Praxis beitreten.`,
+          id: link.id, type: 'INVITE',
+          message: `${link.practice.name} hat dich eingeladen, der Praxis beizutreten.`,
           createdAt: link.createdAt,
         });
       }
+      return { notifications };
     }
 
-    // Therapist notifications: admin-initiated invites
-    const invites = await (fastify.prisma as any).therapistPracticeLink.findMany({
-      where: { therapistId: therapist.id, status: 'PROPOSED', initiatedBy: 'ADMIN' },
-      include: { practice: { select: { id: true, name: true } } },
-      orderBy: { createdAt: 'desc' },
+    // Try manager token
+    const manager = await fastify.prisma.practiceManager.findUnique({
+      where: { sessionToken: token },
+      include: { assignments: { select: { practiceId: true } } },
     });
-    for (const link of invites) {
-      notifications.push({
-        id: link.id, type: 'INVITE',
-        message: `${link.practice.name} hat dich eingeladen, der Praxis beizutreten.`,
-        createdAt: link.createdAt,
-      });
+    if (manager) {
+      // Join requests across all assigned practices
+      const practiceIds = manager.assignments.map((a: any) => a.practiceId);
+      if (practiceIds.length > 0) {
+        const joinRequests = await fastify.prisma.therapistPracticeLink.findMany({
+          where: { practiceId: { in: practiceIds }, status: 'PROPOSED', initiatedBy: 'THERAPIST' } as any,
+          include: {
+            therapist: { select: { id: true, fullName: true } },
+            practice: { select: { id: true, name: true } },
+          },
+          orderBy: { createdAt: 'desc' },
+        });
+        for (const link of joinRequests) {
+          notifications.push({
+            id: link.id, type: 'JOIN_REQUEST',
+            message: `${(link as any).therapist.fullName} möchte ${(link as any).practice.name} beitreten.`,
+            createdAt: link.createdAt,
+          });
+        }
+      }
+      return { notifications };
     }
 
-    return { notifications };
+    return reply.unauthorized('Kein Token');
   });
 };

@@ -14,7 +14,12 @@
       "Bash(DATABASE_URL=\"file:./prisma/dev.db\" npx prisma migrate dev --schema=prisma/schema.prisma)",
       "Bash(DATABASE_URL=\"file:./prisma/test.db\" npx prisma migrate reset --force)",
       "Bash(cat /Users/vucenovic/Desktop/Revio/apps/api/prisma/migrations/*/migration.sql)",
-      "Bash(/Users/vucenovic/Library/pnpm/.tools/pnpm/10.6.3_tmp_7687_0/bin/pnpm add:*)"
+      "Bash(/Users/vucenovic/Library/pnpm/.tools/pnpm/10.6.3_tmp_7687_0/bin/pnpm add:*)",
+      "Bash(pnpm dev:mobile)",
+      "Bash(DATABASE_URL='file:./prisma/prisma/dev.db' pnpm --filter api db:migrate)",
+      "Bash(pkill -f \"tsx src/server\")",
+      "Bash(pkill -f \"next dev\")",
+      "Bash(pkill -f \"expo start\")"
     ]
   }
 }

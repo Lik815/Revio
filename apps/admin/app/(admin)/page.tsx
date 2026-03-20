@@ -4,7 +4,10 @@ import { MilestoneModal } from '../../components/milestone-modal';
 import { api } from '../../lib/api';
 
 export default async function HomePage() {
-  const stats = await api.getStats();
+  const [stats, visibilityIssues] = await Promise.all([
+    api.getStats(),
+    api.getVisibilityIssues(),
+  ]);
 
   const totalTherapists = stats.therapists.approved + stats.therapists.pending_review + stats.therapists.draft + stats.therapists.rejected + stats.therapists.changes_requested + stats.therapists.suspended;
 
@@ -33,6 +36,28 @@ export default async function HomePage() {
           </Link>
         ))}
       </div>
+
+      {visibilityIssues.count > 0 && (
+        <article className="panel" style={{ marginTop: '24px' }}>
+          <div className="panel-header">
+            <div>
+              <div className="kicker">Öffentliche Sichtbarkeit</div>
+              <h3>Gerade blockiert</h3>
+            </div>
+          </div>
+          <div className="task-list">
+            {visibilityIssues.issues.slice(0, 3).map((issue) => (
+              <div key={issue.therapistId} className="task-item">
+                <span className="task-dot task-dot--danger" />
+                <div>
+                  <strong>{issue.fullName}</strong>
+                  <p>{issue.pendingPractices.length} Praxisfreigaben und {issue.pendingLinks.length} offene Links blockieren die Sichtbarkeit.</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </article>
+      )}
 
       <article className="panel" style={{ marginTop: '24px' }}>
         <div className="panel-header">

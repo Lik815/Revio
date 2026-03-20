@@ -41,7 +41,17 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
       type: 'sourceFile',
     };
   }
-  return context.resolveRequest(context, moduleName, platform);
+  // Stub react-native-maps on web (native-only library)
+  if (moduleName === 'react-native-maps' && platform === 'web') {
+    return {
+      filePath: path.resolve(projectRoot, 'src/MapStub.js'),
+      type: 'sourceFile',
+    };
+  }
+  if (typeof context.resolveRequest === 'function') {
+    return context.resolveRequest(context, moduleName, platform);
+  }
+  return null;
 };
 
 // Follow symlinks (required for pnpm)

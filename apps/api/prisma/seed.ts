@@ -234,6 +234,10 @@ async function main() {
 
     const practice = practiceRecords[i % practiceRecords.length];
 
+    const photoIndex = (i % 70) + 1;
+    const photoGender = isFemale ? 'women' : 'men';
+    const photo = `https://randomuser.me/api/portraits/${photoGender}/${photoIndex}.jpg`;
+
     await prisma.therapist.create({
       data: {
         email,
@@ -248,6 +252,7 @@ async function main() {
         kassenart: KASSENART_OPTIONS[i % KASSENART_OPTIONS.length],
         availability: pick(AVAILABILITY_OPTIONS, i * 13),
         reviewStatus: 'APPROVED',
+        photo,
         links: {
           create: { practiceId: practice.id, status: 'CONFIRMED' },
         },

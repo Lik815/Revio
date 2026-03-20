@@ -4,6 +4,7 @@ import { randomBytes } from 'crypto';
 import { hashPassword } from './auth-utils.js';
 import { getToken } from './auth-utils.js';
 import { sendInviteEmail, sendReinviteEmail } from '../utils/mailer.js';
+import { getTherapistProfileCompletion } from '../utils/profile-completeness.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -11,23 +12,20 @@ async function getPracticeByToken(fastify: any, token: string | null) {
   if (!token) return null;
   const manager = await fastify.prisma.practiceManager.findUnique({
     where: { sessionToken: token },
-    include: { practice: true },
+    include: {
+      assignments: {
+        include: { practice: true },
+        orderBy: { createdAt: 'asc' },
+        take: 1,
+      },
+    },
   });
-  return manager?.practice ?? null;
-}
-
-function checkProfileComplete(therapist: {
-  bio: string | null;
-  specializations: string;
-  languages: string;
-  professionalTitle: string;
-}): { complete: boolean; missingFields: string[] } {
-  const missingFields: string[] = [];
-  if (!therapist.bio || therapist.bio.trim() === '') missingFields.push('bio');
-  if (!therapist.specializations || therapist.specializations.trim() === '') missingFields.push('specializations');
-  if (!therapist.languages || therapist.languages.trim() === '') missingFields.push('languages');
-  if (!therapist.professionalTitle || therapist.professionalTitle.trim() === '') missingFields.push('professionalTitle');
-  return { complete: missingFields.length === 0, missingFields };
+  if (!manager) return null;
+  if (manager.assignments[0]?.practice) return manager.assignments[0].practice;
+  if (manager.practiceId) {
+    return fastify.prisma.practice.findUnique({ where: { id: manager.practiceId } });
+  }
+  return null;
 }
 
 // ─── Routes ──────────────────────────────────────────────────────────────────
@@ -251,7 +249,7 @@ export const inviteRoutes: FastifyPluginAsync = async (fastify) => {
     if (!parsed.success) return reply.badRequest(parsed.error.flatten().toString());
 
     const { visibilityPreference } = parsed.data;
-    const { complete, missingFields } = checkProfileComplete(therapist);
+    const { complete, missingFields } = getTherapistProfileCompletion(therapist);
     const isPublished = visibilityPreference === 'visible' && complete;
 
     // Determine final onboarding status
@@ -375,6 +373,7 @@ export const inviteRoutes: FastifyPluginAsync = async (fastify) => {
       onboardingStatus: therapist.onboardingStatus,
       visibilityPreference: therapist.visibilityPreference,
       isPublished: therapist.isPublished,
+      ...getTherapistProfileCompletion(therapist),
       invitation: invitationStatus,
     };
   });

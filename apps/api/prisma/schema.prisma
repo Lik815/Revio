@@ -97,7 +97,7 @@ model Practice {
   updatedAt         DateTime     @updatedAt
   links             TherapistPracticeLink[]
   invitations       Invitation[]
-  manager           PracticeManager?
+  assignments       ManagerPracticeAssignment[]
 }
 
 model PracticeManager {
@@ -107,10 +107,10 @@ model PracticeManager {
   user         User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
   passwordHash String
   sessionToken String?   @unique
-  practiceId   String    @unique
-  practice     Practice  @relation(fields: [practiceId], references: [id], onDelete: Cascade)
+  practiceId   String?
   therapistId  String?   @unique
   therapist    Therapist? @relation("ManagerTherapist", fields: [therapistId], references: [id])
+  assignments  ManagerPracticeAssignment[]
   createdAt    DateTime  @default(now())
 }
 
@@ -149,4 +149,23 @@ model TherapistPracticeLink {
   practice     Practice   @relation(fields: [practiceId], references: [id], onDelete: Cascade)
 
   @@unique([therapistId, practiceId])
+}
+
+model TherapistRemovalLog {
+  id          String   @id @default(cuid())
+  therapistId String
+  practiceId  String
+  managerId   String
+  createdAt   DateTime @default(now())
+}
+
+model ManagerPracticeAssignment {
+  id         String          @id @default(cuid())
+  managerId  String
+  practiceId String
+  manager    PracticeManager @relation(fields: [managerId], references: [id], onDelete: Cascade)
+  practice   Practice        @relation(fields: [practiceId], references: [id], onDelete: Cascade)
+  createdAt  DateTime        @default(now())
+
+  @@unique([managerId, practiceId])
 }

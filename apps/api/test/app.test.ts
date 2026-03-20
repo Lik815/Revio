@@ -1091,4 +1091,158 @@ describe('Manager visibility in search', () => {
     const found = therapists.find((t: any) => t.fullName === 'Dr. Hidden');
     expect(found).toBeUndefined();
   });
+
+  it('manager+therapist stays hidden until explicit publication even if profile is completed and isVisible=true', async () => {
+    const registerRes = await app.inject({
+      method: 'POST',
+      url: '/manager/register',
+      payload: {
+        email: 'manager-visible@test.de',
+        password: 'sicher123',
+        practiceName: 'Manager Sichtbarkeit',
+        practiceCity: 'Berlin',
+        isTherapist: true,
+        fullName: 'Dr. Private',
+        professionalTitle: 'Physiotherapeut',
+      },
+    });
+    expect(registerRes.statusCode).toBe(201);
+
+    const { token } = registerRes.json();
+    const SESSION = { authorization: `Bearer ${token}` };
+
+    const updateRes = await app.inject({
+      method: 'PATCH',
+      url: '/auth/me',
+      headers: SESSION,
+      payload: {
+        bio: 'Vollstaendiges Profil',
+        specializations: ['Ruecken'],
+        languages: ['de'],
+        isVisible: true,
+      },
+    });
+    expect(updateRes.statusCode).toBe(200);
+
+    const searchBeforePublish = await app.inject({
+      method: 'POST',
+      url: '/search',
+      payload: { query: 'Private', city: 'Berlin' },
+    });
+    expect(searchBeforePublish.statusCode).toBe(200);
+    expect(searchBeforePublish.json().therapists.find((t: any) => t.fullName === 'Dr. Private')).toBeUndefined();
+
+    const publishRes = await app.inject({
+      method: 'PATCH',
+      url: '/invite/visibility',
+      headers: SESSION,
+      payload: { visibilityPreference: 'visible' },
+    });
+    expect(publishRes.statusCode).toBe(200);
+    expect(publishRes.json().isPublished).toBe(true);
+
+    const searchAfterPublish = await app.inject({
+      method: 'POST',
+      url: '/search',
+      payload: { query: 'Private', city: 'Berlin' },
+    });
+    expect(searchAfterPublish.statusCode).toBe(200);
+    expect(searchAfterPublish.json().therapists.find((t: any) => t.fullName === 'Dr. Private')).toBeTruthy();
+  });
+
+  it('unpublished manager therapist profile is not reachable via public detail endpoint', async () => {
+    const registerRes = await app.inject({
+      method: 'POST',
+      url: '/manager/register',
+      payload: {
+        email: 'detail-hidden@test.de',
+        password: 'sicher123',
+        practiceName: 'Detail Praxis',
+        practiceCity: 'Hamburg',
+        isTherapist: true,
+        fullName: 'Detail Hidden',
+        professionalTitle: 'Physiotherapeut',
+      },
+    });
+    expect(registerRes.statusCode).toBe(201);
+
+    const { therapistId } = registerRes.json();
+    const detailRes = await app.inject({
+      method: 'GET',
+      url: `/therapist/${therapistId}`,
+    });
+    expect(detailRes.statusCode).toBe(404);
+  });
+
+  it('published profile becomes unpublished again when required fields are removed', async () => {
+    const registerRes = await app.inject({
+      method: 'POST',
+      url: '/manager/register',
+      payload: {
+        email: 'unpublish@test.de',
+        password: 'sicher123',
+        practiceName: 'Unpublish Praxis',
+        practiceCity: 'Berlin',
+        isTherapist: true,
+        fullName: 'Dr. Mutable',
+        professionalTitle: 'Physiotherapeut',
+      },
+    });
+    expect(registerRes.statusCode).toBe(201);
+
+    const { token, therapistId } = registerRes.json();
+    const SESSION = { authorization: `Bearer ${token}` };
+
+    await app.inject({
+      method: 'PATCH',
+      url: '/auth/me',
+      headers: SESSION,
+      payload: {
+        bio: 'Komplettes Profil',
+        specializations: ['Ruecken'],
+        languages: ['de'],
+        isVisible: true,
+      },
+    });
+
+    const publishRes = await app.inject({
+      method: 'PATCH',
+      url: '/invite/visibility',
+      headers: SESSION,
+      payload: { visibilityPreference: 'visible' },
+    });
+    expect(publishRes.statusCode).toBe(200);
+    expect(publishRes.json().isPublished).toBe(true);
+
+    const breakProfileRes = await app.inject({
+      method: 'PATCH',
+      url: '/auth/me',
+      headers: SESSION,
+      payload: {
+        bio: '',
+      },
+    });
+    expect(breakProfileRes.statusCode).toBe(200);
+    expect(breakProfileRes.json().isPublished).toBe(false);
+    expect(breakProfileRes.json().complete).toBe(false);
+    expect(breakProfileRes.json().missingFields).toContain('bio');
+
+    const managerMeRes = await app.inject({
+      method: 'GET',
+      url: '/manager/me',
+      headers: SESSION,
+    });
+    expect(managerMeRes.statusCode).toBe(200);
+    expect(managerMeRes.json().therapistProfile.isPublished).toBe(false);
+    expect(managerMeRes.json().therapistProfile.complete).toBe(false);
+    expect(managerMeRes.json().therapistProfile.missingFields).toContain('bio');
+
+    const searchRes = await app.inject({
+      method: 'POST',
+      url: '/search',
+      payload: { query: 'Mutable', city: 'Berlin' },
+    });
+    expect(searchRes.statusCode).toBe(200);
+    expect(searchRes.json().therapists.find((t: any) => t.id === therapistId)).toBeUndefined();
+  });
 });

@@ -2,6 +2,7 @@ import { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import type { SearchInput, SearchTherapist, SearchPractice } from '@revio/shared';
 import { normalizeText, bestScore, scoreMatch } from '../utils/search-utils.js';
+import { getTherapistPublicationState } from '../utils/profile-completeness.js';
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
@@ -102,15 +103,18 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
 
     const input: SearchInput = parsed.data;
 
-    // Load all approved therapists — always visible, practices are optional.
-    // Invited therapists (invitedByPracticeId != null) must also have isPublished: true
-    // to prevent profiles from showing before the therapist has confirmed publication.
+    // Load all approved therapists that are publicly visible.
+    // Invited profiles and manager-onboarding profiles require an explicit publication
+    // confirmation before they may appear in search.
     const therapists = await fastify.prisma.therapist.findMany({
       where: {
         reviewStatus: 'APPROVED',
         isVisible: true,
         OR: [
-          { invitedByPracticeId: null },
+          {
+            invitedByPracticeId: null,
+            onboardingStatus: { not: 'manager_onboarding' },
+          },
           { isPublished: true },
         ],
       },
@@ -126,6 +130,7 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
     });
 
     const results: SearchTherapist[] = therapists
+      .filter((t) => getTherapistPublicationState(t).publicSearchEligible)
       .filter((t) => {
         // City: case-insensitive exact match (required — therapists are local)
         if (t.city.toLowerCase() !== input.city.toLowerCase()) return false;
@@ -208,6 +213,8 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
       },
     });
     if (!t) return reply.notFound('Therapeut nicht gefunden');
+    const publication = getTherapistPublicationState(t);
+    if (!publication.publicSearchEligible) return reply.notFound('Therapeut nicht gefunden');
     const practices = t.links.map((link) => {
       let photos: string[] | undefined;
       if (link.practice.photos) { try { photos = JSON.parse(link.practice.photos); } catch {} }
@@ -241,7 +248,17 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
         links: {
           where: {
             status: 'CONFIRMED',
-            therapist: { reviewStatus: 'APPROVED', isVisible: true },
+            therapist: {
+              reviewStatus: 'APPROVED',
+              isVisible: true,
+              OR: [
+                {
+                  invitedByPracticeId: null,
+                  onboardingStatus: { not: 'manager_onboarding' },
+                },
+                { isPublished: true },
+              ],
+            },
           },
           include: {
             therapist: {
@@ -266,7 +283,9 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
         lat: practice.lat, lng: practice.lng,
         logo: practice.logo ?? undefined, photos,
       },
-      therapists: practice.links.map((l) => ({
+      therapists: practice.links
+        .filter((l) => getTherapistPublicationState(l.therapist).publicSearchEligible)
+        .map((l) => ({
         id: l.therapist.id,
         fullName: l.therapist.fullName,
         professionalTitle: l.therapist.professionalTitle,

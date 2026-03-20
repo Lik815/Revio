@@ -7,10 +7,12 @@ export function AdminShell({
   children,
   adminUser,
   onLogout,
+  apiUnavailable = false,
 }: {
   children: ReactNode;
   adminUser: { name: string; email: string; role: string };
   onLogout: () => Promise<void>;
+  apiUnavailable?: boolean;
 }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
@@ -26,6 +28,11 @@ export function AdminShell({
       </div>
 
       <main className="main">
+        {apiUnavailable ? (
+          <div className="status-banner status-banner--warning">
+            Die Admin-API ist aktuell nicht erreichbar. Inhalte koennen unvollstaendig sein, bis die Verbindung wieder steht.
+          </div>
+        ) : null}
         <div className="mobile-topbar">
           <button
             type="button"

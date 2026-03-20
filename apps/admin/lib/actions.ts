@@ -6,6 +6,10 @@ import { redirect } from 'next/navigation';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
+export type LoginState = {
+  error: string | null;
+};
+
 async function getAdminToken() {
   const cookieStore = await cookies();
   return cookieStore.get('revio_admin_token')?.value ?? process.env.ADMIN_TOKEN ?? '';
@@ -20,19 +24,24 @@ async function adminPost(path: string) {
   if (!res.ok) throw new Error(`API ${res.status}: ${path}`);
 }
 
-export async function loginAdmin(formData: FormData) {
+export async function loginAdmin(_: LoginState, formData: FormData): Promise<LoginState> {
   const email = String(formData.get('email') ?? '');
   const password = String(formData.get('password') ?? '');
 
-  const res = await fetch(`${API_URL}/admin/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
-    cache: 'no-store',
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}/admin/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+      cache: 'no-store',
+    });
+  } catch {
+    return { error: 'Die Admin-API ist aktuell nicht erreichbar. Bitte pruefe, ob sie lokal laeuft.' };
+  }
 
   if (!res.ok) {
-    throw new Error('E-Mail oder Passwort ist falsch.');
+    return { error: 'E-Mail oder Passwort ist falsch.' };
   }
 
   const data = await res.json();

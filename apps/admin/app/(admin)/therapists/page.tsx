@@ -24,6 +24,53 @@ const statusLabel: Record<string, string> = {
   DRAFT: 'Entwurf',
 };
 
+const statusPriority: Record<string, number> = {
+  PENDING_REVIEW: 0,
+  CHANGES_REQUESTED: 1,
+  DRAFT: 2,
+  REJECTED: 3,
+  SUSPENDED: 4,
+  APPROVED: 5,
+};
+
+function missingProfileCount(t: {
+  bio?: string | null;
+  specializations?: string[];
+  languages?: string[];
+}) {
+  let count = 0;
+  if (!t.bio?.trim()) count++;
+  if (!t.specializations?.length) count++;
+  if (!t.languages?.length) count++;
+  return count;
+}
+
+function getReviewPriority(t: {
+  reviewStatus: string;
+  createdAt: string;
+  bio?: string | null;
+  specializations?: string[];
+  languages?: string[];
+}) {
+  const ageHours = (Date.now() - new Date(t.createdAt).getTime()) / (1000 * 60 * 60);
+  const missingCount = missingProfileCount(t);
+  const overdue = t.reviewStatus === 'PENDING_REVIEW' && ageHours >= 48;
+  const label = overdue
+    ? 'Über SLA'
+    : t.reviewStatus === 'PENDING_REVIEW'
+      ? 'Review offen'
+      : t.reviewStatus === 'CHANGES_REQUESTED'
+        ? 'Nachfassen'
+        : t.reviewStatus === 'DRAFT'
+          ? 'Unvollständig'
+          : t.reviewStatus === 'APPROVED'
+            ? 'Stabil'
+            : 'Beobachten';
+
+  const weight = (statusPriority[t.reviewStatus] ?? 9) * 1000 - ageHours + missingCount * 10 - (overdue ? 500 : 0);
+  return { overdue, missingCount, label, weight };
+}
+
 export default async function TherapistsPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams;
   const therapists = await api.getTherapists();
@@ -37,7 +84,11 @@ export default async function TherapistsPage({ searchParams }: { searchParams: S
     const matchesQuery = !q || [t.fullName, t.professionalTitle, t.city, t.specializations.join(' ')].join(' ').toLowerCase().includes(q);
     const matchesCity = !city || t.city.toLowerCase().includes(city);
     return matchesStatus && matchesQuery && matchesCity;
-  });
+  }).sort((a, b) => getReviewPriority(a).weight - getReviewPriority(b).weight);
+
+  const pendingCount = filtered.filter((t) => t.reviewStatus === 'PENDING_REVIEW').length;
+  const overdueCount = filtered.filter((t) => getReviewPriority(t).overdue).length;
+  const incompleteCount = filtered.filter((t) => getReviewPriority(t).missingCount > 0 && t.reviewStatus !== 'APPROVED').length;
 
   return (
     <PageShell
@@ -46,6 +97,24 @@ export default async function TherapistsPage({ searchParams }: { searchParams: S
       eyebrow="Reviews"
       actions={<div className="hero-pill">{filtered.length} Ergebnisse</div>}
     >
+      <div className="review-summary-grid">
+        <article className="review-summary-card">
+          <div className="kicker">Jetzt prüfen</div>
+          <strong>{pendingCount}</strong>
+          <span>Therapeut:innen warten aktuell auf Erstreview</span>
+        </article>
+        <article className="review-summary-card review-summary-card--warning">
+          <div className="kicker">SLA-Risiko</div>
+          <strong>{overdueCount}</strong>
+          <span>Fälle liegen schon länger als 48 Stunden offen</span>
+        </article>
+        <article className="review-summary-card">
+          <div className="kicker">Unvollständig</div>
+          <strong>{incompleteCount}</strong>
+          <span>Profile brauchen vermutlich Rückfragen oder Änderungen</span>
+        </article>
+      </div>
+
       <form className="toolbar" action="/therapists">
         <input name="q" defaultValue={params.q ?? ''} className="toolbar-input" placeholder="Nach Name, Stadt oder Spezialisierung suchen" />
         <input name="city" defaultValue={params.city ?? ''} className="toolbar-input toolbar-input--sm" placeholder="Stadt" />
@@ -60,10 +129,18 @@ export default async function TherapistsPage({ searchParams }: { searchParams: S
         <button className="primary-btn" type="submit">Filtern</button>
       </form>
 
+      {filtered.length === 0 ? (
+        <div className="empty-state empty-state--compact">
+          <div className="empty-illustration">🗂️</div>
+          <strong>Keine Therapeut:innen für diese Filter</strong>
+          <p>Versuche einen anderen Status, entferne Suchbegriffe oder prüfe die Warteschlange ohne Standortfilter.</p>
+        </div>
+      ) : (
       <table className="table table--elevated">
         <thead>
           <tr>
             <th>Name</th>
+            <th>Priorität</th>
             <th>Titel</th>
             <th>Ort</th>
             <th>Spezialisierungen</th>
@@ -75,6 +152,9 @@ export default async function TherapistsPage({ searchParams }: { searchParams: S
         </thead>
         <tbody>
           {filtered.map((t) => (
+            (() => {
+              const priority = getReviewPriority(t);
+              return (
               <tr key={t.id}>
                 <td data-label="Name">
                   <div className="entity-cell">
@@ -83,6 +163,14 @@ export default async function TherapistsPage({ searchParams }: { searchParams: S
                       <strong>{t.fullName}</strong>
                       <div className="entity-meta">{t.email}</div>
                     </div>
+                  </div>
+                </td>
+                <td data-label="Priorität">
+                  <div className="priority-stack">
+                    <span className={`badge ${priority.overdue ? 'badge--REJECTED' : 'badge--PENDING_REVIEW'}`}>{priority.label}</span>
+                    {priority.missingCount > 0 && (
+                      <span className="entity-meta">{priority.missingCount} Lücken</span>
+                    )}
                   </div>
                 </td>
                 <td data-label="Titel">{t.professionalTitle}</td>
@@ -110,9 +198,12 @@ export default async function TherapistsPage({ searchParams }: { searchParams: S
                   />
                 </td>
               </tr>
+            );
+            })()
           ))}
         </tbody>
       </table>
+      )}
     </PageShell>
   );
 }

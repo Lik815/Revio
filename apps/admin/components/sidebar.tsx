@@ -1,7 +1,6 @@
 'use client';
 
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 
 const links = [
   { href: '/', label: 'Übersicht', icon: '◫' },
@@ -21,6 +20,7 @@ export function Sidebar({
   onNavigate?: () => void;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
 
   return (
     <aside className="sidebar">
@@ -34,15 +34,18 @@ export function Sidebar({
       </div>
       <nav className="sidebar-nav">
         {links.map((link) => (
-          <Link
+          <button
             key={link.href}
-            href={link.href}
+            type="button"
             className={`nav-link ${pathname === link.href ? 'nav-link--active' : ''}`}
-            onClick={onNavigate}
+            onClick={() => {
+              router.push(link.href);
+              onNavigate?.();
+            }}
           >
             <span className="nav-icon">{link.icon}</span>
             <span>{link.label}</span>
-          </Link>
+          </button>
         ))}
       </nav>
 
