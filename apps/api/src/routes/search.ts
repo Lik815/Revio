@@ -130,22 +130,28 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
       },
     });
 
-    const results: SearchTherapist[] = therapists
-      .filter((t) => getTherapistPublicationState(t).publicSearchEligible)
-      .filter((t) => {
-        // City: case-insensitive exact match (required — therapists are local)
-        if (t.city.toLowerCase() !== input.city.toLowerCase()) return false;
+    const normalizedCity = normalizeText(input.city);
+    const passesFilters = (t: typeof therapists[number], { requireCityMatch }: { requireCityMatch: boolean }) => {
+      if (requireCityMatch && normalizeText(t.city) !== normalizedCity) return false;
 
-        const languages = splitList(t.languages).map((l) => l.toLowerCase());
-        const specializations = splitList(t.specializations).map((s) => s.toLowerCase());
+      const languages = splitList(t.languages).map((l) => l.toLowerCase());
+      const specializations = splitList(t.specializations).map((s) => s.toLowerCase());
 
-        if (input.language && !languages.includes(input.language.toLowerCase())) return false;
-        if (typeof input.homeVisit === 'boolean' && t.homeVisit !== input.homeVisit) return false;
-        if (input.specialization && !specializations.includes(input.specialization.toLowerCase())) return false;
-        if (input.kassenart && (t as any).kassenart && (t as any).kassenart !== input.kassenart) return false;
+      if (input.language && !languages.includes(input.language.toLowerCase())) return false;
+      if (typeof input.homeVisit === 'boolean' && t.homeVisit !== input.homeVisit) return false;
+      if (input.specialization && !specializations.includes(input.specialization.toLowerCase())) return false;
+      if (input.kassenart && (t as any).kassenart && (t as any).kassenart !== input.kassenart) return false;
 
-        return true;
-      })
+      return true;
+    };
+
+    const publicTherapists = therapists.filter((t) => getTherapistPublicationState(t).publicSearchEligible);
+    const cityMatchedTherapists = publicTherapists.filter((t) => passesFilters(t, { requireCityMatch: true }));
+    const filteredTherapists = cityMatchedTherapists.length > 0
+      ? cityMatchedTherapists
+      : publicTherapists.filter((t) => passesFilters(t, { requireCityMatch: false }));
+
+    const results: SearchTherapist[] = filteredTherapists
       .map((t) => {
         const practiceNames = t.links.map((l) => l.practice.name);
         const relevance = scoreTherapist(t, input.query, practiceNames);

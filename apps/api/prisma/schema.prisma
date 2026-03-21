@@ -159,6 +159,17 @@ model TherapistRemovalLog {
   createdAt   DateTime @default(now())
 }
 
+model PracticeDeletionLog {
+  id             String   @id @default(cuid())
+  practiceId     String
+  practiceName   String
+  managerId      String
+  reason         String
+  reasonDetail   String?
+  linkedTherapists Int    @default(0)
+  createdAt      DateTime @default(now())
+}
+
 model ManagerPracticeAssignment {
   id         String          @id @default(cuid())
   managerId  String

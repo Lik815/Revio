@@ -618,6 +618,46 @@ export const managerAuthRoutes: FastifyPluginAsync = async (fastify) => {
     return { token: inviteToken, practiceId: practice.id, practiceName: practice.name };
   });
 
+  // DELETE /manager/practice — manager deletes a practice they manage
+  fastify.delete('/manager/practice', async (request, reply) => {
+    const token = getToken(request);
+    if (!token) return reply.unauthorized('Kein Token');
+    const manager = await fastify.prisma.practiceManager.findUnique({ where: { sessionToken: token } });
+    if (!manager) return reply.unauthorized('Nicht eingeloggt');
+
+    const bodySchema = z.object({
+      practiceId: z.string().min(1),
+      reason: z.string().min(1),
+      reasonDetail: z.string().optional(),
+    });
+    const body = bodySchema.safeParse(request.body);
+    if (!body.success) return reply.badRequest('practiceId und reason sind erforderlich');
+
+    const { practiceId, reason, reasonDetail } = body.data;
+
+    const assignment = await fastify.prisma.managerPracticeAssignment.findUnique({
+      where: { managerId_practiceId: { managerId: manager.id, practiceId } },
+      include: { practice: true },
+    });
+    if (!assignment) return reply.forbidden('Keine Berechtigung für diese Praxis');
+
+    const linkedCount = await fastify.prisma.therapistPracticeLink.count({ where: { practiceId } });
+
+    await fastify.prisma.practiceDeletionLog.create({
+      data: {
+        practiceId,
+        practiceName: assignment.practice.name,
+        managerId: manager.id,
+        reason,
+        reasonDetail: reasonDetail ?? null,
+        linkedTherapists: linkedCount,
+      },
+    });
+
+    await fastify.prisma.practice.delete({ where: { id: practiceId } });
+    return { success: true };
+  });
+
   // POST /manager/logout
   fastify.post('/manager/logout', async (request) => {
     const token = getToken(request);

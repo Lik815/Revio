@@ -79,6 +79,11 @@ const languageOptions = Object.keys(LANGUAGE_MAP);
 
 const getBaseUrl = () => BASE_URL;
 
+// Required to bypass localtunnel's interstitial page in dev
+const TUNNEL_HEADERS = BASE_URL.includes('loca.lt')
+  ? { 'bypass-tunnel-reminder': 'true' }
+  : {};
+
 const parseStringOrArray = (val) => {
   if (Array.isArray(val)) return val;
   if (typeof val === 'string') {
@@ -195,6 +200,7 @@ export {
   formatDist,
   formatMissingProfileFields,
   getBaseUrl,
+  TUNNEL_HEADERS,
   getLangLabel,
   getPracticeInitials,
   getPrimaryPractice,

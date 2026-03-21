@@ -14,5 +14,12 @@
     "db:generate": "pnpm --filter @revio/api prisma:generate",
     "db:migrate": "pnpm --filter @revio/api prisma:migrate",
     "db:seed": "pnpm --filter @revio/api seed"
+  },
+  "dependencies": {
+    "expo": "^55.0.8"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.10",
+    "typescript": "~5.9.2"
   }
 }

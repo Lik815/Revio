@@ -5,8 +5,7 @@ import type {
   LinkWithEntities,
 } from '@revio/shared';
 import { cookies } from 'next/headers';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+import { getApiBaseCandidates } from './api-base';
 
 export class AdminApiError extends Error {
   status?: number;
@@ -33,18 +32,29 @@ async function getAdminToken() {
 
 async function adminFetch<T>(path: string): Promise<T> {
   const token = await getAdminToken();
-  let res: Response;
-  try {
-    res = await fetch(`${API_URL}${path}`, {
-      headers: { Authorization: `Bearer ${token}` },
-      cache: 'no-store',
-    });
-  } catch {
-    throw new AdminApiError(`API nicht erreichbar: ${path}`, 'network');
+  const apiBases = getApiBaseCandidates();
+
+  let lastNetworkError: unknown;
+
+  for (const base of apiBases) {
+    let res: Response;
+    try {
+      res = await fetch(`${base}${path}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        cache: 'no-store',
+      });
+    } catch (error) {
+      lastNetworkError = error;
+      continue;
+    }
+
+    if (res.status === 401) throw new AdminApiError(`API 401: ${path}`, 'unauthorized', 401);
+    if (!res.ok) throw new AdminApiError(`API ${res.status}: ${path}`, 'http', res.status);
+    return res.json() as Promise<T>;
   }
-  if (res.status === 401) throw new AdminApiError(`API 401: ${path}`, 'unauthorized', 401);
-  if (!res.ok) throw new AdminApiError(`API ${res.status}: ${path}`, 'http', res.status);
-  return res.json() as Promise<T>;
+
+  const details = lastNetworkError instanceof Error ? ` (${lastNetworkError.message})` : '';
+  throw new AdminApiError(`API nicht erreichbar: ${path}${details}`, 'network');
 }
 
 export async function getAdminSessionState(): Promise<AdminSessionState> {

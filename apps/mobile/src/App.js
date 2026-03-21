@@ -31,6 +31,7 @@ import {
   fortbildungOptions,
   formatMissingProfileFields,
   getBaseUrl,
+  TUNNEL_HEADERS,
   getLangLabel,
   getPracticeInitials,
   getPrimaryPractice,
@@ -558,34 +559,71 @@ export default function App() {
     }
   };
 
+  const [deletionFlowStep, setDeletionFlowStep] = useState(null); // null | 'reason' | 'confirm'
+  const [deletionReason, setDeletionReason] = useState('');
+  const [deletionReasonDetail, setDeletionReasonDetail] = useState('');
+  const [deletionLoading, setDeletionLoading] = useState(false);
+  const [deletionPracticeId, setDeletionPracticeId] = useState(null); // null = therapist flow, string = manager flow
+
+  const DELETION_REASONS = [
+    'Ich habe die Praxis versehentlich erstellt',
+    'Doppelter Eintrag',
+    'Ich verwalte diese Praxis nicht mehr',
+    'Die Praxis ist geschlossen',
+    'Ich möchte sie durch eine andere ersetzen',
+    'Sonstiges',
+  ];
+
   const deletePracticeConfirmed = async () => {
+    setDeletionLoading(true);
     try {
-      const res = await fetch(`${getBaseUrl()}/my/practice`, {
+      const isManagerFlow = deletionPracticeId !== null;
+      const url = isManagerFlow ? `${getBaseUrl()}/manager/practice` : `${getBaseUrl()}/my/practice`;
+      const body = isManagerFlow
+        ? { practiceId: deletionPracticeId, reason: deletionReason, reasonDetail: deletionReason === 'Sonstiges' ? deletionReasonDetail : undefined }
+        : { reason: deletionReason, reasonDetail: deletionReason === 'Sonstiges' ? deletionReasonDetail : undefined };
+
+      const res = await fetch(url, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${authToken}` },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}`, ...TUNNEL_HEADERS },
+        body: JSON.stringify(body),
       });
       if (res.ok) {
-        setShowPracticeAdmin(false);
-        setAdminPracticeDetail(null);
-        const meRes = await fetch(`${getBaseUrl()}/auth/me`, {
-          headers: { Authorization: `Bearer ${authToken}` },
-        });
-        if (meRes.ok) setLoggedInTherapist(normalizeTherapistProfile(await meRes.json()));
+        setDeletionFlowStep(null);
+        setDeletionReason('');
+        setDeletionReasonDetail('');
+        setDeletionPracticeId(null);
+        if (isManagerFlow) {
+          const meRes = await fetch(`${getBaseUrl()}/manager/me`, { headers: { Authorization: `Bearer ${authToken}`, ...TUNNEL_HEADERS } });
+          if (meRes.ok) setLoggedInManager(await meRes.json());
+        } else {
+          setShowPracticeAdmin(false);
+          setAdminPracticeDetail(null);
+          const meRes = await fetch(`${getBaseUrl()}/auth/me`, { headers: { Authorization: `Bearer ${authToken}`, ...TUNNEL_HEADERS } });
+          if (meRes.ok) setLoggedInTherapist(normalizeTherapistProfile(await meRes.json()));
+        }
+      } else {
+        Alert.alert('Fehler', 'Praxis konnte nicht gelöscht werden.');
       }
-    } catch {}
+    } catch {
+      Alert.alert('Fehler', 'Verbindungsfehler beim Löschen.');
+    } finally {
+      setDeletionLoading(false);
+    }
   };
 
   const handleDeletePractice = () => {
-    const practiceName = loggedInTherapist?.adminPractice?.name ?? 'diese Praxis';
-    const msg = `„${practiceName}" wird dauerhaft gelöscht. Alle verknüpften Therapeuten werden getrennt. Diese Aktion kann nicht rückgängig gemacht werden.`;
-    if (Platform.OS === 'web') {
-      if (showWebConfirm(`Praxis löschen?\n\n${msg}`)) deletePracticeConfirmed();
-    } else {
-      Alert.alert('Praxis löschen', msg, [
-        { text: 'Abbrechen', style: 'cancel' },
-        { text: 'Endgültig löschen', style: 'destructive', onPress: deletePracticeConfirmed },
-      ]);
-    }
+    setDeletionReason('');
+    setDeletionReasonDetail('');
+    setDeletionPracticeId(null);
+    setDeletionFlowStep('reason');
+  };
+
+  const handleDeleteManagerPractice = (practiceId) => {
+    setDeletionReason('');
+    setDeletionReasonDetail('');
+    setDeletionPracticeId(practiceId);
+    setDeletionFlowStep('reason');
   };
 
   const handleSaveProfile = async () => {
@@ -740,8 +778,12 @@ export default function App() {
       if (res.ok) {
         const data = await res.json();
         setSelectedTherapist(mapApiTherapist(data.therapist));
+        return;
       }
-    } catch {}
+      Alert.alert('Therapeut konnte nicht geladen werden', 'Bitte pruefe, ob die API erreichbar ist und versuche es erneut.');
+    } catch {
+      Alert.alert('Verbindungsfehler', 'Die Therapeuten-Details konnten nicht geladen werden. Bitte pruefe die API-Verbindung der Expo-App.');
+    }
   };
 
   const loadAdminPracticeDetail = async () => {
@@ -1126,7 +1168,7 @@ export default function App() {
     try {
       const response = await fetch(`${getBaseUrl()}/search`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...TUNNEL_HEADERS },
         body: JSON.stringify({
           query: q || 'physiotherapie',
           city: effectiveCity,
@@ -1134,15 +1176,24 @@ export default function App() {
           kassenart: kassenart || undefined,
         }),
       });
-      if (!response.ok) throw new Error('failed');
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const payload = await response.json();
       const mapped = (payload.therapists ?? []).map(mapApiTherapist);
       const origin = coords ?? userCoords;
       const withDist = withDistances(mapped, origin);
       const filtered = applyFilters(withDist, origin);
+      if (filtered.length === 0 && withDist.length > 0) {
+        Alert.alert('Radius zu klein', `${withDist.length} Therapeut:innen gefunden, aber alle außerhalb von ${searchRadius} km. Radius erhöhen?`);
+      }
       setResults(filtered);
       setAllApiTherapists(withDist);
-    } catch {
+    } catch (err) {
+      const message = String(err?.message ?? 'Unbekannter Fehler');
+      const usingLocalTunnel = getBaseUrl().includes('.loca.lt');
+      const tunnelHint = usingLocalTunnel
+        ? '\n\nHinweis: Deine API-URL zeigt auf einen localtunnel-Link. Prüfe, ob der Tunnel noch aktiv ist oder nutze lokal besser die LAN-IP deines Rechners.'
+        : '';
+      Alert.alert('Verbindungsfehler', `Suche fehlgeschlagen: ${message}\n\nAPI-URL: ${getBaseUrl()}${tunnelHint}`);
       setResults([]);
     } finally {
       setSearchLoading(false);
@@ -3058,6 +3109,7 @@ export default function App() {
         handleManagerProfilePublication={handleManagerProfilePublication}
         handleManagerProfileSave={handleManagerProfileSave}
         handlePickManagerPracticeLogo={handlePickManagerPracticeLogo}
+        handleDeleteManagerPractice={handleDeleteManagerPractice}
         handleRemoveTherapist={handleRemoveTherapist}
         loggedInManager={loggedInManager}
         mgrEditAddress={mgrEditAddress}
@@ -3141,6 +3193,72 @@ export default function App() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: c.background }]}>
       <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
+
+      {/* ── Practice Deletion Flow ───────────────────────────────────────────── */}
+      <Modal visible={deletionFlowStep === 'reason'} transparent animationType="slide" onRequestClose={() => setDeletionFlowStep(null)}>
+        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' }} onPress={() => setDeletionFlowStep(null)} />
+        <View style={{ backgroundColor: c.background, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, paddingBottom: 48 }}>
+          <View style={{ width: 36, height: 4, backgroundColor: c.border, borderRadius: 2, alignSelf: 'center', marginBottom: 20 }} />
+          <Text style={{ fontSize: 18, fontWeight: '700', color: c.text, marginBottom: 6 }}>Warum möchtest du die Praxis löschen?</Text>
+          <Text style={{ fontSize: 14, color: c.muted, marginBottom: 20 }}>Dein Feedback hilft uns, Revio zu verbessern.</Text>
+          {DELETION_REASONS.map((reason) => (
+            <Pressable
+              key={reason}
+              onPress={() => setDeletionReason(reason)}
+              style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: c.border }}
+            >
+              <View style={{ width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: deletionReason === reason ? c.primary : c.border, backgroundColor: deletionReason === reason ? c.primary : 'transparent', marginRight: 12 }} />
+              <Text style={{ fontSize: 15, color: c.text }}>{reason}</Text>
+            </Pressable>
+          ))}
+          {deletionReason === 'Sonstiges' && (
+            <TextInput
+              placeholder="Kurze Beschreibung (optional)"
+              placeholderTextColor={c.muted}
+              value={deletionReasonDetail}
+              onChangeText={setDeletionReasonDetail}
+              style={{ marginTop: 12, borderWidth: 1, borderColor: c.border, borderRadius: 10, padding: 12, color: c.text, fontSize: 14 }}
+              multiline
+            />
+          )}
+          <Pressable
+            onPress={() => deletionReason ? setDeletionFlowStep('confirm') : null}
+            style={{ marginTop: 20, backgroundColor: deletionReason ? '#ef4444' : c.border, borderRadius: 12, paddingVertical: 14, alignItems: 'center' }}
+          >
+            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>Weiter</Text>
+          </Pressable>
+          <Pressable onPress={() => setDeletionFlowStep(null)} style={{ marginTop: 12, alignItems: 'center', paddingVertical: 10 }}>
+            <Text style={{ color: c.muted, fontSize: 14 }}>Abbrechen</Text>
+          </Pressable>
+        </View>
+      </Modal>
+
+      <Modal visible={deletionFlowStep === 'confirm'} transparent animationType="slide" onRequestClose={() => setDeletionFlowStep('reason')}>
+        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' }} onPress={() => setDeletionFlowStep('reason')} />
+        <View style={{ backgroundColor: c.background, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, paddingBottom: 48 }}>
+          <View style={{ width: 36, height: 4, backgroundColor: c.border, borderRadius: 2, alignSelf: 'center', marginBottom: 20 }} />
+          <View style={{ backgroundColor: '#fef2f2', borderRadius: 12, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: '#fecaca' }}>
+            <Text style={{ fontSize: 15, fontWeight: '700', color: '#dc2626', marginBottom: 6 }}>Diese Aktion kann nicht rückgängig gemacht werden.</Text>
+            <Text style={{ fontSize: 14, color: '#7f1d1d' }}>
+              {`„${loggedInTherapist?.adminPractice?.name ?? 'Diese Praxis'}" wird dauerhaft gelöscht. Alle verknüpften Therapeuten werden getrennt und verlieren ihre Praxis-Zuordnung.`}
+            </Text>
+          </View>
+          <Text style={{ fontSize: 13, color: c.muted, marginBottom: 20 }}>
+            {`Grund: ${deletionReason}${deletionReason === 'Sonstiges' && deletionReasonDetail ? ` – ${deletionReasonDetail}` : ''}`}
+          </Text>
+          <Pressable
+            onPress={deletionLoading ? undefined : deletePracticeConfirmed}
+            style={{ backgroundColor: '#dc2626', borderRadius: 12, paddingVertical: 14, alignItems: 'center', opacity: deletionLoading ? 0.6 : 1 }}
+          >
+            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>
+              {deletionLoading ? 'Wird gelöscht…' : 'Praxis endgültig löschen'}
+            </Text>
+          </Pressable>
+          <Pressable onPress={() => setDeletionFlowStep('reason')} style={{ marginTop: 12, alignItems: 'center', paddingVertical: 10 }}>
+            <Text style={{ color: c.muted, fontSize: 14 }}>Zurück</Text>
+          </Pressable>
+        </View>
+      </Modal>
 
       {/* ── Notification Sheet ──────────────────────────────────────────────── */}
       <Modal visible={showNotifications} transparent animationType="slide" onRequestClose={() => setShowNotifications(false)}>

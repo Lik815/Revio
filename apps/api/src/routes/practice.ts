@@ -48,11 +48,21 @@ export const practiceRoutes: FastifyPluginAsync = async (fastify) => {
       },
     });
 
-    // Create PracticeManager for this therapist (or reuse if already exists for another practice — 1:1 for now)
-    const existing = await fastify.prisma.practiceManager.findUnique({ where: { therapistId: therapist.id } });
-    if (!existing) {
-      await fastify.prisma.practiceManager.create({
+    // Create PracticeManager for this therapist (or reuse if already exists)
+    let manager = await fastify.prisma.practiceManager.findUnique({ where: { therapistId: therapist.id } });
+    if (!manager) {
+      manager = await fastify.prisma.practiceManager.create({
         data: { email: therapist.email, passwordHash: therapist.passwordHash ?? '', therapistId: therapist.id, practiceId: practice.id },
+      });
+    }
+
+    // Create ManagerPracticeAssignment so getAdminPractice() can find it
+    const existingAssignment = await fastify.prisma.managerPracticeAssignment.findUnique({
+      where: { managerId_practiceId: { managerId: manager.id, practiceId: practice.id } },
+    });
+    if (!existingAssignment) {
+      await fastify.prisma.managerPracticeAssignment.create({
+        data: { managerId: manager.id, practiceId: practice.id },
       });
     }
 
@@ -304,6 +314,33 @@ export const practiceRoutes: FastifyPluginAsync = async (fastify) => {
 
     const practice = await getAdminPractice(fastify, therapist.id);
     if (!practice) return reply.notFound('Keine eigene Praxis');
+
+    const bodySchema = z.object({
+      reason: z.string().min(1),
+      reasonDetail: z.string().optional(),
+    });
+    const body = bodySchema.safeParse(request.body);
+    if (!body.success) return reply.badRequest('reason ist erforderlich');
+
+    const linkedCount = await fastify.prisma.therapistPracticeLink.count({
+      where: { practiceId: practice.id },
+    });
+
+    const managerAssignment = await fastify.prisma.managerPracticeAssignment.findFirst({
+      where: { practiceId: practice.id },
+      include: { manager: true },
+    });
+
+    await fastify.prisma.practiceDeletionLog.create({
+      data: {
+        practiceId: practice.id,
+        practiceName: practice.name,
+        managerId: managerAssignment?.managerId ?? therapist.id,
+        reason: body.data.reason,
+        reasonDetail: body.data.reasonDetail ?? null,
+        linkedTherapists: linkedCount,
+      },
+    });
 
     await fastify.prisma.practice.delete({ where: { id: practice.id } });
     return { success: true };

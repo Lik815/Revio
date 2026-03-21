@@ -37,6 +37,7 @@ export function ManagerDashboardContent(props) {
     c,
     handleAddManagerPracticePhoto,
     handleAddNewPractice,
+    handleDeleteManagerPractice,
     handleManagerPracticeSave,
     handleManagerProfilePublication,
     handleManagerProfileSave,
@@ -503,6 +504,15 @@ export function ManagerDashboardContent(props) {
               <Text style={{ color: c.primary, fontSize: 15, fontWeight: '600' }}>Therapeut einladen</Text>
             </Pressable>
           </View>
+        )}
+
+        {!mgrEditMode && practice && (
+          <Pressable
+            onPress={() => handleDeleteManagerPractice(practice.id)}
+            style={{ marginHorizontal: 16, marginTop: 4, marginBottom: 8, alignItems: 'center', paddingVertical: 14 }}
+          >
+            <Text style={{ color: '#ef4444', fontSize: 14 }}>Praxis löschen</Text>
+          </Pressable>
         )}
 
         {!mgrEditMode && (

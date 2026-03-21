@@ -3,8 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+import { getApiBaseCandidates } from './api-base';
 
 export type LoginState = {
   error: string | null;
@@ -17,26 +16,46 @@ async function getAdminToken() {
 
 async function adminPost(path: string) {
   const token = await getAdminToken();
-  const res = await fetch(`${API_URL}${path}`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!res.ok) throw new Error(`API ${res.status}: ${path}`);
+  let lastError: unknown;
+
+  for (const base of getApiBaseCandidates()) {
+    try {
+      const res = await fetch(`${base}${path}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error(`API ${res.status}: ${path}`);
+      return;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  if (lastError instanceof Error) throw lastError;
+  throw new Error(`API nicht erreichbar: ${path}`);
 }
 
 export async function loginAdmin(_: LoginState, formData: FormData): Promise<LoginState> {
   const email = String(formData.get('email') ?? '');
   const password = String(formData.get('password') ?? '');
 
-  let res: Response;
-  try {
-    res = await fetch(`${API_URL}/admin/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-      cache: 'no-store',
-    });
-  } catch {
+  let res: Response | null = null;
+
+  for (const base of getApiBaseCandidates()) {
+    try {
+      res = await fetch(`${base}/admin/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+        cache: 'no-store',
+      });
+      break;
+    } catch {
+      continue;
+    }
+  }
+
+  if (!res) {
     return { error: 'Die Admin-API ist aktuell nicht erreichbar. Bitte pruefe, ob sie lokal laeuft.' };
   }
 
