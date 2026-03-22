@@ -233,6 +233,7 @@ export default function App() {
   const [mgrEditPhone, setMgrEditPhone] = useState('');
   const [mgrEditHours, setMgrEditHours] = useState('');
   const [mgrEditDescription, setMgrEditDescription] = useState('');
+  const [mgrEditHomeVisit, setMgrEditHomeVisit] = useState(false);
   const [mgrEditLogo, setMgrEditLogo] = useState(null);
   const [mgrEditPhotos, setMgrEditPhotos] = useState([]);
   const [mgrEditSaving, setMgrEditSaving] = useState(false);
@@ -338,6 +339,7 @@ export default function App() {
   const [editPracticePhone, setEditPracticePhone] = useState('');
   const [editPracticeHours, setEditPracticeHours] = useState('');
   const [editPracticeDescription, setEditPracticeDescription] = useState('');
+  const [editPracticeHomeVisit, setEditPracticeHomeVisit] = useState(false);
   const [practiceEditSaving, setPracticeEditSaving] = useState(false);
   const [editPracticeLogo, setEditPracticeLogo] = useState(null);
   const [editPracticePhotos, setEditPracticePhotos] = useState([]);
@@ -994,6 +996,7 @@ export default function App() {
       if (editPracticePhone.trim() !== undefined) body.phone = editPracticePhone.trim();
       if (editPracticeHours.trim() !== undefined) body.hours = editPracticeHours.trim();
       body.description = editPracticeDescription.trim();
+      body.homeVisit = editPracticeHomeVisit;
       if (editPracticeLogo !== null) body.logo = editPracticeLogo;
       if (editPracticePhotos.length > 0) body.photos = JSON.stringify(editPracticePhotos);
 
@@ -1119,9 +1122,14 @@ export default function App() {
     runSearchWith(query, userCoords);
   }, [homeVisit, kassenart, fortbildungen]);
 
-  // Radius changes re-filter the cached result set — no API call
+  // Radius changes should trigger a fresh nearby search when an origin is active,
+  // otherwise widening the radius would never load new results from the backend.
   useEffect(() => {
     if (!searchedRef.current) return;
+    if (userCoords) {
+      runSearchWith(query, userCoords);
+      return;
+    }
     if (allApiTherapists.length === 0) return;
     setResults(applyFilters(allApiTherapists, userCoords));
   }, [searchRadius]);
@@ -1147,15 +1155,20 @@ export default function App() {
     if (!coords) return list;
     return list
       .map(t => {
-        const p = t.practices?.[0];
+        if (typeof t.distKm === 'number') return t;
+        const p = (t.practices ?? []).find(practice => typeof practice.distKm === 'number') ?? t.practices?.[0];
         if (!p?.lat) return { ...t, distKm: null };
-        return { ...t, distKm: haversine(coords.lat, coords.lng, p.lat, p.lng) };
+        const distKm = typeof p.distKm === 'number'
+          ? p.distKm
+          : haversine(coords.lat, coords.lng, p.lat, p.lng);
+        return { ...t, distKm };
       })
       .sort((a, b) => (a.distKm ?? 9999) - (b.distKm ?? 9999));
   };
 
-  const runSearchWith = async (q, coords, cityOverride) => {
+  const runSearchWith = async (q, coords, cityOverride, originOverride) => {
     const effectiveCity = cityOverride ?? city;
+    const effectiveOrigin = originOverride !== undefined ? originOverride : (coords ?? userCoords);
     if (!effectiveCity.trim()) {
       setPendingQuery(q);
       setLocationSheetCity('');
@@ -1172,6 +1185,11 @@ export default function App() {
         body: JSON.stringify({
           query: q || 'physiotherapie',
           city: effectiveCity,
+          origin: effectiveOrigin ? {
+            lat: effectiveOrigin.lat,
+            lng: effectiveOrigin.lng,
+          } : undefined,
+          radiusKm: effectiveOrigin ? searchRadius : undefined,
           homeVisit: homeVisit || undefined,
           kassenart: kassenart || undefined,
         }),
@@ -1179,7 +1197,7 @@ export default function App() {
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const payload = await response.json();
       const mapped = (payload.therapists ?? []).map(mapApiTherapist);
-      const origin = coords ?? userCoords;
+      const origin = effectiveOrigin;
       const withDist = withDistances(mapped, origin);
       const filtered = applyFilters(withDist, origin);
       if (filtered.length === 0 && withDist.length > 0) {
@@ -1246,11 +1264,16 @@ export default function App() {
     if (coords) {
       setUserCoords(coords);
       AsyncStorage.setItem('savedCoords', JSON.stringify(coords));
+    } else {
+      setUserCoords(null);
+      AsyncStorage.removeItem('savedCoords');
     }
     AsyncStorage.setItem('savedCity', resolvedCity);
     AsyncStorage.setItem('savedLocationLabel', label || resolvedCity);
     setShowLocationSheet(false);
-    if (pendingQuery !== null) runSearchWith(pendingQuery, coords, resolvedCity);
+    if (pendingQuery !== null || searchedRef.current) {
+      runSearchWith(pendingQuery ?? query, coords, resolvedCity, coords ?? null);
+    }
     setPendingQuery(null);
   };
 
@@ -1889,6 +1912,7 @@ export default function App() {
       setEditPracticePhone(p.phone ?? '');
       setEditPracticeHours(p.hours ?? '');
       setEditPracticeDescription(p.description ?? '');
+      setEditPracticeHomeVisit(p.homeVisit ?? false);
       if (p.logo) setEditPracticeLogo(p.logo);
       if (p.photos) {
         try { setEditPracticePhotos(JSON.parse(p.photos)); } catch {}
@@ -1902,6 +1926,7 @@ export default function App() {
         editPracticeAddress={editPracticeAddress}
         editPracticeCity={editPracticeCity}
         editPracticeDescription={editPracticeDescription}
+        editPracticeHomeVisit={editPracticeHomeVisit}
         editPracticeHours={editPracticeHours}
         editPracticeLogo={editPracticeLogo}
         editPracticeName={editPracticeName}
@@ -1923,6 +1948,7 @@ export default function App() {
         setEditPracticeAddress={setEditPracticeAddress}
         setEditPracticeCity={setEditPracticeCity}
         setEditPracticeDescription={setEditPracticeDescription}
+        setEditPracticeHomeVisit={setEditPracticeHomeVisit}
         setEditPracticeHours={setEditPracticeHours}
         setEditPracticeLogo={setEditPracticeLogo}
         setEditPracticeName={setEditPracticeName}
@@ -2939,6 +2965,7 @@ export default function App() {
       if (mgrEditPhone.trim()) body.phone = mgrEditPhone.trim();
       if (mgrEditHours.trim()) body.hours = mgrEditHours.trim();
       if (mgrEditDescription.trim()) body.description = mgrEditDescription.trim();
+      body.homeVisit = mgrEditHomeVisit;
       body.logo = mgrEditLogo || null;
       body.photos = mgrEditPhotos.length > 0 ? JSON.stringify(mgrEditPhotos) : null;
       const res = await fetch(`${getBaseUrl()}/manager/practice`, {
@@ -3115,6 +3142,7 @@ export default function App() {
         mgrEditAddress={mgrEditAddress}
         mgrEditCity={mgrEditCity}
         mgrEditDescription={mgrEditDescription}
+        mgrEditHomeVisit={mgrEditHomeVisit}
         mgrEditHours={mgrEditHours}
         mgrEditLogo={mgrEditLogo}
         mgrEditMode={mgrEditMode}
@@ -3143,6 +3171,7 @@ export default function App() {
         setMgrEditAddress={setMgrEditAddress}
         setMgrEditCity={setMgrEditCity}
         setMgrEditDescription={setMgrEditDescription}
+        setMgrEditHomeVisit={setMgrEditHomeVisit}
         setMgrEditHours={setMgrEditHours}
         setMgrEditLogo={setMgrEditLogo}
         setMgrEditMode={setMgrEditMode}

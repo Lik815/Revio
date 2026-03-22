@@ -157,6 +157,7 @@ export const practiceRoutes: FastifyPluginAsync = async (fastify) => {
       phone: z.string().optional(),
       hours: z.string().optional(),
       description: z.string().optional(),
+      homeVisit: z.boolean().optional(),
       logo: z.string().optional(),
       photos: z.string().optional(),
     });

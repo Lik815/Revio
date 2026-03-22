@@ -34,6 +34,7 @@ const updatePracticeSchema = z.object({
   hours: z.string().optional(),
   city: z.string().optional(),
   description: z.string().optional(),
+  homeVisit: z.boolean().optional(),
   logo: z.string().nullable().optional(),
   photos: z.string().nullable().optional(),
 });

@@ -9,6 +9,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+
 import {
   getLangLabel,
   languageOptions,
@@ -115,10 +116,12 @@ export function TherapistDashboardScreen(props) {
               );
             })}
           </View>
-          <View style={[styles.detailInfoRow, { marginTop: 12 }]}>
-            <Text style={[styles.detailInfoLabel, { color: c.text, flex: 1 }]}>Hausbesuch</Text>
-            <Switch value={editHomeVisit} onValueChange={setEditHomeVisit} trackColor={{ true: c.primary }} />
-          </View>
+          {(th.practices ?? []).length === 0 && (
+            <View style={[styles.detailInfoRow, { marginTop: 12 }]}>
+              <Text style={[styles.detailInfoLabel, { color: c.text, flex: 1 }]}>Hausbesuch</Text>
+              <Switch value={editHomeVisit} onValueChange={setEditHomeVisit} trackColor={{ true: c.primary }} />
+            </View>
+          )}
           <View style={[styles.detailInfoRow, { marginTop: 12 }]}>
             <Text style={[styles.detailInfoLabel, { color: c.text, flex: 1 }]}>In Suche sichtbar</Text>
             <Switch value={editIsVisible} onValueChange={setEditIsVisible} trackColor={{ true: c.primary }} />
@@ -172,10 +175,12 @@ export function TherapistDashboardScreen(props) {
           </View>
 
           <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
-            <View style={styles.detailInfoRow}>
-              <Text style={[styles.detailInfoLabel, { color: c.muted, flex: 1 }]}>{t('homeVisitLabel')}</Text>
-              <Text style={[styles.detailInfoValue, { color: c.text }]}>{th.homeVisit ? 'Ja' : 'Nein'}</Text>
-            </View>
+            {(th.practices ?? []).length === 0 && (
+              <View style={[styles.detailInfoRow, { marginBottom: 8 }]}>
+                <Text style={[styles.detailInfoLabel, { color: c.muted, flex: 1 }]}>{t('homeVisitLabel')}</Text>
+                <Text style={[styles.detailInfoValue, { color: c.text }]}>{th.homeVisit ? 'Ja' : 'Nein'}</Text>
+              </View>
+            )}
             {th.availability ? (
               <View style={[styles.detailInfoRow, { marginTop: 8 }]}>
                 <Text style={[styles.detailInfoLabel, { color: c.muted, flex: 1 }]}>{t('availabilityLabel')}</Text>
@@ -267,6 +272,7 @@ export function PracticeAdminScreen(props) {
     editPracticeAddress,
     editPracticeCity,
     editPracticeDescription,
+    editPracticeHomeVisit,
     editPracticeHours,
     editPracticeLogo,
     editPracticeName,
@@ -287,6 +293,7 @@ export function PracticeAdminScreen(props) {
     setEditPracticeAddress,
     setEditPracticeCity,
     setEditPracticeDescription,
+    setEditPracticeHomeVisit,
     setEditPracticeHours,
     setEditPracticeLogo,
     setEditPracticeName,
@@ -439,6 +446,11 @@ export function PracticeAdminScreen(props) {
             />
           </View>
         ))}
+
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, borderTopWidth: 1, borderTopColor: c.border, marginTop: 4 }}>
+          <Text style={[styles.filterSectionTitle, { color: c.text }]}>Hausbesuche</Text>
+          <Switch value={editPracticeHomeVisit} onValueChange={setEditPracticeHomeVisit} trackColor={{ true: c.primary }} />
+        </View>
 
         <View>
           <Text style={[styles.filterSectionTitle, { color: c.muted }]}>Beschreibung</Text>

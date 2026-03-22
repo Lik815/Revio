@@ -2,7 +2,6 @@ import React from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import {
   ActivityIndicator,
-  Dimensions,
   Image,
   Platform,
   Pressable,
@@ -81,9 +80,176 @@ export function DiscoverScreen(props) {
     fortbildungen,
     kassenart,
     searchRadius,
+    setSearchRadius,
   } = props;
 
-  const mapRegion = getMapRegion();
+  if (viewMode === 'map') {
+    return (
+      <View style={{ flex: 1, backgroundColor: c.background }}>
+        {/* Fixed header + search bar */}
+        <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8, backgroundColor: c.background, zIndex: 10 }}>
+          <View style={[styles.header, { justifyContent: 'space-between', marginBottom: 8 }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <View style={[styles.logoMark, { backgroundColor: c.primary }]}>
+                <Text style={styles.logoText}>R</Text>
+              </View>
+              <Text style={[styles.brandName, { color: c.text }]}>evio</Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              {authToken && (
+                <Pressable onPress={() => setShowNotifications(true)} style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: 'transparent', borderWidth: 2, borderColor: c.muted, alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons name="notifications-outline" size={16} color={c.muted} />
+                  {notifications.length > 0 && <View style={{ position: 'absolute', top: -3, right: -3, width: 10, height: 10, borderRadius: 5, backgroundColor: '#E74C3C' }} />}
+                </Pressable>
+              )}
+            </View>
+          </View>
+          <View style={[styles.searchBox, { backgroundColor: c.card, borderColor: c.border }]}>
+            <Ionicons name="search-outline" size={18} color={c.muted} />
+            <TextInput
+              value={query}
+              onChangeText={(text) => { setQuery(text); setShowAutocomplete(true); setActiveChip(null); }}
+              onSubmitEditing={() => runSearch()}
+              onFocus={() => setShowAutocomplete(true)}
+              onBlur={() => setTimeout(() => setShowAutocomplete(false), 150)}
+              returnKeyType="search"
+              placeholder={t('searchPlaceholder')}
+              placeholderTextColor={c.muted}
+              style={[styles.searchInput, { color: c.text }]}
+            />
+            {query.length > 0 && (
+              <Pressable onPress={() => { setQuery(''); setShowAutocomplete(false); }} hitSlop={8}>
+                <Ionicons name="close-circle" size={16} color={c.muted} />
+              </Pressable>
+            )}
+            <View style={[styles.searchDivider, { backgroundColor: c.border }]} />
+            <Pressable onPress={() => setShowFilters(!showFilters)} style={styles.searchFilterArea} hitSlop={4}>
+              <Ionicons name="options-outline" size={20} color={showFilters || activeFilterCount > 0 ? c.primary : c.muted} />
+              {activeFilterCount > 0 && <View style={[styles.filterBadge, { backgroundColor: c.accent }]}><Text style={styles.filterBadgeText}>{activeFilterCount}</Text></View>}
+            </Pressable>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 6, paddingBottom: 2 }}>
+            <View style={{ flex: 1 }}>
+              {(searched || results.length > 0) && (
+                <>
+                  <Text style={{ color: c.text, fontSize: 13, fontWeight: '600' }}>
+                    {searched ? `${results.length} ${results.length !== 1 ? t('resultsLabelPlural') : t('resultsLabel')}` : 'Vorschläge'}
+                  </Text>
+                  <Text style={{ color: c.muted, fontSize: 12, marginTop: 2 }}>
+                    {city ? `In ${city}` : 'Standort auswählen'}
+                  </Text>
+                </>
+              )}
+            </View>
+            <View style={{ flexDirection: 'row', borderRadius: 10, borderWidth: 1, borderColor: c.border, overflow: 'hidden' }}>
+              {[{ key: 'list', icon: 'list-outline' }, { key: 'map', icon: 'map-outline' }].map((button, index) => (
+                <View key={button.key} style={{ flexDirection: 'row' }}>
+                  {index > 0 && <View style={{ width: 1, backgroundColor: c.border }} />}
+                  <Pressable
+                    onPress={() => setViewMode(button.key)}
+                    style={{ paddingHorizontal: 10, paddingVertical: 6, backgroundColor: viewMode === button.key ? c.primary : c.card }}
+                  >
+                    <Ionicons name={button.icon} size={17} color={viewMode === button.key ? '#fff' : c.muted} />
+                  </Pressable>
+                </View>
+              ))}
+            </View>
+          </View>
+
+          <View style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Pressable
+              onPress={() => { setLocationSheetCity(locationLabel || city); setShowLocationSheet(true); }}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: city ? c.card : c.mutedBg, borderWidth: 1, borderColor: city ? c.accent : c.border, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6, maxWidth: 240 }}
+            >
+              <Ionicons name="navigate-sharp" size={13} color="#2b6877" />
+              <Text numberOfLines={1} style={{ fontSize: 13, color: city ? c.text : c.muted, fontWeight: city ? '500' : '400', flexShrink: 1 }}>
+                {locationLabel || city || t('locationPlaceholder')}
+              </Text>
+              <Text style={{ fontSize: 11, color: c.muted }}>▾</Text>
+            </Pressable>
+          </View>
+        </View>
+
+        {/* Fullscreen map */}
+        <View style={{ flex: 1, position: 'relative' }}>
+          <MapView
+            style={{ flex: 1 }}
+            region={getMapRegion()}
+            onTouchStart={() => setMapScrollEnabled(false)}
+            onTouchEnd={() => setMapScrollEnabled(true)}
+            onTouchCancel={() => setMapScrollEnabled(true)}
+          >
+            {userCoords && (
+              <Circle
+                center={{ latitude: userCoords.lat, longitude: userCoords.lng }}
+                radius={searchRadius * 1000}
+                strokeColor="rgba(52,199,89,0.7)"
+                fillColor="rgba(52,199,89,0.1)"
+                strokeWidth={1.5}
+              />
+            )}
+            {userCoords && (
+              <Marker coordinate={{ latitude: userCoords.lat, longitude: userCoords.lng }} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false}>
+                <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: c.primary, borderWidth: 3, borderColor: '#fff', shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 3, shadowOffset: { width: 0, height: 1 }, elevation: 5 }} />
+              </Marker>
+            )}
+            {mapPractices.map((practice) => (
+              <Marker key={practice.id} coordinate={{ latitude: practice.lat, longitude: practice.lng }} onPress={() => openPractice(practice)} tracksViewChanges={false}>
+                <View style={{ backgroundColor: c.primary, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5, flexDirection: 'row', alignItems: 'center', gap: 5, shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 4 }}>
+                  <Text style={{ color: '#fff', fontSize: 11, fontWeight: '800' }}>{getPracticeInitials(practice.name)}</Text>
+                  <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700', maxWidth: 100 }} numberOfLines={1}>{practice.name}</Text>
+                </View>
+              </Marker>
+            ))}
+          </MapView>
+
+          {/* Radius selector overlay */}
+          <View style={{ position: 'absolute', bottom: 20, left: 12, right: 12, flexDirection: 'row', gap: 6, justifyContent: 'center', zIndex: 20, elevation: 20 }}>
+            {[1, 3, 5, 10, 25].map((km) => (
+              <Pressable
+                key={km}
+                onPress={() => setSearchRadius(km)}
+                style={{ borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: searchRadius === km ? c.primary : 'rgba(0,0,0,0.55)', shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 3, shadowOffset: { width: 0, height: 1 }, elevation: 3 }}
+              >
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#fff' }}>{km} km</Text>
+              </Pressable>
+            ))}
+          </View>
+
+          {searchLoading && (
+            <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.25)', alignItems: 'center', justifyContent: 'center' }}>
+              <ActivityIndicator size="large" color="#fff" />
+            </View>
+          )}
+
+          {!searchLoading && mapPractices.length === 0 && searched && (
+            <View style={{ position: 'absolute', top: 20, left: 20, right: 20, padding: 20, borderRadius: 18, backgroundColor: 'rgba(17,24,39,0.82)', alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="location-outline" size={36} color="#fff" />
+              {userCoords ? (
+                <>
+                  <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700', textAlign: 'center', marginTop: 10 }}>
+                    Keine Praxen im Umkreis von {searchRadius} km
+                  </Text>
+                  <Text style={{ color: 'rgba(255,255,255,0.72)', fontSize: 13, textAlign: 'center', marginTop: 6 }}>
+                    Versuche einen anderen Ort oder einen größeren Radius.
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700', textAlign: 'center', marginTop: 10 }}>
+                    Keine Praxen mit Standortdaten
+                  </Text>
+                  <Text style={{ color: 'rgba(255,255,255,0.72)', fontSize: 13, textAlign: 'center', marginTop: 6 }}>
+                    Fuer diese Ergebnisse liegen noch keine Koordinaten vor.
+                  </Text>
+                </>
+              )}
+            </View>
+          )}
+        </View>
+      </View>
+    );
+  }
 
   return (
     <ScrollView
@@ -145,10 +311,6 @@ export function DiscoverScreen(props) {
               <Ionicons name="close-circle" size={16} color={c.muted} />
             </Pressable>
           )}
-          <View style={[styles.searchDivider, { backgroundColor: c.border }]} />
-          <Pressable onPress={() => runSearch()} style={styles.searchFilterArea} hitSlop={4}>
-            <Ionicons name="arrow-forward-circle" size={20} color={c.primary} />
-          </Pressable>
           <View style={[styles.searchDivider, { backgroundColor: c.border }]} />
           <Pressable onPress={() => setShowFilters(!showFilters)} style={styles.searchFilterArea} hitSlop={4}>
             <Ionicons name="options-outline" size={20} color={showFilters || activeFilterCount > 0 ? c.primary : c.muted} />
@@ -370,88 +532,6 @@ export function DiscoverScreen(props) {
           </Pressable>
         </View>
       ))}
-
-      {viewMode === 'map' && (
-        Platform.OS === 'web' ? (
-          <View style={[styles.emptyState, { backgroundColor: c.card, borderColor: c.border }]}>
-            <Ionicons name="map-outline" size={32} color={c.muted} />
-            <Text style={[styles.emptyTitle, { color: c.text, marginTop: 8 }]}>Kartenansicht nur in der App verfügbar</Text>
-          </View>
-        ) : (
-          <View style={{ height: Dimensions.get('window').height * 0.62, borderRadius: 20, overflow: 'hidden', position: 'relative' }}>
-            <MapView
-              style={{ flex: 1 }}
-              region={mapRegion}
-              onTouchStart={() => setMapScrollEnabled(false)}
-              onTouchEnd={() => setMapScrollEnabled(true)}
-              onTouchCancel={() => setMapScrollEnabled(true)}
-            >
-              {/* Radius circle — only when a nearby-search origin is active */}
-              {userCoords && (
-                <Circle
-                  center={{ latitude: userCoords.lat, longitude: userCoords.lng }}
-                  radius={searchRadius * 1000}
-                  strokeColor="rgba(43,104,119,0.55)"
-                  fillColor="rgba(43,104,119,0.08)"
-                  strokeWidth={1.5}
-                />
-              )}
-
-              {/* Origin marker — visually distinct from practice pills */}
-              {userCoords && (
-                <Marker
-                  coordinate={{ latitude: userCoords.lat, longitude: userCoords.lng }}
-                  anchor={{ x: 0.5, y: 0.5 }}
-                  tracksViewChanges={false}
-                >
-                  <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: c.primary, borderWidth: 3, borderColor: '#fff', shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 3, shadowOffset: { width: 0, height: 1 }, elevation: 5 }} />
-                </Marker>
-              )}
-
-              {/* Practice markers */}
-              {mapPractices.map((practice) => (
-                <Marker key={practice.id} coordinate={{ latitude: practice.lat, longitude: practice.lng }} onPress={() => openPractice(practice)} tracksViewChanges={false}>
-                  <View style={{ backgroundColor: c.primary, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5, flexDirection: 'row', alignItems: 'center', gap: 5, shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 4 }}>
-                    <Text style={{ color: '#fff', fontSize: 11, fontWeight: '800' }}>{getPracticeInitials(practice.name)}</Text>
-                    <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700', maxWidth: 100 }} numberOfLines={1}>{practice.name}</Text>
-                  </View>
-                </Marker>
-              ))}
-            </MapView>
-
-            {searchLoading && (
-              <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.25)', alignItems: 'center', justifyContent: 'center', borderRadius: 20 }}>
-                <ActivityIndicator size="large" color="#fff" />
-              </View>
-            )}
-
-            {!searchLoading && mapPractices.length === 0 && searched && (
-              <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center', padding: 24, borderRadius: 20 }}>
-                <Ionicons name="location-outline" size={36} color="#fff" />
-                {userCoords ? (
-                  <>
-                    <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700', textAlign: 'center', marginTop: 10 }}>
-                      Keine Praxen im Umkreis von {searchRadius} km
-                    </Text>
-                    <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, textAlign: 'center', marginTop: 6 }}>
-                      Versuche einen größeren Radius.
-                    </Text>
-                  </>
-                ) : (
-                  <>
-                    <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700', textAlign: 'center', marginTop: 10 }}>
-                      Keine Praxen mit Standortdaten
-                    </Text>
-                    <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, textAlign: 'center', marginTop: 6 }}>
-                      Für diese Ergebnisse liegen noch keine Koordinaten vor.
-                    </Text>
-                  </>
-                )}
-              </View>
-            )}
-          </View>
-        )
-      )}
 
       {viewMode === 'list' && searchLoading && (
         <View style={[styles.emptyState, { backgroundColor: c.card, borderColor: c.border }]}>

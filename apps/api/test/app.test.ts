@@ -155,6 +155,195 @@ describe('POST /search', () => {
     expect(body.therapists[0].fullName).toBe('Home Visitor');
   });
 
+  it('supports nearby search with origin and radius', async () => {
+    const nearPractice = await prisma.practice.create({
+      data: {
+        name: 'Near Praxis',
+        city: 'Berlin',
+        address: 'Mitte 1',
+        lat: 52.5200,
+        lng: 13.4050,
+        reviewStatus: 'APPROVED',
+      },
+    });
+    const farPractice = await prisma.practice.create({
+      data: {
+        name: 'Far Praxis',
+        city: 'Hamburg',
+        address: 'Elbe 1',
+        lat: 53.5753,
+        lng: 10.0153,
+        reviewStatus: 'APPROVED',
+      },
+    });
+
+    await prisma.therapist.create({
+      data: {
+        email: 'nearby@test.com',
+        fullName: 'Nearby Therapist',
+        professionalTitle: 'PT',
+        city: 'Berlin',
+        specializations: 'physiotherapie',
+        languages: 'de',
+        certifications: '',
+        reviewStatus: 'APPROVED',
+        links: { create: { practiceId: nearPractice.id, status: 'CONFIRMED' } },
+      },
+    });
+    await prisma.therapist.create({
+      data: {
+        email: 'faraway@test.com',
+        fullName: 'Far Away Therapist',
+        professionalTitle: 'PT',
+        city: 'Hamburg',
+        specializations: 'physiotherapie',
+        languages: 'de',
+        certifications: '',
+        reviewStatus: 'APPROVED',
+        links: { create: { practiceId: farPractice.id, status: 'CONFIRMED' } },
+      },
+    });
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/search',
+      payload: {
+        query: 'physiotherapie',
+        origin: { lat: 52.5200, lng: 13.4050 },
+        radiusKm: 5,
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.therapists).toHaveLength(1);
+    expect(body.therapists[0].fullName).toBe('Nearby Therapist');
+    expect(body.therapists[0].practices).toHaveLength(1);
+    expect(body.therapists[0].practices[0].id).toBe(nearPractice.id);
+    expect(body.therapists[0].distKm).toBeLessThan(0.1);
+    expect(body.practices).toHaveLength(1);
+    expect(body.practices[0].id).toBe(nearPractice.id);
+  });
+
+  it('keeps only nearby practices for therapists with multiple linked practices', async () => {
+    const nearPractice = await prisma.practice.create({
+      data: {
+        name: 'Near Praxis',
+        city: 'Berlin',
+        address: 'Mitte 1',
+        lat: 52.5200,
+        lng: 13.4050,
+        reviewStatus: 'APPROVED',
+      },
+    });
+    const farPractice = await prisma.practice.create({
+      data: {
+        name: 'Far Praxis',
+        city: 'Leipzig',
+        address: 'Ring 1',
+        lat: 51.3397,
+        lng: 12.3731,
+        reviewStatus: 'APPROVED',
+      },
+    });
+
+    await prisma.therapist.create({
+      data: {
+        email: 'multi@test.com',
+        fullName: 'Multi Practice Therapist',
+        professionalTitle: 'PT',
+        city: 'Berlin',
+        specializations: 'physiotherapie',
+        languages: 'de',
+        certifications: '',
+        reviewStatus: 'APPROVED',
+        links: {
+          create: [
+            { practiceId: nearPractice.id, status: 'CONFIRMED' },
+            { practiceId: farPractice.id, status: 'CONFIRMED' },
+          ],
+        },
+      },
+    });
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/search',
+      payload: {
+        query: 'physiotherapie',
+        city: 'Berlin',
+        origin: { lat: 52.5200, lng: 13.4050 },
+        radiusKm: 5,
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.therapists).toHaveLength(1);
+    expect(body.therapists[0].practices).toHaveLength(1);
+    expect(body.therapists[0].practices[0].id).toBe(nearPractice.id);
+    expect(body.practices).toHaveLength(1);
+    expect(body.practices[0].id).toBe(nearPractice.id);
+  });
+
+  it('combines nearby search with existing filters', async () => {
+    const nearPractice = await prisma.practice.create({
+      data: {
+        name: 'Near Praxis',
+        city: 'Berlin',
+        address: 'Mitte 1',
+        lat: 52.5200,
+        lng: 13.4050,
+        reviewStatus: 'APPROVED',
+      },
+    });
+
+    await prisma.therapist.create({
+      data: {
+        email: 'home-near@test.com',
+        fullName: 'Home Visit Nearby',
+        professionalTitle: 'PT',
+        city: 'Berlin',
+        homeVisit: true,
+        specializations: 'physiotherapie',
+        languages: 'de',
+        certifications: '',
+        reviewStatus: 'APPROVED',
+        links: { create: { practiceId: nearPractice.id, status: 'CONFIRMED' } },
+      },
+    });
+    await prisma.therapist.create({
+      data: {
+        email: 'nohome-near@test.com',
+        fullName: 'No Home Visit Nearby',
+        professionalTitle: 'PT',
+        city: 'Berlin',
+        homeVisit: false,
+        specializations: 'physiotherapie',
+        languages: 'de',
+        certifications: '',
+        reviewStatus: 'APPROVED',
+        links: { create: { practiceId: nearPractice.id, status: 'CONFIRMED' } },
+      },
+    });
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/search',
+      payload: {
+        query: 'physiotherapie',
+        origin: { lat: 52.5200, lng: 13.4050 },
+        radiusKm: 5,
+        homeVisit: true,
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.therapists).toHaveLength(1);
+    expect(body.therapists[0].fullName).toBe('Home Visit Nearby');
+  });
+
   it('relevance: matching specialization scores higher', async () => {
     const practice = await prisma.practice.create({
       data: { name: 'Test Praxis', city: 'Köln', reviewStatus: 'APPROVED' },

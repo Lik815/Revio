@@ -4,6 +4,7 @@ import {
   Image,
   Pressable,
   ScrollView,
+  Switch,
   Text,
   TextInput,
   View,
@@ -47,6 +48,7 @@ export function ManagerDashboardContent(props) {
     mgrEditAddress,
     mgrEditCity,
     mgrEditDescription,
+    mgrEditHomeVisit,
     mgrEditHours,
     mgrEditLogo,
     mgrEditMode,
@@ -73,6 +75,7 @@ export function ManagerDashboardContent(props) {
     setMgrEditAddress,
     setMgrEditCity,
     setMgrEditDescription,
+    setMgrEditHomeVisit,
     setMgrEditHours,
     setMgrEditLogo,
     setMgrEditMode,
@@ -367,6 +370,10 @@ export function ManagerDashboardContent(props) {
                 <TextInput value={mgrEditPhone} onChangeText={setMgrEditPhone} placeholder={practice.phone ?? '+49 ...'} placeholderTextColor={c.muted} keyboardType="phone-pad" style={[styles.inputField, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg }]} />
                 <Text style={[styles.filterSectionTitle, { color: c.muted }]}>Oeffnungszeiten</Text>
                 <TextInput value={mgrEditHours} onChangeText={setMgrEditHours} placeholder={practice.hours ?? 'Mo-Fr 8-18 Uhr'} placeholderTextColor={c.muted} style={[styles.inputField, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg }]} />
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 }}>
+                  <Text style={[styles.filterSectionTitle, { color: c.text }]}>Hausbesuche</Text>
+                  <Switch value={mgrEditHomeVisit} onValueChange={setMgrEditHomeVisit} trackColor={{ true: c.primary }} />
+                </View>
                 <Text style={[styles.filterSectionTitle, { color: c.muted }]}>Beschreibung</Text>
                 <TextInput value={mgrEditDescription} onChangeText={setMgrEditDescription} placeholder={practice.description ?? 'Kurze Beschreibung...'} placeholderTextColor={c.muted} multiline numberOfLines={3} style={[styles.inputField, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg, minHeight: 72, textAlignVertical: 'top' }]} />
                 <Text style={[styles.filterSectionTitle, { color: c.muted }]}>Logo</Text>
@@ -435,6 +442,7 @@ export function ManagerDashboardContent(props) {
                   setMgrEditPhone(practice.phone ?? '');
                   setMgrEditHours(practice.hours ?? '');
                   setMgrEditDescription(practice.description ?? '');
+                  setMgrEditHomeVisit(practice.homeVisit ?? false);
                   setMgrEditLogo(practice.logo ?? null);
                   setMgrEditPhotos(practicePhotos);
                   setMgrEditMode(true);

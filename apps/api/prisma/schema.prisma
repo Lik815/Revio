@@ -90,6 +90,7 @@ model Practice {
   lng               Float        @default(0)
   reviewStatus      ReviewStatus @default(PENDING_REVIEW)
   description       String?
+  homeVisit         Boolean      @default(false)
   inviteToken       String?      @unique
   logo              String?
   photos            String?

@@ -13,6 +13,16 @@ const GENERIC_QUERIES = new Set([
 const splitList = (value: string) =>
   value.split(',').map((s) => s.trim()).filter(Boolean);
 
+function haversine(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 // ── Relevance scoring ──────────────────────────────────────────────────────
 
 /**
@@ -86,11 +96,18 @@ function scoreTherapist(
 
 const searchBodySchema = z.object({
   query: z.string().min(1),
-  city: z.string().min(1),
+  city: z.string().trim().min(1).optional(),
+  origin: z.object({
+    lat: z.number().finite(),
+    lng: z.number().finite(),
+  }).optional(),
+  radiusKm: z.number().positive().max(100).optional(),
   language: z.string().optional(),
   homeVisit: z.boolean().optional(),
   specialization: z.string().optional(),
   kassenart: z.string().optional(),
+}).refine((data) => Boolean(data.city) || Boolean(data.origin), {
+  message: 'city oder origin ist erforderlich',
 });
 
 export const searchRoutes: FastifyPluginAsync = async (fastify) => {
@@ -130,9 +147,9 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
       },
     });
 
-    const normalizedCity = normalizeText(input.city);
+    const normalizedCity = input.city ? normalizeText(input.city) : null;
     const passesFilters = (t: typeof therapists[number], { requireCityMatch }: { requireCityMatch: boolean }) => {
-      if (requireCityMatch && normalizeText(t.city) !== normalizedCity) return false;
+      if (requireCityMatch && normalizedCity && normalizeText(t.city) !== normalizedCity) return false;
 
       const languages = splitList(t.languages).map((l) => l.toLowerCase());
       const specializations = splitList(t.specializations).map((s) => s.toLowerCase());
@@ -146,38 +163,60 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
     };
 
     const publicTherapists = therapists.filter((t) => getTherapistPublicationState(t).publicSearchEligible);
-    const cityMatchedTherapists = publicTherapists.filter((t) => passesFilters(t, { requireCityMatch: true }));
+    const shouldRequireCityMatch = !input.origin && Boolean(normalizedCity);
+    const cityMatchedTherapists = shouldRequireCityMatch
+      ? publicTherapists.filter((t) => passesFilters(t, { requireCityMatch: true }))
+      : publicTherapists.filter((t) => passesFilters(t, { requireCityMatch: false }));
     const filteredTherapists = cityMatchedTherapists.length > 0
       ? cityMatchedTherapists
       : publicTherapists.filter((t) => passesFilters(t, { requireCityMatch: false }));
 
-    const results: SearchTherapist[] = filteredTherapists
-      .map((t) => {
+    const results: SearchTherapist[] = [];
+
+    filteredTherapists.forEach((t) => {
         const practiceNames = t.links.map((l) => l.practice.name);
         const relevance = scoreTherapist(t, input.query, practiceNames);
         const specializations = splitList(t.specializations);
 
-        const practices: SearchPractice[] = t.links.map((link) => {
-          let photos: string[] | undefined;
-          if (link.practice.photos) {
-            try { photos = JSON.parse(link.practice.photos); } catch {}
-          }
-          return {
-            id: link.practice.id,
-            name: link.practice.name,
-            city: link.practice.city,
-            address: link.practice.address ?? undefined,
-            phone: link.practice.phone ?? undefined,
-            hours: link.practice.hours ?? undefined,
-            description: link.practice.description ?? undefined,
-            lat: link.practice.lat,
-            lng: link.practice.lng,
-            logo: link.practice.logo ?? undefined,
-            photos,
-          };
-        });
+        const practices: SearchPractice[] = t.links
+          .map((link) => {
+            let photos: string[] | undefined;
+            if (link.practice.photos) {
+              try { photos = JSON.parse(link.practice.photos); } catch {}
+            }
 
-        return {
+            const distKm = input.origin && link.practice.lat !== 0 && link.practice.lng !== 0
+              ? haversine(input.origin.lat, input.origin.lng, link.practice.lat, link.practice.lng)
+              : undefined;
+
+            return {
+              id: link.practice.id,
+              name: link.practice.name,
+              city: link.practice.city,
+              address: link.practice.address ?? undefined,
+              phone: link.practice.phone ?? undefined,
+              hours: link.practice.hours ?? undefined,
+              description: link.practice.description ?? undefined,
+              lat: link.practice.lat,
+              lng: link.practice.lng,
+              distKm,
+              logo: link.practice.logo ?? undefined,
+              photos,
+            };
+          })
+          .filter((practice) => {
+            if (!input.origin) return true;
+            if (practice.distKm == null) return false;
+            if (input.radiusKm == null) return true;
+            return practice.distKm <= input.radiusKm;
+          })
+          .sort((a, b) => (a.distKm ?? Number.POSITIVE_INFINITY) - (b.distKm ?? Number.POSITIVE_INFINITY));
+
+        if (practices.length === 0 || relevance <= 0.5) return;
+
+        const nearestDistance = practices[0]?.distKm;
+
+        results.push({
           id: t.id,
           fullName: t.fullName,
           professionalTitle: t.professionalTitle,
@@ -191,11 +230,19 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
           bio: t.bio ?? undefined,
           photo: t.photo ?? undefined,
           relevance,
+          distKm: nearestDistance,
           practices,
-        };
-      })
-      .filter((t) => t.relevance > 0.5) // 0.5 = base score with no actual match
-      .sort((a, b) => b.relevance - a.relevance);
+      });
+    });
+
+    results.sort((a, b) => {
+      if (input.origin) {
+        const aDist = a.distKm ?? Number.POSITIVE_INFINITY;
+        const bDist = b.distKm ?? Number.POSITIVE_INFINITY;
+        if (aDist !== bDist) return aDist - bDist;
+      }
+      return b.relevance - a.relevance;
+    });
 
     const practiceMap = new Map<string, SearchPractice>();
     results.forEach((t) => t.practices.forEach((p) => practiceMap.set(p.id, p)));

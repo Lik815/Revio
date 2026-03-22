@@ -51,7 +51,12 @@ export interface TherapistPracticeLink {
 
 export interface SearchInput {
   query: string;
-  city: string;
+  city?: string;
+  origin?: {
+    lat: number;
+    lng: number;
+  };
+  radiusKm?: number;
   language?: string;
   homeVisit?: boolean;
   specialization?: string;
@@ -68,6 +73,7 @@ export interface SearchPractice {
   description?: string;
   lat: number;
   lng: number;
+  distKm?: number;
   logo?: string;
   photos?: string[];
 }
@@ -86,6 +92,7 @@ export interface SearchTherapist {
   bio?: string;
   photo?: string;
   relevance: number;
+  distKm?: number;
   practices: SearchPractice[];
 }
 

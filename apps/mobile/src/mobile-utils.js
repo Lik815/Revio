@@ -79,9 +79,11 @@ const languageOptions = Object.keys(LANGUAGE_MAP);
 
 const getBaseUrl = () => BASE_URL;
 
-// Required to bypass localtunnel's interstitial page in dev
+// Required to bypass tunnel interstitial pages in dev
 const TUNNEL_HEADERS = BASE_URL.includes('loca.lt')
   ? { 'bypass-tunnel-reminder': 'true' }
+  : BASE_URL.includes('ngrok')
+  ? { 'ngrok-skip-browser-warning': 'true' }
   : {};
 
 const parseStringOrArray = (val) => {
@@ -122,6 +124,7 @@ const mapApiTherapist = (t) => ({
   bio: t.bio ?? '',
   kassenart: t.kassenart ?? null,
   fortbildungen: parseStringOrArray(t.certifications),
+  distKm: typeof t.distKm === 'number' ? t.distKm : null,
   verifiziert: true,
   behandlungsbereiche: parseStringOrArray(t.specializations),
   verfügbareZeiten: '',
@@ -137,6 +140,7 @@ const mapApiTherapist = (t) => ({
     description: p.description ?? '',
     lat: p.lat,
     lng: p.lng,
+    distKm: typeof p.distKm === 'number' ? p.distKm : null,
     logo: p.logo ?? null,
     photos: p.photos ?? [],
   })),
