@@ -1805,9 +1805,9 @@ export default function App() {
         <View style={{ marginHorizontal: 16, marginBottom: 16, gap: 10 }}>
           <Pressable
             onPress={accountType === 'manager' ? handleManagerLogout : handleLogout}
-            style={{ borderRadius: 12, paddingVertical: 14, alignItems: 'center', borderWidth: 1.5, borderColor: '#E74C3C' }}
+            style={{ borderRadius: 12, paddingVertical: 14, alignItems: 'center', borderWidth: 1.5, borderColor: c.border }}
           >
-            <Text style={{ color: '#E74C3C', fontSize: 16, fontWeight: '600' }}>{t('logoutBtn')}</Text>
+            <Text style={{ color: c.text, fontSize: 16, fontWeight: '600' }}>{t('logoutBtn')}</Text>
           </Pressable>
           {loggedInTherapist && (
             <Pressable
