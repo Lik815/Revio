@@ -10,6 +10,13 @@ type TherapistLike = {
   onboardingStatus?: string | null;
 };
 
+type TherapistPracticeLinkLike = {
+  status?: string | null;
+  practice?: {
+    reviewStatus?: string | null;
+  } | null;
+};
+
 const hasText = (value?: string | null) => !!value && value.trim() !== '';
 
 export function getTherapistProfileCompletion(therapist: TherapistLike) {
@@ -27,7 +34,10 @@ export function getTherapistProfileCompletion(therapist: TherapistLike) {
   };
 }
 
-export function getTherapistPublicationState(therapist: TherapistLike) {
+export function getTherapistPublicationState(
+  therapist: TherapistLike,
+  options?: { links?: TherapistPracticeLinkLike[] },
+) {
   const completion = getTherapistProfileCompletion(therapist);
   const reviewApproved = therapist.reviewStatus === 'APPROVED';
   const visible = therapist.isVisible === true;
@@ -36,6 +46,9 @@ export function getTherapistPublicationState(therapist: TherapistLike) {
     therapist.onboardingStatus === 'manager_onboarding' ||
     therapist.onboardingStatus === 'invited' ||
     therapist.onboardingStatus === 'claimed';
+  const hasConfirmedApprovedPractice = options?.links
+    ? options.links.some((link) => link.status === 'CONFIRMED' && link.practice?.reviewStatus === 'APPROVED')
+    : undefined;
 
   const publicSearchEligible =
     reviewApproved &&
@@ -43,12 +56,14 @@ export function getTherapistPublicationState(therapist: TherapistLike) {
     (
       !requiresExplicitPublication ||
       (completion.complete && explicitlyPublished)
-    );
+    ) &&
+    hasConfirmedApprovedPractice !== false;
 
   return {
     ...completion,
     reviewApproved,
     explicitlyPublished,
+    hasConfirmedApprovedPractice,
     publicSearchEligible,
   };
 }

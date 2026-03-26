@@ -2,6 +2,7 @@
   "expo": {
     "name": "Revio",
     "slug": "revo",
+    "scheme": "revo",
     "version": "0.1.0",
     "orientation": "portrait",
     "icon": "./assets/logo.png",
@@ -26,6 +27,19 @@
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION"
+      ],
+      "config": {
+        "googleMaps": {
+          "apiKey": ""
+        }
+      },
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": false,
+          "data": [{ "scheme": "revo" }],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
       ]
     },
     "web": {
@@ -36,6 +50,14 @@
         "expo-location",
         {
           "locationWhenInUsePermission": "Revio benötigt deinen Standort, um Therapeuten in deiner Nähe zu finden."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/logo.png",
+          "color": "#2F3E46",
+          "sounds": []
         }
       ]
     ],

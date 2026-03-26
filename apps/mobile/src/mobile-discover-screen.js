@@ -12,7 +12,6 @@ import {
   View,
 } from 'react-native';
 import {
-  fortbildungOptions,
   formatDist,
   getLangLabel,
   getPracticeInitials,
@@ -21,6 +20,19 @@ import {
   quickChips,
 } from './mobile-utils';
 
+// ── Map platform split ──────────────────────────────────────────────────────
+// Native (iOS / Android): real react-native-maps
+//   iOS  → Apple Maps / MapKit   (no API key required)
+//   Android → Google Maps        (requires GOOGLE_MAPS_API_KEY in app.json
+//                                  android.config.googleMaps.apiKey for builds)
+//
+// Web: MapStub.js — a coordinate-projecting layout stub with matching API
+//   surface (default MapView, Marker, Circle). No native modules imported.
+//
+// Two guards work together (see metro.config.js for the full explanation):
+//   1. This Platform.OS ternary — dead-code signal to the bundler.
+//   2. Metro resolver stub — ensures react-native-maps never enters web bundle.
+// ────────────────────────────────────────────────────────────────────────────
 const mapModule = Platform.OS === 'web'
   ? require('./MapStub')
   : require('react-native-maps');
@@ -38,6 +50,7 @@ export function DiscoverScreen(props) {
     authToken,
     c,
     callPhone,
+    certificationOptions,
     city,
     discoverScrollRef,
     getMapRegion,
@@ -396,7 +409,7 @@ export function DiscoverScreen(props) {
           </View>
 
           <Text style={[styles.filterSectionTitle, { color: c.muted, marginTop: 14 }]}>{t('fortbildungLabel')}</Text>
-          {fortbildungOptions.map((option) => {
+          {certificationOptions.map((option) => {
             const checked = fortbildungen.includes(option.key);
             return (
               <Pressable key={option.key} onPress={() => toggleFortbildung(option.key)} style={styles.checkRow}>

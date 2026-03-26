@@ -22,6 +22,9 @@ import {
   useColorScheme
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import * as Device from 'expo-device';
+import * as DocumentPicker from 'expo-document-picker';
+import * as Notifications from 'expo-notifications';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -42,6 +45,7 @@ import {
   normalizeTherapistProfile,
   regSpecOptions,
   tabs,
+  GERMAN_CITIES,
 } from './mobile-utils';
 import { DiscoverScreen } from './mobile-discover-screen';
 import { ManagerDashboardContent } from './mobile-manager-dashboard';
@@ -62,7 +66,56 @@ import {
 } from './mobile-therapist-dashboard';
 import { translations } from './mobile-translations';
 
-// ─── Palette ─────────────────────────────────────────────────────────────────
+// ─── Push Notifications ───────────────────────────────────────────────────────
+// Show notifications as banners even while the app is foregrounded
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
+
+async function registerForPushNotifications(authToken) {
+  // Push tokens are only available on physical devices
+  if (!Device.isDevice) return;
+
+  if (Platform.OS === 'android') {
+    await Notifications.setNotificationChannelAsync('default', {
+      name: 'Standard',
+      importance: Notifications.AndroidImportance.MAX,
+    });
+  }
+
+  const { status: existingStatus } = await Notifications.getPermissionsAsync();
+  let finalStatus = existingStatus;
+  if (existingStatus !== 'granted') {
+    const { status } = await Notifications.requestPermissionsAsync();
+    finalStatus = status;
+  }
+  if (finalStatus !== 'granted') return;
+
+  try {
+    const { data: pushToken } = await Notifications.getExpoPushTokenAsync({
+      projectId: '453d86fe-08c1-4852-ae2a-a9991f64c845',
+    });
+    await fetch(`${getBaseUrl()}/auth/push-token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
+      body: JSON.stringify({ pushToken }),
+    });
+  } catch {}
+}
+
+const formatProfileOverviewName = (fullName = '') => {
+  const parts = String(fullName).trim().split(/\s+/).filter(Boolean);
+  if (parts.length <= 1) return fullName;
+  const lastName = parts[parts.length - 1];
+  const firstNames = parts.slice(0, -1).join(' ');
+  return `${lastName} ${firstNames}`.trim();
+};
+
+// ─── Palette ───────────────────────────────���───────────────────────���─────────
 // Old Rose #d88c9a · Soft Apricot #f2d0a9 · Almond Cream #f1e3d3 · Muted Teal #99c1b9
 
 const palette = {
@@ -215,6 +268,8 @@ export default function App() {
   const [mgrEmail, setMgrEmail] = useState('');
   const [mgrPassword, setMgrPassword] = useState('');
   const [mgrPasswordConfirm, setMgrPasswordConfirm] = useState('');
+  const [showMgrPassword, setShowMgrPassword] = useState(false);
+  const [showMgrPasswordConfirm, setShowMgrPasswordConfirm] = useState(false);
   const [mgrPracticeName, setMgrPracticeName] = useState('');
   const [mgrPracticeCity, setMgrPracticeCity] = useState('');
   const [mgrPracticeAddress, setMgrPracticeAddress] = useState('');
@@ -239,7 +294,8 @@ export default function App() {
   const [mgrEditSaving, setMgrEditSaving] = useState(false);
   const [removingTherapistId, setRemovingTherapistId] = useState(null);
   const [activePracticeId, setActivePracticeId] = useState(null);
-  const [showAddPracticeForm, setShowAddPracticeForm] = useState(false);
+  const [showAddPracticeScreen, setShowAddPracticeScreen] = useState(false);
+  const [addPracticeStep, setAddPracticeStep] = useState(1);
   const [mgrNewPracticeName, setMgrNewPracticeName] = useState('');
   const [mgrNewPracticeCity, setMgrNewPracticeCity] = useState('');
   const [mgrNewPracticeAddress, setMgrNewPracticeAddress] = useState('');
@@ -267,24 +323,18 @@ export default function App() {
   const [regFirstName, setRegFirstName] = useState('');
   const [regLastName, setRegLastName] = useState('');
   const [regCity, setRegCity] = useState('');
-  const [regBio, setRegBio] = useState('');
+  const [regCitySearch, setRegCitySearch] = useState('');
   const [regSpecializations, setRegSpecializations] = useState([]);
-  const [regLanguages, setRegLanguages] = useState([]);
-  const [regHomeVisit, setRegHomeVisit] = useState(false);
+  const [regLanguages, setRegLanguages] = useState(['de']);
   const [regFortbildungen, setRegFortbildungen] = useState([]);
-  const [regPracticeName, setRegPracticeName] = useState('');
-  const [regPracticeAddress, setRegPracticeAddress] = useState('');
-  const [regPracticeCity, setRegPracticeCity] = useState('');
-  const [regPracticePhone, setRegPracticePhone] = useState('');
+  const [regSpecSearch, setRegSpecSearch] = useState('');
+  const [regLangSearch, setRegLangSearch] = useState('');
+  const [showRegPassword, setShowRegPassword] = useState(false);
+  const [showRegPasswordConfirm, setShowRegPasswordConfirm] = useState(false);
 
   const toggleRegSpec = (s) => setRegSpecializations(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]);
   const toggleRegLang = (l) => setRegLanguages(prev => prev.includes(l) ? prev.filter(x => x !== l) : [...prev, l]);
   const toggleRegFort = (f) => setRegFortbildungen(prev => prev.includes(f) ? prev.filter(x => x !== f) : [...prev, f]);
-  const [regPracticeMode, setRegPracticeMode] = useState('new'); // 'new' | 'existing' | 'skip'
-  const [regExistingPracticeName, setRegExistingPracticeName] = useState('');
-  const [regExistingPracticeId, setRegExistingPracticeId] = useState(null);
-  const [regPracticeSearchResults, setRegPracticeSearchResults] = useState([]);
-  const [regPracticeSearching, setRegPracticeSearching] = useState(false);
 
   // Auth state
   const [authToken, setAuthToken] = useState(null);
@@ -304,6 +354,8 @@ export default function App() {
   const [editIsVisible, setEditIsVisible] = useState(true);
   const [editAvailability, setEditAvailability] = useState('');
   const [profileSaving, setProfileSaving] = useState(false);
+  const [therapistDocuments, setTherapistDocuments] = useState([]);
+  const [documentUploading, setDocumentUploading] = useState(false);
 
   // Practice management state
   const [showCreatePractice, setShowCreatePractice] = useState(false);
@@ -352,7 +404,7 @@ export default function App() {
   const [createTherapistCity, setCreateTherapistCity] = useState('');
   const [createTherapistBio, setCreateTherapistBio] = useState('');
   const [createTherapistSpecs, setCreateTherapistSpecs] = useState([]);
-  const [createTherapistLangs, setCreateTherapistLangs] = useState([]);
+  const [createTherapistCerts, setCreateTherapistCerts] = useState([]);
   const [createTherapistKassenart, setCreateTherapistKassenart] = useState('');
   const [createTherapistHomeVisit, setCreateTherapistHomeVisit] = useState(false);
   const [createTherapistAvailability, setCreateTherapistAvailability] = useState('');
@@ -364,9 +416,16 @@ export default function App() {
   const [inviteClaimToken, setInviteClaimToken] = useState(null);
   const [inviteClaimData, setInviteClaimData] = useState(null); // { therapist, practice }
   const [inviteClaimLoading, setInviteClaimLoading] = useState(false);
+
+  // Email verification deep-link state
+  const [showEmailVerify, setShowEmailVerify] = useState(false);
+  const [emailVerifyStatus, setEmailVerifyStatus] = useState('idle'); // 'verifying' | 'success' | 'error'
+  const [emailVerifyError, setEmailVerifyError] = useState('');
   const [inviteClaimError, setInviteClaimError] = useState('');
   const [inviteClaimPassword, setInviteClaimPassword] = useState('');
   const [inviteClaimPasswordConfirm, setInviteClaimPasswordConfirm] = useState('');
+  const [showInvitePassword, setShowInvitePassword] = useState(false);
+  const [showInvitePasswordConfirm, setShowInvitePasswordConfirm] = useState(false);
   const [showVisibilityModal, setShowVisibilityModal] = useState(false);
   const [visibilityLoading, setVisibilityLoading] = useState(false);
 
@@ -408,14 +467,59 @@ export default function App() {
     });
   }, []);
 
-  // Deep-link / initial URL handling for invite token
+  // Email verification deep-link handler (revo://verify?token=xxx)
+  const handleVerifyEmailLink = async (token) => {
+    setActiveTab('therapist');
+    setShowLogin(false);
+    setShowRegister(false);
+    setEmailVerifyError('');
+    setEmailVerifyStatus('verifying');
+    setShowEmailVerify(true);
+    try {
+      const res = await fetch(`${getBaseUrl()}/auth/verify-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...TUNNEL_HEADERS },
+        body: JSON.stringify({ token }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setEmailVerifyError(err.message ?? 'Bestätigung fehlgeschlagen.');
+        setEmailVerifyStatus('error');
+        return;
+      }
+      const data = await res.json();
+      await AsyncStorage.setItem('revio_auth_token', data.token);
+      await AsyncStorage.setItem('revio_account_type', 'therapist');
+      setAuthToken(data.token);
+      setAccountType('therapist');
+      const profileRes = await fetch(`${getBaseUrl()}/auth/me`, {
+        headers: { Authorization: `Bearer ${data.token}`, ...TUNNEL_HEADERS },
+      });
+      if (profileRes.ok) setLoggedInTherapist(normalizeTherapistProfile(await profileRes.json()));
+      setEmailVerifyStatus('success');
+      setTimeout(() => setShowEmailVerify(false), 2500);
+    } catch {
+      setEmailVerifyError('Verbindungsfehler. Bitte prüfe deine Internetverbindung.');
+      setEmailVerifyStatus('error');
+    }
+  };
+
+  // Deep-link / initial URL handling
   useEffect(() => {
     const handleUrl = async (url) => {
       if (!url) return;
       try {
+        const isVerifyLink = /revo:\/\/verify|\/verify[?]|verify-email/.test(url);
         const match = url.match(/[?&]token=([^&]+)/);
         if (!match) return;
         const token = decodeURIComponent(match[1]);
+
+        if (isVerifyLink) {
+          await handleVerifyEmailLink(token);
+          return;
+        }
+
+        // Existing invite-claim flow (unchanged)
         setInviteClaimLoading(true);
         setInviteClaimError('');
         try {
@@ -449,6 +553,27 @@ export default function App() {
     const sub = Linking.addEventListener('url', (e) => handleUrl(e.url));
     return () => sub.remove();
   }, []);
+
+  // Register Expo push token when a therapist logs in
+  useEffect(() => {
+    if (authToken && accountType === 'therapist') {
+      registerForPushNotifications(authToken);
+    }
+  }, [authToken, accountType]);
+
+  // Fetch therapist's uploaded documents on login/session restore
+  useEffect(() => {
+    if (authToken && accountType === 'therapist') {
+      fetch(`${getBaseUrl()}/auth/documents`, {
+        headers: { Authorization: `Bearer ${authToken}` },
+      })
+        .then((r) => (r.ok ? r.json() : []))
+        .then((docs) => setTherapistDocuments(Array.isArray(docs) ? docs : []))
+        .catch(() => {});
+    } else {
+      setTherapistDocuments([]);
+    }
+  }, [authToken, accountType]);
 
   // Poll notifications every 30s when logged in
   useEffect(() => {
@@ -702,6 +827,44 @@ export default function App() {
     }
   };
 
+  const handlePickDocument = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'],
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled || !result.assets?.[0]) return;
+
+      const asset = result.assets[0];
+      const formData = new FormData();
+      formData.append('document', {
+        uri: asset.uri,
+        name: asset.name,
+        type: asset.mimeType || 'application/octet-stream',
+      });
+
+      setDocumentUploading(true);
+      const res = await fetch(`${getBaseUrl()}/upload/document`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${authToken}` },
+        body: formData,
+      });
+
+      if (res.ok) {
+        const { id, originalName } = await res.json();
+        setTherapistDocuments((prev) => [{ id, originalName, mimetype: asset.mimeType }, ...prev]);
+        Alert.alert('Hochgeladen', `„${originalName}" wurde erfolgreich übermittelt.`);
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        Alert.alert('Fehler', errData.message ?? 'Dokument konnte nicht hochgeladen werden.');
+      }
+    } catch {
+      Alert.alert('Verbindungsfehler', 'Bitte prüfe deine Internetverbindung.');
+    } finally {
+      setDocumentUploading(false);
+    }
+  };
+
   // Practice: create new practice
   const handleCreatePractice = async () => {
     if (!authToken || !createPracticeName.trim() || !createPracticeCity.trim()) {
@@ -831,7 +994,7 @@ export default function App() {
         city: createTherapistCity.trim() || undefined,
         bio: createTherapistBio.trim() || undefined,
         specializations: createTherapistSpecs,
-        languages: createTherapistLangs,
+        certifications: createTherapistCerts,
         kassenart: createTherapistKassenart || undefined,
         homeVisit: createTherapistHomeVisit,
         availability: createTherapistAvailability.trim() || undefined,
@@ -846,7 +1009,7 @@ export default function App() {
       if (res.ok) {
         setCreateTherapistName(''); setCreateTherapistEmail(''); setCreateTherapistTitle('');
         setCreateTherapistCity(''); setCreateTherapistBio(''); setCreateTherapistSpecs([]);
-        setCreateTherapistLangs([]); setCreateTherapistKassenart(''); setCreateTherapistHomeVisit(false);
+        setCreateTherapistCerts([]); setCreateTherapistKassenart(''); setCreateTherapistHomeVisit(false);
         setCreateTherapistAvailability(''); setCreateTherapistError('');
         Alert.alert('Profil erstellt', 'Eine Einladungs-E-Mail wurde verschickt.');
         if (isManager) {
@@ -1079,6 +1242,7 @@ export default function App() {
   const [homeVisit, setHomeVisit] = useState(false);
   const [kassenart, setKassenart] = useState(null);
   const [fortbildungen, setFortbildungen] = useState([]);
+  const [certificationOptions, setCertificationOptions] = useState(fortbildungOptions);
   const [searchRadius, setSearchRadius] = useState(5);
   const [showFilters, setShowFilters] = useState(false);
   const [results, setResults] = useState([]);
@@ -1107,12 +1271,33 @@ export default function App() {
     : [];
 
   const activeFilterCount = (homeVisit ? 1 : 0) + (kassenart ? 1 : 0) + fortbildungen.length;
+  const getCertificationLabel = (key) => certificationOptions.find((option) => option.key === key)?.label ?? key;
 
   const toggleFortbildung = (key) => {
     setFortbildungen(prev =>
       prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
     );
   };
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadCertificationOptions = async () => {
+      try {
+        const res = await fetch(`${getBaseUrl()}/config/options`, {
+          headers: TUNNEL_HEADERS,
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled && Array.isArray(data.certifications) && data.certifications.length > 0) {
+          setCertificationOptions(data.certifications);
+        }
+      } catch {}
+    };
+
+    loadCertificationOptions();
+    return () => { cancelled = true; };
+  }, []);
 
   // Auto-refresh search when filters change (only if a search has already been run)
   const searchedRef = React.useRef(false);
@@ -1501,6 +1686,7 @@ export default function App() {
       authToken={authToken}
       c={c}
       callPhone={callPhone}
+      certificationOptions={certificationOptions}
       city={city}
       discoverScrollRef={discoverScrollRef}
       fortbildungen={fortbildungen}
@@ -1556,12 +1742,12 @@ export default function App() {
         callPhone={callPhone}
         isPracticeFavorite={isPracticeFavorite}
         openPractice={openPractice}
+        openTherapistById={openTherapistById}
         practice={practice}
         selectedPracticeError={selectedPracticeError}
         selectedPracticeLoading={selectedPracticeLoading}
         selectedPracticeTherapists={selectedPracticeTherapists}
         setSelectedPractice={setSelectedPractice}
-        setSelectedTherapist={setSelectedTherapist}
         styles={styles}
         t={t}
         toggleFavoritePractice={toggleFavoritePractice}
@@ -1604,7 +1790,7 @@ export default function App() {
     />
   );
 
-  // ── Therapist dashboard (logged in) ───────────────────────────────────────
+  // ── Therapist dashboard (logged in) ───────────────��───────────────────────
 
   const renderTherapistDashboard = () => {
     const th = loggedInTherapist;
@@ -1631,8 +1817,11 @@ export default function App() {
         editMode={editMode}
         editSpecializations={editSpecializations}
         handleLoadInviteToken={handleLoadInviteToken}
+        documentUploading={documentUploading}
+        handlePickDocument={handlePickDocument}
         handlePickPhoto={handlePickPhoto}
         handleSaveProfile={handleSaveProfile}
+        therapistDocuments={therapistDocuments}
         inviteToken={inviteToken}
         loadAdminPracticeDetail={loadAdminPracticeDetail}
         loggedInTherapist={loggedInTherapist}
@@ -1668,6 +1857,7 @@ export default function App() {
       c={c}
       setRegStep={setRegStep}
       setRegSubmitted={setRegSubmitted}
+      setShowManagerReg={setShowManagerReg}
       setShowLogin={setShowLogin}
       setShowRegister={setShowRegister}
       styles={styles}
@@ -1756,6 +1946,23 @@ export default function App() {
 
         {loggedInTherapist && (
           <>
+            <Text style={[styles.filterSectionTitle, { color: c.muted, marginTop: 4 }]}>PROFILUEBERSICHT</Text>
+            <View style={[styles.infoCard, { backgroundColor: c.card, borderColor: c.border, gap: 0 }]}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 4 }}>
+                <Text style={{ color: c.muted, fontSize: 13 }}>Name</Text>
+                <Text style={{ color: c.text, fontSize: 14, fontWeight: '600', flex: 1, textAlign: 'right', marginLeft: 16 }}>
+                  {formatProfileOverviewName(loggedInTherapist.fullName ?? '') || '—'}
+                </Text>
+              </View>
+              <View style={{ height: 1, backgroundColor: c.border, marginVertical: 12 }} />
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 4 }}>
+                <Text style={{ color: c.muted, fontSize: 13 }}>E-Mail</Text>
+                <Text style={{ color: c.text, fontSize: 14, fontWeight: '600', flex: 1, textAlign: 'right', marginLeft: 16 }}>
+                  {loggedInTherapist.email ?? '—'}
+                </Text>
+              </View>
+            </View>
+
             <Text style={[styles.filterSectionTitle, { color: c.muted, marginTop: 4 }]}>{t('myPractice')}</Text>
             {loggedInTherapist.adminPractice ? (
               <Pressable
@@ -1786,6 +1993,19 @@ export default function App() {
                 </Pressable>
               </>
             )}
+          </>
+        )}
+
+        {accountType === 'manager' && (
+          <>
+            <Text style={[styles.filterSectionTitle, { color: c.muted, marginTop: 4 }]}>PRAXEN</Text>
+            <Pressable
+              onPress={() => { setMgrNewPracticeName(''); setMgrNewPracticeCity(''); setMgrNewPracticeAddress(''); setMgrNewPracticePhone(''); setAddPracticeStep(1); setShowAddPracticeScreen(true); }}
+              style={[styles.optionRow, { backgroundColor: c.card, borderColor: c.border }]}
+            >
+              <Text style={[styles.optionLabel, { color: c.text }]}>Weitere Praxis hinzufügen</Text>
+              <Text style={[styles.optionValue, { color: c.primary }]}>＋</Text>
+            </Pressable>
           </>
         )}
 
@@ -1829,14 +2049,12 @@ export default function App() {
       c={c}
       createPracticeAddress={createPracticeAddress}
       createPracticeCity={createPracticeCity}
-      createPracticeHours={createPracticeHours}
       createPracticeLoading={createPracticeLoading}
       createPracticeName={createPracticeName}
       createPracticePhone={createPracticePhone}
       handleCreatePractice={handleCreatePractice}
       setCreatePracticeAddress={setCreatePracticeAddress}
       setCreatePracticeCity={setCreatePracticeCity}
-      setCreatePracticeHours={setCreatePracticeHours}
       setCreatePracticeName={setCreatePracticeName}
       setCreatePracticePhone={setCreatePracticePhone}
       setShowCreatePractice={setShowCreatePractice}
@@ -1869,12 +2087,13 @@ export default function App() {
       c={c}
       createTherapistAvailability={createTherapistAvailability}
       createTherapistBio={createTherapistBio}
+      createTherapistCerts={createTherapistCerts}
+      certificationOptions={certificationOptions}
       createTherapistCity={createTherapistCity}
       createTherapistEmail={createTherapistEmail}
       createTherapistError={createTherapistError}
       createTherapistHomeVisit={createTherapistHomeVisit}
       createTherapistKassenart={createTherapistKassenart}
-      createTherapistLangs={createTherapistLangs}
       createTherapistLoading={createTherapistLoading}
       createTherapistName={createTherapistName}
       createTherapistSpecs={createTherapistSpecs}
@@ -1888,11 +2107,11 @@ export default function App() {
       inviteTokenLoading={inviteTokenLoading}
       setCreateTherapistAvailability={setCreateTherapistAvailability}
       setCreateTherapistBio={setCreateTherapistBio}
+      setCreateTherapistCerts={setCreateTherapistCerts}
       setCreateTherapistCity={setCreateTherapistCity}
       setCreateTherapistEmail={setCreateTherapistEmail}
       setCreateTherapistHomeVisit={setCreateTherapistHomeVisit}
       setCreateTherapistKassenart={setCreateTherapistKassenart}
-      setCreateTherapistLangs={setCreateTherapistLangs}
       setCreateTherapistName={setCreateTherapistName}
       setCreateTherapistSpecs={setCreateTherapistSpecs}
       setCreateTherapistTitle={setCreateTherapistTitle}
@@ -2083,17 +2302,17 @@ export default function App() {
         <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 20 }]}>
           <View style={[styles.infoCard, { backgroundColor: c.card, borderColor: c.border, alignItems: 'center', paddingVertical: 40 }]}>
             <Text style={{ fontSize: 48, marginBottom: 16 }}>🎉</Text>
-            <Text style={[styles.infoTitle, { color: c.text, textAlign: 'center' }]}>Eingereicht!</Text>
+            <Text style={[styles.infoTitle, { color: c.text, textAlign: 'center' }]}>Registrierung abgeschlossen!</Text>
             <Text style={[styles.infoBody, { color: c.muted, textAlign: 'center', marginTop: 8 }]}>
               {__DEV__
                 ? 'Entwicklungsmodus: Dein Profil wurde automatisch freigegeben und ist sofort in der Suche sichtbar.'
-                : 'Dein Profil wird innerhalb von 48 Stunden manuell geprüft. Den Status kannst du jederzeit in der App unter „Für Therapeuten" einsehen.'}
+                : 'Wir haben dir eine Bestätigungs-E-Mail gesendet. Bitte klicke auf den Link darin, um dein Konto zu aktivieren. Dein Profil wird anschließend innerhalb von 48 Stunden manuell geprüft.'}
             </Text>
             <Pressable
               style={[styles.registerBtn, { backgroundColor: c.primary, marginTop: 24, paddingHorizontal: 32 }]}
-              onPress={() => { setShowRegister(false); setRegSubmitted(false); setRegStep(1); }}
+              onPress={() => { setShowRegister(false); setRegSubmitted(false); setRegStep(1); setRegSpecSearch(''); setRegLangSearch(''); }}
             >
-              <Text style={styles.registerBtnText}>Zurück zur App</Text>
+              <Text style={styles.registerBtnText}>Zur App</Text>
             </Pressable>
           </View>
         </ScrollView>
@@ -2116,13 +2335,9 @@ export default function App() {
         case 1:
           return regEmail.length > 3 && regPassword.length >= 6 && regPassword === regPasswordConfirm;
         case 2:
-          return regFirstName.trim().length > 0 && regLastName.trim().length > 0 && regCity.trim().length > 0;
+          return regFirstName.trim().length > 0 && regLastName.trim().length > 0;
         case 3:
           return regLanguages.length > 0;
-        case 4:
-          if (regPracticeMode === 'new') return regPracticeName.trim().length > 0 && regPracticeCity.trim().length > 0;
-          if (regPracticeMode === 'existing') return !!regExistingPracticeId;
-          return true; // skip
         default:
           return true;
       }
@@ -2136,8 +2351,18 @@ export default function App() {
               <Text style={[styles.regStepTitle, { color: c.text }]}>Account erstellen</Text>
               <Text style={[styles.regStepSub, { color: c.muted }]}>Erstelle dein Revio-Konto</Text>
               <TextInput value={regEmail} onChangeText={setRegEmail} placeholder="E-Mail-Adresse" placeholderTextColor={c.muted} keyboardType="email-address" autoCapitalize="none" style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text }]} />
-              <TextInput value={regPassword} onChangeText={setRegPassword} placeholder="Passwort (mind. 6 Zeichen)" placeholderTextColor={c.muted} secureTextEntry style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text }]} />
-              <TextInput value={regPasswordConfirm} onChangeText={setRegPasswordConfirm} placeholder="Passwort bestätigen" placeholderTextColor={c.muted} secureTextEntry style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text }]} />
+              <View style={{ position: 'relative' }}>
+                <TextInput value={regPassword} onChangeText={setRegPassword} placeholder="Passwort (mind. 6 Zeichen)" placeholderTextColor={c.muted} secureTextEntry={!showRegPassword} style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text, paddingRight: 44 }]} />
+                <Pressable onPress={() => setShowRegPassword(v => !v)} style={{ position: 'absolute', right: 12, top: 0, bottom: 0, justifyContent: 'center' }}>
+                  <Ionicons name={showRegPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color={c.muted} />
+                </Pressable>
+              </View>
+              <View style={{ position: 'relative' }}>
+                <TextInput value={regPasswordConfirm} onChangeText={setRegPasswordConfirm} placeholder="Passwort bestätigen" placeholderTextColor={c.muted} secureTextEntry={!showRegPasswordConfirm} style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text, paddingRight: 44 }]} />
+                <Pressable onPress={() => setShowRegPasswordConfirm(v => !v)} style={{ position: 'absolute', right: 12, top: 0, bottom: 0, justifyContent: 'center' }}>
+                  <Ionicons name={showRegPasswordConfirm ? 'eye-off-outline' : 'eye-outline'} size={20} color={c.muted} />
+                </Pressable>
+              </View>
               {regPasswordConfirm.length > 0 && regPassword !== regPasswordConfirm && (
                 <Text style={{ color: '#E05A77', fontSize: 13, marginTop: -6 }}>Passwörter stimmen nicht überein</Text>
               )}
@@ -2147,45 +2372,124 @@ export default function App() {
           return (
             <>
               <Text style={[styles.regStepTitle, { color: c.text }]}>Persönliche Angaben</Text>
-              <Text style={[styles.regStepSub, { color: c.muted }]}>Erzähl uns etwas über dich</Text>
-              <TextInput value={regFirstName} onChangeText={setRegFirstName} placeholder="Vorname" placeholderTextColor={c.muted} style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text }]} />
-              <TextInput value={regLastName} onChangeText={setRegLastName} placeholder="Nachname" placeholderTextColor={c.muted} style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text }]} />
-              <TextInput value={regCity} onChangeText={setRegCity} placeholder="Stadt (z. B. Köln)" placeholderTextColor={c.muted} style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text }]} />
-              <TextInput value={regBio} onChangeText={setRegBio} placeholder="Kurze Vorstellung…" placeholderTextColor={c.muted} multiline numberOfLines={4} style={[styles.regInput, styles.regTextarea, { backgroundColor: c.card, borderColor: c.border, color: c.text }]} />
+              <Text style={[styles.regStepSub, { color: c.muted }]}>Wie sollen wir dich ansprechen?</Text>
+              <TextInput value={regFirstName} onChangeText={setRegFirstName} placeholder="Vorname" placeholderTextColor={c.muted} style={[styles.regInput, { backgroundColor: c.card, borderColor: regFirstName.length > 0 && regFirstName.trim().length === 0 ? '#E05A77' : c.border, color: c.text }]} />
+              {regFirstName.length > 0 && regFirstName.trim().length === 0 && (
+                <Text style={{ color: '#E05A77', fontSize: 13, marginTop: -6 }}>Vorname ist erforderlich</Text>
+              )}
+              <TextInput value={regLastName} onChangeText={setRegLastName} placeholder="Nachname" placeholderTextColor={c.muted} style={[styles.regInput, { backgroundColor: c.card, borderColor: regLastName.length > 0 && regLastName.trim().length === 0 ? '#E05A77' : c.border, color: c.text }]} />
+              {regLastName.length > 0 && regLastName.trim().length === 0 && (
+                <Text style={{ color: '#E05A77', fontSize: 13, marginTop: -6 }}>Nachname ist erforderlich</Text>
+              )}
+              {regCity ? (
+                <View style={[styles.tagRow, { marginBottom: 8 }]}>
+                  <Pressable onPress={() => { setRegCity(''); setRegCitySearch(''); }} style={[styles.chip, { backgroundColor: c.primary, borderColor: c.primary }]}>
+                    <Text style={[styles.chipText, { color: '#FFFFFF' }]}>{regCity} ×</Text>
+                  </Pressable>
+                </View>
+              ) : (
+                <>
+                  <TextInput
+                    value={regCitySearch}
+                    onChangeText={setRegCitySearch}
+                    placeholder="Stadt suchen (optional)"
+                    placeholderTextColor={c.muted}
+                    style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text }]}
+                  />
+                  {regCitySearch.length > 0 && (() => {
+                    const citySuggestions = GERMAN_CITIES.filter(ci => ci.toLowerCase().includes(regCitySearch.toLowerCase())).slice(0, 6);
+                    return citySuggestions.length > 0 ? (
+                      <View style={{ backgroundColor: c.card, borderRadius: 8, borderWidth: 1, borderColor: c.border, marginTop: -8, marginBottom: 8 }}>
+                        {citySuggestions.map((ci) => (
+                          <Pressable
+                            key={ci}
+                            onPress={() => { setRegCity(ci); setRegCitySearch(''); }}
+                            style={{ paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: c.border }}
+                          >
+                            <Text style={{ color: c.text, fontSize: 14 }}>{ci}</Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                    ) : null;
+                  })()}
+                </>
+              )}
             </>
           );
-        case 3:
+        case 3: {
+          const specSuggestions = regSpecSearch.length > 0
+            ? regSpecOptions.filter(s => s.toLowerCase().includes(regSpecSearch.toLowerCase()) && !regSpecializations.includes(s)).slice(0, 6)
+            : [];
+          const langSuggestions = regLangSearch.length > 0
+            ? languageOptions.filter(l => getLangLabel(l).toLowerCase().includes(regLangSearch.toLowerCase()) && !regLanguages.includes(l)).slice(0, 6)
+            : [];
           return (
             <>
               <Text style={[styles.regStepTitle, { color: c.text }]}>Fachliches Profil</Text>
-              <Text style={[styles.regStepSub, { color: c.muted }]}>Spezialisierungen, Sprachen & mehr</Text>
-              <Text style={[styles.filterSectionTitle, { color: c.muted }]}>Spezialisierungen <Text style={{ fontWeight: '400', textTransform: 'none', letterSpacing: 0, fontSize: 11 }}>(optional)</Text></Text>
-              <View style={styles.tagRow}>
-                {regSpecOptions.map(s => {
-                  const active = regSpecializations.includes(s);
-                  return (
-                    <Pressable key={s} onPress={() => toggleRegSpec(s)} style={[styles.chip, active ? { backgroundColor: c.primary, borderColor: c.primary } : { backgroundColor: c.card, borderColor: c.border }]}>
-                      <Text style={[styles.chipText, { color: active ? '#FFFFFF' : c.text }]}>{s}</Text>
+              <Text style={[styles.regStepSub, { color: c.muted }]}>Spezialisierungen, Sprachen & Fortbildungen</Text>
+
+              <Text style={[styles.filterSectionTitle, { color: c.muted }]}>
+                Spezialisierungen <Text style={{ fontWeight: '400', textTransform: 'none', letterSpacing: 0, fontSize: 11 }}>(optional)</Text>
+              </Text>
+              <TextInput
+                value={regSpecSearch}
+                onChangeText={setRegSpecSearch}
+                placeholder="Spezialisierung suchen…"
+                placeholderTextColor={c.muted}
+                style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text }]}
+              />
+              {specSuggestions.length > 0 && (
+                <View style={{ borderRadius: 10, borderWidth: 1, borderColor: c.border, marginTop: -8, marginBottom: 8, overflow: 'hidden', backgroundColor: c.card }}>
+                  {specSuggestions.map((s, i) => (
+                    <Pressable key={s} onPress={() => { toggleRegSpec(s); setRegSpecSearch(''); }}
+                      style={{ padding: 12, borderTopWidth: i > 0 ? 1 : 0, borderColor: c.border }}>
+                      <Text style={{ color: c.text, fontSize: 14 }}>{s}</Text>
                     </Pressable>
-                  );
-                })}
-              </View>
-              <Text style={[styles.filterSectionTitle, { color: c.muted, marginTop: 14 }]}>Sprachen</Text>
-              <View>
-                {languageOptions.map(l => {
-                  const checked = regLanguages.includes(l);
-                  return (
-                    <Pressable key={l} onPress={() => toggleRegLang(l)} style={styles.checkRow}>
-                      <View style={[styles.checkbox, { borderColor: checked ? c.primary : c.border, backgroundColor: checked ? c.primary : 'transparent' }]}>
-                        {checked && <Text style={styles.checkmark}>✓</Text>}
-                      </View>
-                      <Text style={[styles.checkLabel, { color: c.text }]}>{getLangLabel(l)}</Text>
+                  ))}
+                </View>
+              )}
+              {regSpecializations.length > 0 && (
+                <View style={[styles.tagRow, { marginBottom: 8 }]}>
+                  {regSpecializations.map(s => (
+                    <Pressable key={s} onPress={() => toggleRegSpec(s)} style={[styles.chip, { backgroundColor: c.primary, borderColor: c.primary }]}>
+                      <Text style={[styles.chipText, { color: '#FFFFFF' }]}>{s} ×</Text>
                     </Pressable>
-                  );
-                })}
-              </View>
-              <Text style={[styles.filterSectionTitle, { color: c.muted, marginTop: 14 }]}>Fortbildungen <Text style={{ fontWeight: '400', textTransform: 'none', letterSpacing: 0, fontSize: 11 }}>(Checkliste)</Text></Text>
-              {fortbildungOptions.map(opt => {
+                  ))}
+                </View>
+              )}
+
+              <Text style={[styles.filterSectionTitle, { color: c.muted, marginTop: 8 }]}>Sprachen <Text style={{ fontWeight: '400', textTransform: 'none', letterSpacing: 0, fontSize: 11 }}>(Deutsch vorausgewählt)</Text></Text>
+              <TextInput
+                value={regLangSearch}
+                onChangeText={setRegLangSearch}
+                placeholder="Weitere Sprache hinzufügen (optional)"
+                placeholderTextColor={c.muted}
+                style={[styles.regInput, { backgroundColor: c.card, borderColor: regLanguages.length === 0 && regLangSearch.length === 0 ? c.border : regLanguages.length > 0 ? c.primary : c.border, color: c.text }]}
+              />
+              {langSuggestions.length > 0 && (
+                <View style={{ borderRadius: 10, borderWidth: 1, borderColor: c.border, marginTop: -8, marginBottom: 8, overflow: 'hidden', backgroundColor: c.card }}>
+                  {langSuggestions.map((l, i) => (
+                    <Pressable key={l} onPress={() => { toggleRegLang(l); setRegLangSearch(''); }}
+                      style={{ padding: 12, borderTopWidth: i > 0 ? 1 : 0, borderColor: c.border }}>
+                      <Text style={{ color: c.text, fontSize: 14 }}>{getLangLabel(l)}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              )}
+              {regLanguages.length > 0 && (
+                <View style={[styles.tagRow, { marginBottom: 4 }]}>
+                  {regLanguages.map(l => (
+                    <Pressable key={l} onPress={() => toggleRegLang(l)} style={[styles.chip, { backgroundColor: c.primary, borderColor: c.primary }]}>
+                      <Text style={[styles.chipText, { color: '#FFFFFF' }]}>{getLangLabel(l)} ×</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              )}
+
+              <Text style={[styles.filterSectionTitle, { color: c.muted, marginTop: 8 }]}>
+                Fortbildungen <Text style={{ fontWeight: '400', textTransform: 'none', letterSpacing: 0, fontSize: 11 }}>(optional)</Text>
+              </Text>
+              {certificationOptions.map(opt => {
                 const checked = regFortbildungen.includes(opt.key);
                 return (
                   <Pressable key={opt.key} onPress={() => toggleRegFort(opt.key)} style={styles.checkRow}>
@@ -2196,105 +2500,10 @@ export default function App() {
                   </Pressable>
                 );
               })}
-              <View style={[styles.switchRow, { marginTop: 14, paddingTop: 14, borderTopWidth: 1, borderTopColor: c.border }]}>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.switchTitle, { color: c.text }]}>Hausbesuche</Text>
-                  <Text style={[styles.switchLabel, { color: c.muted }]}>Du bist bereit, Patienten zu Hause zu behandeln</Text>
-                </View>
-                <Switch value={regHomeVisit} onValueChange={setRegHomeVisit} trackColor={{ true: c.success }} />
-              </View>
             </>
           );
+        }
         case 4:
-          return (
-            <>
-              <Text style={[styles.regStepTitle, { color: c.text }]}>Praxis verbinden</Text>
-              <Text style={[styles.regStepSub, { color: c.muted }]}>In welcher Praxis arbeitest du? (optional)</Text>
-
-              <View style={styles.kassenartRow}>
-                {[
-                  { key: 'new', label: '＋ Neue Praxis' },
-                  { key: 'existing', label: '🔗 Bestehende' },
-                  { key: 'skip', label: 'Überspringen' },
-                ].map(opt => {
-                  const active = regPracticeMode === opt.key;
-                  return (
-                    <Pressable key={opt.key} onPress={() => setRegPracticeMode(opt.key)}
-                      style={[styles.kassenartBtn, active ? { backgroundColor: c.primary, borderColor: c.primary } : { backgroundColor: c.mutedBg, borderColor: c.border }]}>
-                      <Text style={[styles.kassenartText, { color: active ? '#FFFFFF' : c.text }]}>{opt.label}</Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-
-              {regPracticeMode === 'new' && (
-                <>
-                  <TextInput value={regPracticeName} onChangeText={setRegPracticeName} placeholder="Praxisname" placeholderTextColor={c.muted} style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text }]} />
-                  <TextInput value={regPracticeAddress} onChangeText={setRegPracticeAddress} placeholder="Straße und Hausnummer" placeholderTextColor={c.muted} style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text }]} />
-                  <TextInput value={regPracticeCity} onChangeText={setRegPracticeCity} placeholder="Stadt (z. B. Köln)" placeholderTextColor={c.muted} style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text }]} />
-                  <TextInput value={regPracticePhone} onChangeText={setRegPracticePhone} placeholder="Telefonnummer" placeholderTextColor={c.muted} keyboardType="phone-pad" style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text }]} />
-                </>
-              )}
-
-              {regPracticeMode === 'existing' && (
-                <>
-                  <View style={[styles.noticeBox, { backgroundColor: c.mutedBg, borderColor: c.border }]}>
-                    <Text style={styles.noticeIcon}>ℹ️</Text>
-                    <Text style={[styles.noticeBody, { color: c.muted }]}>
-                      Suche nach der Praxis. Der Praxis-Admin muss deine Anfrage anschließend bestätigen.
-                    </Text>
-                  </View>
-                  <TextInput
-                    value={regExistingPracticeName}
-                    onChangeText={async (text) => {
-                      setRegExistingPracticeName(text);
-                      setRegExistingPracticeId(null);
-                      if (text.length < 2) { setRegPracticeSearchResults([]); return; }
-                      setRegPracticeSearching(true);
-                      try {
-                        const res = await fetch(`${getBaseUrl()}/practices/search?q=${encodeURIComponent(text)}`);
-                        if (res.ok) { const d = await res.json(); setRegPracticeSearchResults(d.practices ?? []); }
-                      } catch { /* ignore */ } finally { setRegPracticeSearching(false); }
-                    }}
-                    placeholder="Praxisname oder Stadt suchen…"
-                    placeholderTextColor={c.muted}
-                    style={[styles.regInput, { backgroundColor: c.card, borderColor: regExistingPracticeId ? c.primary : c.border, color: c.text }]}
-                  />
-                  {regPracticeSearching && <Text style={[styles.regStepSub, { color: c.muted }]}>Suche…</Text>}
-                  {regPracticeSearchResults.length > 0 && !regExistingPracticeId && (
-                    <View style={[{ borderRadius: 10, overflow: 'hidden', borderWidth: 1, borderColor: c.border, marginTop: 4 }]}>
-                      {regPracticeSearchResults.map((p, i) => (
-                        <Pressable
-                          key={p.id}
-                          onPress={() => { setRegExistingPracticeId(p.id); setRegExistingPracticeName(`${p.name} – ${p.city}`); setRegPracticeSearchResults([]); }}
-                          style={[{ padding: 12, backgroundColor: c.card, borderTopWidth: i > 0 ? 1 : 0, borderColor: c.border }]}
-                        >
-                          <Text style={[styles.practiceName, { color: c.text }]}>{p.name}</Text>
-                          <Text style={[styles.practiceCity, { color: c.muted }]}>{p.city}{p.address ? ` · ${p.address}` : ''}</Text>
-                        </Pressable>
-                      ))}
-                    </View>
-                  )}
-                  {regExistingPracticeId && (
-                    <View style={[styles.noticeBox, { backgroundColor: c.successBg, borderColor: c.success }]}>
-                      <Text style={styles.noticeIcon}>✅</Text>
-                      <Text style={[styles.noticeBody, { color: c.success }]}>Praxis ausgewählt. Anfrage wird nach Registrierung gestellt.</Text>
-                    </View>
-                  )}
-                </>
-              )}
-
-              {regPracticeMode === 'skip' && (
-                <View style={[styles.noticeBox, { backgroundColor: c.mutedBg, borderColor: c.border }]}>
-                  <Text style={styles.noticeIcon}>✓</Text>
-                  <Text style={[styles.noticeBody, { color: c.muted }]}>
-                    Du kannst eine Praxis später in deinen Profileinstellungen hinzufügen.
-                  </Text>
-                </View>
-              )}
-            </>
-          );
-        case 5:
           return (
             <>
               <Text style={[styles.regStepTitle, { color: c.text }]}>Vorschau & Einreichen</Text>
@@ -2305,21 +2514,13 @@ export default function App() {
                 { label: 'Stadt', value: regCity || '—' },
                 { label: 'Spezialisierungen', value: regSpecializations.join(', ') || '—' },
                 { label: 'Sprachen', value: regLanguages.map(getLangLabel).join(', ') || '—' },
-                { label: 'Hausbesuche', value: regHomeVisit ? 'Ja' : 'Nein' },
-                { label: 'Praxis', value: regPracticeMode === 'new' ? (regPracticeName || '—') : regPracticeMode === 'existing' ? (regExistingPracticeName || '—') : 'Keine Praxis' },
-                ...(regPracticeMode === 'new' ? [{ label: 'Adresse', value: [regPracticeAddress, regPracticeCity].filter(Boolean).join(', ') || '—' }] : []),
+                { label: 'Fortbildungen', value: regFortbildungen.map(getCertificationLabel).join(', ') || '—' },
               ].map(row => (
                 <View key={row.label} style={[styles.previewRow, { borderBottomColor: c.border }]}>
                   <Text style={[styles.previewLabel, { color: c.muted }]}>{row.label}</Text>
                   <Text style={[styles.previewValue, { color: c.text }]}>{row.value}</Text>
                 </View>
               ))}
-              {regBio ? (
-                <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border, marginTop: 4 }]}>
-                  <Text style={[styles.filterSectionTitle, { color: c.muted }]}>Über mich</Text>
-                  <Text style={[styles.infoBody, { color: c.text, fontSize: 14 }]}>{regBio}</Text>
-                </View>
-              ) : null}
               <View style={[styles.noticeBox, { backgroundColor: c.mutedBg, borderColor: c.border }]}>
                 <Text style={styles.noticeIcon}>ℹ️</Text>
                 <Text style={[styles.noticeBody, { color: c.muted }]}>
@@ -2359,6 +2560,7 @@ export default function App() {
         <Pressable
           style={[styles.registerBtn, { backgroundColor: canProceed() ? c.primary : c.border, marginTop: 8 }]}
           onPress={async () => {
+            if (!canProceed()) return;
             if (regStep < REG_STEPS) {
               setRegStep(s => s + 1);
             } else {
@@ -2370,28 +2572,31 @@ export default function App() {
                     email: regEmail,
                     password: regPassword,
                     fullName: `${regFirstName} ${regLastName}`.trim(),
-                    professionalTitle: 'Physiotherapeut/in',
-                    city: regCity,
-                    bio: regBio || undefined,
-                    homeVisit: regHomeVisit,
-                    specializations: regSpecializations.length > 0 ? regSpecializations : ['Physiotherapie'],
-                    languages: regLanguages.length > 0 ? regLanguages.map(l => l.toLowerCase()) : ['de'],
+                    city: regCity || undefined,
+                    specializations: regSpecializations,
+                    languages: regLanguages.map(l => l.toLowerCase()),
                     certifications: regFortbildungen,
-                    ...(regPracticeMode === 'new' ? {
-                      practice: {
-                        name: regPracticeName || 'Eigene Praxis',
-                        city: regPracticeCity || regCity,
-                        address: regPracticeAddress || undefined,
-                        phone: regPracticePhone || undefined,
-                      },
-                    } : regPracticeMode === 'existing' && regExistingPracticeId ? {
-                      existingPracticeId: regExistingPracticeId,
-                    } : {}),
                   }),
                 });
+                const resData = await res.json().catch(() => ({}));
                 if (!res.ok) {
-                  const err = await res.json().catch(() => ({}));
-                  showWebAlert(err.message ?? 'Fehler beim Einreichen. Bitte versuche es erneut.');
+                  const msg = typeof resData.message === 'string' ? resData.message : (resData.error ?? `Fehler ${res.status}`);
+                  showWebAlert(msg);
+                  return;
+                }
+                if (resData.token) {
+                  await AsyncStorage.setItem('revio_auth_token', resData.token);
+                  await AsyncStorage.setItem('revio_account_type', 'therapist');
+                  setAuthToken(resData.token);
+                  setAccountType('therapist');
+                  const profileRes = await fetch(`${getBaseUrl()}/auth/me`, {
+                    headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${resData.token}` },
+                  });
+                  if (profileRes.ok) setLoggedInTherapist(normalizeTherapistProfile(await profileRes.json()));
+                  setShowRegister(false);
+                  setRegStep(1);
+                  setRegSpecSearch('');
+                  setRegLangSearch('');
                   return;
                 }
               } catch {
@@ -2454,6 +2659,40 @@ export default function App() {
       setVisibilityLoading(false);
     }
   };
+
+  const renderEmailVerifyScreen = () => (
+    <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 20 }]}>
+      <View style={[styles.infoCard, { backgroundColor: c.card, borderColor: c.border, alignItems: 'center', paddingVertical: 48 }]}>
+        {emailVerifyStatus === 'verifying' && (
+          <>
+            <Text style={{ fontSize: 40, marginBottom: 16 }}>⏳</Text>
+            <Text style={[styles.infoTitle, { color: c.text, textAlign: 'center' }]}>E-Mail wird bestätigt…</Text>
+            <Text style={[styles.infoBody, { color: c.muted, textAlign: 'center', marginTop: 8 }]}>Bitte einen Moment warten.</Text>
+          </>
+        )}
+        {emailVerifyStatus === 'success' && (
+          <>
+            <Text style={{ fontSize: 40, marginBottom: 16 }}>✅</Text>
+            <Text style={[styles.infoTitle, { color: c.text, textAlign: 'center' }]}>E-Mail bestätigt!</Text>
+            <Text style={[styles.infoBody, { color: c.muted, textAlign: 'center', marginTop: 8 }]}>Du wirst automatisch eingeloggt.</Text>
+          </>
+        )}
+        {emailVerifyStatus === 'error' && (
+          <>
+            <Text style={{ fontSize: 40, marginBottom: 16 }}>❌</Text>
+            <Text style={[styles.infoTitle, { color: c.text, textAlign: 'center' }]}>Bestätigung fehlgeschlagen</Text>
+            <Text style={[styles.infoBody, { color: c.muted, textAlign: 'center', marginTop: 8 }]}>{emailVerifyError}</Text>
+            <Pressable
+              style={[styles.registerBtn, { backgroundColor: c.primary, marginTop: 24, paddingHorizontal: 32 }]}
+              onPress={() => { setShowEmailVerify(false); setEmailVerifyStatus('idle'); }}
+            >
+              <Text style={styles.registerBtnText}>Zurück</Text>
+            </Pressable>
+          </>
+        )}
+      </View>
+    </ScrollView>
+  );
 
   const renderInviteClaimScreen = () => {
     if (inviteClaimLoading && !inviteClaimData) {
@@ -2553,24 +2792,34 @@ export default function App() {
 
         <View style={[styles.infoCard, { backgroundColor: c.card, borderColor: c.border }]}>
           <Text style={[styles.filterSectionTitle, { color: c.muted }]}>PASSWORT SETZEN</Text>
-          <TextInput
-            style={[styles.regInput, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg, marginTop: 6 }]}
-            value={inviteClaimPassword}
-            onChangeText={setInviteClaimPassword}
-            placeholder="Passwort (mind. 6 Zeichen)"
-            placeholderTextColor={c.muted}
-            secureTextEntry
-            autoCapitalize="none"
-          />
-          <TextInput
-            style={[styles.regInput, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg, marginTop: 10 }]}
-            value={inviteClaimPasswordConfirm}
-            onChangeText={setInviteClaimPasswordConfirm}
-            placeholder="Passwort wiederholen"
-            placeholderTextColor={c.muted}
-            secureTextEntry
-            autoCapitalize="none"
-          />
+          <View style={{ position: 'relative', marginTop: 6 }}>
+            <TextInput
+              style={[styles.regInput, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg, marginTop: 0, paddingRight: 44 }]}
+              value={inviteClaimPassword}
+              onChangeText={setInviteClaimPassword}
+              placeholder="Passwort (mind. 6 Zeichen)"
+              placeholderTextColor={c.muted}
+              secureTextEntry={!showInvitePassword}
+              autoCapitalize="none"
+            />
+            <Pressable onPress={() => setShowInvitePassword(v => !v)} style={{ position: 'absolute', right: 12, top: 0, bottom: 0, justifyContent: 'center' }}>
+              <Ionicons name={showInvitePassword ? 'eye-off-outline' : 'eye-outline'} size={20} color={c.muted} />
+            </Pressable>
+          </View>
+          <View style={{ position: 'relative', marginTop: 10 }}>
+            <TextInput
+              style={[styles.regInput, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg, marginTop: 0, paddingRight: 44 }]}
+              value={inviteClaimPasswordConfirm}
+              onChangeText={setInviteClaimPasswordConfirm}
+              placeholder="Passwort wiederholen"
+              placeholderTextColor={c.muted}
+              secureTextEntry={!showInvitePasswordConfirm}
+              autoCapitalize="none"
+            />
+            <Pressable onPress={() => setShowInvitePasswordConfirm(v => !v)} style={{ position: 'absolute', right: 12, top: 0, bottom: 0, justifyContent: 'center' }}>
+              <Ionicons name={showInvitePasswordConfirm ? 'eye-off-outline' : 'eye-outline'} size={20} color={c.muted} />
+            </Pressable>
+          </View>
           {!!inviteClaimError && (
             <Text style={{ color: '#E74C3C', fontSize: 13, marginTop: 8 }}>{inviteClaimError}</Text>
           )}
@@ -2675,8 +2924,18 @@ export default function App() {
             <Text style={[styles.regStepTitle, { color: c.text }]}>Zugangsdaten</Text>
             <Text style={[styles.regStepSub, { color: c.muted }]}>Erstelle deinen Praxis-Account</Text>
             <TextInput value={mgrEmail} onChangeText={setMgrEmail} placeholder="E-Mail-Adresse" placeholderTextColor={c.muted} keyboardType="email-address" autoCapitalize="none" style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text }]} />
-            <TextInput value={mgrPassword} onChangeText={setMgrPassword} placeholder="Passwort (mind. 6 Zeichen)" placeholderTextColor={c.muted} secureTextEntry style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text }]} />
-            <TextInput value={mgrPasswordConfirm} onChangeText={setMgrPasswordConfirm} placeholder="Passwort wiederholen" placeholderTextColor={c.muted} secureTextEntry style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text }]} />
+            <View style={{ position: 'relative' }}>
+              <TextInput value={mgrPassword} onChangeText={setMgrPassword} placeholder="Passwort (mind. 6 Zeichen)" placeholderTextColor={c.muted} secureTextEntry={!showMgrPassword} style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text, paddingRight: 44 }]} />
+              <Pressable onPress={() => setShowMgrPassword(v => !v)} style={{ position: 'absolute', right: 12, top: 0, bottom: 0, justifyContent: 'center' }}>
+                <Ionicons name={showMgrPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color={c.muted} />
+              </Pressable>
+            </View>
+            <View style={{ position: 'relative' }}>
+              <TextInput value={mgrPasswordConfirm} onChangeText={setMgrPasswordConfirm} placeholder="Passwort wiederholen" placeholderTextColor={c.muted} secureTextEntry={!showMgrPasswordConfirm} style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text, paddingRight: 44 }]} />
+              <Pressable onPress={() => setShowMgrPasswordConfirm(v => !v)} style={{ position: 'absolute', right: 12, top: 0, bottom: 0, justifyContent: 'center' }}>
+                <Ionicons name={showMgrPasswordConfirm ? 'eye-off-outline' : 'eye-outline'} size={20} color={c.muted} />
+              </Pressable>
+            </View>
             {mgrPasswordConfirm.length > 0 && mgrPassword !== mgrPasswordConfirm && (
               <Text style={{ color: '#E05A77', fontSize: 13, marginTop: -6 }}>Passwörter stimmen nicht überein</Text>
             )}
@@ -2707,7 +2966,7 @@ export default function App() {
               <Ionicons name={!mgrIsTherapist ? 'checkmark-circle' : 'ellipse-outline'} size={22} color={!mgrIsTherapist ? '#fff' : c.muted} />
               <View style={{ flex: 1 }}>
                 <Text style={{ color: !mgrIsTherapist ? '#fff' : c.text, fontWeight: '700', fontSize: 15 }}>Nein, nur Praxismanager</Text>
-                <Text style={{ color: !mgrIsTherapist ? 'rgba(255,255,255,0.8)' : c.muted, fontSize: 13, marginTop: 2 }}>Ich verwalte die Praxis, bin aber kein Therapeut</Text>
+                <Text style={{ color: !mgrIsTherapist ? 'rgba(255,255,255,0.8)' : c.muted, fontSize: 13, marginTop: 2 }}>Registriere die Praxis ohne eigenes Therapeutenprofil.</Text>
               </View>
             </Pressable>
             <Pressable
@@ -2717,7 +2976,7 @@ export default function App() {
               <Ionicons name={mgrIsTherapist ? 'checkmark-circle' : 'ellipse-outline'} size={22} color={mgrIsTherapist ? '#fff' : c.muted} />
               <View style={{ flex: 1 }}>
                 <Text style={{ color: mgrIsTherapist ? '#fff' : c.text, fontWeight: '700', fontSize: 15 }}>Ja, ich bin auch Therapeut/in</Text>
-                <Text style={{ color: mgrIsTherapist ? 'rgba(255,255,255,0.8)' : c.muted, fontSize: 13, marginTop: 2 }}>Ich behandle selbst und verwalte die Praxis</Text>
+                <Text style={{ color: mgrIsTherapist ? 'rgba(255,255,255,0.8)' : c.muted, fontSize: 13, marginTop: 2 }}>Registriere die Praxis und mein Therapeutenprofil.</Text>
               </View>
             </Pressable>
           </>
@@ -2806,7 +3065,6 @@ export default function App() {
     const goBack = () => {
       if (mgrRegStep === 1) {
         setShowManagerReg(false);
-        setShowLogin(true);
         return;
       }
       // If on summary step and not therapist, skip back over step 4
@@ -3086,9 +3344,6 @@ export default function App() {
       const meRes = await fetch(`${getBaseUrl()}/manager/me`, { headers: { Authorization: `Bearer ${authToken}` } });
       if (meRes.ok) setLoggedInManager(await meRes.json());
       setActivePracticeId(practiceId);
-      setShowAddPracticeForm(false);
-      setMgrNewPracticeName(''); setMgrNewPracticeCity('');
-      setMgrNewPracticeAddress(''); setMgrNewPracticePhone('');
     } catch (e) {
       Alert.alert('Fehler', e.message);
     } finally {
@@ -3131,7 +3386,6 @@ export default function App() {
         activePracticeId={activePracticeId}
         c={c}
         handleAddManagerPracticePhoto={handleAddManagerPracticePhoto}
-        handleAddNewPractice={handleAddNewPractice}
         handleManagerPracticeSave={handleManagerPracticeSave}
         handleManagerProfilePublication={handleManagerProfilePublication}
         handleManagerProfileSave={handleManagerProfileSave}
@@ -3150,11 +3404,6 @@ export default function App() {
         mgrEditPhone={mgrEditPhone}
         mgrEditPhotos={mgrEditPhotos}
         mgrEditSaving={mgrEditSaving}
-        mgrNewPracticeAddress={mgrNewPracticeAddress}
-        mgrNewPracticeCity={mgrNewPracticeCity}
-        mgrNewPracticeLoading={mgrNewPracticeLoading}
-        mgrNewPracticeName={mgrNewPracticeName}
-        mgrNewPracticePhone={mgrNewPracticePhone}
         mgrProfileBio={mgrProfileBio}
         mgrProfileEditMode={mgrProfileEditMode}
         mgrProfileFullName={mgrProfileFullName}
@@ -3178,10 +3427,6 @@ export default function App() {
         setMgrEditName={setMgrEditName}
         setMgrEditPhone={setMgrEditPhone}
         setMgrEditPhotos={setMgrEditPhotos}
-        setMgrNewPracticeAddress={setMgrNewPracticeAddress}
-        setMgrNewPracticeCity={setMgrNewPracticeCity}
-        setMgrNewPracticeName={setMgrNewPracticeName}
-        setMgrNewPracticePhone={setMgrNewPracticePhone}
         setMgrProfileBio={setMgrProfileBio}
         setMgrProfileEditMode={setMgrProfileEditMode}
         setMgrProfileFullName={setMgrProfileFullName}
@@ -3189,19 +3434,153 @@ export default function App() {
         setMgrProfileLanguages={setMgrProfileLanguages}
         setMgrProfileSpecializations={setMgrProfileSpecializations}
         setMgrProfileTitle={setMgrProfileTitle}
-        setShowAddPracticeForm={setShowAddPracticeForm}
         setShowInvitePage={setShowInvitePage}
-        showAddPracticeForm={showAddPracticeForm}
         styles={styles}
       />
     );
   };
+
+  // ── Neue Praxis Screen (2 Schritte) ──────────────────────────────────────
+
+  const closeAddPracticeScreen = () => {
+    setShowAddPracticeScreen(false);
+    setAddPracticeStep(1);
+    setMgrNewPracticeName('');
+    setMgrNewPracticeCity('');
+    setMgrNewPracticeAddress('');
+    setMgrNewPracticePhone('');
+  };
+
+  const renderAddPracticeScreen = () => (
+    <View style={{ flex: 1, backgroundColor: c.background }}>
+      {/* Header */}
+      <View style={[styles.header, { paddingBottom: 12 }]}>
+        <Pressable onPress={addPracticeStep === 2 ? () => setAddPracticeStep(1) : closeAddPracticeScreen} style={{ padding: 4, marginRight: 8 }}>
+          <Ionicons name="arrow-back" size={24} color={c.text} />
+        </Pressable>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.headerTitle, { color: c.text }]}>
+            {addPracticeStep === 1 ? 'Neue Praxis' : 'Übersicht & Bestätigung'}
+          </Text>
+          <Text style={[styles.headerSub, { color: c.muted }]}>Schritt {addPracticeStep} von 2</Text>
+        </View>
+      </View>
+
+      {/* Step indicator */}
+      <View style={{ flexDirection: 'row', marginHorizontal: 16, marginBottom: 20, gap: 6 }}>
+        {[1, 2].map((s) => (
+          <View key={s} style={{ flex: 1, height: 4, borderRadius: 2, backgroundColor: s <= addPracticeStep ? c.primary : c.border }} />
+        ))}
+      </View>
+
+      {addPracticeStep === 1 ? (
+        /* ── Schritt 1: Formular ── */
+        <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
+          <Text style={[styles.filterSectionTitle, { color: c.muted, marginBottom: 12 }]}>PRAXISDATEN</Text>
+
+          <Text style={{ color: c.muted, fontSize: 13, marginBottom: 4 }}>Praxisname *</Text>
+          <TextInput
+            style={[styles.input, { color: c.text, borderColor: mgrNewPracticeName.trim() ? c.primary : c.border, backgroundColor: c.mutedBg, marginBottom: 16, outlineWidth: 0 }]}
+            placeholder="z. B. Physiotherapie Mustermann"
+            placeholderTextColor={c.muted}
+            value={mgrNewPracticeName}
+            onChangeText={setMgrNewPracticeName}
+          />
+
+          <Text style={{ color: c.muted, fontSize: 13, marginBottom: 4 }}>Stadt *</Text>
+          <TextInput
+            style={[styles.input, { color: c.text, borderColor: mgrNewPracticeCity.trim() ? c.primary : c.border, backgroundColor: c.mutedBg, marginBottom: 16, outlineWidth: 0 }]}
+            placeholder="z. B. München"
+            placeholderTextColor={c.muted}
+            value={mgrNewPracticeCity}
+            onChangeText={setMgrNewPracticeCity}
+          />
+
+          <Text style={{ color: c.muted, fontSize: 13, marginBottom: 4 }}>Adresse <Text style={{ color: c.muted, fontStyle: 'italic' }}>(optional)</Text></Text>
+          <TextInput
+            style={[styles.input, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg, marginBottom: 16, outlineWidth: 0 }]}
+            placeholder="z. B. Musterstraße 12"
+            placeholderTextColor={c.muted}
+            value={mgrNewPracticeAddress}
+            onChangeText={setMgrNewPracticeAddress}
+          />
+
+          <Text style={{ color: c.muted, fontSize: 13, marginBottom: 4 }}>Telefon <Text style={{ color: c.muted, fontStyle: 'italic' }}>(optional)</Text></Text>
+          <TextInput
+            style={[styles.input, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg, marginBottom: 32 }]}
+            placeholder="z. B. 089 123456"
+            placeholderTextColor={c.muted}
+            value={mgrNewPracticePhone}
+            onChangeText={setMgrNewPracticePhone}
+            keyboardType="phone-pad"
+          />
+
+          <Pressable
+            onPress={() => {
+              if (!mgrNewPracticeName.trim() || !mgrNewPracticeCity.trim()) {
+                if (Platform.OS === 'web') { showWebAlert('Bitte Praxisname und Stadt ausfüllen.'); }
+                else { Alert.alert('Pflichtfelder', 'Bitte Praxisname und Stadt ausfüllen.'); }
+                return;
+              }
+              setAddPracticeStep(2);
+            }}
+            style={{ backgroundColor: c.primary, borderRadius: 14, paddingVertical: 16, alignItems: 'center' }}
+          >
+            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 16 }}>Weiter zur Übersicht</Text>
+          </Pressable>
+        </ScrollView>
+      ) : (
+        /* ── Schritt 2: Übersicht & Bestätigung ── */
+        <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40 }}>
+          <Text style={[styles.filterSectionTitle, { color: c.muted, marginBottom: 16 }]}>ZUSAMMENFASSUNG</Text>
+
+          <View style={{ backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.border, padding: 16, marginBottom: 20, gap: 14 }}>
+            {[
+              { label: 'Praxisname', value: mgrNewPracticeName },
+              { label: 'Stadt', value: mgrNewPracticeCity },
+              { label: 'Adresse', value: mgrNewPracticeAddress || '—' },
+              { label: 'Telefon', value: mgrNewPracticePhone || '—' },
+            ].map(({ label, value }) => (
+              <View key={label} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <Text style={{ color: c.muted, fontSize: 13, flex: 1 }}>{label}</Text>
+                <Text style={{ color: c.text, fontSize: 14, fontWeight: '600', flex: 2, textAlign: 'right' }}>{value}</Text>
+              </View>
+            ))}
+          </View>
+
+          {/* Hinweis Admin-Freigabe */}
+          <View style={{ backgroundColor: '#FFF8E1', borderRadius: 12, padding: 14, marginBottom: 24, flexDirection: 'row', gap: 10, alignItems: 'flex-start' }}>
+            <Ionicons name="information-circle-outline" size={20} color="#F57F17" style={{ marginTop: 1 }} />
+            <Text style={{ color: '#795548', fontSize: 13, flex: 1, lineHeight: 20 }}>
+              Die Praxis wird nach dem Einreichen zur Prüfung weitergeleitet. Erst nach Freigabe durch einen Admin ist sie öffentlich sichtbar.
+            </Text>
+          </View>
+
+          <Pressable
+            onPress={async () => {
+              await handleAddNewPractice();
+              closeAddPracticeScreen();
+            }}
+            disabled={mgrNewPracticeLoading}
+            style={{ backgroundColor: mgrNewPracticeLoading ? c.border : c.primary, borderRadius: 14, paddingVertical: 16, alignItems: 'center', marginBottom: 12 }}
+          >
+            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 16 }}>{mgrNewPracticeLoading ? 'Wird erstellt...' : 'Praxis einreichen'}</Text>
+          </Pressable>
+
+          <Pressable onPress={closeAddPracticeScreen} style={{ alignItems: 'center', paddingVertical: 12 }}>
+            <Text style={{ color: c.muted, fontSize: 14 }}>Abbrechen</Text>
+          </Pressable>
+        </ScrollView>
+      )}
+    </View>
+  );
 
   // ── Layout ────────────────────────────────────────────────────────────────
 
   const renderTab = () => {
     if (selectedTherapist) return renderTherapistProfile(selectedTherapist);
     if (selectedPractice) return renderPracticeProfile(selectedPractice);
+    if (showAddPracticeScreen) return renderAddPracticeScreen();
     if (showCreatePractice) return renderCreatePractice();
     if (showPracticeSearch) return renderPracticeSearch();
     if (showInvitePage) return renderInvitePage();
@@ -3209,8 +3588,10 @@ export default function App() {
     if (activeTab === 'favorites') return renderFavorites();
     if (activeTab === 'therapist') {
       if (accountType === 'manager' && loggedInManager) return renderManagerDashboard();
+      if (showEmailVerify) return renderEmailVerifyScreen();
       if (showInviteClaim) return renderInviteClaimScreen();
       if (loggedInTherapist) return renderTherapistDashboard();
+      if (showManagerReg) return renderManagerReg();
       if (showLogin) return renderLogin();
       if (showRegister) return renderRegister();
       return renderTherapist();
@@ -3732,7 +4113,7 @@ const styles = StyleSheet.create({
   regInput: {
     borderWidth: 1, borderRadius: 14,
     paddingHorizontal: 14, paddingVertical: 12,
-    fontSize: 15
+    fontSize: 15, outlineWidth: 0
   },
   regTextarea: { minHeight: 100, textAlignVertical: 'top', paddingTop: 12 },
 

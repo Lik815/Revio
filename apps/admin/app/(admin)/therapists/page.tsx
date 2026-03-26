@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { PageShell } from '../../../components/page-shell';
 import { TherapistActions } from '../../../components/action-buttons';
 import { DeadlineTimer } from '../../../components/deadline-timer';
@@ -22,6 +23,27 @@ const statusLabel: Record<string, string> = {
   CHANGES_REQUESTED: 'Änderungen',
   SUSPENDED: 'Gesperrt',
   DRAFT: 'Entwurf',
+};
+
+const visibilityLabel: Record<string, string> = {
+  visible: 'Sichtbar',
+  blocked: 'Blockiert',
+  not_approved: 'Nicht freigegeben',
+};
+
+const visibilityBadgeClass: Record<string, string> = {
+  visible: 'badge--APPROVED',
+  blocked: 'badge--CHANGES_REQUESTED',
+  not_approved: 'badge--DRAFT',
+};
+
+const blockingReasonLabel: Record<string, string> = {
+  profile_incomplete: 'Profil unvollständig',
+  manually_hidden: 'Manuell versteckt',
+  publication_missing: 'Freigabe fehlt',
+  no_confirmed_link: 'Keine Praxis',
+  pending_link_only: 'Praxis ausstehend',
+  practice_not_approved: 'Praxis nicht freigegeben',
 };
 
 const statusPriority: Record<string, number> = {
@@ -147,6 +169,7 @@ export default async function TherapistsPage({ searchParams }: { searchParams: S
             <th>Eingereicht</th>
             <th>Frist (48h)</th>
             <th>Status</th>
+            <th>Sichtbarkeit</th>
             <th>Aktionen</th>
           </tr>
         </thead>
@@ -160,7 +183,7 @@ export default async function TherapistsPage({ searchParams }: { searchParams: S
                   <div className="entity-cell">
                     <div className="entity-avatar">{t.fullName.slice(0, 1)}</div>
                     <div>
-                      <strong>{t.fullName}</strong>
+                      <Link href={`/therapists/${t.id}`} style={{ fontWeight: 600 }}>{t.fullName}</Link>
                       <div className="entity-meta">{t.email}</div>
                     </div>
                   </div>
@@ -184,6 +207,24 @@ export default async function TherapistsPage({ searchParams }: { searchParams: S
                   <span className={`badge badge--${t.reviewStatus}`}>
                     {statusLabel[t.reviewStatus] ?? t.reviewStatus}
                   </span>
+                </td>
+                <td data-label="Sichtbarkeit">
+                  {(() => {
+                    const vis = t.visibility;
+                    return (
+                      <div className="priority-stack">
+                        <span className={`badge ${visibilityBadgeClass[vis.visibilityState] ?? 'badge--DRAFT'}`}>
+                          {visibilityLabel[vis.visibilityState] ?? vis.visibilityState}
+                        </span>
+                        {vis.blockingReasons.length > 0 && (
+                          <span className="entity-meta" title={vis.blockingReasons.map((r) => blockingReasonLabel[r] ?? r).join(', ')}>
+                            {blockingReasonLabel[vis.blockingReasons[0]] ?? vis.blockingReasons[0]}
+                            {vis.blockingReasons.length > 1 && ` +${vis.blockingReasons.length - 1}`}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </td>
                 <td data-label="Aktionen">
                   <TherapistActions

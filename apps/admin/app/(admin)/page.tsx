@@ -42,19 +42,27 @@ export default async function HomePage() {
           <div className="panel-header">
             <div>
               <div className="kicker">Öffentliche Sichtbarkeit</div>
-              <h3>Gerade blockiert</h3>
+              <h3>Freigegebene Profile — trotzdem nicht sichtbar</h3>
             </div>
+            <div className="hero-pill">{visibilityIssues.count}</div>
           </div>
           <div className="task-list">
-            {visibilityIssues.issues.slice(0, 3).map((issue) => (
-              <div key={issue.therapistId} className="task-item">
-                <span className="task-dot task-dot--danger" />
-                <div>
-                  <strong>{issue.fullName}</strong>
-                  <p>{issue.pendingPractices.length} Praxisfreigaben und {issue.pendingLinks.length} offene Links blockieren die Sichtbarkeit.</p>
+            {visibilityIssues.issues.slice(0, 5).map((issue) => (
+              <Link key={issue.therapistId} href={`/therapists/${issue.therapistId}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+                <div className="task-item task-item--clickable">
+                  <span className="task-dot task-dot--danger" />
+                  <div style={{ flex: 1 }}>
+                    <strong>{issue.therapistName}</strong>
+                    <p style={{ margin: '2px 0 0', fontSize: 13, color: 'var(--muted)' }}>{issue.reason.replace(/_/g, ' ')}</p>
+                  </div>
                 </div>
-              </div>
+              </Link>
             ))}
+            {visibilityIssues.count > 5 && (
+              <div style={{ padding: '10px 16px', color: 'var(--muted)', fontSize: 13 }}>
+                + {visibilityIssues.count - 5} weitere — alle unter <Link href="/therapists?status=APPROVED">Therapeut:innen → Freigegeben</Link> prüfen
+              </div>
+            )}
           </div>
         </article>
       )}

@@ -76,10 +76,11 @@ export async function getAdminSessionState(): Promise<AdminSessionState> {
 
 export type VisibilityIssue = {
   therapistId: string;
-  fullName: string;
-  visible: boolean;
-  pendingPractices: { id: string; name: string; status: string }[];
-  pendingLinks: { id: string; practiceId: string; status: string }[];
+  therapistName: string;
+  email: string;
+  reason: string;
+  detail: string;
+  linkedPractices: { id: string; name: string; status: string; reviewStatus: string }[];
 };
 
 export type VisibilityIssues = {
@@ -93,7 +94,7 @@ export type PracticeManager = {
   createdAt: string;
   practiceId: string;
   therapistId: string | null;
-  practice: { id: string; name: string; city: string; reviewStatus: string };
+  practice: { id: string; name: string; city: string; reviewStatus: string } | null;
   therapist: { id: string; fullName: string; email: string; reviewStatus: string } | null;
 };
 
@@ -101,11 +102,30 @@ export type ManagersResponse = {
   managers: PracticeManager[];
 };
 
+export type TherapistDocument = {
+  id: string;
+  filename: string;
+  originalName: string;
+  mimetype: string;
+  uploadedAt: string;
+};
+
+export type CertificationOption = {
+  id: string;
+  key: string;
+  label: string;
+  isActive: boolean;
+  sortOrder: number;
+};
+
 export const api = {
   getStats: () => adminFetch<AdminStats>('/admin/stats'),
   getTherapists: () => adminFetch<TherapistWithLinks[]>('/admin/therapists'),
+  getTherapist: (id: string) => adminFetch<TherapistWithLinks>(`/admin/therapists/${id}`),
   getPractices: () => adminFetch<PracticeWithLinks[]>('/admin/practices'),
   getLinks: () => adminFetch<LinkWithEntities[]>('/admin/links'),
   getVisibilityIssues: () => adminFetch<VisibilityIssues>('/admin/visibility-issues'),
   getManagers: () => adminFetch<ManagersResponse>('/admin/managers'),
+  getTherapistDocuments: (id: string) => adminFetch<TherapistDocument[]>(`/admin/therapists/${id}/documents`),
+  getCertificationOptions: () => adminFetch<{ certifications: CertificationOption[] }>('/admin/certifications'),
 };

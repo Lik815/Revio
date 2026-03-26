@@ -14,15 +14,19 @@ async function getAdminToken() {
   return cookieStore.get('revio_admin_token')?.value ?? process.env.ADMIN_TOKEN ?? '';
 }
 
-async function adminPost(path: string) {
+async function adminRequest(path: string, init?: { method?: 'POST' | 'PATCH' | 'DELETE'; body?: unknown }) {
   const token = await getAdminToken();
   let lastError: unknown;
 
   for (const base of getApiBaseCandidates()) {
     try {
       const res = await fetch(`${base}${path}`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        method: init?.method ?? 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          ...(init?.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+        },
+        ...(init?.body !== undefined ? { body: JSON.stringify(init.body) } : {}),
       });
       if (!res.ok) throw new Error(`API ${res.status}: ${path}`);
       return;
@@ -90,61 +94,92 @@ export async function logoutAdmin() {
 
 // Therapist actions
 export async function approveTherapist(id: string) {
-  await adminPost(`/admin/therapists/${id}/approve`);
+  await adminRequest(`/admin/therapists/${id}/approve`);
   revalidatePath('/therapists');
   revalidatePath('/');
 }
 
 export async function rejectTherapist(id: string) {
-  await adminPost(`/admin/therapists/${id}/reject`);
+  await adminRequest(`/admin/therapists/${id}/reject`);
   revalidatePath('/therapists');
   revalidatePath('/');
 }
 
 export async function requestChangesTherapist(id: string) {
-  await adminPost(`/admin/therapists/${id}/request-changes`);
+  await adminRequest(`/admin/therapists/${id}/request-changes`);
   revalidatePath('/therapists');
 }
 
 export async function suspendTherapist(id: string) {
-  await adminPost(`/admin/therapists/${id}/suspend`);
+  await adminRequest(`/admin/therapists/${id}/suspend`);
   revalidatePath('/therapists');
   revalidatePath('/');
 }
 
 // Practice actions
 export async function approvePractice(id: string) {
-  await adminPost(`/admin/practices/${id}/approve`);
+  await adminRequest(`/admin/practices/${id}/approve`);
   revalidatePath('/practices');
   revalidatePath('/');
 }
 
 export async function rejectPractice(id: string) {
-  await adminPost(`/admin/practices/${id}/reject`);
+  await adminRequest(`/admin/practices/${id}/reject`);
   revalidatePath('/practices');
   revalidatePath('/');
 }
 
 export async function suspendPractice(id: string) {
-  await adminPost(`/admin/practices/${id}/suspend`);
+  await adminRequest(`/admin/practices/${id}/suspend`);
   revalidatePath('/practices');
   revalidatePath('/');
 }
 
 // Link actions
 export async function confirmLink(id: string) {
-  await adminPost(`/admin/links/${id}/confirm`);
+  await adminRequest(`/admin/links/${id}/confirm`);
   revalidatePath('/links');
   revalidatePath('/');
 }
 
 export async function rejectLink(id: string) {
-  await adminPost(`/admin/links/${id}/reject`);
+  await adminRequest(`/admin/links/${id}/reject`);
   revalidatePath('/links');
   revalidatePath('/');
 }
 
 export async function disputeLink(id: string) {
-  await adminPost(`/admin/links/${id}/dispute`);
+  await adminRequest(`/admin/links/${id}/dispute`);
   revalidatePath('/links');
+}
+
+// Certification option actions
+export async function createCertificationOption(formData: FormData) {
+  const label = String(formData.get('label') ?? '').trim();
+  if (!label) return;
+
+  await adminRequest('/admin/certifications', {
+    body: { label },
+  });
+  revalidatePath('/settings');
+}
+
+export async function updateCertificationOption(id: string, formData: FormData) {
+  const label = String(formData.get('label') ?? '').trim();
+  if (!label) return;
+
+  await adminRequest(`/admin/certifications/${id}/update`, {
+    body: { label },
+  });
+  revalidatePath('/settings');
+}
+
+export async function toggleCertificationOption(id: string) {
+  await adminRequest(`/admin/certifications/${id}/toggle`);
+  revalidatePath('/settings');
+}
+
+export async function deleteCertificationOption(id: string) {
+  await adminRequest(`/admin/certifications/${id}/delete`);
+  revalidatePath('/settings');
 }

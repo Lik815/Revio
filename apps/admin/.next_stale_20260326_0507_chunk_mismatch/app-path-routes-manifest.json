@@ -1,0 +1,13 @@
+{
+  "/_not-found/page": "/_not-found",
+  "/api/documents/[filename]/route": "/api/documents/[filename]",
+  "/(admin)/managers/page": "/managers",
+  "/(admin)/therapists/page": "/therapists",
+  "/(admin)/profiles/page": "/profiles",
+  "/(admin)/page": "/",
+  "/(admin)/links/page": "/links",
+  "/(admin)/therapists/[id]/page": "/therapists/[id]",
+  "/(admin)/practices/page": "/practices",
+  "/(admin)/settings/page": "/settings",
+  "/login/page": "/login"
+}

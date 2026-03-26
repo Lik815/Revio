@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import {
   Pressable,
@@ -9,8 +9,6 @@ import {
   View,
 } from 'react-native';
 import {
-  getLangLabel,
-  languageOptions,
   regSpecOptions,
 } from './mobile-utils';
 
@@ -28,9 +26,10 @@ export function LoginScreen(props) {
     styles,
     t,
   } = props;
+  const [showPassword, setShowPassword] = useState(false);
 
   return (
-    <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 20 }]}>
+    <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 20, flexGrow: 1 }]}>
       <Pressable onPress={() => setShowLogin(false)} style={styles.backBtn}>
         <Text style={[styles.backBtnText, { color: c.primary }]}>‹ {t('backBtn')}</Text>
       </Pressable>
@@ -54,14 +53,19 @@ export function LoginScreen(props) {
           keyboardType="email-address"
         />
         <Text style={[styles.filterSectionTitle, { color: c.muted, marginTop: 12 }]}>Passwort</Text>
-        <TextInput
-          style={[styles.inputField, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg }]}
-          value={loginPassword}
-          onChangeText={setLoginPassword}
-          placeholder="••••••••"
-          placeholderTextColor={c.muted}
-          secureTextEntry
-        />
+        <View style={{ position: 'relative' }}>
+          <TextInput
+            style={[styles.inputField, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg, paddingRight: 44 }]}
+            value={loginPassword}
+            onChangeText={setLoginPassword}
+            placeholder="••••••••"
+            placeholderTextColor={c.muted}
+            secureTextEntry={!showPassword}
+          />
+          <Pressable onPress={() => setShowPassword(v => !v)} style={{ position: 'absolute', right: 12, top: 0, bottom: 0, justifyContent: 'center' }}>
+            <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color={c.muted} />
+          </Pressable>
+        </View>
       </View>
 
       {loginError ? (
@@ -87,13 +91,14 @@ export function TherapistLandingScreen(props) {
     c,
     setRegStep,
     setRegSubmitted,
+    setShowManagerReg,
     setShowLogin,
     setShowRegister,
     styles,
   } = props;
 
   return (
-    <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 20 }]}>
+    <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 20, flexGrow: 1 }]}>
       <View style={styles.header}>
         <View style={[styles.logoMark, { backgroundColor: c.primary }]}><Text style={styles.logoText}>R</Text></View>
         <View style={{ flex: 1 }}>
@@ -133,8 +138,15 @@ export function TherapistLandingScreen(props) {
         <Text style={styles.registerBtnText}>Jetzt registrieren</Text>
       </Pressable>
 
-      <Pressable onPress={() => setShowLogin(true)}>
-        <Text style={[styles.loginLink, { color: c.primary }]}>Bereits registriert? Anmelden</Text>
+      <Pressable
+        style={[styles.registerBtn, { backgroundColor: c.card, borderWidth: 1, borderColor: c.border, marginTop: 10 }]}
+        onPress={() => setShowLogin(true)}
+      >
+        <Text style={[styles.registerBtnText, { color: c.text }]}>Anmelden</Text>
+      </Pressable>
+
+      <Pressable onPress={() => setShowManagerReg(true)} style={{ alignSelf: 'center', paddingVertical: 8, marginTop: 12 }}>
+        <Text style={{ color: c.muted, fontSize: 14 }}>Praxis als Manager registrieren</Text>
       </Pressable>
     </ScrollView>
   );
@@ -145,14 +157,12 @@ export function CreatePracticeScreen(props) {
     c,
     createPracticeAddress,
     createPracticeCity,
-    createPracticeHours,
     createPracticeLoading,
     createPracticeName,
     createPracticePhone,
     handleCreatePractice,
     setCreatePracticeAddress,
     setCreatePracticeCity,
-    setCreatePracticeHours,
     setCreatePracticeName,
     setCreatePracticePhone,
     setShowCreatePractice,
@@ -182,8 +192,6 @@ export function CreatePracticeScreen(props) {
         <TextInput style={[styles.inputField, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg }]} value={createPracticeAddress} onChangeText={setCreatePracticeAddress} placeholder="Straße und Hausnummer" placeholderTextColor={c.muted} />
         <Text style={[styles.filterSectionTitle, { color: c.muted, marginTop: 12 }]}>Telefon</Text>
         <TextInput style={[styles.inputField, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg }]} value={createPracticePhone} onChangeText={setCreatePracticePhone} placeholder="+49 221 …" placeholderTextColor={c.muted} keyboardType="phone-pad" />
-        <Text style={[styles.filterSectionTitle, { color: c.muted, marginTop: 12 }]}>Öffnungszeiten</Text>
-        <TextInput style={[styles.inputField, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg }]} value={createPracticeHours} onChangeText={setCreatePracticeHours} placeholder="Mo–Fr 8:00–18:00" placeholderTextColor={c.muted} />
       </View>
 
       <Pressable style={[styles.registerBtn, { backgroundColor: createPracticeLoading ? c.border : c.primary }]} onPress={handleCreatePractice} disabled={createPracticeLoading}>
@@ -271,16 +279,19 @@ export function PracticeSearchScreen(props) {
 }
 
 export function InvitePageScreen(props) {
+  const [specializationSearch, setSpecializationSearch] = useState('');
+  const [certificationSearch, setCertificationSearch] = useState('');
   const {
     c,
+    certificationOptions,
     createTherapistAvailability,
     createTherapistBio,
     createTherapistCity,
     createTherapistEmail,
     createTherapistError,
+    createTherapistCerts,
     createTherapistHomeVisit,
     createTherapistKassenart,
-    createTherapistLangs,
     createTherapistLoading,
     createTherapistName,
     createTherapistSpecs,
@@ -294,11 +305,11 @@ export function InvitePageScreen(props) {
     inviteTokenLoading,
     setCreateTherapistAvailability,
     setCreateTherapistBio,
+    setCreateTherapistCerts,
     setCreateTherapistCity,
     setCreateTherapistEmail,
     setCreateTherapistHomeVisit,
     setCreateTherapistKassenart,
-    setCreateTherapistLangs,
     setCreateTherapistName,
     setCreateTherapistSpecs,
     setCreateTherapistTitle,
@@ -307,6 +318,24 @@ export function InvitePageScreen(props) {
     styles,
     t,
   } = props;
+
+  const specializationSuggestions = specializationSearch.trim().length > 0
+    ? regSpecOptions
+        .filter((specialization) =>
+          specialization.toLowerCase().includes(specializationSearch.trim().toLowerCase()) &&
+          !createTherapistSpecs.includes(specialization)
+        )
+        .slice(0, 6)
+    : [];
+
+  const certificationSuggestions = certificationSearch.trim().length > 0
+    ? certificationOptions
+        .filter((option) =>
+          option.label.toLowerCase().includes(certificationSearch.trim().toLowerCase()) &&
+          !createTherapistCerts.includes(option.key)
+        )
+        .slice(0, 6)
+    : [];
 
   return (
     <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 40 }]} keyboardShouldPersistTaps="handled">
@@ -367,39 +396,89 @@ export function InvitePageScreen(props) {
           </View>
 
           <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border, gap: 10 }]}>
-            <Text style={[styles.filterSectionTitle, { color: c.muted }]}>SPEZIALISIERUNGEN</Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-              {regSpecOptions.map((specialization) => {
-                const active = createTherapistSpecs.includes(specialization);
-                return (
+            <Text style={[styles.filterSectionTitle, { color: c.muted }]}>Spezialisierungen</Text>
+            <Text style={{ color: c.muted, fontSize: 12, marginTop: -4 }}>Mehrfachauswahl · optional</Text>
+            <TextInput
+              value={specializationSearch}
+              onChangeText={setSpecializationSearch}
+              placeholder="Spezialisierung suchen…"
+              placeholderTextColor={c.muted}
+              style={[styles.regInput, { backgroundColor: c.mutedBg, borderColor: c.border, color: c.text }]}
+            />
+            {specializationSuggestions.length > 0 && (
+              <View style={{ borderRadius: 10, borderWidth: 1, borderColor: c.border, marginTop: -2, overflow: 'hidden', backgroundColor: c.mutedBg }}>
+                {specializationSuggestions.map((specialization, index) => (
                   <Pressable
                     key={specialization}
-                    onPress={() => setCreateTherapistSpecs((prev) => active ? prev.filter((value) => value !== specialization) : [...prev, specialization])}
-                    style={[styles.kassenartBtn, { backgroundColor: active ? c.primary : c.mutedBg, borderColor: active ? c.primary : c.border }]}
+                    onPress={() => {
+                      setCreateTherapistSpecs((prev) => [...prev, specialization]);
+                      setSpecializationSearch('');
+                    }}
+                    style={{ padding: 12, borderTopWidth: index > 0 ? 1 : 0, borderColor: c.border }}
                   >
-                    <Text style={[styles.kassenartText, { color: active ? '#fff' : c.text }]}>{specialization}</Text>
+                    <Text style={{ color: c.text, fontSize: 14 }}>{specialization}</Text>
                   </Pressable>
-                );
-              })}
-            </View>
+                ))}
+              </View>
+            )}
+            {createTherapistSpecs.length > 0 && (
+              <View style={styles.tagRow}>
+                {createTherapistSpecs.map((specialization) => (
+                  <Pressable
+                    key={specialization}
+                    onPress={() => setCreateTherapistSpecs((prev) => prev.filter((value) => value !== specialization))}
+                    style={[styles.chip, { backgroundColor: c.primary, borderColor: c.primary }]}
+                  >
+                    <Text style={[styles.chipText, { color: '#FFFFFF' }]}>{specialization} ×</Text>
+                  </Pressable>
+                ))}
+              </View>
+            )}
           </View>
 
           <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border, gap: 10 }]}>
-            <Text style={[styles.filterSectionTitle, { color: c.muted }]}>SPRACHEN</Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-              {languageOptions.map((code) => {
-                const active = createTherapistLangs.includes(code);
-                return (
+            <Text style={[styles.filterSectionTitle, { color: c.muted }]}>Fortbildungen</Text>
+            <Text style={{ color: c.muted, fontSize: 12, marginTop: -4 }}>Mehrfachauswahl · optional</Text>
+            <TextInput
+              value={certificationSearch}
+              onChangeText={setCertificationSearch}
+              placeholder="Fortbildung suchen…"
+              placeholderTextColor={c.muted}
+              style={[styles.regInput, { backgroundColor: c.mutedBg, borderColor: c.border, color: c.text }]}
+            />
+            {certificationSuggestions.length > 0 && (
+              <View style={{ borderRadius: 10, borderWidth: 1, borderColor: c.border, marginTop: -2, overflow: 'hidden', backgroundColor: c.mutedBg }}>
+                {certificationSuggestions.map((option, index) => (
                   <Pressable
-                    key={code}
-                    onPress={() => setCreateTherapistLangs((prev) => active ? prev.filter((value) => value !== code) : [...prev, code])}
-                    style={[styles.kassenartBtn, { backgroundColor: active ? c.primary : c.mutedBg, borderColor: active ? c.primary : c.border }]}
+                    key={option.key}
+                    onPress={() => {
+                      setCreateTherapistCerts((prev) => [...prev, option.key]);
+                      setCertificationSearch('');
+                    }}
+                    style={{ padding: 12, borderTopWidth: index > 0 ? 1 : 0, borderColor: c.border }}
                   >
-                    <Text style={[styles.kassenartText, { color: active ? '#fff' : c.text }]}>{getLangLabel(code)}</Text>
+                    <Text style={{ color: c.text, fontSize: 14 }}>{option.label}</Text>
                   </Pressable>
-                );
-              })}
-            </View>
+                ))}
+              </View>
+            )}
+            {createTherapistCerts.length > 0 && (
+              <View style={styles.tagRow}>
+                {createTherapistCerts.map((certificationKey) => {
+                  const option = certificationOptions.find((entry) => entry.key === certificationKey);
+                  const label = option?.label ?? certificationKey;
+                  return (
+                    <Pressable
+                      key={certificationKey}
+                      onPress={() => setCreateTherapistCerts((prev) => prev.filter((value) => value !== certificationKey))}
+                      style={[styles.chip, { backgroundColor: c.primary, borderColor: c.primary }]}
+                    >
+                      <Text style={[styles.chipText, { color: '#FFFFFF' }]}>{label} ×</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            )}
           </View>
 
           <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border, gap: 10 }]}>

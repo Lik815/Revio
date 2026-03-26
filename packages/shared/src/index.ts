@@ -24,6 +24,9 @@ export interface Therapist {
   city: string;
   bio?: string;
   reviewStatus: ReviewStatus;
+  isVisible: boolean;
+  isPublished: boolean;
+  onboardingStatus: string | null;
   createdAt: string;
 }
 
@@ -149,12 +152,21 @@ export interface AdminStats {
   };
 }
 
+export type VisibilityState = 'not_approved' | 'blocked' | 'visible';
+
+export interface TherapistVisibility {
+  visibilityState: VisibilityState;
+  publicSearchEligible: boolean;
+  blockingReasons: string[];
+}
+
 export interface TherapistWithLinks extends Therapist {
   links: Array<{
     id: string;
     status: LinkStatus;
     practice: Practice;
   }>;
+  visibility: TherapistVisibility;
 }
 
 export interface PracticeWithLinks extends Practice {

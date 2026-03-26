@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import {
   Image,
@@ -19,6 +19,7 @@ export function TherapistDashboardScreen(props) {
   const {
     authToken,
     c,
+    documentUploading,
     editAvailability,
     editBio,
     editHomeVisit,
@@ -27,6 +28,7 @@ export function TherapistDashboardScreen(props) {
     editMode,
     editSpecializations,
     handleLoadInviteToken,
+    handlePickDocument,
     handlePickPhoto,
     handleSaveProfile,
     inviteToken,
@@ -50,6 +52,7 @@ export function TherapistDashboardScreen(props) {
     setShowPracticeSearch,
     styles,
     t,
+    therapistDocuments,
   } = props;
 
   const th = loggedInTherapist;
@@ -79,6 +82,29 @@ export function TherapistDashboardScreen(props) {
         </View>
       </View>
 
+      {(th.practices ?? []).length === 0 && (
+        <View style={[{ marginTop: 12, marginHorizontal: 0, borderRadius: 14, borderWidth: 1, padding: 16, backgroundColor: c.mutedBg, borderColor: c.border }]}>
+          <Text style={{ color: c.text, fontWeight: '600', fontSize: 14, marginBottom: 4 }}>Noch keine Praxis verbunden</Text>
+          <Text style={{ color: c.muted, fontSize: 13, marginBottom: 12 }}>
+            Du bist noch mit keiner Praxis verknüpft. Erstelle eine eigene Praxis oder verbinde dich mit einer bestehenden.
+          </Text>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <Pressable
+              onPress={() => setShowCreatePractice(true)}
+              style={{ flex: 1, backgroundColor: c.primary, borderRadius: 10, paddingVertical: 10, alignItems: 'center' }}
+            >
+              <Text style={{ color: '#fff', fontWeight: '600', fontSize: 13 }}>＋ Praxis erstellen</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setShowPracticeSearch(true)}
+              style={{ flex: 1, borderRadius: 10, paddingVertical: 10, alignItems: 'center', borderWidth: 1, borderColor: c.border }}
+            >
+              <Text style={{ color: c.text, fontWeight: '600', fontSize: 13 }}>🔗 Praxis verbinden</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
+
       {editMode ? (
         <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
           <Text style={[styles.filterSectionTitle, { color: c.muted }]}>Über mich</Text>
@@ -99,23 +125,7 @@ export function TherapistDashboardScreen(props) {
             placeholderTextColor={c.muted}
           />
           <Text style={[styles.filterSectionTitle, { color: c.muted, marginTop: 12 }]}>Sprachen</Text>
-          <View>
-            {languageOptions.map((language) => {
-              const checked = editLanguages.includes(language);
-              return (
-                <Pressable
-                  key={language}
-                  onPress={() => setEditLanguages((prev) => prev.includes(language) ? prev.filter((value) => value !== language) : [...prev, language])}
-                  style={styles.checkRow}
-                >
-                  <View style={[styles.checkbox, { borderColor: checked ? c.primary : c.border, backgroundColor: checked ? c.primary : 'transparent' }]}>
-                    {checked && <Text style={styles.checkmark}>✓</Text>}
-                  </View>
-                  <Text style={[styles.checkLabel, { color: c.text }]}>{getLangLabel(language)}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
+          <LangMultiselect editLanguages={editLanguages} setEditLanguages={setEditLanguages} c={c} styles={styles} />
           {(th.practices ?? []).length === 0 && (
             <View style={[styles.detailInfoRow, { marginTop: 12 }]}>
               <Text style={[styles.detailInfoLabel, { color: c.text, flex: 1 }]}>Hausbesuch</Text>
@@ -196,6 +206,46 @@ export function TherapistDashboardScreen(props) {
           <Pressable style={[styles.registerBtn, { backgroundColor: c.primary }]} onPress={props.onEnterEdit}>
             <Text style={styles.registerBtnText}>✏️ Profil bearbeiten</Text>
           </Pressable>
+
+          <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
+            <Text style={[styles.filterSectionTitle, { color: c.muted }]}>Nachweise & Dokumente</Text>
+            {(therapistDocuments ?? []).length > 0 && (
+              <View style={{ marginBottom: 12 }}>
+                {(therapistDocuments ?? []).map((doc) => (
+                  <View
+                    key={doc.id}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: c.border }}
+                  >
+                    <Text style={{ fontSize: 16 }}>{doc.mimetype === 'application/pdf' ? '📄' : '🖼️'}</Text>
+                    <Text style={{ flex: 1, fontSize: 13, color: c.text }} numberOfLines={1}>{doc.originalName}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+            <Pressable
+              onPress={handlePickDocument}
+              disabled={documentUploading}
+              style={{
+                flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+                gap: 8, paddingVertical: 10, paddingHorizontal: 14,
+                borderRadius: 10, borderWidth: 1,
+                borderColor: documentUploading ? c.border : c.primary,
+                borderStyle: 'dashed',
+              }}
+            >
+              {documentUploading ? (
+                <Text style={{ color: c.muted, fontSize: 13 }}>Wird hochgeladen…</Text>
+              ) : (
+                <>
+                  <Ionicons name="attach-outline" size={18} color={c.primary} />
+                  <Text style={{ color: c.primary, fontWeight: '600', fontSize: 13 }}>Nachweis hochladen</Text>
+                </>
+              )}
+            </Pressable>
+            <Text style={{ color: c.muted, fontSize: 12, marginTop: 8 }}>
+              PDF, Foto oder Scan — nur für Admins sichtbar
+            </Text>
+          </View>
 
           {(th.practices ?? []).length > 0 && (
             <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
@@ -521,5 +571,54 @@ export function PracticeAdminScreen(props) {
         <Text style={{ color: c.muted, fontSize: 14 }}>Praxis löschen</Text>
       </Pressable>
     </ScrollView>
+  );
+}
+
+function LangMultiselect({ editLanguages, setEditLanguages, c, styles }) {
+  const [search, setSearch] = useState('');
+  const q = search.trim().toLowerCase();
+  const suggestions = languageOptions.filter((code) => {
+    if (editLanguages.includes(code)) return false;
+    if (!q) return true;
+    return code.toLowerCase().includes(q) || getLangLabel(code).toLowerCase().includes(q);
+  }).slice(0, 8);
+
+  return (
+    <View>
+      {editLanguages.length > 0 && (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+          {editLanguages.map((code) => (
+            <Pressable
+              key={code}
+              onPress={() => setEditLanguages((prev) => prev.filter((l) => l !== code))}
+              style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: c.primary + '22', borderRadius: 16, paddingHorizontal: 10, paddingVertical: 4, gap: 4 }}
+            >
+              <Text style={{ color: c.primary, fontSize: 13 }}>{getLangLabel(code)}</Text>
+              <Text style={{ color: c.primary, fontSize: 13 }}>×</Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
+      <TextInput
+        value={search}
+        onChangeText={setSearch}
+        placeholder="Sprache suchen…"
+        placeholderTextColor={c.muted}
+        style={[styles.inputField, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg }]}
+      />
+      {suggestions.length > 0 && (
+        <View style={{ borderWidth: 1, borderColor: c.border, borderRadius: 8, marginTop: 4, overflow: 'hidden' }}>
+          {suggestions.map((code) => (
+            <Pressable
+              key={code}
+              onPress={() => { setEditLanguages((prev) => [...prev, code]); setSearch(''); }}
+              style={{ paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: c.border }}
+            >
+              <Text style={{ color: c.text, fontSize: 14 }}>{getLangLabel(code)}</Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
+    </View>
   );
 }

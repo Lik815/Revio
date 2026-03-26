@@ -5,6 +5,7 @@ import { randomBytes } from 'crypto';
 import { geocodeAddress } from '../utils/geocode.js';
 import { sendInviteEmail } from '../utils/mailer.js';
 import { getTherapistPublicationState } from '../utils/profile-completeness.js';
+import { tryEnsurePracticeLogoAsset } from '../../prisma/practice-logo.js';
 
 // ── Schemas ──────────────────────────────────────────────────────────────────
 
@@ -48,21 +49,42 @@ const createPracticeSchema = z.object({
 
 // ── Helper ───────────────────────────────────────────────────────────────────
 
-async function getManagerByToken(fastify: any, token: string) {
-  return fastify.prisma.practiceManager.findUnique({
-    where: { sessionToken: token },
-    include: {
-      therapist: {
-        select: {
-          id: true, fullName: true, professionalTitle: true,
-          city: true, bio: true, photo: true,
-          specializations: true, languages: true,
-          isVisible: true, isPublished: true, reviewStatus: true,
-          visibilityPreference: true, onboardingStatus: true,
-        },
-      },
+const MANAGER_INCLUDE = {
+  therapist: {
+    select: {
+      id: true, fullName: true, professionalTitle: true,
+      city: true, bio: true, photo: true,
+      specializations: true, languages: true,
+      isVisible: true, isPublished: true, reviewStatus: true,
+      visibilityPreference: true, onboardingStatus: true,
     },
+  },
+} as const;
+
+async function getManagerByToken(fastify: any, token: string) {
+  // Primary: match by PracticeManager.sessionToken
+  const manager = await fastify.prisma.practiceManager.findFirst({
+    where: { sessionToken: token },
+    include: MANAGER_INCLUDE,
   });
+  if (manager) return manager;
+
+  // Fallback: match by User.sessionToken (covers cases where PracticeManager.sessionToken is out of sync)
+  const user = await fastify.prisma.user.findUnique({ where: { sessionToken: token } });
+  if (!user) return null;
+
+  const mgrByUser = await fastify.prisma.practiceManager.findFirst({
+    where: { userId: user.id },
+    include: MANAGER_INCLUDE,
+  });
+  if (mgrByUser) {
+    // Sync the token so future requests hit the primary path
+    await fastify.prisma.practiceManager.update({
+      where: { id: mgrByUser.id },
+      data: { sessionToken: token },
+    });
+  }
+  return mgrByUser;
 }
 
 async function getManagerPractices(fastify: any, managerId: string) {
@@ -181,6 +203,7 @@ export const managerAuthRoutes: FastifyPluginAsync = async (fastify) => {
 
     // Geocode practice address
     const geo = await geocodeAddress(practiceAddress ?? '', practiceCity);
+    const generatedLogo = tryEnsurePracticeLogoAsset(practiceName, practiceCity);
 
     // Create practice
     const practice = await fastify.prisma.practice.create({
@@ -189,6 +212,7 @@ export const managerAuthRoutes: FastifyPluginAsync = async (fastify) => {
         city: practiceCity,
         address: practiceAddress,
         phone: practicePhone,
+        ...(generatedLogo ? { logo: generatedLogo } : {}),
         reviewStatus: isDev ? 'APPROVED' : 'PENDING_REVIEW',
         ...(geo ? { lat: geo.lat, lng: geo.lng } : {}),
       },
@@ -331,6 +355,7 @@ export const managerAuthRoutes: FastifyPluginAsync = async (fastify) => {
     const { practiceName, practiceCity, practiceAddress, practicePhone } = parsed.data;
     const isDev = process.env.NODE_ENV !== 'production';
     const geo = await geocodeAddress(practiceAddress ?? '', practiceCity);
+    const generatedLogo = tryEnsurePracticeLogoAsset(practiceName, practiceCity);
 
     const practice = await fastify.prisma.practice.create({
       data: {
@@ -338,6 +363,7 @@ export const managerAuthRoutes: FastifyPluginAsync = async (fastify) => {
         city: practiceCity,
         address: practiceAddress,
         phone: practicePhone,
+        ...(generatedLogo ? { logo: generatedLogo } : {}),
         reviewStatus: isDev ? 'APPROVED' : 'PENDING_REVIEW',
         ...(geo ? { lat: geo.lat, lng: geo.lng } : {}),
       },
@@ -531,6 +557,7 @@ export const managerAuthRoutes: FastifyPluginAsync = async (fastify) => {
       bio: z.string().optional(),
       specializations: z.array(z.string()).optional().default([]),
       languages: z.array(z.string()).optional().default([]),
+      certifications: z.array(z.string()).optional().default([]),
       kassenart: z.string().optional(),
       homeVisit: z.boolean().optional().default(false),
       availability: z.string().optional(),
@@ -538,7 +565,7 @@ export const managerAuthRoutes: FastifyPluginAsync = async (fastify) => {
     const parsed = schema.safeParse(request.body);
     if (!parsed.success) return reply.badRequest(parsed.error.flatten().toString());
 
-    const { fullName, professionalTitle, email, practiceId, city, bio, specializations, languages, kassenart, homeVisit, availability } = parsed.data;
+    const { fullName, professionalTitle, email, practiceId, city, bio, specializations, languages, certifications, kassenart, homeVisit, availability } = parsed.data;
 
     const assignment = await fastify.prisma.managerPracticeAssignment.findUnique({
       where: { managerId_practiceId: { managerId: manager.id, practiceId } },
@@ -559,6 +586,7 @@ export const managerAuthRoutes: FastifyPluginAsync = async (fastify) => {
         bio: bio ?? null,
         specializations: specializations.join(', '),
         languages: languages.join(', '),
+        certifications: certifications.join(', '),
         kassenart: kassenart ?? '',
         homeVisit: homeVisit ?? false,
         availability: availability ?? undefined,

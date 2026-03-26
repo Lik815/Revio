@@ -1,18 +1,63 @@
 import { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
+import { createReadStream, existsSync } from 'fs';
+import { join, dirname, basename } from 'path';
+import { fileURLToPath } from 'url';
 import { getEnv } from '../env.js';
 import { geocodeAddress } from '../utils/geocode.js';
+import { getTherapistPublicationState } from '../utils/profile-completeness.js';
+import { sendPushNotification } from '../utils/push-notify.js';
+import { sendProfileApprovedEmail, sendProfileRejectedEmail, sendProfileChangesRequestedEmail } from '../utils/mailer.js';
+import { ensureDefaultCertificationOptions } from '../utils/certification-options.js';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const DOCUMENTS_DIR = join(__dirname, '../../../documents');
 
 const splitList = (value: string) =>
   value.split(',').map((s) => s.trim()).filter(Boolean);
 
-function mapTherapist(t: {
+type TherapistRow = {
   id: string; email: string; fullName: string; professionalTitle: string;
   city: string; bio: string | null; homeVisit: boolean; specializations: string;
   languages: string; certifications: string; reviewStatus: string;
+  isVisible: boolean; isPublished: boolean; onboardingStatus: string | null;
   createdAt: Date; updatedAt: Date;
   links?: Array<{ id: string; status: string; practice: { id: string; name: string; city: string; address: string | null; phone: string | null; hours: string | null; lat: number; lng: number; reviewStatus: string; createdAt: Date; updatedAt: Date } }>;
-}) {
+};
+
+function computeVisibility(t: TherapistRow) {
+  if (t.reviewStatus !== 'APPROVED') {
+    return { visibilityState: 'not_approved' as const, publicSearchEligible: false, blockingReasons: [] };
+  }
+
+  const pubState = getTherapistPublicationState(t);
+  const blockingReasons: string[] = [];
+
+  if (!pubState.complete) blockingReasons.push('profile_incomplete');
+  if (!t.isVisible) blockingReasons.push('manually_hidden');
+
+  const requiresExplicitPublication =
+    t.onboardingStatus === 'manager_onboarding' ||
+    t.onboardingStatus === 'invited' ||
+    t.onboardingStatus === 'claimed';
+  if (requiresExplicitPublication && !t.isPublished) blockingReasons.push('publication_missing');
+
+  const confirmedLinks = (t.links ?? []).filter((l) => l.status === 'CONFIRMED');
+  if (confirmedLinks.length === 0) {
+    const hasPending = (t.links ?? []).some((l) => l.status === 'PROPOSED' || l.status === 'DISPUTED');
+    blockingReasons.push(hasPending ? 'pending_link_only' : 'no_confirmed_link');
+  } else if (confirmedLinks.every((l) => l.practice.reviewStatus !== 'APPROVED')) {
+    blockingReasons.push('practice_not_approved');
+  }
+
+  return {
+    visibilityState: blockingReasons.length === 0 ? 'visible' as const : 'blocked' as const,
+    publicSearchEligible: blockingReasons.length === 0,
+    blockingReasons,
+  };
+}
+
+function mapTherapist(t: TherapistRow) {
   return {
     id: t.id, email: t.email, fullName: t.fullName,
     professionalTitle: t.professionalTitle, city: t.city,
@@ -21,8 +66,12 @@ function mapTherapist(t: {
     languages: splitList(t.languages),
     certifications: splitList(t.certifications),
     reviewStatus: t.reviewStatus,
+    isVisible: t.isVisible,
+    isPublished: t.isPublished,
+    onboardingStatus: t.onboardingStatus,
     createdAt: t.createdAt.toISOString(),
     links: t.links?.map((l) => ({ id: l.id, status: l.status, practice: mapPractice(l.practice) })),
+    visibility: computeVisibility(t),
   };
 }
 
@@ -51,6 +100,9 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
   const loginSchema = z.object({
     email: z.string().email(),
     password: z.string().min(1),
+  });
+  const certificationSchema = z.object({
+    label: z.string().trim().min(2),
   });
 
   fastify.post('/login', async (request, reply) => {
@@ -87,9 +139,180 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
     };
   });
 
-  // Visibility issues: always returns empty since APPROVED therapists are always visible
+  fastify.get('/certifications', async () => {
+    await ensureDefaultCertificationOptions(fastify.prisma);
+
+    const certifications = await fastify.prisma.certificationOption.findMany({
+      orderBy: [{ sortOrder: 'asc' }, { label: 'asc' }],
+    });
+
+    return {
+      certifications: certifications.map((option) => ({
+        id: option.id,
+        key: option.key,
+        label: option.label,
+        isActive: option.isActive,
+        sortOrder: option.sortOrder,
+      })),
+    };
+  });
+
+  fastify.post('/certifications', async (request, reply) => {
+    await ensureDefaultCertificationOptions(fastify.prisma);
+
+    const parsed = certificationSchema.safeParse(request.body);
+    if (!parsed.success) return reply.badRequest('Ungültige Eingabedaten');
+
+    const label = parsed.data.label;
+    const existing = await fastify.prisma.certificationOption.findFirst({
+      where: {
+        OR: [{ key: label }, { label }],
+      },
+    });
+    if (existing) return reply.conflict('Diese Fortbildung existiert bereits');
+
+    const maxSortOrder = await fastify.prisma.certificationOption.aggregate({
+      _max: { sortOrder: true },
+    });
+
+    const option = await fastify.prisma.certificationOption.create({
+      data: {
+        key: label,
+        label,
+        isActive: true,
+        sortOrder: (maxSortOrder._max.sortOrder ?? 0) + 10,
+      },
+    });
+
+    return reply.status(201).send({
+      id: option.id,
+      key: option.key,
+      label: option.label,
+      isActive: option.isActive,
+      sortOrder: option.sortOrder,
+    });
+  });
+
+  fastify.post('/certifications/:id/update', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const parsed = certificationSchema.safeParse(request.body);
+    if (!parsed.success) return reply.badRequest('Ungültige Eingabedaten');
+
+    const existing = await fastify.prisma.certificationOption.findUnique({ where: { id } });
+    if (!existing) return reply.notFound('Fortbildung nicht gefunden');
+
+    const label = parsed.data.label;
+    const duplicate = await fastify.prisma.certificationOption.findFirst({
+      where: {
+        id: { not: id },
+        OR: [{ key: label }, { label }],
+      },
+    });
+    if (duplicate) return reply.conflict('Diese Fortbildung existiert bereits');
+
+    const option = await fastify.prisma.certificationOption.update({
+      where: { id },
+      data: { label },
+    });
+
+    return {
+      id: option.id,
+      key: option.key,
+      label: option.label,
+      isActive: option.isActive,
+      sortOrder: option.sortOrder,
+    };
+  });
+
+  fastify.post('/certifications/:id/toggle', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const existing = await fastify.prisma.certificationOption.findUnique({ where: { id } });
+    if (!existing) return reply.notFound('Fortbildung nicht gefunden');
+
+    const option = await fastify.prisma.certificationOption.update({
+      where: { id },
+      data: { isActive: !existing.isActive },
+    });
+
+    return {
+      id: option.id,
+      key: option.key,
+      label: option.label,
+      isActive: option.isActive,
+      sortOrder: option.sortOrder,
+    };
+  });
+
+  fastify.post('/certifications/:id/delete', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const existing = await fastify.prisma.certificationOption.findUnique({ where: { id } });
+    if (!existing) return reply.notFound('Fortbildung nicht gefunden');
+
+    await fastify.prisma.certificationOption.delete({ where: { id } });
+    return { success: true };
+  });
+
+  // Visibility issues: APPROVED therapists who are not publicly visible
   fastify.get('/visibility-issues', async () => {
-    return { count: 0, issues: [] };
+    const therapists = await fastify.prisma.therapist.findMany({
+      where: { reviewStatus: 'APPROVED' },
+      include: {
+        links: {
+          include: { practice: { select: { id: true, name: true, reviewStatus: true } } },
+        },
+      },
+    });
+
+    const issues: Array<{
+      therapistId: string;
+      therapistName: string;
+      email: string;
+      reason: string;
+      detail: string;
+      linkedPractices: Array<{ id: string; name: string; status: string; reviewStatus: string }>;
+    }> = [];
+
+    for (const t of therapists) {
+      const pubState = getTherapistPublicationState(t);
+      const confirmedLinks = t.links.filter((l) => l.status === 'CONFIRMED');
+      const linkedPractices = t.links.map((l) => ({
+        id: l.practice.id,
+        name: l.practice.name,
+        status: l.status,
+        reviewStatus: l.practice.reviewStatus,
+      }));
+
+      if (!pubState.publicSearchEligible) {
+        let reason = 'publication_incomplete';
+        let detail = `Missing fields: ${pubState.missingFields.join(', ') || 'none'}; isVisible=${t.isVisible}; isPublished=${t.isPublished}; onboardingStatus=${t.onboardingStatus}`;
+        issues.push({ therapistId: t.id, therapistName: t.fullName, email: t.email, reason, detail, linkedPractices });
+        continue;
+      }
+
+      // publicSearchEligible is true — check practice links
+      if (confirmedLinks.length === 0) {
+        const hasProposed = t.links.some((l) => l.status === 'PROPOSED' || l.status === 'DISPUTED');
+        const reason = hasProposed ? 'pending_link_only' : 'no_confirmed_link';
+        const detail = hasProposed
+          ? `Has ${t.links.filter((l) => l.status === 'PROPOSED' || l.status === 'DISPUTED').length} pending/disputed link(s), none confirmed`
+          : 'No practice links at all';
+        issues.push({ therapistId: t.id, therapistName: t.fullName, email: t.email, reason, detail, linkedPractices });
+      } else {
+        const unapprovedPractices = confirmedLinks.filter((l) => l.practice.reviewStatus !== 'APPROVED');
+        if (unapprovedPractices.length > 0 && confirmedLinks.every((l) => l.practice.reviewStatus !== 'APPROVED')) {
+          issues.push({
+            therapistId: t.id,
+            therapistName: t.fullName,
+            email: t.email,
+            reason: 'confirmed_link_practice_not_approved',
+            detail: `All confirmed practices have non-APPROVED status: ${unapprovedPractices.map((l) => `${l.practice.name} (${l.practice.reviewStatus})`).join(', ')}`,
+            linkedPractices,
+          });
+        }
+      }
+    }
+
+    return { count: issues.length, issues };
   });
 
   // Stats
@@ -149,6 +372,19 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
       }),
     ]);
 
+    // Push + email notifications — fire-and-forget, must not block the response
+    if (t.expoPushToken) {
+      sendPushNotification({
+        to: t.expoPushToken,
+        title: 'Profil freigegeben ✓',
+        body: 'Dein Therapeutenprofil wurde geprüft und ist jetzt auf Revio sichtbar.',
+        data: { type: 'profile_approved' },
+      });
+    }
+    sendProfileApprovedEmail({ to: t.email, name: t.fullName }).catch((err) =>
+      fastify.log.error({ err }, 'Failed to send profile approved email'),
+    );
+
     return {
       message: 'Therapeut freigegeben.',
       sideEffects: {
@@ -162,6 +398,19 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
     const { id } = request.params as { id: string };
     const t = await fastify.prisma.therapist.update({ where: { id }, data: { reviewStatus: 'REJECTED' } }).catch(() => null);
     if (!t) return reply.notFound('Therapist not found');
+
+    if (t.expoPushToken) {
+      sendPushNotification({
+        to: t.expoPushToken,
+        title: 'Profil nicht freigegeben',
+        body: 'Dein Therapeutenprofil konnte leider nicht freigegeben werden. Bitte kontaktiere uns für weitere Informationen.',
+        data: { type: 'profile_rejected' },
+      });
+    }
+    sendProfileRejectedEmail({ to: t.email, name: t.fullName }).catch((err) =>
+      fastify.log.error({ err }, 'Failed to send profile rejected email'),
+    );
+
     return { message: 'Therapist rejected.' };
   });
 
@@ -169,6 +418,19 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
     const { id } = request.params as { id: string };
     const t = await fastify.prisma.therapist.update({ where: { id }, data: { reviewStatus: 'CHANGES_REQUESTED' } }).catch(() => null);
     if (!t) return reply.notFound('Therapist not found');
+
+    sendProfileChangesRequestedEmail({ to: t.email, name: t.fullName }).catch((err) =>
+      fastify.log.error({ err }, 'Failed to send profile changes-requested email'),
+    );
+
+    if (t.expoPushToken) {
+      sendPushNotification({
+        to: t.expoPushToken,
+        title: 'Änderungen erforderlich',
+        body: 'Bitte überarbeite dein Therapeutenprofil und reiche es erneut ein.',
+      }).catch((err) => fastify.log.error({ err }, 'Failed to send push for request-changes'));
+    }
+
     return { message: 'Changes requested.' };
   });
 
@@ -176,6 +438,15 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
     const { id } = request.params as { id: string };
     const t = await fastify.prisma.therapist.update({ where: { id }, data: { reviewStatus: 'SUSPENDED' } }).catch(() => null);
     if (!t) return reply.notFound('Therapist not found');
+
+    if (t.expoPushToken) {
+      sendPushNotification({
+        to: t.expoPushToken,
+        title: 'Profil gesperrt',
+        body: 'Dein Therapeutenprofil wurde vorübergehend gesperrt. Bitte kontaktiere uns für weitere Informationen.',
+      }).catch((err) => fastify.log.error({ err }, 'Failed to send push for suspend'));
+    }
+
     return { message: 'Therapist suspended.' };
   });
 
@@ -294,5 +565,55 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     return { total: practices.length, updated, failed };
+  });
+
+  // Documents
+  fastify.get('/therapists/:id/documents', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const therapist = await fastify.prisma.therapist.findUnique({ where: { id } });
+    if (!therapist) return reply.notFound('Therapist not found');
+
+    const docs = await fastify.prisma.therapistDocument.findMany({
+      where: { therapistId: id },
+      orderBy: { uploadedAt: 'desc' },
+    });
+
+    return docs.map((d) => ({
+      id: d.id,
+      filename: d.filename,
+      originalName: d.originalName,
+      mimetype: d.mimetype,
+      uploadedAt: d.uploadedAt.toISOString(),
+    }));
+  });
+
+  // Serve a document file — admin-only (verifyAdmin hook covers this route)
+  fastify.get('/documents/:filename', async (request, reply) => {
+    const { filename } = request.params as { filename: string };
+
+    // Prevent path traversal: only allow plain filenames (no slashes, no dots leading path)
+    if (!/^[a-f0-9]{32}\.(pdf|jpg|png|webp)$/.test(filename)) {
+      return reply.badRequest('Ungültiger Dateiname');
+    }
+
+    const filepath = join(DOCUMENTS_DIR, filename);
+    if (!existsSync(filepath)) return reply.notFound('Datei nicht gefunden');
+
+    // Verify the file is actually tracked in the DB (no orphan access)
+    const doc = await fastify.prisma.therapistDocument.findFirst({ where: { filename } });
+    if (!doc) return reply.notFound('Datei nicht gefunden');
+
+    const mimeMap: Record<string, string> = {
+      pdf: 'application/pdf',
+      jpg: 'image/jpeg',
+      png: 'image/png',
+      webp: 'image/webp',
+    };
+    const ext = filename.split('.').pop() ?? '';
+    const contentType = mimeMap[ext] ?? 'application/octet-stream';
+
+    reply.header('Content-Type', contentType);
+    reply.header('Content-Disposition', `inline; filename="${doc.originalName}"`);
+    return reply.send(createReadStream(filepath));
   });
 };

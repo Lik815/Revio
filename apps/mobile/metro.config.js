@@ -41,13 +41,29 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
       type: 'sourceFile',
     };
   }
-  // Stub react-native-maps on web (native-only library)
+
+  // ── Map platform split ────────────────────────────────────────────────────
+  // react-native-maps is a native-only library (MapKit on iOS, Google Maps on
+  // Android). It must never be bundled into the web build.
+  //
+  // Strategy: two independent guards so neither can fail alone.
+  //   1. Metro resolver (here): replaces the import at bundle time for web.
+  //      This is the authoritative guard — react-native-maps never enters the
+  //      web bundle even if dead-code elimination misses the branch below.
+  //   2. Runtime Platform.OS check (mobile-discover-screen.js): signals dead
+  //      code to the bundler so the else-branch is eliminated on web. Acts as
+  //      an explicit, readable declaration of intent in the source file.
+  //
+  // MapStub.js exports the same API surface (default MapView, Marker, Circle)
+  // so the rest of mobile-discover-screen.js is platform-agnostic.
+  // ─────────────────────────────────────────────────────────────────────────
   if (moduleName === 'react-native-maps' && platform === 'web') {
     return {
       filePath: path.resolve(projectRoot, 'src/MapStub.js'),
       type: 'sourceFile',
     };
   }
+
   if (typeof context.resolveRequest === 'function') {
     return context.resolveRequest(context, moduleName, platform);
   }

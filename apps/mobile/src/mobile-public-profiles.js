@@ -41,12 +41,12 @@ export function PracticeProfileScreen(props) {
     callPhone,
     isPracticeFavorite,
     openPractice,
+    openTherapistById,
     practice,
     selectedPracticeError,
     selectedPracticeLoading,
     selectedPracticeTherapists,
     setSelectedPractice,
-    setSelectedTherapist,
     styles,
     t,
     toggleFavoritePractice,
@@ -140,7 +140,7 @@ export function PracticeProfileScreen(props) {
         </View>
       ) : (
         therapists.map((therapist) => (
-          <Pressable key={therapist.id} onPress={() => setSelectedTherapist(therapist)} style={[styles.miniCard, { backgroundColor: c.card, borderColor: c.border }]}>
+          <Pressable key={therapist.id} onPress={() => openTherapistById(therapist.id)} style={[styles.miniCard, { backgroundColor: c.card, borderColor: c.border }]}>
             <Image source={{ uri: therapist.photo }} style={styles.miniAvatar} />
             <View style={{ flex: 1 }}>
               <Text style={[styles.cardName, { color: c.text }]}>{therapist.fullName}</Text>
@@ -353,7 +353,10 @@ export function TherapistProfileScreen(props) {
             <Pressable style={[styles.ctaBtn, { backgroundColor: c.accent, flex: 1 }]} onPress={() => callPhone(primaryPractice.phone)}>
               <Text style={styles.ctaBtnText}>{t('callPractice')}</Text>
             </Pressable>
-            <Pressable style={[styles.ctaBtnSecondary, { borderColor: c.border, backgroundColor: c.mutedBg, flex: 1 }]} onPress={() => openPractice(primaryPractice)}>
+            <Pressable
+              style={[styles.ctaBtnSecondary, { borderColor: c.border, backgroundColor: c.mutedBg, flex: 1 }]}
+              onPress={() => { setSelectedTherapist(null); openPractice(primaryPractice); }}
+            >
               <Text style={[styles.ctaBtnSecondaryText, { color: c.text }]}>Praxis ansehen</Text>
             </Pressable>
           </View>

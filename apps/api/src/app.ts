@@ -17,6 +17,7 @@ import { practiceRoutes } from './routes/practice.js';
 import { uploadRoutes } from './routes/upload.js';
 import { inviteRoutes } from './routes/invite.js';
 import { managerAuthRoutes } from './routes/manager-auth.js';
+import { configRoutes } from './routes/config.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -35,6 +36,7 @@ export async function buildApp() {
   await app.register(adminAuthPlugin);
 
   await app.register(healthRoutes);
+  await app.register(configRoutes);
   await app.register(searchRoutes);
   await app.register(registerRoutes);
   await app.register(adminRoutes, { prefix: '/admin' });

@@ -9,7 +9,7 @@ export function PageShell({
 }: {
   title: string;
   description?: string;
-  eyebrow?: string;
+  eyebrow?: ReactNode;
   actions?: ReactNode;
   children: ReactNode;
 }) {

@@ -8,6 +8,7 @@ const links = [
   { href: '/practices', label: 'Praxen', icon: '◪' },
   { href: '/links', label: 'Verknüpfungen', icon: '⇄' },
   { href: '/managers', label: 'Manager', icon: '◈' },
+  { href: '/settings', label: 'Fortbildungen', icon: '☰' },
 ];
 
 export function Sidebar({

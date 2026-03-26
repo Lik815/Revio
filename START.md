@@ -8,7 +8,7 @@ pnpm db:generate
 pnpm db:migrate
 pnpm db:seed
 pnpm dev
-```
+``` 
 
 `pnpm dev` startet API, Admin-Dashboard und Mobile (Expo) gleichzeitig.
 
@@ -115,9 +115,16 @@ Und fuer Mobile:
 
 ## Haeufige Fehler
 
-`Keine Suchdaten auf dem Handy`
-- meist zeigt `apps/mobile/.env` auf `localhost` oder auf eine alte `*.loca.lt`-URL
-- lokal besser die LAN-IP des Rechners verwenden
+`Keine Therapeuten in der Suche` / `Kein Login möglich` / `Keine Suchdaten`
+- **häufigste Ursache:** `apps/mobile/.env` zeigt auf eine alte oder tote URL (z. B. abgelaufener ngrok/localtunnel-Link oder alte LAN-IP)
+- Fix: `apps/mobile/.env` auf `http://localhost:4000` setzen (für Browser/Simulator/Expo Web)
+
+```bash
+EXPO_PUBLIC_API_URL=http://localhost:4000
+```
+
+- Danach Expo **komplett neu starten** — `.env`-Änderungen werden erst beim Neustart übernommen, nicht beim Hot-Reload
+- Für echtes Handy: aktuelle LAN-IP des Rechners verwenden (ändert sich bei Netzwechsel!), z. B. `http://192.168.178.X:4000`
 
 `Tunnel Unavailable`
 - der alte API-Tunnel ist tot
@@ -145,16 +152,19 @@ lsof -nP -iTCP:8081 -sTCP:LISTEN
 
 ## Sauber neu starten
 
-Wenn du alles einmal komplett frisch starten willst:
+Alles auf einmal killen:
 
 ```bash
-lsof -nP -iTCP:3000 -sTCP:LISTEN
-lsof -nP -iTCP:4000 -sTCP:LISTEN
-lsof -nP -iTCP:8081 -sTCP:LISTEN
-kill <PID>
+lsof -ti :4000,:8081,:8082,:19000,:19001,:19002 | xargs kill -9 2>/dev/null; pkill -f "expo" 2>/dev/null; pkill -f "tsx src/server" 2>/dev/null; pkill -f "next dev" 2>/dev/null; echo "Alles gestoppt."
 ```
 
-Dann z. B.:
+Dann neu starten:
+
+```bash
+pnpm dev
+```
+
+Oder einzeln:
 
 ```bash
 pnpm dev:api
@@ -170,6 +180,6 @@ Admin:
 - Passwort: `admin123`
 - Admin-Token: `dev-admin-token`
 
-Praxismanager-Testaccount:
+Therapeut + Praxis-Admin ("Physio & Motion"):
 - E-Mail: `test@revio.de`
 - Passwort: `password`

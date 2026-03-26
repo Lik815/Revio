@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import { scrypt, randomBytes } from 'crypto';
 import { promisify } from 'util';
+import { ensurePracticeLogoAsset } from './practice-logo.js';
 
 const scryptAsync = promisify(scrypt);
 const prisma = new PrismaClient();
@@ -170,6 +171,7 @@ async function main() {
     // Deterministic picsum photo IDs (offset to get clinic/interior-ish images)
     const photoId1 = 200 + (i * 17) % 800;
     const photoId2 = 201 + (i * 23) % 800;
+    const logo = ensurePracticeLogoAsset(PRACTICE_NAMES[i], cityName);
 
     const p = await prisma.practice.create({
       data: {
@@ -181,6 +183,7 @@ async function main() {
         lat: jitter(lat, i * 17),
         lng: jitter(lng, i * 31),
         reviewStatus: 'APPROVED',
+        logo,
         photos: JSON.stringify([
           `https://picsum.photos/id/${photoId1}/600/400`,
           `https://picsum.photos/id/${photoId2}/600/400`,
@@ -329,6 +332,7 @@ async function main() {
       hours: 'Mo–Fr 9:00–18:00',
       lat: 50.95,
       lng: 6.97,
+      logo: ensurePracticeLogoAsset('Neuro Motion Lab', 'Köln'),
       reviewStatus: 'PENDING_REVIEW',
     },
   });

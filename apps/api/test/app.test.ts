@@ -389,6 +389,77 @@ describe('POST /search', () => {
   });
 });
 
+describe('GET /practice-detail/:id', () => {
+  it('returns public therapists for an approved practice detail page', async () => {
+    const practice = await prisma.practice.create({
+      data: {
+        name: 'Praxis Detail',
+        city: 'Köln',
+        reviewStatus: 'APPROVED',
+      },
+    });
+
+    const visibleTherapist = await prisma.therapist.create({
+      data: {
+        email: 'practice-detail-visible@test.com',
+        fullName: 'Visible Therapist',
+        professionalTitle: 'Physiotherapeutin',
+        city: 'Köln',
+        bio: 'Vollständiges Profil für die Praxisdetailseite.',
+        specializations: 'Manuelle Therapie, Lymphdrainage',
+        languages: 'de, en',
+        certifications: '',
+        reviewStatus: 'APPROVED',
+        isVisible: true,
+        isPublished: true,
+        onboardingStatus: 'claimed',
+        links: {
+          create: {
+            practiceId: practice.id,
+            status: 'CONFIRMED',
+          },
+        },
+      },
+    });
+
+    await prisma.therapist.create({
+      data: {
+        email: 'practice-detail-hidden@test.com',
+        fullName: 'Hidden Therapist',
+        professionalTitle: 'Physiotherapeut',
+        city: 'Köln',
+        bio: 'Sollte nicht auf der Praxisdetailseite erscheinen.',
+        specializations: 'Bobath-Therapie',
+        languages: 'de',
+        certifications: '',
+        reviewStatus: 'APPROVED',
+        isVisible: true,
+        isPublished: false,
+        onboardingStatus: 'claimed',
+        links: {
+          create: {
+            practiceId: practice.id,
+            status: 'CONFIRMED',
+          },
+        },
+      },
+    });
+
+    const res = await app.inject({
+      method: 'GET',
+      url: `/practice-detail/${practice.id}`,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.practice.id).toBe(practice.id);
+    expect(body.therapists).toHaveLength(1);
+    expect(body.therapists[0].id).toBe(visibleTherapist.id);
+    expect(body.therapists[0].fullName).toBe('Visible Therapist');
+    expect(body.therapists[0].specializations).toEqual(['Manuelle Therapie', 'Lymphdrainage']);
+  });
+});
+
 // ─── Registration ─────────────────────────────────────────────────────────────
 
 describe('POST /register/therapist', () => {

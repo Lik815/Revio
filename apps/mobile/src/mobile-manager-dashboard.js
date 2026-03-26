@@ -37,7 +37,6 @@ export function ManagerDashboardContent(props) {
     activePracticeId,
     c,
     handleAddManagerPracticePhoto,
-    handleAddNewPractice,
     handleDeleteManagerPractice,
     handleManagerPracticeSave,
     handleManagerProfilePublication,
@@ -56,11 +55,6 @@ export function ManagerDashboardContent(props) {
     mgrEditPhone,
     mgrEditPhotos,
     mgrEditSaving,
-    mgrNewPracticeAddress,
-    mgrNewPracticeCity,
-    mgrNewPracticeLoading,
-    mgrNewPracticeName,
-    mgrNewPracticePhone,
     mgrProfileBio,
     mgrProfileEditMode,
     mgrProfileFullName,
@@ -82,10 +76,6 @@ export function ManagerDashboardContent(props) {
     setMgrEditName,
     setMgrEditPhone,
     setMgrEditPhotos,
-    setMgrNewPracticeAddress,
-    setMgrNewPracticeCity,
-    setMgrNewPracticeName,
-    setMgrNewPracticePhone,
     setMgrProfileBio,
     setMgrProfileEditMode,
     setMgrProfileFullName,
@@ -93,11 +83,9 @@ export function ManagerDashboardContent(props) {
     setMgrProfileLanguages,
     setMgrProfileSpecializations,
     setMgrProfileTitle,
-    setShowAddPracticeForm,
     setShowInvitePage,
     setInvitePageTab,
     setInviteToken,
-    showAddPracticeForm,
     styles,
   } = props;
 
@@ -499,7 +487,8 @@ export function ManagerDashboardContent(props) {
         </View>
 
         {!mgrEditMode && (
-          <View style={{ marginHorizontal: 16, marginBottom: 12 }}>
+          <View style={{ marginHorizontal: 16, marginBottom: 12, gap: 8 }}>
+            {/* Invite a new therapist by email */}
             <Pressable
               onPress={() => {
                 setInvitePageTab('new');
@@ -523,73 +512,6 @@ export function ManagerDashboardContent(props) {
           </Pressable>
         )}
 
-        {!mgrEditMode && (
-          <View style={{ marginHorizontal: 16, marginBottom: 12 }}>
-            {!showAddPracticeForm ? (
-              <Pressable
-                onPress={() => setShowAddPracticeForm(true)}
-                style={{ borderRadius: 12, paddingVertical: 12, alignItems: 'center', borderWidth: 1.5, borderColor: c.primary, flexDirection: 'row', justifyContent: 'center', gap: 6 }}
-              >
-                <Ionicons name="add-circle-outline" size={18} color={c.primary} />
-                <Text style={{ color: c.primary, fontSize: 15, fontWeight: '600' }}>Weitere Praxis hinzufuegen</Text>
-              </Pressable>
-            ) : (
-              <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
-                <Text style={[styles.filterSectionTitle, { color: c.muted, marginBottom: 10 }]}>NEUE PRAXIS</Text>
-                <TextInput
-                  style={[styles.input, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg, marginBottom: 8 }]}
-                  placeholder="Praxisname *"
-                  placeholderTextColor={c.muted}
-                  value={mgrNewPracticeName}
-                  onChangeText={setMgrNewPracticeName}
-                />
-                <TextInput
-                  style={[styles.input, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg, marginBottom: 8 }]}
-                  placeholder="Stadt *"
-                  placeholderTextColor={c.muted}
-                  value={mgrNewPracticeCity}
-                  onChangeText={setMgrNewPracticeCity}
-                />
-                <TextInput
-                  style={[styles.input, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg, marginBottom: 8 }]}
-                  placeholder="Adresse"
-                  placeholderTextColor={c.muted}
-                  value={mgrNewPracticeAddress}
-                  onChangeText={setMgrNewPracticeAddress}
-                />
-                <TextInput
-                  style={[styles.input, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg, marginBottom: 12 }]}
-                  placeholder="Telefon"
-                  placeholderTextColor={c.muted}
-                  value={mgrNewPracticePhone}
-                  onChangeText={setMgrNewPracticePhone}
-                  keyboardType="phone-pad"
-                />
-                <View style={{ flexDirection: 'row', gap: 10 }}>
-                  <Pressable
-                    style={{ flex: 1, backgroundColor: c.mutedBg, borderRadius: 12, paddingVertical: 12, alignItems: 'center', borderWidth: 1, borderColor: c.border }}
-                    onPress={() => {
-                      setShowAddPracticeForm(false);
-                      setMgrNewPracticeName('');
-                      setMgrNewPracticeCity('');
-                      setMgrNewPracticeAddress('');
-                      setMgrNewPracticePhone('');
-                    }}
-                  >
-                    <Text style={{ color: c.text, fontWeight: '600' }}>Abbrechen</Text>
-                  </Pressable>
-                  <Pressable
-                    style={{ flex: 1, backgroundColor: mgrNewPracticeLoading ? c.border : c.primary, borderRadius: 12, paddingVertical: 12, alignItems: 'center' }}
-                    onPress={handleAddNewPractice}
-                    disabled={mgrNewPracticeLoading}
-                  >
-                    <Text style={{ color: '#fff', fontWeight: '700' }}>{mgrNewPracticeLoading ? 'Erstellen...' : 'Erstellen'}</Text>
-                  </Pressable>
-                </View>
-              </View>
-            )}
-          </View>
-        )}
       </ScrollView>
     </View>
   );

@@ -13,7 +13,9 @@
     "test": "pnpm -r test",
     "db:generate": "pnpm --filter @revio/api prisma:generate",
     "db:migrate": "pnpm --filter @revio/api prisma:migrate",
-    "db:seed": "pnpm --filter @revio/api seed"
+    "db:seed": "pnpm --filter @revio/api seed",
+    "db:seed:koeln": "pnpm --filter @revio/api seed:koeln",
+    "db:seed:practice-logos": "pnpm --filter @revio/api seed:practice-logos"
   },
   "dependencies": {
     "expo": "^55.0.8"

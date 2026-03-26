@@ -37,15 +37,18 @@ enum Role {
 }
 
 model User {
-  id               String                  @id @default(cuid())
-  email            String                  @unique
-  passwordHash     String?
-  sessionToken     String?                 @unique
-  role             Role
-  createdAt        DateTime                @default(now())
-  updatedAt        DateTime                @updatedAt
-  therapistProfile Therapist?              @relation("TherapistUser")
-  managerProfile   PracticeManager?
+  id                     String                  @id @default(cuid())
+  email                  String                  @unique
+  passwordHash           String?
+  sessionToken           String?                 @unique
+  role                   Role
+  emailVerificationToken      String?
+  emailVerifiedAt             DateTime?
+  requiresEmailVerification   Boolean   @default(false)
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  therapistProfile       Therapist?              @relation("TherapistUser")
+  managerProfile         PracticeManager?
 }
 
 model Therapist {
@@ -68,6 +71,7 @@ model Therapist {
   passwordHash          String?
   sessionToken          String?      @unique
   photo                 String?
+  expoPushToken         String?
   invitedByPracticeId   String?
   onboardingStatus      String       @default("none")
   visibilityPreference  String       @default("hidden")
@@ -77,6 +81,7 @@ model Therapist {
   links                 TherapistPracticeLink[]
   invitations           Invitation[]
   managerAccount        PracticeManager? @relation("ManagerTherapist")
+  documents             TherapistDocument[]
 }
 
 model Practice {
@@ -152,6 +157,16 @@ model TherapistPracticeLink {
   @@unique([therapistId, practiceId])
 }
 
+model TherapistDocument {
+  id           String    @id @default(cuid())
+  therapistId  String
+  filename     String    // stored filename (UUID-based, no path)
+  originalName String    // original filename from upload
+  mimetype     String
+  uploadedAt   DateTime  @default(now())
+  therapist    Therapist @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+}
+
 model TherapistRemovalLog {
   id          String   @id @default(cuid())
   therapistId String
@@ -169,6 +184,18 @@ model PracticeDeletionLog {
   reasonDetail   String?
   linkedTherapists Int    @default(0)
   createdAt      DateTime @default(now())
+}
+
+model CertificationOption {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  label     String   @unique
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, sortOrder, label])
 }
 
 model ManagerPracticeAssignment {

@@ -4,6 +4,7 @@ import { randomBytes } from 'crypto';
 import { getToken } from './auth-utils.js';
 import { geocodeAddress } from '../utils/geocode.js';
 import { sendInviteEmail, sendReinviteEmail } from '../utils/mailer.js';
+import { tryEnsurePracticeLogoAsset } from '../../prisma/practice-logo.js';
 
 async function getAuthedTherapist(request: any, fastify: any) {
   const token = getToken(request);
@@ -39,10 +40,12 @@ export const practiceRoutes: FastifyPluginAsync = async (fastify) => {
 
     const d = parsed.data;
     const geo = await geocodeAddress(d.address ?? '', d.city);
+    const generatedLogo = tryEnsurePracticeLogoAsset(d.name, d.city);
 
     const practice = await fastify.prisma.practice.create({
       data: {
         ...d,
+        ...(generatedLogo ? { logo: generatedLogo } : {}),
         reviewStatus: process.env.NODE_ENV === 'production' ? 'PENDING_REVIEW' : 'APPROVED',
         ...(geo ? { lat: geo.lat, lng: geo.lng } : {}),
       },
@@ -361,11 +364,12 @@ export const practiceRoutes: FastifyPluginAsync = async (fastify) => {
       email: z.string().email(),
       specializations: z.array(z.string()).optional().default([]),
       languages: z.array(z.string()).optional().default([]),
+      certifications: z.array(z.string()).optional().default([]),
     });
     const parsed = schema.safeParse(request.body);
     if (!parsed.success) return reply.badRequest(parsed.error.flatten().toString());
 
-    const { fullName, professionalTitle, email, specializations, languages } = parsed.data;
+    const { fullName, professionalTitle, email, specializations, languages, certifications } = parsed.data;
     const existing = await fastify.prisma.therapist.findUnique({ where: { email } });
     if (existing) return reply.conflict('Ein Therapeut mit dieser E-Mail-Adresse existiert bereits.');
 
@@ -376,6 +380,7 @@ export const practiceRoutes: FastifyPluginAsync = async (fastify) => {
         city: practice.city,
         specializations: specializations.join(', '),
         languages: languages.join(', '),
+        certifications: certifications.join(', '),
         reviewStatus: isDev ? 'APPROVED' : 'PENDING_REVIEW',
         onboardingStatus: 'invited',
         visibilityPreference: 'hidden',

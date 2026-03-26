@@ -38,7 +38,7 @@
 
 ### Mobile App
 
-- [ ] **Push-Benachrichtigungen** — Therapeut erhält Benachrichtigung bei Profil-Freigabe/-Ablehnung
+- [x] **Push-Benachrichtigungen** — Therapeut erhält Benachrichtigung bei Profil-Freigabe/-Ablehnung/-Änderungsanforderung/Sperrung
 - [x] **Kassenart** — Feld in DB + API + Registrierungsflow + Filter in Suche. _(schema.prisma, search.ts, App.js)_
 - [x] **Verfügbare Zeiten** — `availability`-Feld in DB + API + Profil. _(schema.prisma, auth.ts, App.js)_
 - [x] **Logo in Header** — `logo.png` in alle Header-Zeilen eingebunden. _(App.js)_
@@ -46,7 +46,7 @@
 ### Admin-Dashboard
 
 - ~~**Verifizierungs-Aktion**~~ — nicht geplant; Freigabe via APPROVED-Status reicht
-- [ ] **Dokumente einsehen** — Upload-Dateien im Admin abrufbar
+- [x] **Dokumente einsehen** — Upload-Dateien im Admin abrufbar + Therapeuten-Dashboard-Upload
 
 ### API
 

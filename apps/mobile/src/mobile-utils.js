@@ -59,6 +59,28 @@ const LANGUAGE_MAP = {
   PL: 'Polnisch',
   RU: 'Russisch',
   SR: 'Serbisch',
+  PT: 'Portugiesisch',
+  NL: 'Niederländisch',
+  UK: 'Ukrainisch',
+  HR: 'Kroatisch',
+  BS: 'Bosnisch',
+  CS: 'Tschechisch',
+  SK: 'Slowakisch',
+  HU: 'Ungarisch',
+  RO: 'Rumänisch',
+  BG: 'Bulgarisch',
+  EL: 'Griechisch',
+  SQ: 'Albanisch',
+  FA: 'Persisch',
+  UR: 'Urdu',
+  HI: 'Hindi',
+  ZH: 'Chinesisch',
+  JA: 'Japanisch',
+  KO: 'Koreanisch',
+  VI: 'Vietnamesisch',
+  DA: 'Dänisch',
+  SV: 'Schwedisch',
+  FI: 'Finnisch',
 };
 
 const PROFILE_FIELD_LABELS = {
@@ -74,7 +96,7 @@ const radiusOptions = [1, 3, 5, 10, 25];
 const GENERIC_SEARCH_LABELS = ['physiotherapie', 'physio', 'therapeut', 'physiotherapeut', 'krankengymnastik'];
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:4000';
-const REG_STEPS = 5;
+const REG_STEPS = 4;
 const languageOptions = Object.keys(LANGUAGE_MAP);
 
 const getBaseUrl = () => BASE_URL;
@@ -196,6 +218,32 @@ const haversine = (lat1, lng1, lat2, lng2) => {
 const formatDist = (km) =>
   km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1)} km`;
 
+const GERMAN_CITIES = [
+  'Aachen', 'Augsburg', 'Bamberg', 'Bayreuth', 'Berlin', 'Bielefeld', 'Bochum',
+  'Bonn', 'Bottrop', 'Brandenburg an der Havel', 'Braunschweig', 'Bremen',
+  'Bremerhaven', 'Chemnitz', 'Cottbus', 'Darmstadt', 'Dessau-Roßlau', 'Dortmund',
+  'Dresden', 'Duisburg', 'Düsseldorf', 'Erfurt', 'Erlangen', 'Essen',
+  'Flensburg', 'Frankfurt am Main', 'Frankfurt (Oder)', 'Freiburg im Breisgau',
+  'Fürth', 'Gelsenkirchen', 'Gera', 'Göttingen', 'Greifswald', 'Gütersloh',
+  'Hagen', 'Halle (Saale)', 'Hamburg', 'Hamm', 'Hannover', 'Heidelberg',
+  'Heilbronn', 'Herne', 'Hildesheim', 'Ingolstadt', 'Iserlohn', 'Jena',
+  'Kaiserslautern', 'Karlsruhe', 'Kassel', 'Kiel', 'Koblenz', 'Köln',
+  'Krefeld', 'Landshut', 'Leipzig', 'Leverkusen', 'Lübeck', 'Ludwigshafen am Rhein',
+  'Lüneburg', 'Magdeburg', 'Mainz', 'Mannheim', 'Moers', 'Mönchengladbach',
+  'Mülheim an der Ruhr', 'München', 'Münster', 'Neuss', 'Neumünster',
+  'Nürnberg', 'Oberhausen', 'Offenbach am Main', 'Oldenburg', 'Osnabrück',
+  'Paderborn', 'Pforzheim', 'Potsdam', 'Ratingen', 'Recklinghausen',
+  'Regensburg', 'Remscheid', 'Reutlingen', 'Rostock', 'Saarbrücken',
+  'Salzgitter', 'Schwerin', 'Siegen', 'Solingen', 'Stuttgart', 'Trier',
+  'Tübingen', 'Ulm', 'Velbert', 'Villingen-Schwenningen', 'Witten',
+  'Wolfsburg', 'Wuppertal', 'Würzburg', 'Wiesbaden', 'Zwickau',
+  'Aschaffenburg', 'Baden-Baden', 'Bergisch Gladbach', 'Bremerhaven',
+  'Friedrichshafen', 'Göppingen', 'Heidenheim an der Brenz', 'Hersfeld',
+  'Kaiserslautern', 'Konstanz', 'Kempten (Allgäu)', 'Lüdenscheid', 'Marburg',
+  'Minden', 'Mülheim', 'Passau', 'Ravensburg', 'Rosenheim', 'Salzgitter',
+  'Stralsund', 'Suhl', 'Troisdorf', 'Weimar', 'Wilhelmshaven',
+];
+
 export {
   REG_STEPS,
   allSuggestions,
@@ -218,4 +266,5 @@ export {
   quickChips,
   regSpecOptions,
   tabs,
+  GERMAN_CITIES,
 };

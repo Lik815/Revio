@@ -43,6 +43,11 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       const validUserPassword = await verifyPassword(password, user.passwordHash);
       if (!validUserPassword) return reply.unauthorized('Ungültige Zugangsdaten');
 
+      // Block self-registered therapists who have not verified their email yet
+      if (user.role === 'therapist' && user.requiresEmailVerification && !user.emailVerifiedAt) {
+        return reply.unauthorized('Bitte bestätige zunächst deine E-Mail-Adresse. Überprüfe deinen Posteingang.');
+      }
+
       const token = randomBytes(32).toString('hex');
       await fastify.prisma.user.update({
         where: { id: user.id },
@@ -159,6 +164,71 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     return reply.unauthorized('Ungültige Zugangsdaten');
   });
 
+  fastify.get('/auth/verify-email', async (request, reply) => {
+    const { token } = request.query as { token?: string };
+    if (!token) return reply.badRequest('Token fehlt.');
+
+    const user = await fastify.prisma.user.findFirst({
+      where: { emailVerificationToken: token },
+    });
+    if (!user) {
+      return reply.code(400).send(`
+        <html><body style="font-family:sans-serif;text-align:center;padding:60px">
+          <h2 style="color:#e05a77">Ungültiger oder abgelaufener Link</h2>
+          <p>Bitte registriere dich erneut oder kontaktiere den Support.</p>
+        </body></html>
+      `);
+    }
+
+    await fastify.prisma.user.update({
+      where: { id: user.id },
+      data: { emailVerifiedAt: new Date(), emailVerificationToken: null },
+    });
+
+    reply.header('Content-Type', 'text/html');
+    return reply.send(`
+      <html><body style="font-family:sans-serif;text-align:center;padding:60px">
+        <h2 style="color:#2563eb">E-Mail bestätigt ✓</h2>
+        <p>Dein Konto ist jetzt aktiv. Du kannst die Revio-App öffnen und dich einloggen.</p>
+      </body></html>
+    `);
+  });
+
+  // App-friendly verification: verifies token and returns a session token for auto-login
+  fastify.post('/auth/verify-email', async (request, reply) => {
+    const { token } = request.body as { token?: string };
+    if (!token) return reply.badRequest('Token fehlt.');
+
+    const user = await fastify.prisma.user.findFirst({
+      where: { emailVerificationToken: token },
+      include: { therapistProfile: true },
+    });
+    if (!user) return reply.badRequest('Ungültiger oder abgelaufener Bestätigungslink.');
+
+    const sessionToken = randomBytes(32).toString('hex');
+    await fastify.prisma.user.update({
+      where: { id: user.id },
+      data: { emailVerifiedAt: new Date(), emailVerificationToken: null, sessionToken },
+    });
+
+    const therapist = user.therapistProfile ?? await fastify.prisma.therapist.findFirst({
+      where: { userId: user.id },
+    });
+    if (!therapist) return reply.badRequest('Kein Therapeutenprofil gefunden.');
+
+    await fastify.prisma.therapist.update({
+      where: { id: therapist.id },
+      data: { sessionToken },
+    });
+
+    return reply.status(200).send({
+      token: sessionToken,
+      therapistId: therapist.id,
+      fullName: therapist.fullName,
+      accountType: 'therapist',
+    });
+  });
+
   fastify.get('/auth/me', async (request, reply) => {
     const token = getToken(request);
     if (!token) return reply.unauthorized('Kein Token');
@@ -206,6 +276,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       city: therapist.city,
       bio: therapist.bio,
       homeVisit: therapist.homeVisit,
+      emailVerified: !!(user?.emailVerifiedAt ?? true),
       specializations: splitList(therapist.specializations),
       languages: splitList(therapist.languages),
       certifications: splitList(therapist.certifications),
@@ -322,6 +393,70 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     return { success: true };
+  });
+
+  fastify.post('/auth/push-token', async (request, reply) => {
+    const token = getToken(request);
+    if (!token) return reply.unauthorized('Kein Token');
+
+    const { pushToken } = request.body as { pushToken?: string };
+    if (!pushToken || !pushToken.startsWith('ExponentPushToken[')) {
+      return reply.badRequest('Ungültiger Push-Token');
+    }
+
+    // Resolve therapist via User row or direct session token
+    let therapistId: string | null = null;
+    const user = await fastify.prisma.user.findUnique({
+      where: { sessionToken: token },
+      include: { therapistProfile: true },
+    });
+    if (user?.therapistProfile) {
+      therapistId = user.therapistProfile.id;
+    } else {
+      const therapist = await fastify.prisma.therapist.findUnique({ where: { sessionToken: token } });
+      if (therapist) therapistId = therapist.id;
+    }
+
+    if (!therapistId) return reply.unauthorized('Ungültiger Token');
+
+    await fastify.prisma.therapist.update({
+      where: { id: therapistId },
+      data: { expoPushToken: pushToken },
+    });
+
+    return { success: true };
+  });
+
+  // Returns the document list for the authenticated therapist (no stored filenames exposed)
+  fastify.get('/auth/documents', async (request, reply) => {
+    const token = getToken(request);
+    if (!token) return reply.unauthorized('Kein Token');
+
+    let therapistId: string | null = null;
+    const user = await fastify.prisma.user.findUnique({
+      where: { sessionToken: token },
+      include: { therapistProfile: true },
+    });
+    if (user?.therapistProfile) {
+      therapistId = user.therapistProfile.id;
+    } else {
+      const t = await fastify.prisma.therapist.findUnique({ where: { sessionToken: token } });
+      if (t) therapistId = t.id;
+    }
+    if (!therapistId) return reply.unauthorized('Ungültiger Token');
+
+    const docs = await fastify.prisma.therapistDocument.findMany({
+      where: { therapistId },
+      orderBy: { uploadedAt: 'desc' },
+    });
+
+    // Do not expose internal filename (UUID-based) to the client
+    return docs.map((d) => ({
+      id: d.id,
+      originalName: d.originalName,
+      mimetype: d.mimetype,
+      uploadedAt: d.uploadedAt.toISOString(),
+    }));
   });
 
   fastify.post('/auth/logout', async (request, reply) => {
