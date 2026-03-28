@@ -13,11 +13,13 @@ import {
 } from 'react-native';
 import {
   formatDist,
-  getLangLabel,
   getPracticeInitials,
   getSearchMatchLabel,
   kassenartOptions,
   quickChips,
+  RADIUS,
+  SPACE,
+  TYPE,
 } from './mobile-utils';
 
 // ── Map platform split ──────────────────────────────────────────────────────
@@ -84,6 +86,7 @@ export function DiscoverScreen(props) {
     setViewMode,
     showAutocomplete,
     showFilters,
+    SkeletonCard,
     styles,
     t,
     toggleFavorite,
@@ -96,12 +99,38 @@ export function DiscoverScreen(props) {
     setSearchRadius,
   } = props;
 
+  const mutedText = c.textMuted ?? c.muted;
+  const iconHitSlop = { top: 10, bottom: 10, left: 10, right: 10 };
+  const showHeaderToggle = viewMode === 'map' || searched || results.length > 0;
+  const headerToggle = (
+    <View style={{ flexDirection: 'row', borderRadius: RADIUS.full, borderWidth: 1, borderColor: c.border, overflow: 'hidden' }}>
+      {[{ key: 'list', icon: 'list' }, { key: 'map', icon: 'map' }].map((button, index) => (
+        <View key={button.key} style={{ flexDirection: 'row' }}>
+          {index > 0 && <View style={{ width: 1, backgroundColor: c.border }} />}
+          <Pressable
+            onPress={() => setViewMode(button.key)}
+            style={{
+              minWidth: 42,
+              minHeight: 42,
+              paddingHorizontal: 10,
+              justifyContent: 'center',
+              alignItems: 'center',
+              backgroundColor: viewMode === button.key ? c.primaryBg : c.card,
+            }}
+          >
+            <Ionicons name={viewMode === button.key ? button.icon : `${button.icon}-outline`} size={18} color={viewMode === button.key ? c.primary : mutedText} />
+          </Pressable>
+        </View>
+      ))}
+    </View>
+  );
+
   if (viewMode === 'map') {
     return (
       <View style={{ flex: 1, backgroundColor: c.background }}>
         {/* Fixed header + search bar */}
-        <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8, backgroundColor: c.background, zIndex: 10 }}>
-          <View style={[styles.header, { justifyContent: 'space-between', marginBottom: 8 }]}>
+        <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 10, backgroundColor: c.background, zIndex: 10, gap: SPACE.sm }}>
+          <View style={[styles.header, { justifyContent: 'space-between', marginBottom: 0 }]}>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <View style={[styles.logoMark, { backgroundColor: c.primary }]}>
                 <Text style={styles.logoText}>R</Text>
@@ -110,9 +139,13 @@ export function DiscoverScreen(props) {
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               {authToken && (
-                <Pressable onPress={() => setShowNotifications(true)} style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: 'transparent', borderWidth: 2, borderColor: c.muted, alignItems: 'center', justifyContent: 'center' }}>
-                  <Ionicons name="notifications-outline" size={16} color={c.muted} />
-                  {notifications.length > 0 && <View style={{ position: 'absolute', top: -3, right: -3, width: 10, height: 10, borderRadius: 5, backgroundColor: '#E74C3C' }} />}
+                <Pressable
+                  onPress={() => setShowNotifications(true)}
+                  hitSlop={iconHitSlop}
+                  style={{ width: 40, height: 40, borderRadius: RADIUS.full, backgroundColor: c.card, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <Ionicons name="notifications-outline" size={18} color={mutedText} />
+                  {notifications.length > 0 && <View style={{ position: 'absolute', top: 3, right: 3, width: 8, height: 8, borderRadius: RADIUS.full, backgroundColor: c.error }} />}
                 </Pressable>
               )}
             </View>
@@ -131,56 +164,42 @@ export function DiscoverScreen(props) {
               style={[styles.searchInput, { color: c.text }]}
             />
             {query.length > 0 && (
-              <Pressable onPress={() => { setQuery(''); setShowAutocomplete(false); }} hitSlop={8}>
+              <Pressable onPress={() => { setQuery(''); setShowAutocomplete(false); }} hitSlop={iconHitSlop}>
                 <Ionicons name="close-circle" size={16} color={c.muted} />
               </Pressable>
             )}
             <View style={[styles.searchDivider, { backgroundColor: c.border }]} />
-            <Pressable onPress={() => setShowFilters(!showFilters)} style={styles.searchFilterArea} hitSlop={4}>
+            <Pressable onPress={() => setShowFilters(!showFilters)} style={styles.searchFilterArea} hitSlop={iconHitSlop}>
               <Ionicons name="options-outline" size={20} color={showFilters || activeFilterCount > 0 ? c.primary : c.muted} />
-              {activeFilterCount > 0 && <View style={[styles.filterBadge, { backgroundColor: c.accent }]}><Text style={styles.filterBadgeText}>{activeFilterCount}</Text></View>}
-            </Pressable>
-          </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 6, paddingBottom: 2 }}>
-            <View style={{ flex: 1 }}>
-              {(searched || results.length > 0) && (
+              {activeFilterCount > 0 && (
                 <>
-                  <Text style={{ color: c.text, fontSize: 13, fontWeight: '600' }}>
-                    {searched ? `${results.length} ${results.length !== 1 ? t('resultsLabelPlural') : t('resultsLabel')}` : 'Vorschläge'}
-                  </Text>
-                  <Text style={{ color: c.muted, fontSize: 12, marginTop: 2 }}>
-                    {city ? `In ${city}` : 'Standort auswählen'}
-                  </Text>
+                  <Text style={{ ...TYPE.label, color: c.primary, textTransform: 'none', letterSpacing: 0.3 }}>Filter aktiv</Text>
+                  <View style={[styles.filterBadge, { backgroundColor: c.primary }]}>
+                    <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
+                  </View>
                 </>
               )}
-            </View>
-            <View style={{ flexDirection: 'row', borderRadius: 10, borderWidth: 1, borderColor: c.border, overflow: 'hidden' }}>
-              {[{ key: 'list', icon: 'list-outline' }, { key: 'map', icon: 'map-outline' }].map((button, index) => (
-                <View key={button.key} style={{ flexDirection: 'row' }}>
-                  {index > 0 && <View style={{ width: 1, backgroundColor: c.border }} />}
-                  <Pressable
-                    onPress={() => setViewMode(button.key)}
-                    style={{ paddingHorizontal: 10, paddingVertical: 6, backgroundColor: viewMode === button.key ? c.primary : c.card }}
-                  >
-                    <Ionicons name={button.icon} size={17} color={viewMode === button.key ? '#fff' : c.muted} />
-                  </Pressable>
-                </View>
-              ))}
-            </View>
-          </View>
-
-          <View style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Pressable
-              onPress={() => { setLocationSheetCity(locationLabel || city); setShowLocationSheet(true); }}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: city ? c.card : c.mutedBg, borderWidth: 1, borderColor: city ? c.accent : c.border, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6, maxWidth: 240 }}
-            >
-              <Ionicons name="navigate-sharp" size={13} color="#2b6877" />
-              <Text numberOfLines={1} style={{ fontSize: 13, color: city ? c.text : c.muted, fontWeight: city ? '500' : '400', flexShrink: 1 }}>
-                {locationLabel || city || t('locationPlaceholder')}
-              </Text>
-              <Text style={{ fontSize: 11, color: c.muted }}>▾</Text>
             </Pressable>
           </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SPACE.sm }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACE.sm, flex: 1 }}>
+              <Pressable
+                onPress={() => { setLocationSheetCity(locationLabel || city); setShowLocationSheet(true); }}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderColor: city ? c.primary : c.border, borderRadius: RADIUS.full, paddingHorizontal: 12, paddingVertical: 7, maxWidth: 210, backgroundColor: c.card }}
+              >
+                <Ionicons name="location-outline" size={13} color={mutedText} />
+                <Text numberOfLines={1} style={{ ...TYPE.meta, color: city ? c.text : mutedText, flexShrink: 1 }}>
+                  {locationLabel || city || t('locationPlaceholder')}
+                </Text>
+              </Pressable>
+            </View>
+            {showHeaderToggle ? headerToggle : null}
+          </View>
+          {(searched || results.length > 0) && (
+            <Text style={{ ...TYPE.meta, color: mutedText }}>
+              {searched ? `${results.length} ${results.length !== 1 ? t('resultsLabelPlural') : t('resultsLabel')}` : 'Vorschläge'}
+            </Text>
+          )}
         </View>
 
         {/* Fullscreen map */}
@@ -280,10 +299,14 @@ export function DiscoverScreen(props) {
           <Text style={[styles.brandName, { color: c.text }]}>evio</Text>
         </View>
         {authToken && (
-          <Pressable onPress={() => setShowNotifications(true)} style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: 'transparent', borderWidth: 2, borderColor: c.muted, alignItems: 'center', justifyContent: 'center' }}>
-            <Ionicons name="notifications-outline" size={16} color={c.muted} />
+          <Pressable
+            onPress={() => setShowNotifications(true)}
+            hitSlop={iconHitSlop}
+            style={{ width: 40, height: 40, borderRadius: RADIUS.full, backgroundColor: c.card, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' }}
+          >
+            <Ionicons name="notifications-outline" size={18} color={mutedText} />
             {notifications.length > 0 && (
-              <View style={{ position: 'absolute', top: -3, right: -3, width: 10, height: 10, borderRadius: 5, backgroundColor: '#E74C3C' }} />
+              <View style={{ position: 'absolute', top: 3, right: 3, width: 8, height: 8, borderRadius: RADIUS.full, backgroundColor: c.error }} />
             )}
           </Pressable>
         )}
@@ -320,17 +343,20 @@ export function DiscoverScreen(props) {
             style={[styles.searchInput, { color: c.text }]}
           />
           {query.length > 0 && (
-            <Pressable onPress={() => { setQuery(''); setShowAutocomplete(false); }} hitSlop={8}>
+            <Pressable onPress={() => { setQuery(''); setShowAutocomplete(false); }} hitSlop={iconHitSlop}>
               <Ionicons name="close-circle" size={16} color={c.muted} />
             </Pressable>
           )}
           <View style={[styles.searchDivider, { backgroundColor: c.border }]} />
-          <Pressable onPress={() => setShowFilters(!showFilters)} style={styles.searchFilterArea} hitSlop={4}>
+          <Pressable onPress={() => setShowFilters(!showFilters)} style={styles.searchFilterArea} hitSlop={iconHitSlop}>
             <Ionicons name="options-outline" size={20} color={showFilters || activeFilterCount > 0 ? c.primary : c.muted} />
             {activeFilterCount > 0 && (
-              <View style={[styles.filterBadge, { backgroundColor: c.accent }]}>
-                <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
-              </View>
+              <>
+                <Text style={{ ...TYPE.label, color: c.primary, textTransform: 'none', letterSpacing: 0.3 }}>Filter aktiv</Text>
+                <View style={[styles.filterBadge, { backgroundColor: c.primary }]}>
+                  <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
+                </View>
+              </>
             )}
           </Pressable>
         </View>
@@ -374,16 +400,20 @@ export function DiscoverScreen(props) {
         })}
       </ScrollView>
 
-      <Pressable
-        onPress={() => { setLocationSheetCity(locationLabel || city); setShowLocationSheet(true); }}
-        style={{ flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', backgroundColor: city ? c.card : c.mutedBg, borderWidth: 1, borderColor: city ? c.accent : c.border, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6, maxWidth: 280 }}
-      >
-        <Ionicons name="navigate-sharp" size={13} color="#2b6877" />
-        <Text numberOfLines={1} style={{ fontSize: 13, color: city ? c.text : c.muted, fontWeight: city ? '500' : '400', flexShrink: 1 }}>
-          {locationLabel || city || t('locationPlaceholder')}
-        </Text>
-        <Text style={{ fontSize: 11, color: c.muted }}>▾</Text>
-      </Pressable>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SPACE.sm }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACE.sm, flex: 1 }}>
+          <Pressable
+            onPress={() => { setLocationSheetCity(locationLabel || city); setShowLocationSheet(true); }}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderColor: city ? c.primary : c.border, borderRadius: RADIUS.full, paddingHorizontal: 12, paddingVertical: 7, maxWidth: 210, backgroundColor: c.card }}
+          >
+            <Ionicons name="location-outline" size={13} color={mutedText} />
+            <Text numberOfLines={1} style={{ ...TYPE.meta, color: city ? c.text : mutedText, flexShrink: 1 }}>
+              {locationLabel || city || t('locationPlaceholder')}
+            </Text>
+          </Pressable>
+        </View>
+        {showHeaderToggle ? headerToggle : null}
+      </View>
 
       {showFilters && (
         <View style={[styles.filterPanel, { backgroundColor: c.card, borderColor: c.border }]}>
@@ -433,11 +463,11 @@ export function DiscoverScreen(props) {
 
       {(searched || results.length > 0) ? (
         <View style={styles.sectionRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.sectionLabel, { color: c.text }]}>
+          <View style={{ flex: 1, gap: 4 }}>
+            <Text style={{ ...TYPE.meta, color: mutedText }}>
               {searched ? `${results.length} ${results.length !== 1 ? t('resultsLabelPlural') : t('resultsLabel')}` : 'Vorschlaege'}
             </Text>
-            <Text style={{ color: c.muted, fontSize: 12, marginTop: 3 }}>
+            <Text style={{ ...TYPE.meta, color: mutedText }}>
               {city ? `In ${city}` : 'Standort auswaehlen'}
               {activeFilterCount > 0 ? ` · ${activeFilterCount} Filter aktiv` : ''}
             </Text>
@@ -446,33 +476,22 @@ export function DiscoverScreen(props) {
             <View style={[styles.approvedPill, { backgroundColor: c.successBg }]}>
               <Text style={[styles.approvedPillText, { color: c.success }]}>{t('verifiedOnly')}</Text>
             </View>
-            {searched && (
-              <View style={{ flexDirection: 'row', borderRadius: 10, borderWidth: 1, borderColor: c.border, overflow: 'hidden' }}>
-                {[{ key: 'list', icon: 'list-outline' }, { key: 'map', icon: 'map-outline' }].map((button, index) => (
-                  <View key={button.key} style={{ flexDirection: 'row' }}>
-                    {index > 0 && <View style={{ width: 1, backgroundColor: c.border }} />}
-                    <Pressable
-                      onPress={() => setViewMode(button.key)}
-                      style={{ paddingHorizontal: 10, paddingVertical: 6, backgroundColor: viewMode === button.key ? c.primary : c.card }}
-                    >
-                      <Ionicons name={button.icon} size={17} color={viewMode === button.key ? '#fff' : c.muted} />
-                    </Pressable>
-                  </View>
-                ))}
-              </View>
-            )}
           </View>
         </View>
       ) : null}
 
-      {viewMode === 'list' && results.map((therapist) => (
+      {viewMode === 'list' && searchLoading && [1, 2, 3].map((item) => (
+        <SkeletonCard key={item} C={c} />
+      ))}
+
+      {viewMode === 'list' && !searchLoading && results.map((therapist) => (
         <View key={therapist.id} style={[styles.resultCard, { backgroundColor: c.card, borderColor: c.border }]}>
           <View style={styles.cardTop}>
             <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }} onPress={() => openTherapistById(therapist.id)}>
-              <Image source={{ uri: therapist.photo }} style={styles.avatar} />
+              <Image source={{ uri: therapist.photo }} style={[styles.avatar, { width: 60, height: 60, borderRadius: RADIUS.full }]} />
               <View style={{ flex: 1 }}>
                 <Text style={[styles.cardName, { color: c.text }]}>{therapist.fullName}</Text>
-                <Text style={[styles.cardTitle, { color: c.muted }]}>{therapist.professionalTitle}</Text>
+                <Text style={[styles.cardTitle, { color: mutedText }]}>{therapist.professionalTitle}</Text>
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 7 }}>
                   <View style={[styles.metaPill, { backgroundColor: c.mutedBg }]}>
                     <Text style={[styles.metaPillText, { color: c.text }]}>{getSearchMatchLabel(therapist, query)}</Text>
@@ -486,20 +505,20 @@ export function DiscoverScreen(props) {
               </View>
               <Text style={[styles.practiceArrow, { color: c.muted }]}>›</Text>
             </Pressable>
-            <HeartButton isSaved={isFavorite(therapist.id)} onToggle={() => toggleFavorite(therapist)} unsavedColor={c.muted} hitSlop={10} />
+            <HeartButton isSaved={isFavorite(therapist.id)} onToggle={() => toggleFavorite(therapist)} unsavedColor={c.muted} hitSlop={iconHitSlop} />
           </View>
 
           <View style={styles.tagRow}>
-            {therapist.specializations.map((specialization) => (
-              <View key={specialization} style={[styles.tag, { backgroundColor: c.mutedBg }]}>
-                <Text style={[styles.tagText, { color: c.text }]}>{specialization}</Text>
+            {(therapist.specializations ?? []).slice(0, 2).map((specialization) => (
+              <View key={specialization} style={[styles.tag, { backgroundColor: c.primaryBg }]}>
+                <Text style={[styles.tagText, { color: c.primary }]}>{specialization}</Text>
               </View>
             ))}
-            {therapist.languages.map((language) => (
-              <View key={language} style={[styles.tag, { backgroundColor: c.mutedBg }]}>
-                <Text style={[styles.tagText, { color: c.muted }]}>{getLangLabel(language)}</Text>
+            {(therapist.specializations ?? []).length > 2 && (
+              <View style={[styles.tag, { backgroundColor: c.mutedBg }]}>
+                <Text style={[styles.tagText, { color: mutedText }]}>+{therapist.specializations.length - 2}</Text>
               </View>
-            ))}
+            )}
             {therapist.homeVisit && (
               <View style={[styles.tag, { backgroundColor: c.successBg }]}>
                 <Text style={[styles.tagText, { color: c.success }]}>{t('homeVisitTag')}</Text>
@@ -509,7 +528,7 @@ export function DiscoverScreen(props) {
 
           {therapist.fortbildungen?.length > 0 && (
             <View style={styles.tagRow}>
-              {therapist.fortbildungen.map((qualification) => (
+              {therapist.fortbildungen.slice(0, 2).map((qualification) => (
                 <View key={qualification} style={[styles.tag, { backgroundColor: c.successBg, borderWidth: 1, borderColor: c.success }]}>
                   <Text style={[styles.tagText, { color: c.success }]}>{qualification}</Text>
                 </View>
@@ -540,18 +559,14 @@ export function DiscoverScreen(props) {
             </Pressable>
           )}
 
-          <Pressable style={[styles.ctaBtn, { backgroundColor: c.accent }]} onPress={() => callPhone(therapist.practices?.[0]?.phone)}>
-            <Text style={styles.ctaBtnText}>{t('callPractice')}</Text>
+          <Pressable
+            style={[styles.ctaBtn, { backgroundColor: c.primary, marginTop: 2 }]}
+            onPress={() => callPhone(therapist.practices?.[0]?.phone)}
+          >
+            <Text style={styles.ctaBtnText}>Anrufen</Text>
           </Pressable>
         </View>
       ))}
-
-      {viewMode === 'list' && searchLoading && (
-        <View style={[styles.emptyState, { backgroundColor: c.card, borderColor: c.border }]}>
-          <Text style={styles.emptyIcon}>⏳</Text>
-          <Text style={[styles.emptyTitle, { color: c.text }]}>{t('loading')}</Text>
-        </View>
-      )}
 
       {viewMode === 'list' && !searchLoading && results.length === 0 && searched && (
         <View style={[styles.emptyState, { backgroundColor: c.card, borderColor: c.border }]}>

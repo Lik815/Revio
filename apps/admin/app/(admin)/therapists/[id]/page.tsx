@@ -61,6 +61,20 @@ export default async function TherapistDetailPage({ params }: Props) {
     api.getTherapist(id),
     api.getTherapistDocuments(id),
   ]);
+  const publicVisibilityBadge =
+    therapist.reviewStatus === 'APPROVED' && therapist.isVisible
+      ? { label: 'Öffentlich sichtbar', className: 'badge badge--APPROVED' }
+      : therapist.reviewStatus === 'APPROVED' && !therapist.isVisible
+        ? { label: 'Freigegeben, aber versteckt', className: 'badge badge--PENDING_REVIEW' }
+        : { label: 'Nicht öffentlich', className: 'badge badge--DRAFT' };
+  const isApprovedButNotVisible = therapist.reviewStatus === 'APPROVED' && therapist.visibility.visibilityState !== 'visible';
+  const blockerReasons = (
+    therapist.visibility.blockingReasons.length > 0
+      ? therapist.visibility.blockingReasons
+      : !therapist.isVisible
+        ? ['manually_hidden']
+        : ['profile_incomplete']
+  ).map((reason) => blockingReasonLabel[reason] ?? reason);
 
   return (
     <PageShell
@@ -68,11 +82,33 @@ export default async function TherapistDetailPage({ params }: Props) {
       description={`${therapist.professionalTitle} · ${therapist.city} · ${therapist.email}`}
       eyebrow={<Link href="/therapists" style={{ color: 'var(--muted)', fontSize: 13 }}>← Zurück zur Liste</Link>}
       actions={
-        <span className={`badge badge--${therapist.reviewStatus}`}>
-          {statusLabel[therapist.reviewStatus] ?? therapist.reviewStatus}
-        </span>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <span className={`badge badge--${therapist.reviewStatus}`}>
+            {statusLabel[therapist.reviewStatus] ?? therapist.reviewStatus}
+          </span>
+          <span className={publicVisibilityBadge.className}>
+            {publicVisibilityBadge.label}
+          </span>
+        </div>
       }
     >
+      {isApprovedButNotVisible && (
+        <div
+          style={{
+            marginBottom: 16,
+            borderRadius: 12,
+            background: 'rgba(217, 119, 6, 0.08)',
+            border: '1px solid rgba(217, 119, 6, 0.22)',
+            padding: '10px 12px',
+            color: 'var(--warning)',
+            fontSize: 13,
+            lineHeight: 1.5,
+          }}
+        >
+          <strong>Nicht sichtbar weil:</strong> {blockerReasons.join(', ')}
+        </div>
+      )}
+
       {/* Visibility state */}
       {(() => {
         const vis = therapist.visibility;

@@ -29,7 +29,12 @@ import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
+  COLORS,
+  RADIUS,
   REG_STEPS,
+  SHADOW,
+  SPACE,
+  TYPE,
   allSuggestions,
   fortbildungOptions,
   formatMissingProfileFields,
@@ -44,6 +49,7 @@ import {
   normalizeLanguageCodes,
   normalizeTherapistProfile,
   regSpecOptions,
+  softenErrorMessage,
   tabs,
   GERMAN_CITIES,
 } from './mobile-utils';
@@ -115,38 +121,6 @@ const formatProfileOverviewName = (fullName = '') => {
   return `${lastName} ${firstNames}`.trim();
 };
 
-// ─── Palette ───────────────────────────────���───────────────────────���─────────
-// Old Rose #d88c9a · Soft Apricot #f2d0a9 · Almond Cream #f1e3d3 · Muted Teal #99c1b9
-
-const palette = {
-  light: {
-    background: '#F7F9FA',
-    text: '#1F2A30',
-    primary: '#4F6D7A',
-    accent: '#7FAE9F',
-    card: '#FFFFFF',
-    border: '#D0DBE0',
-    muted: '#A7B6BE',
-    mutedBg: '#EDF2F4',
-    nav: '#FFFFFF',
-    success: '#7FAE9F',
-    successBg: '#EAF3F0'
-  },
-  dark: {
-    background: '#111A1F',
-    text: '#E8EEF1',
-    primary: '#6B8FA0',
-    accent: '#7FAE9F',
-    card: '#1A2630',
-    border: '#2A3A44',
-    muted: '#7A9099',
-    mutedBg: '#1E2E38',
-    nav: '#151F26',
-    success: '#7FAE9F',
-    successBg: '#1A2E2A'
-  }
-};
-
 const webWindow = typeof globalThis !== 'undefined' ? globalThis.window : undefined;
 const webNavigator = typeof globalThis !== 'undefined' ? globalThis.navigator : undefined;
 
@@ -157,6 +131,8 @@ function showWebAlert(message) {
 function showWebConfirm(message) {
   return webWindow?.confirm?.(message) ?? false;
 }
+
+const ICON_HIT_SLOP = { top: 10, bottom: 10, left: 10, right: 10 };
 
 // ─── App ──────────────────────────────────────────────────────────────────────
 
@@ -175,9 +151,9 @@ function HeartButton({
   isSaved,
   onToggle,
   size = 22,
-  savedColor = '#E05A77',
-  unsavedColor = '#9ca3af',
-  hitSlop = 8,
+  savedColor = COLORS.light.saved,
+  unsavedColor = COLORS.light.muted,
+  hitSlop = ICON_HIT_SLOP,
   style = undefined,
 }) {
   const scale = React.useRef(new Animated.Value(1)).current;
@@ -206,13 +182,40 @@ function HeartButton({
   );
 }
 
+function SkeletonCard({ C }) {
+  return (
+    <View
+      style={{
+        borderWidth: 1,
+        borderColor: C.border,
+        borderRadius: RADIUS.lg,
+        padding: 18,
+        gap: 14,
+        backgroundColor: C.card,
+      }}
+    >
+      <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
+        <View style={{ width: 56, height: 56, borderRadius: RADIUS.full, backgroundColor: C.mutedBg }} />
+        <View style={{ gap: 8, flex: 1 }}>
+          <View style={{ height: 16, borderRadius: RADIUS.sm, backgroundColor: C.mutedBg, width: '55%' }} />
+          <View style={{ height: 12, borderRadius: RADIUS.sm, backgroundColor: C.mutedBg, width: '35%' }} />
+        </View>
+      </View>
+      <View style={{ height: 12, borderRadius: RADIUS.sm, backgroundColor: C.mutedBg }} />
+      <View style={{ height: 12, borderRadius: RADIUS.sm, backgroundColor: C.mutedBg, width: '70%' }} />
+      <View style={{ height: 42, borderRadius: RADIUS.md, backgroundColor: C.mutedBg }} />
+    </View>
+  );
+}
+
 export default function App() {
   const systemScheme = useColorScheme();
-  const [themeMode, setThemeMode] = useState('system'); // 'light' | 'dark' | 'system'
-  const scheme = themeMode === 'system'
-    ? (systemScheme === 'dark' ? 'dark' : 'light')
-    : themeMode;
-  const c = palette[scheme];
+  const [themeMode, setThemeMode] = useState(systemScheme === 'dark' ? 'dark' : 'light'); // 'light' | 'dark'
+  const scheme = themeMode;
+  const c = COLORS[scheme];
+  const ThemedHeartButton = (props) => (
+    <HeartButton {...props} savedColor={c.saved} unsavedColor={props.unsavedColor ?? c.muted} />
+  );
 
   const [appLanguage, setAppLanguage] = useState('de'); // 'de' | 'en'
   const t = (key) => translations[appLanguage]?.[key] ?? translations['de'][key];
@@ -329,6 +332,7 @@ export default function App() {
   const [regFortbildungen, setRegFortbildungen] = useState([]);
   const [regSpecSearch, setRegSpecSearch] = useState('');
   const [regLangSearch, setRegLangSearch] = useState('');
+  const [showRegFortbildungen, setShowRegFortbildungen] = useState(false);
   const [showRegPassword, setShowRegPassword] = useState(false);
   const [showRegPasswordConfirm, setShowRegPasswordConfirm] = useState(false);
 
@@ -1591,10 +1595,12 @@ export default function App() {
       AsyncStorage.getItem('savedLocationLabel'),
       AsyncStorage.getItem('appLanguage'),
       AsyncStorage.getItem('savedCoords'),
-    ]).then(([savedCity, savedLabel, savedLang, savedCoords]) => {
+      AsyncStorage.getItem('themeMode'),
+    ]).then(([savedCity, savedLabel, savedLang, savedCoords, savedThemeMode]) => {
       if (savedCity) setCity(savedCity);
       if (savedLabel) setLocationLabel(savedLabel);
       if (savedLang === 'de' || savedLang === 'en') setAppLanguage(savedLang);
+      if (savedThemeMode === 'light' || savedThemeMode === 'dark') setThemeMode(savedThemeMode);
       if (savedCoords) {
         try { setUserCoords(JSON.parse(savedCoords)); } catch {}
       }
@@ -1624,10 +1630,10 @@ export default function App() {
       } else {
         const body = await res.json().catch(() => ({}));
         console.error('[openPractice] status:', res.status, 'body:', JSON.stringify(body));
-        setSelectedPracticeError(`Fehler ${res.status}: ${body.message ?? 'Therapeuten konnten nicht geladen werden.'}`);
+        setSelectedPracticeError(softenErrorMessage(body.message ?? 'Konnte nicht geladen werden – bitte erneut versuchen'));
       }
     } catch {
-      setSelectedPracticeError('Verbindungsfehler beim Laden der Therapeuten.');
+      setSelectedPracticeError('Keine Verbindung – bitte erneut versuchen.');
     } finally {
       setSelectedPracticeLoading(false);
     }
@@ -1679,7 +1685,8 @@ export default function App() {
 
   const renderDiscover = () => (
     <DiscoverScreen
-      HeartButton={HeartButton}
+      HeartButton={ThemedHeartButton}
+      SkeletonCard={SkeletonCard}
       acSuggestions={acSuggestions}
       activeChip={activeChip}
       activeFilterCount={activeFilterCount}
@@ -1758,7 +1765,7 @@ export default function App() {
   const renderTherapistProfile = (th) => {
     return (
       <TherapistProfileScreen
-        HeartButton={HeartButton}
+        HeartButton={ThemedHeartButton}
         c={c}
         callPhone={callPhone}
         isFavorite={isFavorite}
@@ -1920,27 +1927,21 @@ export default function App() {
         {/* Erscheinungsbild toggle */}
         <View style={[styles.optionRow, { backgroundColor: c.card, borderColor: c.border }]}>
           <Text style={[styles.optionLabel, { color: c.text }]}>{t('appearanceOption')}</Text>
-          <View style={styles.themeToggleRow}>
-            {[
-              { key: 'light',  label: t('themeLight') },
-              { key: 'dark',   label: t('themeDark') },
-              { key: 'system', label: t('themeSystem') }
-            ].map(({ key, label }) => (
-              <Pressable
-                key={key}
-                onPress={() => setThemeMode(key)}
-                style={[
-                  styles.themeBtn,
-                  themeMode === key
-                    ? { backgroundColor: c.primary, borderColor: c.primary }
-                    : { backgroundColor: c.mutedBg, borderColor: c.border }
-                ]}
-              >
-                <Text style={[styles.themeBtnText, { color: themeMode === key ? '#FFFFFF' : c.muted }]}>
-                  {label}
-                </Text>
-              </Pressable>
-            ))}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACE.sm }}>
+            <Text style={[styles.optionValue, { color: c.muted }]}>
+              {themeMode === 'dark' ? t('themeDark') : t('themeLight')}
+            </Text>
+            <Switch
+              value={themeMode === 'dark'}
+              onValueChange={(value) => {
+                const nextThemeMode = value ? 'dark' : 'light';
+                setThemeMode(nextThemeMode);
+                AsyncStorage.setItem('themeMode', nextThemeMode);
+              }}
+              trackColor={{ false: c.border, true: c.primary }}
+              ios_backgroundColor={c.border}
+              thumbColor="#FFFFFF"
+            />
           </View>
         </View>
 
@@ -2194,7 +2195,7 @@ export default function App() {
 
       <View style={[styles.noticeBox, { backgroundColor: c.mutedBg, borderColor: c.border, marginBottom: 4 }]}>
         <View style={styles.lockBadge}>
-          <Ionicons name="accessibility" size={16} color="#6b8fa0" />
+          <Ionicons name="accessibility" size={16} color={c.primary} />
         </View>
         <View style={{ flex: 1 }}>
           <Text style={[styles.noticeBody, { color: c.muted, flex: 0 }]}>{t('favoritesHint')}</Text>
@@ -2223,7 +2224,7 @@ export default function App() {
                   </View>
                   <Text style={[styles.practiceArrow, { color: c.muted }]}>›</Text>
                 </Pressable>
-                <HeartButton isSaved={true} onToggle={() => toggleFavorite(fav)} hitSlop={10} />
+                <ThemedHeartButton isSaved={true} onToggle={() => toggleFavorite(fav)} hitSlop={ICON_HIT_SLOP} />
               </View>
               {fav.practices?.length > 0 && (
                 <Pressable
@@ -2274,8 +2275,8 @@ export default function App() {
                   </View>
                   <Text style={[styles.practiceArrow, { color: c.muted }]}>›</Text>
                 </View>
-                <Pressable onPress={(e) => { e.stopPropagation(); toggleFavoritePractice(p); }} hitSlop={10}>
-                  <Ionicons name="heart" size={22} color="#E05A77" />
+                <Pressable onPress={(e) => { e.stopPropagation(); toggleFavoritePractice(p); }} hitSlop={ICON_HIT_SLOP}>
+                  <Ionicons name="heart" size={22} color={c.saved} />
                 </Pressable>
               </Pressable>
               {p.phone && (
@@ -2310,7 +2311,14 @@ export default function App() {
             </Text>
             <Pressable
               style={[styles.registerBtn, { backgroundColor: c.primary, marginTop: 24, paddingHorizontal: 32 }]}
-              onPress={() => { setShowRegister(false); setRegSubmitted(false); setRegStep(1); setRegSpecSearch(''); setRegLangSearch(''); }}
+              onPress={() => {
+                setShowRegister(false);
+                setRegSubmitted(false);
+                setRegStep(1);
+                setRegSpecSearch('');
+                setRegLangSearch('');
+                setShowRegFortbildungen(false);
+              }}
             >
               <Text style={styles.registerBtnText}>Zur App</Text>
             </Pressable>
@@ -2353,18 +2361,18 @@ export default function App() {
               <TextInput value={regEmail} onChangeText={setRegEmail} placeholder="E-Mail-Adresse" placeholderTextColor={c.muted} keyboardType="email-address" autoCapitalize="none" style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text }]} />
               <View style={{ position: 'relative' }}>
                 <TextInput value={regPassword} onChangeText={setRegPassword} placeholder="Passwort (mind. 6 Zeichen)" placeholderTextColor={c.muted} secureTextEntry={!showRegPassword} style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text, paddingRight: 44 }]} />
-                <Pressable onPress={() => setShowRegPassword(v => !v)} style={{ position: 'absolute', right: 12, top: 0, bottom: 0, justifyContent: 'center' }}>
+                <Pressable onPress={() => setShowRegPassword(v => !v)} hitSlop={ICON_HIT_SLOP} style={{ position: 'absolute', right: 12, top: 0, bottom: 0, justifyContent: 'center' }}>
                   <Ionicons name={showRegPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color={c.muted} />
                 </Pressable>
               </View>
               <View style={{ position: 'relative' }}>
                 <TextInput value={regPasswordConfirm} onChangeText={setRegPasswordConfirm} placeholder="Passwort bestätigen" placeholderTextColor={c.muted} secureTextEntry={!showRegPasswordConfirm} style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text, paddingRight: 44 }]} />
-                <Pressable onPress={() => setShowRegPasswordConfirm(v => !v)} style={{ position: 'absolute', right: 12, top: 0, bottom: 0, justifyContent: 'center' }}>
+                <Pressable onPress={() => setShowRegPasswordConfirm(v => !v)} hitSlop={ICON_HIT_SLOP} style={{ position: 'absolute', right: 12, top: 0, bottom: 0, justifyContent: 'center' }}>
                   <Ionicons name={showRegPasswordConfirm ? 'eye-off-outline' : 'eye-outline'} size={20} color={c.muted} />
                 </Pressable>
               </View>
               {regPasswordConfirm.length > 0 && regPassword !== regPasswordConfirm && (
-                <Text style={{ color: '#E05A77', fontSize: 13, marginTop: -6 }}>Passwörter stimmen nicht überein</Text>
+                <Text style={{ color: c.saved, fontSize: 13, marginTop: -6 }}>Passwörter stimmen nicht überein</Text>
               )}
             </>
           );
@@ -2373,13 +2381,13 @@ export default function App() {
             <>
               <Text style={[styles.regStepTitle, { color: c.text }]}>Persönliche Angaben</Text>
               <Text style={[styles.regStepSub, { color: c.muted }]}>Wie sollen wir dich ansprechen?</Text>
-              <TextInput value={regFirstName} onChangeText={setRegFirstName} placeholder="Vorname" placeholderTextColor={c.muted} style={[styles.regInput, { backgroundColor: c.card, borderColor: regFirstName.length > 0 && regFirstName.trim().length === 0 ? '#E05A77' : c.border, color: c.text }]} />
+              <TextInput value={regFirstName} onChangeText={setRegFirstName} placeholder="Vorname" placeholderTextColor={c.muted} style={[styles.regInput, { backgroundColor: c.card, borderColor: regFirstName.length > 0 && regFirstName.trim().length === 0 ? c.saved : c.border, color: c.text }]} />
               {regFirstName.length > 0 && regFirstName.trim().length === 0 && (
-                <Text style={{ color: '#E05A77', fontSize: 13, marginTop: -6 }}>Vorname ist erforderlich</Text>
+                <Text style={{ color: c.saved, fontSize: 13, marginTop: -6 }}>Vorname ist erforderlich</Text>
               )}
-              <TextInput value={regLastName} onChangeText={setRegLastName} placeholder="Nachname" placeholderTextColor={c.muted} style={[styles.regInput, { backgroundColor: c.card, borderColor: regLastName.length > 0 && regLastName.trim().length === 0 ? '#E05A77' : c.border, color: c.text }]} />
+              <TextInput value={regLastName} onChangeText={setRegLastName} placeholder="Nachname" placeholderTextColor={c.muted} style={[styles.regInput, { backgroundColor: c.card, borderColor: regLastName.length > 0 && regLastName.trim().length === 0 ? c.saved : c.border, color: c.text }]} />
               {regLastName.length > 0 && regLastName.trim().length === 0 && (
-                <Text style={{ color: '#E05A77', fontSize: 13, marginTop: -6 }}>Nachname ist erforderlich</Text>
+                <Text style={{ color: c.saved, fontSize: 13, marginTop: -6 }}>Nachname ist erforderlich</Text>
               )}
               {regCity ? (
                 <View style={[styles.tagRow, { marginBottom: 8 }]}>
@@ -2428,50 +2436,26 @@ export default function App() {
               <Text style={[styles.regStepTitle, { color: c.text }]}>Fachliches Profil</Text>
               <Text style={[styles.regStepSub, { color: c.muted }]}>Spezialisierungen, Sprachen & Fortbildungen</Text>
 
-              <Text style={[styles.filterSectionTitle, { color: c.muted }]}>
-                Spezialisierungen <Text style={{ fontWeight: '400', textTransform: 'none', letterSpacing: 0, fontSize: 11 }}>(optional)</Text>
-              </Text>
-              <TextInput
-                value={regSpecSearch}
-                onChangeText={setRegSpecSearch}
-                placeholder="Spezialisierung suchen…"
-                placeholderTextColor={c.muted}
-                style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text }]}
-              />
-              {specSuggestions.length > 0 && (
-                <View style={{ borderRadius: 10, borderWidth: 1, borderColor: c.border, marginTop: -8, marginBottom: 8, overflow: 'hidden', backgroundColor: c.card }}>
-                  {specSuggestions.map((s, i) => (
-                    <Pressable key={s} onPress={() => { toggleRegSpec(s); setRegSpecSearch(''); }}
-                      style={{ padding: 12, borderTopWidth: i > 0 ? 1 : 0, borderColor: c.border }}>
-                      <Text style={{ color: c.text, fontSize: 14 }}>{s}</Text>
-                    </Pressable>
-                  ))}
+              <View style={styles.sectionBadgeRow}>
+                <Text style={[styles.filterSectionTitle, { color: c.muted, marginBottom: 0 }]}>Sprachen</Text>
+                <View style={[styles.inlineMetaPill, { backgroundColor: c.primaryBg }]}>
+                  <Text style={[styles.inlineMetaPillText, { color: c.primary }]}>Pflicht</Text>
                 </View>
-              )}
-              {regSpecializations.length > 0 && (
-                <View style={[styles.tagRow, { marginBottom: 8 }]}>
-                  {regSpecializations.map(s => (
-                    <Pressable key={s} onPress={() => toggleRegSpec(s)} style={[styles.chip, { backgroundColor: c.primary, borderColor: c.primary }]}>
-                      <Text style={[styles.chipText, { color: '#FFFFFF' }]}>{s} ×</Text>
-                    </Pressable>
-                  ))}
-                </View>
-              )}
-
-              <Text style={[styles.filterSectionTitle, { color: c.muted, marginTop: 8 }]}>Sprachen <Text style={{ fontWeight: '400', textTransform: 'none', letterSpacing: 0, fontSize: 11 }}>(Deutsch vorausgewählt)</Text></Text>
+              </View>
+              <Text style={[styles.metaNote, { color: c.textMuted, marginBottom: 8 }]}>Deutsch ist vorausgewählt.</Text>
               <TextInput
                 value={regLangSearch}
                 onChangeText={setRegLangSearch}
                 placeholder="Weitere Sprache hinzufügen (optional)"
                 placeholderTextColor={c.muted}
-                style={[styles.regInput, { backgroundColor: c.card, borderColor: regLanguages.length === 0 && regLangSearch.length === 0 ? c.border : regLanguages.length > 0 ? c.primary : c.border, color: c.text }]}
+                style={[styles.regInput, { backgroundColor: c.card, borderColor: regLanguages.length > 0 ? c.primary : c.border, color: c.text }]}
               />
               {langSuggestions.length > 0 && (
-                <View style={{ borderRadius: 10, borderWidth: 1, borderColor: c.border, marginTop: -8, marginBottom: 8, overflow: 'hidden', backgroundColor: c.card }}>
+                <View style={{ borderRadius: RADIUS.sm, borderWidth: 1, borderColor: c.border, marginTop: -8, marginBottom: 8, overflow: 'hidden', backgroundColor: c.card }}>
                   {langSuggestions.map((l, i) => (
                     <Pressable key={l} onPress={() => { toggleRegLang(l); setRegLangSearch(''); }}
-                      style={{ padding: 12, borderTopWidth: i > 0 ? 1 : 0, borderColor: c.border }}>
-                      <Text style={{ color: c.text, fontSize: 14 }}>{getLangLabel(l)}</Text>
+                      style={{ padding: SPACE.md, borderTopWidth: i > 0 ? 1 : 0, borderColor: c.border }}>
+                      <Text style={{ ...TYPE.body, color: c.text }}>{getLangLabel(l)}</Text>
                     </Pressable>
                   ))}
                 </View>
@@ -2486,10 +2470,56 @@ export default function App() {
                 </View>
               )}
 
-              <Text style={[styles.filterSectionTitle, { color: c.muted, marginTop: 8 }]}>
-                Fortbildungen <Text style={{ fontWeight: '400', textTransform: 'none', letterSpacing: 0, fontSize: 11 }}>(optional)</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACE.md, marginVertical: SPACE.lg }}>
+                <View style={{ flex: 1, height: 1, backgroundColor: c.border }} />
+                <Text style={{ ...TYPE.label, color: c.textMuted }}>Optional</Text>
+                <View style={{ flex: 1, height: 1, backgroundColor: c.border }} />
+              </View>
+
+              <Text style={[styles.filterSectionTitle, { color: c.muted }]}>
+                Spezialisierungen <Text style={styles.optionalInlineLabel}>(optional)</Text>
               </Text>
-              {certificationOptions.map(opt => {
+              <TextInput
+                value={regSpecSearch}
+                onChangeText={setRegSpecSearch}
+                placeholder="Spezialisierung suchen…"
+                placeholderTextColor={c.muted}
+                style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text }]}
+              />
+              {specSuggestions.length > 0 && (
+                <View style={{ borderRadius: RADIUS.sm, borderWidth: 1, borderColor: c.border, marginTop: -8, marginBottom: 8, overflow: 'hidden', backgroundColor: c.card }}>
+                  {specSuggestions.map((s, i) => (
+                    <Pressable
+                      key={s}
+                      onPress={() => { toggleRegSpec(s); setRegSpecSearch(''); }}
+                      style={{ padding: SPACE.md, borderTopWidth: i > 0 ? 1 : 0, borderColor: c.border }}
+                    >
+                      <Text style={{ ...TYPE.body, color: c.text }}>{s}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              )}
+              {regSpecializations.length > 0 && (
+                <View style={[styles.tagRow, { marginBottom: 8 }]}>
+                  {regSpecializations.map((s) => (
+                    <Pressable key={s} onPress={() => toggleRegSpec(s)} style={[styles.chip, { backgroundColor: c.primary, borderColor: c.primary }]}>
+                      <Text style={[styles.chipText, { color: '#FFFFFF' }]}>{s} ×</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              )}
+
+              <Pressable
+                onPress={() => setShowRegFortbildungen((value) => !value)}
+                style={[styles.collapseToggle, { backgroundColor: c.card, borderColor: c.border }]}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.filterSectionTitle, { color: c.muted, marginBottom: 2 }]}>Fortbildungen / Zertifikate</Text>
+                  <Text style={[styles.metaNote, { color: c.textMuted }]}>Optional</Text>
+                </View>
+                <Ionicons name={showRegFortbildungen ? 'chevron-up-outline' : 'chevron-down-outline'} size={18} color={c.textMuted} />
+              </Pressable>
+              {showRegFortbildungen && certificationOptions.map((opt) => {
                 const checked = regFortbildungen.includes(opt.key);
                 return (
                   <Pressable key={opt.key} onPress={() => toggleRegFort(opt.key)} style={styles.checkRow}>
@@ -2537,7 +2567,14 @@ export default function App() {
     return (
       <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 20 }]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <Pressable
-          onPress={() => { if (regStep === 1) setShowRegister(false); else setRegStep(s => s - 1); }}
+          onPress={() => {
+            if (regStep === 1) {
+              setShowRegister(false);
+              setShowRegFortbildungen(false);
+            } else {
+              setRegStep(s => s - 1);
+            }
+          }}
           style={styles.backBtn}
         >
           <Text style={[styles.backBtnText, { color: c.primary }]}>‹ {regStep === 1 ? 'Abbrechen' : t('backBtn')}</Text>
@@ -2597,6 +2634,7 @@ export default function App() {
                   setRegStep(1);
                   setRegSpecSearch('');
                   setRegLangSearch('');
+                  setShowRegFortbildungen(false);
                   return;
                 }
               } catch {
@@ -2681,7 +2719,7 @@ export default function App() {
           <>
             <Text style={{ fontSize: 40, marginBottom: 16 }}>❌</Text>
             <Text style={[styles.infoTitle, { color: c.text, textAlign: 'center' }]}>Bestätigung fehlgeschlagen</Text>
-            <Text style={[styles.infoBody, { color: c.muted, textAlign: 'center', marginTop: 8 }]}>{emailVerifyError}</Text>
+            <Text style={[styles.infoBody, { color: c.muted, textAlign: 'center', marginTop: 8 }]}>{softenErrorMessage(emailVerifyError)}</Text>
             <Pressable
               style={[styles.registerBtn, { backgroundColor: c.primary, marginTop: 24, paddingHorizontal: 32 }]}
               onPress={() => { setShowEmailVerify(false); setEmailVerifyStatus('idle'); }}
@@ -2707,9 +2745,9 @@ export default function App() {
       return (
         <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 40 }]}>
           <View style={[styles.infoCard, { backgroundColor: c.card, borderColor: c.border, marginTop: 40 }]}>
-            <Ionicons name="alert-circle-outline" size={40} color="#E74C3C" style={{ alignSelf: 'center' }} />
-            <Text style={[styles.infoTitle, { color: c.text, textAlign: 'center' }]}>Ungültige Einladung</Text>
-            <Text style={[styles.infoBody, { color: c.muted, textAlign: 'center' }]}>{inviteClaimError}</Text>
+            <Ionicons name="alert-circle-outline" size={40} color={c.error} style={{ alignSelf: 'center' }} />
+            <Text style={[styles.infoTitle, { color: c.text, textAlign: 'center' }]}>Einladung konnte nicht geprüft werden</Text>
+            <Text style={[styles.infoBody, { color: c.muted, textAlign: 'center' }]}>{softenErrorMessage(inviteClaimError)}</Text>
             <Pressable
               style={[styles.registerBtn, { backgroundColor: c.primary, marginTop: 8 }]}
               onPress={() => { setShowInviteClaim(false); setInviteClaimError(''); }}
@@ -2802,7 +2840,7 @@ export default function App() {
               secureTextEntry={!showInvitePassword}
               autoCapitalize="none"
             />
-            <Pressable onPress={() => setShowInvitePassword(v => !v)} style={{ position: 'absolute', right: 12, top: 0, bottom: 0, justifyContent: 'center' }}>
+              <Pressable onPress={() => setShowInvitePassword(v => !v)} hitSlop={ICON_HIT_SLOP} style={{ position: 'absolute', right: 12, top: 0, bottom: 0, justifyContent: 'center' }}>
               <Ionicons name={showInvitePassword ? 'eye-off-outline' : 'eye-outline'} size={20} color={c.muted} />
             </Pressable>
           </View>
@@ -2816,12 +2854,12 @@ export default function App() {
               secureTextEntry={!showInvitePasswordConfirm}
               autoCapitalize="none"
             />
-            <Pressable onPress={() => setShowInvitePasswordConfirm(v => !v)} style={{ position: 'absolute', right: 12, top: 0, bottom: 0, justifyContent: 'center' }}>
+            <Pressable onPress={() => setShowInvitePasswordConfirm(v => !v)} hitSlop={ICON_HIT_SLOP} style={{ position: 'absolute', right: 12, top: 0, bottom: 0, justifyContent: 'center' }}>
               <Ionicons name={showInvitePasswordConfirm ? 'eye-off-outline' : 'eye-outline'} size={20} color={c.muted} />
             </Pressable>
           </View>
           {!!inviteClaimError && (
-            <Text style={{ color: '#E74C3C', fontSize: 13, marginTop: 8 }}>{inviteClaimError}</Text>
+            <Text style={{ color: c.error, fontSize: 13, marginTop: 8 }}>{softenErrorMessage(inviteClaimError)}</Text>
           )}
           <Pressable
             style={[styles.registerBtn, { backgroundColor: inviteClaimLoading ? c.border : c.primary, marginTop: 16 }]}
@@ -2926,18 +2964,18 @@ export default function App() {
             <TextInput value={mgrEmail} onChangeText={setMgrEmail} placeholder="E-Mail-Adresse" placeholderTextColor={c.muted} keyboardType="email-address" autoCapitalize="none" style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text }]} />
             <View style={{ position: 'relative' }}>
               <TextInput value={mgrPassword} onChangeText={setMgrPassword} placeholder="Passwort (mind. 6 Zeichen)" placeholderTextColor={c.muted} secureTextEntry={!showMgrPassword} style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text, paddingRight: 44 }]} />
-              <Pressable onPress={() => setShowMgrPassword(v => !v)} style={{ position: 'absolute', right: 12, top: 0, bottom: 0, justifyContent: 'center' }}>
+              <Pressable onPress={() => setShowMgrPassword(v => !v)} hitSlop={ICON_HIT_SLOP} style={{ position: 'absolute', right: 12, top: 0, bottom: 0, justifyContent: 'center' }}>
                 <Ionicons name={showMgrPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color={c.muted} />
               </Pressable>
             </View>
             <View style={{ position: 'relative' }}>
               <TextInput value={mgrPasswordConfirm} onChangeText={setMgrPasswordConfirm} placeholder="Passwort wiederholen" placeholderTextColor={c.muted} secureTextEntry={!showMgrPasswordConfirm} style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text, paddingRight: 44 }]} />
-              <Pressable onPress={() => setShowMgrPasswordConfirm(v => !v)} style={{ position: 'absolute', right: 12, top: 0, bottom: 0, justifyContent: 'center' }}>
+              <Pressable onPress={() => setShowMgrPasswordConfirm(v => !v)} hitSlop={ICON_HIT_SLOP} style={{ position: 'absolute', right: 12, top: 0, bottom: 0, justifyContent: 'center' }}>
                 <Ionicons name={showMgrPasswordConfirm ? 'eye-off-outline' : 'eye-outline'} size={20} color={c.muted} />
               </Pressable>
             </View>
             {mgrPasswordConfirm.length > 0 && mgrPassword !== mgrPasswordConfirm && (
-              <Text style={{ color: '#E05A77', fontSize: 13, marginTop: -6 }}>Passwörter stimmen nicht überein</Text>
+              <Text style={{ color: c.saved, fontSize: 13, marginTop: -6 }}>Passwörter stimmen nicht überein</Text>
             )}
           </>
         );
@@ -3045,8 +3083,8 @@ export default function App() {
             )}
           </View>
           {!!mgrRegError && (
-            <View style={{ backgroundColor: '#FDECEA', borderRadius: 10, borderWidth: 1, borderColor: '#E74C3C', padding: 12, marginTop: 8 }}>
-              <Text style={{ color: '#E74C3C', fontSize: 13 }}>{mgrRegError}</Text>
+            <View style={{ backgroundColor: c.errorBg, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: c.error, padding: 12, marginTop: 8 }}>
+              <Text style={{ color: c.error, fontSize: 13 }}>{softenErrorMessage(mgrRegError)}</Text>
             </View>
           )}
         </>
@@ -3455,7 +3493,7 @@ export default function App() {
     <View style={{ flex: 1, backgroundColor: c.background }}>
       {/* Header */}
       <View style={[styles.header, { paddingBottom: 12 }]}>
-        <Pressable onPress={addPracticeStep === 2 ? () => setAddPracticeStep(1) : closeAddPracticeScreen} style={{ padding: 4, marginRight: 8 }}>
+        <Pressable onPress={addPracticeStep === 2 ? () => setAddPracticeStep(1) : closeAddPracticeScreen} hitSlop={ICON_HIT_SLOP} style={{ padding: 4, marginRight: 8 }}>
           <Ionicons name="arrow-back" size={24} color={c.text} />
         </Pressable>
         <View style={{ flex: 1 }}>
@@ -3549,9 +3587,9 @@ export default function App() {
           </View>
 
           {/* Hinweis Admin-Freigabe */}
-          <View style={{ backgroundColor: '#FFF8E1', borderRadius: 12, padding: 14, marginBottom: 24, flexDirection: 'row', gap: 10, alignItems: 'flex-start' }}>
-            <Ionicons name="information-circle-outline" size={20} color="#F57F17" style={{ marginTop: 1 }} />
-            <Text style={{ color: '#795548', fontSize: 13, flex: 1, lineHeight: 20 }}>
+          <View style={{ backgroundColor: c.warningBg, borderRadius: RADIUS.md, padding: 14, marginBottom: 24, flexDirection: 'row', gap: 10, alignItems: 'flex-start' }}>
+            <Ionicons name="information-circle-outline" size={20} color={c.warning} style={{ marginTop: 1 }} />
+            <Text style={{ color: c.warning, fontSize: 13, flex: 1, lineHeight: 20 }}>
               Die Praxis wird nach dem Einreichen zur Prüfung weitergeleitet. Erst nach Freigabe durch einen Admin ist sie öffentlich sichtbar.
             </Text>
           </View>
@@ -3633,7 +3671,7 @@ export default function App() {
           )}
           <Pressable
             onPress={() => deletionReason ? setDeletionFlowStep('confirm') : null}
-            style={{ marginTop: 20, backgroundColor: deletionReason ? '#ef4444' : c.border, borderRadius: 12, paddingVertical: 14, alignItems: 'center' }}
+            style={{ marginTop: 20, backgroundColor: deletionReason ? c.error : c.border, borderRadius: RADIUS.md, paddingVertical: 14, alignItems: 'center' }}
           >
             <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>Weiter</Text>
           </Pressable>
@@ -3647,9 +3685,9 @@ export default function App() {
         <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' }} onPress={() => setDeletionFlowStep('reason')} />
         <View style={{ backgroundColor: c.background, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, paddingBottom: 48 }}>
           <View style={{ width: 36, height: 4, backgroundColor: c.border, borderRadius: 2, alignSelf: 'center', marginBottom: 20 }} />
-          <View style={{ backgroundColor: '#fef2f2', borderRadius: 12, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: '#fecaca' }}>
-            <Text style={{ fontSize: 15, fontWeight: '700', color: '#dc2626', marginBottom: 6 }}>Diese Aktion kann nicht rückgängig gemacht werden.</Text>
-            <Text style={{ fontSize: 14, color: '#7f1d1d' }}>
+          <View style={{ backgroundColor: c.errorBg, borderRadius: RADIUS.md, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: c.error }}>
+            <Text style={{ fontSize: 15, fontWeight: '700', color: c.error, marginBottom: 6 }}>Diese Aktion kann nicht rückgängig gemacht werden.</Text>
+            <Text style={{ fontSize: 14, color: c.error }}>
               {`„${loggedInTherapist?.adminPractice?.name ?? 'Diese Praxis'}" wird dauerhaft gelöscht. Alle verknüpften Therapeuten werden getrennt und verlieren ihre Praxis-Zuordnung.`}
             </Text>
           </View>
@@ -3658,7 +3696,7 @@ export default function App() {
           </Text>
           <Pressable
             onPress={deletionLoading ? undefined : deletePracticeConfirmed}
-            style={{ backgroundColor: '#dc2626', borderRadius: 12, paddingVertical: 14, alignItems: 'center', opacity: deletionLoading ? 0.6 : 1 }}
+            style={{ backgroundColor: c.error, borderRadius: RADIUS.md, paddingVertical: 14, alignItems: 'center', opacity: deletionLoading ? 0.6 : 1 }}
           >
             <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>
               {deletionLoading ? 'Wird gelöscht…' : 'Praxis endgültig löschen'}
@@ -3681,7 +3719,7 @@ export default function App() {
           ) : (
             notifications.map((n) => (
               <View key={n.id} style={{ paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: c.border, flexDirection: 'row', gap: 10, alignItems: 'flex-start' }}>
-                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#E74C3C', marginTop: 5 }} />
+                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: c.error, marginTop: 5 }} />
                 <View style={{ flex: 1 }}>
                   <Text style={{ color: c.text, fontSize: 14, lineHeight: 20 }}>{n.message}</Text>
                   <Text style={{ color: c.muted, fontSize: 11, marginTop: 3 }}>
@@ -3805,7 +3843,7 @@ export default function App() {
                     style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12,
                       borderBottomWidth: i < locationSuggestions.length - 1 ? 1 : 0, borderBottomColor: c.border }}
                   >
-                    <Ionicons name="navigate-sharp" size={14} color="#2b6877" />
+                    <Ionicons name="navigate-sharp" size={14} color={c.primary} />
                     <Text style={{ flex: 1, color: c.text, fontSize: 14 }} numberOfLines={2}>{s.label}</Text>
                   </Pressable>
                 ))}
@@ -3837,6 +3875,7 @@ export default function App() {
                 if (tab.key !== 'therapist') {
                   setShowLogin(false);
                   setShowRegister(false);
+                  setShowRegFortbildungen(false);
                   setShowInviteClaim(false);
                 }
                 if (tab.key === 'discover') {
@@ -3852,10 +3891,12 @@ export default function App() {
               }}
               style={styles.navItem}
             >
-              <View style={[styles.navPill, active && { backgroundColor: c.primary }]}>
-                <Text style={[styles.navIcon, { color: active ? '#FFFFFF' : c.muted }]}>
-                  {tab.icon}
-                </Text>
+              <View style={[styles.navPill, active && { backgroundColor: c.primaryBg }]}>
+                <Ionicons
+                  name={active ? tab.icon : `${tab.icon}-outline`}
+                  size={22}
+                  color={active ? c.primary : c.muted}
+                />
               </View>
               <Text style={[styles.navLabel, { color: active ? c.primary : c.muted }]}>
                 {t(tab.labelKey)}
@@ -3873,255 +3914,377 @@ export default function App() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   appFrame: { flex: 1 },
-  scrollContent: { padding: 20, gap: 14 },
+  scrollContent: { padding: SPACE.xl, gap: SPACE.lg },
 
-  // Hero
-  hero: { paddingTop: 8, paddingBottom: 4, gap: 8 },
-  heroTitle: { fontSize: 28, fontWeight: '800', lineHeight: 36 },
-  heroSub: { fontSize: 15, lineHeight: 22 },
+  hero: { paddingTop: SPACE.sm, paddingBottom: SPACE.xs, gap: SPACE.sm },
+  heroTitle: { ...TYPE.xl },
+  heroSub: { ...TYPE.body },
 
-  // Header
-  header: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingBottom: 4 },
-  logoMark: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  logoText: { color: '#FFFFFF', fontSize: 20, fontWeight: '800' },
-  brandName: { fontSize: 24, fontWeight: '700', letterSpacing: 3, marginLeft: 4 },
-  logoContainer: { backgroundColor: '#506d7a', padding: 10, borderRadius: 12 },
+  header: { flexDirection: 'row', alignItems: 'center', gap: SPACE.md, paddingBottom: SPACE.xs },
+  logoMark: { width: 40, height: 40, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center' },
+  logoText: { color: '#FFFFFF', fontSize: 20, fontWeight: '800', lineHeight: 20 },
+  brandName: { ...TYPE.lg, letterSpacing: 3, marginLeft: 4 },
+  logoContainer: { backgroundColor: COLORS.light.primary, padding: SPACE.md, borderRadius: RADIUS.md },
   logoImage: { width: 80, height: 80, resizeMode: 'contain' },
-  headerTitle: { fontSize: 20, fontWeight: '700' },
-  headerSub: { fontSize: 13, marginTop: 1 },
+  headerTitle: { ...TYPE.lg },
+  headerSub: { ...TYPE.meta, marginTop: 1 },
 
-  // Search box
   searchBox: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderRadius: 16,
+    borderRadius: RADIUS.md,
     paddingLeft: 14,
     paddingRight: 4,
-    paddingVertical: 0,
     height: 52,
     gap: 10,
-    boxShadow: '0px 2px 6px rgba(0, 0, 0, 0.06)',
-    elevation: 2,
+    ...SHADOW.card,
   },
-  searchInput: { flex: 1, fontSize: 16 },
+  searchInput: { flex: 1, ...TYPE.body },
   searchDivider: { width: 1, height: 24, opacity: 0.5 },
-  searchFilterArea: { paddingHorizontal: 12, paddingVertical: 14, position: 'relative' },
+  searchFilterArea: {
+    paddingHorizontal: 12,
+    paddingVertical: 14,
+    minHeight: 44,
+    justifyContent: 'center',
+    position: 'relative',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACE.xs,
+  },
 
-  // Autocomplete
   autocompleteBox: {
     borderWidth: 1,
     borderTopWidth: 0,
-    borderBottomLeftRadius: 16,
-    borderBottomRightRadius: 16,
+    borderBottomLeftRadius: RADIUS.md,
+    borderBottomRightRadius: RADIUS.md,
     marginTop: -4,
     paddingTop: 4,
-    overflow: 'hidden'
+    overflow: 'hidden',
   },
-  acItem: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12 },
-  acSearchIcon: { fontSize: 14 },
-  acItemText: { fontSize: 15 },
+  acItem: { flexDirection: 'row', alignItems: 'center', gap: SPACE.sm, paddingHorizontal: 14, paddingVertical: 12, minHeight: 44 },
+  acSearchIcon: { ...TYPE.meta },
+  acItemText: { ...TYPE.body },
 
-  // Chips
-  chipsRow: { gap: 8, paddingVertical: 2 },
-  chip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 },
-  chipText: { fontSize: 14, fontWeight: '500' },
+  chipsRow: { gap: SPACE.sm, paddingVertical: 2 },
+  chip: {
+    borderWidth: 1,
+    borderRadius: RADIUS.full,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    minHeight: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chipText: { ...TYPE.meta },
 
-  // Filter row
-  filterRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  filterRow: { flexDirection: 'row', gap: SPACE.sm, alignItems: 'center' },
   cityInput: {
-    flex: 1, borderWidth: 1, borderRadius: 12,
-    paddingHorizontal: 12, paddingVertical: 10, fontSize: 15
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: RADIUS.md,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    minHeight: 44,
+    ...TYPE.body,
   },
-  filterBtn: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10 },
-  filterBtnText: { fontSize: 14, fontWeight: '600' },
-  goBtn: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  goBtnText: { fontSize: 18, fontWeight: '700', color: '#1B1F23' },
+  filterBtn: {
+    borderWidth: 1,
+    borderRadius: RADIUS.md,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  filterBtnText: { ...TYPE.meta },
+  goBtn: { width: 44, height: 44, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center' },
+  goBtnText: { ...TYPE.heading, color: '#FFFFFF' },
 
-  // Filter panel
-  filterPanel: { borderWidth: 1, borderRadius: 16, padding: 16 },
-  filterSectionTitle: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10 },
-  kassenartRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  kassenartBtn: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 7 },
-  kassenartText: { fontSize: 13, fontWeight: '600' },
-  checkRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 5 },
-  checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
-  checkmark: { color: '#FFFFFF', fontSize: 12, fontWeight: '800' },
-  checkLabel: { fontSize: 14 },
+  filterPanel: { borderWidth: 1, borderRadius: RADIUS.md, padding: SPACE.lg, gap: SPACE.md },
+  filterSectionTitle: { ...TYPE.label, marginBottom: 10 },
+  sectionBadgeRow: { flexDirection: 'row', alignItems: 'center', gap: SPACE.sm, flexWrap: 'wrap', marginBottom: 6 },
+  inlineMetaPill: { borderRadius: RADIUS.full, paddingHorizontal: 10, paddingVertical: 5 },
+  inlineMetaPillText: { ...TYPE.label, fontSize: 11, lineHeight: 11 },
+  metaNote: { ...TYPE.meta },
+  optionalInlineLabel: { fontWeight: '400', textTransform: 'none', letterSpacing: 0, fontSize: 11, lineHeight: 14 },
+  collapseToggle: {
+    minHeight: 44,
+    borderWidth: 1,
+    borderRadius: RADIUS.md,
+    paddingHorizontal: SPACE.md,
+    paddingVertical: SPACE.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACE.sm,
+  },
+  kassenartRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACE.sm },
+  kassenartBtn: {
+    borderWidth: 1,
+    borderRadius: RADIUS.full,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    minHeight: 44,
+    alignItems: 'center',
+  },
+  kassenartText: { ...TYPE.meta },
+  checkRow: { flexDirection: 'row', alignItems: 'center', gap: SPACE.sm, paddingVertical: 8, minHeight: 44 },
+  checkbox: { width: 22, height: 22, borderRadius: RADIUS.sm, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  checkmark: { color: '#FFFFFF', ...TYPE.label, fontSize: 12, lineHeight: 12, letterSpacing: 0, textTransform: 'none' },
+  checkLabel: { ...TYPE.body, flex: 1 },
   switchRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
-  switchTitle: { fontSize: 15, fontWeight: '600', marginBottom: 2 },
-  switchLabel: { fontSize: 13, lineHeight: 18 },
+  switchTitle: { ...TYPE.body, fontWeight: '600', marginBottom: 2 },
+  switchLabel: { ...TYPE.meta },
 
-  // Section row
-  sectionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  sectionLabel: { fontSize: 16, fontWeight: '700' },
-  approvedPill: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
-  approvedPillText: { fontSize: 12, fontWeight: '600' },
-  metaPill: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 },
-  metaPillText: { fontSize: 12, fontWeight: '600' },
+  sectionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: SPACE.sm },
+  sectionLabel: { ...TYPE.heading },
+  approvedPill: { borderRadius: RADIUS.full, paddingHorizontal: 10, paddingVertical: 4 },
+  approvedPillText: { ...TYPE.meta },
+  metaPill: { borderRadius: RADIUS.full, paddingHorizontal: 10, paddingVertical: 5 },
+  metaPillText: { ...TYPE.meta },
 
-  // Result cards
-  resultCard: { borderWidth: 1, borderRadius: 20, padding: 16, gap: 12 },
-  cardTop: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  avatar: { width: 52, height: 52, borderRadius: 26 },
-  cardName: { fontSize: 17, fontWeight: '700', marginBottom: 2 },
-  cardTitle: { fontSize: 13 },
+  resultCard: { borderWidth: 1, borderRadius: RADIUS.lg, padding: 18, gap: 14, ...SHADOW.card },
+  cardTop: { flexDirection: 'row', alignItems: 'center', gap: SPACE.md },
+  avatar: { width: 56, height: 56, borderRadius: RADIUS.full },
+  cardName: { ...TYPE.heading, marginBottom: 2 },
+  cardTitle: { ...TYPE.meta },
   tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  tag: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 },
-  tagText: { fontSize: 13, fontWeight: '500' },
+  tag: { borderRadius: RADIUS.full, paddingHorizontal: 10, paddingVertical: 5 },
+  tagText: { ...TYPE.meta },
   practiceBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    borderWidth: 1, borderRadius: 12, padding: 10
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1,
+    borderRadius: RADIUS.md,
+    padding: SPACE.md,
+    minHeight: 56,
   },
   practiceInitial: {
-    width: 36, height: 36, borderRadius: 10,
-    alignItems: 'center', justifyContent: 'center'
+    width: 36,
+    height: 36,
+    borderRadius: RADIUS.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  practiceInitialText: { fontSize: 16, fontWeight: '700' },
-  practiceName: { fontSize: 14, fontWeight: '600' },
-  practiceCity: { fontSize: 12, marginTop: 1 },
+  practiceInitialText: { ...TYPE.heading, fontWeight: '700' },
+  practiceName: { ...TYPE.body, fontWeight: '600' },
+  practiceCity: { ...TYPE.meta, marginTop: 1 },
   practiceArrow: { fontSize: 18 },
   filterIconBtn: {
-    width: 48, height: 48, borderRadius: 14, borderWidth: 1,
-    alignItems: 'center', justifyContent: 'center'
+    width: 48,
+    height: 48,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   filterIconText: { fontSize: 20 },
   filterBadge: {
-    position: 'absolute', top: 6, right: 6,
-    width: 16, height: 16, borderRadius: 8,
-    alignItems: 'center', justifyContent: 'center'
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 20,
+    height: 20,
+    borderRadius: RADIUS.full,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  filterBadgeText: { fontSize: 10, fontWeight: '700', color: '#FFFFFF' },
-  distBadge: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3, marginRight: 6 },
-  distBadgeText: { fontSize: 12, fontWeight: '700' },
+  filterBadgeText: { ...TYPE.label, color: '#FFFFFF', fontSize: 11, lineHeight: 11, letterSpacing: 0, textTransform: 'none' },
+  distBadge: { borderRadius: RADIUS.full, paddingHorizontal: 8, paddingVertical: 3, marginRight: 6 },
+  distBadgeText: { ...TYPE.meta, fontWeight: '700' },
 
-  // Practice profile screen
-  backBtn: { paddingVertical: 4 },
-  backBtnText: { fontSize: 16, fontWeight: '600' },
-  practiceHeader: { borderWidth: 1, borderRadius: 20, padding: 20, alignItems: 'center', gap: 6 },
+  backBtn: { paddingVertical: 10, minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
+  backBtnText: { ...TYPE.body, fontWeight: '600' },
+  practiceHeader: { borderWidth: 1, borderRadius: RADIUS.lg, padding: 20, alignItems: 'center', gap: 6, ...SHADOW.card },
   practiceLogoLarge: {
-    width: 64, height: 64, borderRadius: 18,
-    alignItems: 'center', justifyContent: 'center', marginBottom: 4
+    width: 64,
+    height: 64,
+    borderRadius: RADIUS.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
   },
-  practiceLogoText: { color: '#FFFFFF', fontSize: 26, fontWeight: '800' },
+  practiceLogoText: { color: '#FFFFFF', fontSize: 26, fontWeight: '800', lineHeight: 26 },
   practiceLogoCross: { position: 'absolute', top: 8, right: 8, width: 18, height: 18 },
   plusBarH: { position: 'absolute', top: '38%', left: 0, right: 0, height: 5, borderRadius: 3 },
   plusBarV: { position: 'absolute', left: '38%', top: 0, bottom: 0, width: 5, borderRadius: 3 },
-  practiceHeaderName: { fontSize: 20, fontWeight: '700' },
-  practiceHeaderCity: { fontSize: 14 },
+  practiceHeaderName: { ...TYPE.lg },
+  practiceHeaderCity: { ...TYPE.body },
   detailRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 1,
+    borderRadius: RADIUS.md,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
   },
   detailIcon: { fontSize: 18 },
-  detailText: { fontSize: 14, flex: 1, lineHeight: 20 },
+  detailText: { ...TYPE.body, flex: 1 },
   miniCard: {
-    flexDirection: 'row', alignItems: 'flex-start', gap: 12,
-    borderWidth: 1, borderRadius: 16, padding: 14
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: SPACE.md,
+    borderWidth: 1,
+    borderRadius: RADIUS.md,
+    padding: 14,
   },
-  miniAvatar: { width: 44, height: 44, borderRadius: 22 },
+  miniAvatar: { width: 44, height: 44, borderRadius: RADIUS.full },
 
-  ctaBtn: { borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
-  ctaBtnText: { fontSize: 15, fontWeight: '700', color: '#1B1F23' },
-  ctaBtnSecondary: { borderRadius: 12, paddingVertical: 12, alignItems: 'center', borderWidth: 1 },
-  ctaBtnSecondaryText: { fontSize: 15, fontWeight: '700' },
+  ctaBtn: { borderRadius: RADIUS.md, paddingVertical: 12, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  ctaBtnText: { ...TYPE.heading, color: '#FFFFFF' },
+  ctaBtnSecondary: { borderRadius: RADIUS.md, paddingVertical: 12, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+  ctaBtnSecondaryText: { ...TYPE.heading },
 
-  // Empty state
-  emptyState: { borderWidth: 1, borderRadius: 20, padding: 32, alignItems: 'center', gap: 8 },
+  emptyState: { borderWidth: 1, borderRadius: RADIUS.lg, padding: SPACE.xxl, alignItems: 'center', gap: SPACE.sm },
   emptyIcon: { fontSize: 32 },
-  emptyTitle: { fontSize: 17, fontWeight: '700' },
-  emptyBody: { fontSize: 14, textAlign: 'center', lineHeight: 20 },
+  emptyTitle: { ...TYPE.heading },
+  emptyBody: { ...TYPE.body, textAlign: 'center' },
   emptyActions: { flexDirection: 'row', gap: 10, marginTop: 8, width: '100%' },
-  emptyActionBtn: { flex: 1, borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
-  emptyActionText: { fontSize: 13, fontWeight: '700' },
-  emptyInlineState: { borderWidth: 1, borderRadius: 16, padding: 14, marginHorizontal: 16, marginTop: 8 },
+  emptyActionBtn: { flex: 1, borderRadius: RADIUS.md, paddingVertical: 12, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  emptyActionText: { ...TYPE.meta, fontWeight: '700' },
+  emptyInlineState: { borderWidth: 1, borderRadius: RADIUS.md, padding: 14, marginHorizontal: 16, marginTop: 8 },
 
-  // Therapist tab
   noticeBox: {
-    flexDirection: 'row', alignItems: 'flex-start', gap: 10,
-    borderWidth: 1, borderRadius: 16, padding: 14,
-    width: '100%'
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    borderWidth: 1,
+    borderRadius: RADIUS.md,
+    padding: 14,
+    width: '100%',
   },
   lockBadge: {
     width: 28,
     height: 28,
-    borderRadius: 999,
+    borderRadius: RADIUS.full,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F7F9FA',
     marginTop: 1,
   },
   noticeIcon: { fontSize: 20, marginTop: 1, width: 24, textAlign: 'center' },
-  noticeTitle: { fontSize: 14, fontWeight: '700', marginBottom: 3 },
-  noticeBody: { fontSize: 13, lineHeight: 18, flex: 1, flexShrink: 1 },
-  infoCard: { borderWidth: 1, borderRadius: 20, padding: 20, gap: 8 },
-  infoTitle: { fontSize: 20, fontWeight: '700' },
-  infoBody: { fontSize: 15, lineHeight: 22 },
+  noticeTitle: { ...TYPE.body, fontWeight: '700', marginBottom: 3 },
+  noticeBody: { ...TYPE.meta, flex: 1, flexShrink: 1 },
+  infoCard: { borderWidth: 1, borderRadius: RADIUS.lg, padding: 20, gap: 10, ...SHADOW.card },
+  infoTitle: { ...TYPE.lg },
+  infoBody: { ...TYPE.body },
   stepRow: {
-    flexDirection: 'row', alignItems: 'flex-start', gap: 14,
-    borderBottomWidth: 1, paddingBottom: 14
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 14,
+    borderBottomWidth: 1,
+    paddingBottom: 14,
   },
-  stepNum: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  stepNumText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
-  stepTitle: { fontSize: 15, fontWeight: '600', marginBottom: 2 },
-  stepBody: { fontSize: 13, lineHeight: 18 },
-  registerBtn: { borderRadius: 14, paddingVertical: 14, alignItems: 'center', marginTop: 4 },
-  registerBtnText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
-  loginLink: { textAlign: 'center', fontSize: 14, fontWeight: '600', paddingVertical: 12 },
+  stepNum: { width: 32, height: 32, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center' },
+  stepNumText: { color: '#FFFFFF', ...TYPE.body, fontWeight: '700', lineHeight: 18 },
+  stepTitle: { ...TYPE.body, fontWeight: '600', marginBottom: 2 },
+  stepBody: { ...TYPE.meta },
+  registerBtn: { borderRadius: RADIUS.md, paddingVertical: 14, minHeight: 48, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
+  registerBtnText: { ...TYPE.heading, color: '#FFFFFF' },
+  loginLink: { textAlign: 'center', ...TYPE.body, fontWeight: '600', paddingVertical: 12 },
 
-  // Options rows
   optionRow: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    borderWidth: 1, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: RADIUS.md,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    minHeight: 56,
   },
-  optionLabel: { fontSize: 15, fontWeight: '500' },
-  optionValue: { fontSize: 14 },
+  optionLabel: { ...TYPE.body, fontWeight: '500' },
+  optionValue: { ...TYPE.meta },
 
-  // Therapist profile
-  therapistAvatarLarge: { width: 80, height: 80, borderRadius: 40, marginBottom: 4 },
+  therapistAvatarLarge: { width: 80, height: 80, borderRadius: RADIUS.full, marginBottom: 4 },
   therapistAvatarSmall: { width: 40, height: 40 },
-  practiceHeaderInitial: { width: 64, height: 64, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  practiceHeaderInitialText: { color: '#fff', fontSize: 24, fontWeight: '800' },
-  infoSection: { borderWidth: 1, borderRadius: 16, padding: 16, gap: 10 },
+  practiceHeaderInitial: { width: 64, height: 64, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center' },
+  practiceHeaderInitialText: { color: '#FFFFFF', fontSize: 24, fontWeight: '800', lineHeight: 24 },
+  infoSection: { borderWidth: 1, borderRadius: RADIUS.md, padding: 18, gap: 10, ...SHADOW.card },
+  profileName: { ...TYPE.lg },
+  therapistName: { ...TYPE.heading },
+  therapistTitle: { ...TYPE.meta },
   profileNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'center' },
-  verifiedBadge: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 },
-  verifiedText: { fontSize: 12, fontWeight: '700' },
+  verifiedBadge: { borderRadius: RADIUS.full, paddingHorizontal: 8, paddingVertical: 3 },
+  verifiedText: { ...TYPE.meta, fontWeight: '700' },
   detailInfoRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  detailInfoLabel: { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
-  detailInfoValue: { fontSize: 14, marginTop: 1 },
-
-  // Theme toggle
-  themeToggleRow: { flexDirection: 'row', gap: 6 },
-  themeBtn: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 5 },
-  themeBtnText: { fontSize: 13, fontWeight: '600' },
-
-  // Bottom nav
-  navbar: {
-    borderTopWidth: 1, flexDirection: 'row',
-    justifyContent: 'space-around', paddingVertical: 8, paddingHorizontal: 8
+  detailInfoLabel: { ...TYPE.label },
+  detailInfoValue: { ...TYPE.body, marginTop: 1 },
+  input: {
+    borderWidth: 1,
+    borderRadius: RADIUS.md,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    minHeight: 48,
+    ...TYPE.body,
+    outlineWidth: 0,
   },
-  navItem: { alignItems: 'center', gap: 4, flex: 1, paddingVertical: 4 },
-  navPill: { borderRadius: 12, paddingHorizontal: 20, paddingVertical: 6 },
-  navIcon: { fontSize: 18, fontWeight: '700' },
-  navLabel: { fontSize: 11, fontWeight: '600' },
+  inputField: {
+    borderWidth: 1,
+    borderRadius: RADIUS.md,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    minHeight: 48,
+    ...TYPE.body,
+    outlineWidth: 0,
+  },
 
-  // Registration stepper
+  themeToggleRow: { flexDirection: 'row', gap: 6 },
+  themeBtn: {
+    borderWidth: 1,
+    borderRadius: RADIUS.full,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  themeBtnText: { ...TYPE.meta, fontWeight: '600' },
+
+  navbar: {
+    borderTopWidth: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+  },
+  navItem: { alignItems: 'center', gap: 4, flex: 1, paddingVertical: 10, minHeight: 44 },
+  navPill: {
+    borderRadius: RADIUS.full,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    minHeight: 38,
+    minWidth: 54,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  navIcon: { fontSize: 18, fontWeight: '700' },
+  navLabel: { fontSize: 12, fontWeight: '600', letterSpacing: 0.2 },
+
   regProgressRow: { flexDirection: 'row', gap: 4, marginBottom: 4 },
   regProgressBar: { height: 4, borderRadius: 2, flex: 1 },
-  regStepTitle: { fontSize: 22, fontWeight: '800', marginBottom: 4 },
-  regStepSub: { fontSize: 14, lineHeight: 20, marginBottom: 4 },
+  regStepTitle: { ...TYPE.lg, marginBottom: 4 },
+  regStepSub: { ...TYPE.body, marginBottom: 4 },
   regInput: {
-    borderWidth: 1, borderRadius: 14,
-    paddingHorizontal: 14, paddingVertical: 12,
-    fontSize: 15, outlineWidth: 0
+    borderWidth: 1,
+    borderRadius: RADIUS.md,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    minHeight: 48,
+    ...TYPE.body,
+    outlineWidth: 0,
   },
   regTextarea: { minHeight: 100, textAlignVertical: 'top', paddingTop: 12 },
 
-  // Preview step
   previewRow: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start',
-    paddingVertical: 10, borderBottomWidth: 1, gap: 12
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    gap: 12,
   },
-  previewLabel: { fontSize: 13, fontWeight: '600', flex: 1 },
-  previewValue: { fontSize: 13, flex: 2, textAlign: 'right' }
+  previewLabel: { ...TYPE.meta, fontWeight: '600', flex: 1 },
+  previewValue: { ...TYPE.meta, flex: 2, textAlign: 'right' },
 });

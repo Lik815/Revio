@@ -9,7 +9,10 @@ import {
   View,
 } from 'react-native';
 import {
+  RADIUS,
   regSpecOptions,
+  softenErrorMessage,
+  TYPE,
 } from './mobile-utils';
 
 export function LoginScreen(props) {
@@ -62,15 +65,15 @@ export function LoginScreen(props) {
             placeholderTextColor={c.muted}
             secureTextEntry={!showPassword}
           />
-          <Pressable onPress={() => setShowPassword(v => !v)} style={{ position: 'absolute', right: 12, top: 0, bottom: 0, justifyContent: 'center' }}>
+          <Pressable onPress={() => setShowPassword(v => !v)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={{ position: 'absolute', right: 12, top: 0, bottom: 0, justifyContent: 'center' }}>
             <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color={c.muted} />
           </Pressable>
         </View>
       </View>
 
       {loginError ? (
-        <View style={[styles.noticeBox, { backgroundColor: '#FDECEA', borderColor: '#E74C3C', marginBottom: 8 }]}>
-          <Text style={{ color: '#E74C3C', flex: 1 }}>{loginError}</Text>
+        <View style={[styles.noticeBox, { backgroundColor: c.errorBg, borderColor: c.error, marginBottom: 8 }]}>
+          <Text style={{ color: c.error, flex: 1 }}>{softenErrorMessage(loginError)}</Text>
         </View>
       ) : null}
 
@@ -142,11 +145,11 @@ export function TherapistLandingScreen(props) {
         style={[styles.registerBtn, { backgroundColor: c.card, borderWidth: 1, borderColor: c.border, marginTop: 10 }]}
         onPress={() => setShowLogin(true)}
       >
-        <Text style={[styles.registerBtnText, { color: c.text }]}>Anmelden</Text>
+        <Text style={{ ...TYPE.heading, color: c.text }}>Anmelden</Text>
       </Pressable>
 
-      <Pressable onPress={() => setShowManagerReg(true)} style={{ alignSelf: 'center', paddingVertical: 8, marginTop: 12 }}>
-        <Text style={{ color: c.muted, fontSize: 14 }}>Praxis als Manager registrieren</Text>
+      <Pressable onPress={() => setShowManagerReg(true)} style={{ alignSelf: 'center', paddingVertical: 10, marginTop: 12 }}>
+        <Text style={{ ...TYPE.body, color: c.muted }}>Praxis als Manager registrieren</Text>
       </Pressable>
     </ScrollView>
   );
@@ -239,7 +242,7 @@ export function PracticeSearchScreen(props) {
             placeholderTextColor={c.muted}
             returnKeyType="search"
           />
-          <Pressable onPress={handleSearchPractices}>
+          <Pressable onPress={handleSearchPractices} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <Text style={{ fontSize: 20, color: c.primary }}>⌕</Text>
           </Pressable>
         </View>
@@ -344,14 +347,14 @@ export function InvitePageScreen(props) {
       </Pressable>
       <Text style={[styles.profileName, { color: c.text, marginBottom: 16 }]}>Therapeuten einladen</Text>
 
-      <View style={{ flexDirection: 'row', backgroundColor: c.mutedBg, borderRadius: 12, padding: 3, marginBottom: 20 }}>
+      <View style={{ flexDirection: 'row', backgroundColor: c.mutedBg, borderRadius: RADIUS.md, padding: 3, marginBottom: 20 }}>
         {[{ key: 'new', label: 'Neuer Therapeut' }, { key: 'link', label: 'Einladungslink' }].map((tab) => (
           <Pressable
             key={tab.key}
             onPress={() => setInvitePageTab(tab.key)}
-            style={{ flex: 1, paddingVertical: 9, borderRadius: 10, alignItems: 'center', backgroundColor: invitePageTab === tab.key ? c.card : 'transparent' }}
+            style={{ flex: 1, paddingVertical: 10, borderRadius: RADIUS.sm, alignItems: 'center', backgroundColor: invitePageTab === tab.key ? c.card : 'transparent', minHeight: 44, justifyContent: 'center' }}
           >
-            <Text style={{ fontSize: 14, fontWeight: invitePageTab === tab.key ? '700' : '500', color: invitePageTab === tab.key ? c.text : c.muted }}>
+            <Text style={{ ...TYPE.meta, fontWeight: invitePageTab === tab.key ? '700' : '500', color: invitePageTab === tab.key ? c.text : c.muted }}>
               {tab.label}
             </Text>
           </Pressable>
@@ -406,7 +409,7 @@ export function InvitePageScreen(props) {
               style={[styles.regInput, { backgroundColor: c.mutedBg, borderColor: c.border, color: c.text }]}
             />
             {specializationSuggestions.length > 0 && (
-              <View style={{ borderRadius: 10, borderWidth: 1, borderColor: c.border, marginTop: -2, overflow: 'hidden', backgroundColor: c.mutedBg }}>
+              <View style={{ borderRadius: RADIUS.sm, borderWidth: 1, borderColor: c.border, marginTop: -2, overflow: 'hidden', backgroundColor: c.mutedBg }}>
                 {specializationSuggestions.map((specialization, index) => (
                   <Pressable
                     key={specialization}
@@ -447,7 +450,7 @@ export function InvitePageScreen(props) {
               style={[styles.regInput, { backgroundColor: c.mutedBg, borderColor: c.border, color: c.text }]}
             />
             {certificationSuggestions.length > 0 && (
-              <View style={{ borderRadius: 10, borderWidth: 1, borderColor: c.border, marginTop: -2, overflow: 'hidden', backgroundColor: c.mutedBg }}>
+              <View style={{ borderRadius: RADIUS.sm, borderWidth: 1, borderColor: c.border, marginTop: -2, overflow: 'hidden', backgroundColor: c.mutedBg }}>
                 {certificationSuggestions.map((option, index) => (
                   <Pressable
                     key={option.key}
@@ -504,9 +507,9 @@ export function InvitePageScreen(props) {
           </View>
 
           {!!createTherapistError && (
-            <Text style={{ color: '#E74C3C', fontSize: 13, marginHorizontal: 4 }}>{createTherapistError}</Text>
+            <Text style={{ color: c.error, fontSize: 13, marginHorizontal: 4 }}>{softenErrorMessage(createTherapistError)}</Text>
           )}
-          <Pressable onPress={handleCreateTherapist} disabled={createTherapistLoading} style={{ backgroundColor: createTherapistLoading ? c.border : c.primary, borderRadius: 12, paddingVertical: 14, alignItems: 'center' }}>
+          <Pressable onPress={handleCreateTherapist} disabled={createTherapistLoading} style={{ backgroundColor: createTherapistLoading ? c.border : c.primary, borderRadius: RADIUS.md, paddingVertical: 14, alignItems: 'center' }}>
             <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>
               {createTherapistLoading ? 'Wird erstellt…' : 'Profil erstellen & einladen'}
             </Text>
@@ -527,13 +530,13 @@ export function InvitePageScreen(props) {
                   Teile diesen Link mit Therapeuten. Sie können damit eine Beitrittsanfrage an deine Praxis senden.
                 </Text>
               </View>
-              <Pressable onPress={handleShareInviteLink} style={{ backgroundColor: c.primary, borderRadius: 12, paddingVertical: 14, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 }}>
+              <Pressable onPress={handleShareInviteLink} style={{ backgroundColor: c.primary, borderRadius: RADIUS.md, paddingVertical: 14, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 }}>
                 <Ionicons name="share-outline" size={18} color="#fff" />
                 <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600' }}>Link teilen</Text>
               </Pressable>
             </>
           ) : (
-            <Pressable onPress={handleLoadInviteToken} style={{ backgroundColor: c.primary, borderRadius: 12, paddingVertical: 14, alignItems: 'center' }}>
+            <Pressable onPress={handleLoadInviteToken} style={{ backgroundColor: c.primary, borderRadius: RADIUS.md, paddingVertical: 14, alignItems: 'center' }}>
               <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600' }}>Link erstellen</Text>
             </Pressable>
           )}

@@ -177,6 +177,20 @@ export default async function TherapistsPage({ searchParams }: { searchParams: S
           {filtered.map((t) => (
             (() => {
               const priority = getReviewPriority(t);
+              const publicVisibilityBadge =
+                t.reviewStatus === 'APPROVED' && t.isVisible
+                  ? { label: 'Öffentlich sichtbar', className: 'badge badge--APPROVED' }
+                  : t.reviewStatus === 'APPROVED' && !t.isVisible
+                    ? { label: 'Freigegeben, aber versteckt', className: 'badge badge--PENDING_REVIEW' }
+                    : { label: 'Nicht öffentlich', className: 'badge badge--DRAFT' };
+              const isApprovedButNotVisible = t.reviewStatus === 'APPROVED' && t.visibility.visibilityState !== 'visible';
+              const blockerReasons = (
+                t.visibility.blockingReasons.length > 0
+                  ? t.visibility.blockingReasons
+                  : !t.isVisible
+                    ? ['manually_hidden']
+                    : ['profile_incomplete']
+              ).map((reason) => blockingReasonLabel[reason] ?? reason);
               return (
               <tr key={t.id}>
                 <td data-label="Name">
@@ -204,27 +218,52 @@ export default async function TherapistsPage({ searchParams }: { searchParams: S
                   <DeadlineTimer createdAt={t.createdAt} status={t.reviewStatus} />
                 </td>
                 <td data-label="Status">
-                  <span className={`badge badge--${t.reviewStatus}`}>
-                    {statusLabel[t.reviewStatus] ?? t.reviewStatus}
-                  </span>
+                  <div className="priority-stack">
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      <span className={`badge badge--${t.reviewStatus}`}>
+                        {statusLabel[t.reviewStatus] ?? t.reviewStatus}
+                      </span>
+                      <span className={publicVisibilityBadge.className}>
+                        {publicVisibilityBadge.label}
+                      </span>
+                    </div>
+                  </div>
                 </td>
                 <td data-label="Sichtbarkeit">
-                  {(() => {
-                    const vis = t.visibility;
-                    return (
-                      <div className="priority-stack">
-                        <span className={`badge ${visibilityBadgeClass[vis.visibilityState] ?? 'badge--DRAFT'}`}>
-                          {visibilityLabel[vis.visibilityState] ?? vis.visibilityState}
-                        </span>
-                        {vis.blockingReasons.length > 0 && (
-                          <span className="entity-meta" title={vis.blockingReasons.map((r) => blockingReasonLabel[r] ?? r).join(', ')}>
-                            {blockingReasonLabel[vis.blockingReasons[0]] ?? vis.blockingReasons[0]}
-                            {vis.blockingReasons.length > 1 && ` +${vis.blockingReasons.length - 1}`}
-                          </span>
-                        )}
+                  {isApprovedButNotVisible ? (
+                    <div className="priority-stack">
+                      <div
+                        style={{
+                          borderRadius: 12,
+                          background: 'rgba(217, 119, 6, 0.08)',
+                          border: '1px solid rgba(217, 119, 6, 0.22)',
+                          padding: '10px 12px',
+                          color: 'var(--warning)',
+                          fontSize: 13,
+                          lineHeight: 1.5,
+                        }}
+                      >
+                        <strong>Nicht sichtbar weil:</strong> {blockerReasons.join(', ')}
                       </div>
-                    );
-                  })()}
+                    </div>
+                  ) : (
+                    (() => {
+                      const vis = t.visibility;
+                      return (
+                        <div className="priority-stack">
+                          <span className={`badge ${visibilityBadgeClass[vis.visibilityState] ?? 'badge--DRAFT'}`}>
+                            {visibilityLabel[vis.visibilityState] ?? vis.visibilityState}
+                          </span>
+                          {vis.blockingReasons.length > 0 && (
+                            <span className="entity-meta" title={vis.blockingReasons.map((r) => blockingReasonLabel[r] ?? r).join(', ')}>
+                              {blockingReasonLabel[vis.blockingReasons[0]] ?? vis.blockingReasons[0]}
+                              {vis.blockingReasons.length > 1 && ` +${vis.blockingReasons.length - 1}`}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()
+                  )}
                 </td>
                 <td data-label="Aktionen">
                   <TherapistActions

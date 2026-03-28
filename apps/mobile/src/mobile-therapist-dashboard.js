@@ -13,7 +13,31 @@ import {
 import {
   getLangLabel,
   languageOptions,
+  RADIUS,
+  SPACE,
+  TYPE,
 } from './mobile-utils';
+
+function StatusMiniCard({ icon, label, value, color, c }) {
+  return (
+    <View
+      style={{
+        flex: 1,
+        minWidth: '45%',
+        borderWidth: 1,
+        borderColor: c.border,
+        borderRadius: RADIUS.md,
+        padding: SPACE.md,
+        gap: SPACE.xs,
+        backgroundColor: c.card,
+      }}
+    >
+      <Ionicons name={icon} size={18} color={color} />
+      <Text style={{ ...TYPE.label, color: c.textMuted ?? c.muted }}>{label}</Text>
+      <Text style={{ ...TYPE.meta, color, fontWeight: '600' }}>{value}</Text>
+    </View>
+  );
+}
 
 export function TherapistDashboardScreen(props) {
   const {
@@ -57,6 +81,10 @@ export function TherapistDashboardScreen(props) {
 
   const th = loggedInTherapist;
   const initials = th.fullName.split(' ').map((name) => name[0]).join('').slice(0, 2).toUpperCase();
+  const reviewStatusLabel = th.reviewStatus === 'APPROVED' ? 'Freigegeben' : th.reviewStatus === 'CHANGES_REQUESTED' ? 'Anpassung nötig' : 'In Prüfung';
+  const reviewStatusColor = th.reviewStatus === 'APPROVED' ? c.success : th.reviewStatus === 'CHANGES_REQUESTED' ? c.warning : c.muted;
+  const hasPractice = (th.practices ?? []).length > 0;
+  const hasDocuments = (therapistDocuments ?? []).length > 0;
 
   return (
     <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 20 }]}>
@@ -74,16 +102,41 @@ export function TherapistDashboardScreen(props) {
           </View>
         </Pressable>
         <Text style={[styles.practiceHeaderName, { color: c.text, marginTop: 10 }]}>{th.fullName}</Text>
-        <Text style={[styles.practiceHeaderCity, { color: c.muted }]}>{th.professionalTitle}</Text>
-        <View style={[styles.tag, { backgroundColor: th.reviewStatus === 'APPROVED' ? c.successBg : c.mutedBg, marginTop: 6 }]}>
-          <Text style={{ color: th.reviewStatus === 'APPROVED' ? c.success : c.muted, fontSize: 12 }}>
-            {th.reviewStatus === 'APPROVED' ? '✓ Freigegeben' : '⏳ In Prüfung'}
-          </Text>
+        <Text style={[styles.practiceHeaderCity, { color: c.textMuted ?? c.muted }]}>{th.professionalTitle}</Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: SPACE.sm, marginTop: SPACE.sm, width: '100%' }}>
+          <StatusMiniCard
+            icon="shield-checkmark-outline"
+            label="Prüfstatus"
+            value={reviewStatusLabel}
+            color={reviewStatusColor}
+            c={c}
+          />
+          <StatusMiniCard
+            icon="eye-outline"
+            label="Sichtbar"
+            value={th.isVisible ? 'Ja' : 'Versteckt'}
+            color={th.isVisible ? c.success : c.muted}
+            c={c}
+          />
+          <StatusMiniCard
+            icon="business-outline"
+            label="Praxis"
+            value={hasPractice ? 'Verknüpft' : 'Fehlt'}
+            color={hasPractice ? c.success : c.warning}
+            c={c}
+          />
+          <StatusMiniCard
+            icon="document-outline"
+            label="Nachweise"
+            value={hasDocuments ? 'Vorhanden' : 'Fehlen'}
+            color={hasDocuments ? c.success : c.warning}
+            c={c}
+          />
         </View>
       </View>
 
       {(th.practices ?? []).length === 0 && (
-        <View style={[{ marginTop: 12, marginHorizontal: 0, borderRadius: 14, borderWidth: 1, padding: 16, backgroundColor: c.mutedBg, borderColor: c.border }]}>
+        <View style={[{ marginTop: 12, marginHorizontal: 0, borderRadius: RADIUS.md, borderWidth: 1, padding: 16, backgroundColor: c.mutedBg, borderColor: c.border }]}>
           <Text style={{ color: c.text, fontWeight: '600', fontSize: 14, marginBottom: 4 }}>Noch keine Praxis verbunden</Text>
           <Text style={{ color: c.muted, fontSize: 13, marginBottom: 12 }}>
             Du bist noch mit keiner Praxis verknüpft. Erstelle eine eigene Praxis oder verbinde dich mit einer bestehenden.
@@ -91,13 +144,13 @@ export function TherapistDashboardScreen(props) {
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <Pressable
               onPress={() => setShowCreatePractice(true)}
-              style={{ flex: 1, backgroundColor: c.primary, borderRadius: 10, paddingVertical: 10, alignItems: 'center' }}
+              style={{ flex: 1, backgroundColor: c.primary, borderRadius: RADIUS.sm, paddingVertical: 10, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}
             >
               <Text style={{ color: '#fff', fontWeight: '600', fontSize: 13 }}>＋ Praxis erstellen</Text>
             </Pressable>
             <Pressable
               onPress={() => setShowPracticeSearch(true)}
-              style={{ flex: 1, borderRadius: 10, paddingVertical: 10, alignItems: 'center', borderWidth: 1, borderColor: c.border }}
+              style={{ flex: 1, borderRadius: RADIUS.sm, paddingVertical: 10, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: c.border }}
             >
               <Text style={{ color: c.text, fontWeight: '600', fontSize: 13 }}>🔗 Praxis verbinden</Text>
             </Pressable>
@@ -146,7 +199,7 @@ export function TherapistDashboardScreen(props) {
           />
           <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
             <Pressable style={[styles.registerBtn, { flex: 1, backgroundColor: c.border, marginTop: 0 }]} onPress={() => setEditMode(false)}>
-              <Text style={[styles.registerBtnText, { color: c.text }]}>Abbrechen</Text>
+              <Text style={{ ...TYPE.heading, color: c.text }}>Abbrechen</Text>
             </Pressable>
             <Pressable style={[styles.registerBtn, { flex: 1, backgroundColor: profileSaving ? c.border : c.primary, marginTop: 0 }]} onPress={handleSaveProfile} disabled={profileSaving}>
               <Text style={styles.registerBtnText}>{profileSaving ? 'Speichern…' : 'Speichern'}</Text>
@@ -228,7 +281,7 @@ export function TherapistDashboardScreen(props) {
               style={{
                 flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
                 gap: 8, paddingVertical: 10, paddingHorizontal: 14,
-                borderRadius: 10, borderWidth: 1,
+                borderRadius: RADIUS.sm, borderWidth: 1,
                 borderColor: documentUploading ? c.border : c.primary,
                 borderStyle: 'dashed',
               }}
@@ -268,14 +321,14 @@ export function TherapistDashboardScreen(props) {
                       <Pressable
                         onPress={() => { setInvitePageTab('new'); if (!inviteToken) handleLoadInviteToken(); setShowInvitePage(true); }}
                         style={{ padding: 6 }}
-                        hitSlop={8}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                       >
                         <Ionicons name="person-add-outline" size={18} color={c.primary} />
                       </Pressable>
                       <Pressable
                         onPress={() => { setAdminPracticeDetail(null); loadAdminPracticeDetail(); setShowPracticeAdmin(true); }}
                         style={{ padding: 6 }}
-                        hitSlop={8}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                       >
                         <Ionicons name="settings-outline" size={18} color={c.primary} />
                       </Pressable>
@@ -389,7 +442,7 @@ export function PracticeAdminScreen(props) {
 
       <View style={[styles.practiceHeader, { backgroundColor: c.card, borderColor: c.border }]}>
         {p.logo ? (
-          <Image source={{ uri: p.logo }} style={[styles.practiceHeaderInitial, { borderRadius: 12 }]} />
+          <Image source={{ uri: p.logo }} style={[styles.practiceHeaderInitial, { borderRadius: RADIUS.md }]} />
         ) : (
           <View style={[styles.practiceHeaderInitial, { backgroundColor: c.primary }]}>
             <Text style={styles.practiceHeaderInitialText}>{p.name.charAt(0)}</Text>
@@ -419,8 +472,8 @@ export function PracticeAdminScreen(props) {
                 <Pressable onPress={() => handleLinkAction(link.id, 'accept')} style={[styles.kassenartBtn, { backgroundColor: c.success, borderColor: c.success, flex: 1 }]}>
                   <Text style={[styles.kassenartText, { color: '#fff' }]}>✓ Annehmen</Text>
                 </Pressable>
-                <Pressable onPress={() => handleLinkAction(link.id, 'reject')} style={[styles.kassenartBtn, { backgroundColor: 'transparent', borderColor: '#E74C3C', flex: 1 }]}>
-                  <Text style={[styles.kassenartText, { color: '#E74C3C' }]}>✕ Ablehnen</Text>
+                <Pressable onPress={() => handleLinkAction(link.id, 'reject')} style={[styles.kassenartBtn, { backgroundColor: 'transparent', borderColor: c.error, flex: 1 }]}>
+                  <Text style={[styles.kassenartText, { color: c.error }]}>✕ Ablehnen</Text>
                 </Pressable>
               </View>
             </View>
@@ -437,9 +490,11 @@ export function PracticeAdminScreen(props) {
             : therapist.onboardingStatus === 'claimed' ? 'Profil wird ausgefüllt'
             : therapist.isPublished ? 'Veröffentlicht' : 'Profil vollständig'
           : null;
-        const statusColor = therapist.onboardingStatus === 'invited' ? '#F59E0B'
-          : therapist.onboardingStatus === 'claimed' ? '#3B82F6'
-          : '#10B981';
+        const statusColor = therapist.onboardingStatus === 'invited'
+          ? c.warning
+          : therapist.onboardingStatus === 'claimed'
+            ? c.primary
+            : c.success;
 
         return (
           <View key={link.id} style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border, gap: 0 }]}>
@@ -459,7 +514,7 @@ export function PracticeAdminScreen(props) {
               <Text style={[styles.practiceArrow, { color: c.muted }]}>›</Text>
             </Pressable>
             {isInvited && therapist.onboardingStatus === 'invited' && (
-              <Pressable onPress={() => handleResendInvite(therapist.id)} style={{ marginTop: 10, paddingVertical: 8, alignItems: 'center', borderTopWidth: 1, borderTopColor: c.border }}>
+              <Pressable onPress={() => handleResendInvite(therapist.id)} style={{ marginTop: 10, paddingVertical: 10, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderTopWidth: 1, borderTopColor: c.border }}>
                 <Text style={{ fontSize: 13, color: c.primary, fontWeight: '600' }}>Einladung erneut senden</Text>
               </Pressable>
             )}
@@ -517,9 +572,9 @@ export function PracticeAdminScreen(props) {
         <Text style={[styles.filterSectionTitle, { color: c.muted }]}>Logo</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
           {editPracticeLogo ? (
-            <Image source={{ uri: editPracticeLogo }} style={{ width: 64, height: 64, borderRadius: 8 }} />
+            <Image source={{ uri: editPracticeLogo }} style={{ width: 64, height: 64, borderRadius: RADIUS.sm }} />
           ) : (
-            <View style={{ width: 64, height: 64, borderRadius: 8, backgroundColor: c.primary, alignItems: 'center', justifyContent: 'center' }}>
+            <View style={{ width: 64, height: 64, borderRadius: RADIUS.sm, backgroundColor: c.primary, alignItems: 'center', justifyContent: 'center' }}>
               <Text style={{ color: '#fff', fontSize: 22, fontWeight: '700' }}>{editPracticeName.charAt(0) || '?'}</Text>
               <Text style={{ color: '#fff', fontSize: 10 }}>✚</Text>
             </View>
@@ -528,8 +583,8 @@ export function PracticeAdminScreen(props) {
             <Text style={[styles.kassenartText, { color: c.text }]}>📷 Logo ändern</Text>
           </Pressable>
           {editPracticeLogo && (
-            <Pressable onPress={() => setEditPracticeLogo(null)} style={[styles.kassenartBtn, { backgroundColor: 'transparent', borderColor: '#E74C3C' }]}>
-              <Text style={[styles.kassenartText, { color: '#E74C3C' }]}>Entfernen</Text>
+            <Pressable onPress={() => setEditPracticeLogo(null)} style={[styles.kassenartBtn, { backgroundColor: 'transparent', borderColor: c.error }]}>
+              <Text style={[styles.kassenartText, { color: c.error }]}>Entfernen</Text>
             </Pressable>
           )}
         </View>
@@ -538,16 +593,17 @@ export function PracticeAdminScreen(props) {
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           {editPracticePhotos.map((photo, index) => (
             <View key={index} style={{ position: 'relative' }}>
-              <Image source={{ uri: photo }} style={{ width: 80, height: 80, borderRadius: 6 }} />
+              <Image source={{ uri: photo }} style={{ width: 80, height: 80, borderRadius: RADIUS.sm }} />
               <Pressable
                 onPress={() => setEditPracticePhotos((prev) => prev.filter((_, photoIndex) => photoIndex !== index))}
-                style={{ position: 'absolute', top: -6, right: -6, backgroundColor: '#E74C3C', borderRadius: 10, width: 20, height: 20, alignItems: 'center', justifyContent: 'center' }}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                style={{ position: 'absolute', top: -6, right: -6, backgroundColor: c.error, borderRadius: RADIUS.sm, width: 20, height: 20, alignItems: 'center', justifyContent: 'center' }}
               >
                 <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>✕</Text>
               </Pressable>
             </View>
           ))}
-          <Pressable onPress={handleAddPracticePhoto} style={{ width: 80, height: 80, borderRadius: 6, borderWidth: 1, borderColor: c.border, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', backgroundColor: c.mutedBg }}>
+          <Pressable onPress={handleAddPracticePhoto} style={{ width: 80, height: 80, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: c.border, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', backgroundColor: c.mutedBg }}>
             <Text style={{ color: c.muted, fontSize: 28 }}>＋</Text>
           </Pressable>
         </View>
@@ -591,7 +647,7 @@ function LangMultiselect({ editLanguages, setEditLanguages, c, styles }) {
             <Pressable
               key={code}
               onPress={() => setEditLanguages((prev) => prev.filter((l) => l !== code))}
-              style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: c.primary + '22', borderRadius: 16, paddingHorizontal: 10, paddingVertical: 4, gap: 4 }}
+              style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: c.primaryBg, borderRadius: RADIUS.full, paddingHorizontal: 14, paddingVertical: 9, minHeight: 36, gap: 4 }}
             >
               <Text style={{ color: c.primary, fontSize: 13 }}>{getLangLabel(code)}</Text>
               <Text style={{ color: c.primary, fontSize: 13 }}>×</Text>
@@ -607,7 +663,7 @@ function LangMultiselect({ editLanguages, setEditLanguages, c, styles }) {
         style={[styles.inputField, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg }]}
       />
       {suggestions.length > 0 && (
-        <View style={{ borderWidth: 1, borderColor: c.border, borderRadius: 8, marginTop: 4, overflow: 'hidden' }}>
+        <View style={{ borderWidth: 1, borderColor: c.border, borderRadius: RADIUS.sm, marginTop: 4, overflow: 'hidden' }}>
           {suggestions.map((code) => (
             <Pressable
               key={code}

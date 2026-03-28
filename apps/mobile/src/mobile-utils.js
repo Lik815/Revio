@@ -17,11 +17,100 @@ const quickChips = [
   { label: 'Schulterrehabilitation', keywords: ['schulter', 'schulterrehabilitation', 'nackenschmerzen', 'nacken'] }
 ];
 
+const COLORS = {
+  light: {
+    background: '#F5F7F8',
+    bgElevated: '#FFFFFF',
+    text: '#1C2B33',
+    textMuted: '#6B838E',
+    primary: '#3E6271',
+    primaryBg: '#EBF2F5',
+    accent: '#5A9E8E',
+    accentBg: '#EAF4F1',
+    card: '#FFFFFF',
+    border: '#D4DEE3',
+    muted: '#A7B6BE',
+    mutedBg: '#EDF2F4',
+    nav: '#FFFFFF',
+    success: '#5A9E8E',
+    successBg: '#EAF4F1',
+    error: '#B94040',
+    errorBg: '#FBEAEA',
+    warning: '#8A6000',
+    warningBg: '#FEF5DC',
+    saved: '#D0526A',
+  },
+  dark: {
+    background: '#111A1F',
+    bgElevated: '#1A2630',
+    text: '#E8EEF1',
+    textMuted: '#7A9099',
+    primary: '#6B8FA0',
+    primaryBg: '#1A2E38',
+    accent: '#6FB8A8',
+    accentBg: '#1A2E2A',
+    card: '#1A2630',
+    border: '#2A3A44',
+    muted: '#7A9099',
+    mutedBg: '#1E2E38',
+    nav: '#151F26',
+    success: '#6FB8A8',
+    successBg: '#1A2E2A',
+    error: '#D46060',
+    errorBg: '#2E1A1A',
+    warning: '#C49A30',
+    warningBg: '#2A2010',
+    saved: '#E07090',
+  },
+};
+
+const SPACE = {
+  xs: 4,
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 24,
+  xxl: 32,
+};
+
+const RADIUS = {
+  sm: 10,
+  md: 16,
+  lg: 20,
+  full: 999,
+};
+
+const SHADOW = {
+  card: {
+    shadowColor: '#1C2B33',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  modal: {
+    shadowColor: '#1C2B33',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 24,
+    elevation: 8,
+  },
+};
+
+const TYPE = {
+  xl: { fontSize: 26, fontWeight: '800', lineHeight: 34 },
+  lg: { fontSize: 20, fontWeight: '700', lineHeight: 28 },
+  heading: { fontSize: 17, fontWeight: '600', lineHeight: 24 },
+  body: { fontSize: 15, fontWeight: '400', lineHeight: 22 },
+  meta: { fontSize: 13, fontWeight: '500', lineHeight: 18 },
+  label: { fontSize: 11, fontWeight: '600', lineHeight: 14, letterSpacing: 0.6, textTransform: 'uppercase' },
+};
+
 const tabs = [
-  { key: 'discover', labelKey: 'tabSearch', icon: '⌕' },
-  { key: 'favorites', labelKey: 'tabFavorites', icon: '♡' },
-  { key: 'therapist', labelKey: 'tabTherapist', icon: '＋' },
-  { key: 'options', labelKey: 'tabOptions', icon: '☰' }
+  { key: 'discover', labelKey: 'tabSearch', icon: 'search' },
+  { key: 'favorites', labelKey: 'tabFavorites', icon: 'heart' },
+  { key: 'therapist', labelKey: 'tabTherapist', icon: 'person' },
+  { key: 'options', labelKey: 'tabOptions', icon: 'settings' }
 ];
 
 const kassenartOptions = [
@@ -151,7 +240,7 @@ const mapApiTherapist = (t) => ({
   behandlungsbereiche: parseStringOrArray(t.specializations),
   verfügbareZeiten: '',
   website: '',
-  photo: t.photo || `https://i.pravatar.cc/96?u=${t.id}`,
+  photo: t.photo ? (t.photo.startsWith('http') ? t.photo : `${BASE_URL}${t.photo}`) : `https://i.pravatar.cc/96?u=${t.id}`,
   practices: (t.practices ?? []).map((p) => ({
     id: p.id,
     name: p.name,
@@ -163,7 +252,7 @@ const mapApiTherapist = (t) => ({
     lat: p.lat,
     lng: p.lng,
     distKm: typeof p.distKm === 'number' ? p.distKm : null,
-    logo: p.logo ?? null,
+    logo: p.logo ? (p.logo.startsWith('http') ? p.logo : `${BASE_URL}${p.logo}`) : null,
     photos: p.photos ?? [],
   })),
 });
@@ -173,11 +262,20 @@ const normalizeTherapistProfile = (therapist) => {
   return {
     ...therapist,
     languages: normalizeLanguageCodes(therapist.languages),
+    photo: therapist.photo ? (therapist.photo.startsWith('http') ? therapist.photo : `${BASE_URL}${therapist.photo}`) : therapist.photo,
   };
 };
 
 const formatMissingProfileFields = (fields = []) =>
   fields.map((field) => PROFILE_FIELD_LABELS[field] ?? field);
+
+const softenErrorMessage = (message = '') => {
+  if (typeof message !== 'string') return '';
+  return message
+    .replace(/Fehler beim Laden/gi, 'Konnte nicht geladen werden – bitte erneut versuchen')
+    .replace(/Ungültige E-Mail/gi, 'Bitte eine gültige E-Mail eingeben')
+    .replace(/Etwas ist schiefgelaufen/gi, 'Hat nicht geklappt – bitte nochmal versuchen');
+};
 
 const getPrimaryPractice = (therapist) => therapist?.practices?.[0] ?? null;
 
@@ -245,6 +343,11 @@ const GERMAN_CITIES = [
 ];
 
 export {
+  COLORS,
+  SPACE,
+  RADIUS,
+  SHADOW,
+  TYPE,
   REG_STEPS,
   allSuggestions,
   fortbildungOptions,
@@ -265,6 +368,7 @@ export {
   normalizeTherapistProfile,
   quickChips,
   regSpecOptions,
+  softenErrorMessage,
   tabs,
   GERMAN_CITIES,
 };

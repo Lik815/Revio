@@ -16,6 +16,9 @@ import {
   getLangLabel,
   getPracticeInitials,
   getPrimaryPractice,
+  RADIUS,
+  softenErrorMessage,
+  TYPE,
 } from './mobile-utils';
 
 const webNavigator = typeof globalThis !== 'undefined' ? globalThis.navigator : undefined;
@@ -53,6 +56,7 @@ export function PracticeProfileScreen(props) {
   } = props;
 
   const therapists = selectedPracticeTherapists;
+  const iconHitSlop = { top: 10, bottom: 10, left: 10, right: 10 };
 
   return (
     <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 20 }]}>
@@ -61,8 +65,8 @@ export function PracticeProfileScreen(props) {
           <Text style={[styles.backBtnText, { color: c.primary }]}>‹ {t('backBtn')}</Text>
         </Pressable>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <Pressable onPress={() => toggleFavoritePractice(practice)} style={{ paddingHorizontal: 10, paddingVertical: 10 }}>
-            <Ionicons name={isPracticeFavorite(practice.id) ? 'heart' : 'heart-outline'} size={22} color={isPracticeFavorite(practice.id) ? '#E05A77' : c.muted} />
+          <Pressable onPress={() => toggleFavoritePractice(practice)} hitSlop={iconHitSlop} style={{ paddingHorizontal: 10, paddingVertical: 10 }}>
+            <Ionicons name={isPracticeFavorite(practice.id) ? 'heart' : 'heart-outline'} size={22} color={isPracticeFavorite(practice.id) ? c.saved : c.muted} />
           </Pressable>
           <Pressable
             onPress={() => sharePublicLink({
@@ -70,6 +74,7 @@ export function PracticeProfileScreen(props) {
               url: `https://revio.app/p/${practice.id}`,
               message: `${practice.name} – ${practice.city}\nhttps://revio.app/p/${practice.id}`,
             })}
+            hitSlop={iconHitSlop}
             style={{ paddingHorizontal: 12, paddingVertical: 10 }}
           >
             <Ionicons name="share-outline" size={22} color={c.primary} />
@@ -79,7 +84,7 @@ export function PracticeProfileScreen(props) {
 
       <View style={[styles.practiceHeader, { backgroundColor: c.card, borderColor: c.border }]}>
         {practice.logo ? (
-          <Image source={{ uri: practice.logo }} style={[styles.practiceLogoLarge, { borderRadius: 12 }]} />
+          <Image source={{ uri: practice.logo }} style={[styles.practiceLogoLarge, { borderRadius: RADIUS.md }]} />
         ) : (
           <View style={[styles.practiceLogoLarge, { backgroundColor: c.primary }]}>
             <View style={styles.practiceLogoCross}>
@@ -109,15 +114,15 @@ export function PracticeProfileScreen(props) {
       {practice.photos?.length > 0 && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: 4 }} contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}>
           {practice.photos.map((uri, index) => (
-            <Image key={index} source={{ uri }} style={{ width: 220, height: 145, borderRadius: 10 }} />
+            <Image key={index} source={{ uri }} style={{ width: 220, height: 145, borderRadius: RADIUS.sm }} />
           ))}
         </ScrollView>
       )}
 
       {!!practice.description && (
-        <View style={{ marginHorizontal: 16, marginTop: 8, marginBottom: 4, padding: 14, backgroundColor: c.card, borderRadius: 10, borderWidth: 1, borderColor: c.border }}>
-          <Text style={{ color: c.muted, fontSize: 12, fontWeight: '600', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>Über die Praxis</Text>
-          <Text style={{ color: c.text, fontSize: 14, lineHeight: 21 }}>{practice.description}</Text>
+        <View style={{ marginHorizontal: 16, marginTop: 8, marginBottom: 4, padding: 14, backgroundColor: c.card, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: c.border }}>
+          <Text style={{ ...TYPE.label, color: c.muted, marginBottom: 6, textTransform: 'none', letterSpacing: 0.5 }}>Über die Praxis</Text>
+          <Text style={{ ...TYPE.body, color: c.text }}>{practice.description}</Text>
         </View>
       )}
 
@@ -130,7 +135,7 @@ export function PracticeProfileScreen(props) {
           <Text style={{ color: c.muted, marginTop: 8, fontSize: 13 }}>Lade Therapeuten…</Text>
         </View>
       ) : selectedPracticeError ? (
-        <Text style={{ color: c.muted, fontSize: 13, paddingVertical: 8, marginHorizontal: 16 }}>{selectedPracticeError}</Text>
+        <Text style={{ ...TYPE.meta, color: c.error, paddingVertical: 10, marginHorizontal: 16 }}>{softenErrorMessage(selectedPracticeError)}</Text>
       ) : therapists.length === 0 ? (
         <View style={[styles.emptyInlineState, { backgroundColor: c.card, borderColor: c.border }]}>
           <Text style={{ color: c.text, fontWeight: '700', fontSize: 14 }}>Aktuell keine oeffentlichen Profile</Text>
@@ -185,6 +190,7 @@ export function TherapistProfileScreen(props) {
   } = props;
 
   const primaryPractice = getPrimaryPractice(th);
+  const iconHitSlop = { top: 10, bottom: 10, left: 10, right: 10 };
 
   return (
     <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 20 }]}>
@@ -193,13 +199,14 @@ export function TherapistProfileScreen(props) {
           <Text style={[styles.backBtnText, { color: c.primary }]}>‹ {t('backBtn')}</Text>
         </Pressable>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <HeartButton isSaved={isFavorite(th.id)} onToggle={() => toggleFavorite(th)} unsavedColor={c.muted} style={{ paddingHorizontal: 10, paddingVertical: 10 }} />
+          <HeartButton isSaved={isFavorite(th.id)} onToggle={() => toggleFavorite(th)} unsavedColor={c.muted} hitSlop={iconHitSlop} style={{ paddingHorizontal: 10, paddingVertical: 10 }} />
           <Pressable
             onPress={() => sharePublicLink({
               title: th.fullName,
               url: `https://revio.app/t/${th.id}`,
               message: `${th.fullName} – ${th.professionalTitle}\nhttps://revio.app/t/${th.id}`,
             })}
+            hitSlop={iconHitSlop}
             style={{ paddingHorizontal: 12, paddingVertical: 10 }}
           >
             <Ionicons name="share-outline" size={22} color={c.primary} />
