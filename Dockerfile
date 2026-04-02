@@ -1,58 +1,28 @@
-# ─── Stage 1: Install dependencies ───────────────────────────────────────────
-FROM node:20-alpine AS deps
-ENV PNPM_HOME="/pnpm"
-ENV PATH="$PNPM_HOME:$PATH"
-RUN corepack enable && corepack prepare pnpm@10.6.3 --activate
+FROM node:20-alpine
+
+RUN npm install -g pnpm@10.6.3
 
 WORKDIR /app
-COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+
+# Copy workspace config files
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
+COPY packages/ ./packages/
 COPY apps/api/package.json ./apps/api/
-COPY packages/shared/package.json ./packages/shared/
-RUN pnpm install --frozen-lockfile --filter @revio/api...
+COPY apps/admin/package.json ./apps/admin/
 
-# ─── Stage 2: Build ───────────────────────────────────────────────────────────
-FROM node:20-alpine AS builder
-ENV PNPM_HOME="/pnpm"
-ENV PATH="$PNPM_HOME:$PATH"
-RUN corepack enable && corepack prepare pnpm@10.6.3 --activate
+# Install all dependencies
+RUN pnpm install --frozen-lockfile
 
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/apps/api/node_modules ./apps/api/node_modules
-COPY package.json pnpm-workspace.yaml ./
-COPY packages/shared ./packages/shared
-COPY apps/api ./apps/api
+# Copy source
+COPY apps/api/ ./apps/api/
+COPY apps/admin/ ./apps/admin/
 
-RUN pnpm --filter @revio/api prisma:generate
-RUN pnpm --filter @revio/api build
+# Generate Prisma client for PostgreSQL
+RUN cd apps/api && npx prisma generate --schema prisma/schema.production.prisma
 
-# ─── Stage 3: Production runner ───────────────────────────────────────────────
-FROM node:20-alpine AS runner
-ENV PNPM_HOME="/pnpm"
-ENV PATH="$PNPM_HOME:$PATH"
-ENV NODE_ENV=production
-RUN corepack enable && corepack prepare pnpm@10.6.3 --activate
-
-WORKDIR /app
-
-# Install production deps only
-COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
-COPY packages/shared/package.json ./packages/shared/
-COPY apps/api/package.json ./apps/api/
-RUN pnpm install --frozen-lockfile --prod --filter @revio/api...
-
-# Copy build artifacts
-COPY --from=builder /app/apps/api/dist ./apps/api/dist
-COPY --from=builder /app/apps/api/prisma ./apps/api/prisma
-
-# Copy generated Prisma client (may be in either location depending on pnpm hoisting)
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder /app/apps/api/node_modules/@prisma ./apps/api/node_modules/@prisma
-
-# Uploads volume mount point
-RUN mkdir -p ./apps/api/uploads
+# Build TypeScript
+RUN cd apps/api && npx tsc -p tsconfig.json
 
 EXPOSE 4000
-WORKDIR /app/apps/api
 
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/server.js"]
+CMD ["sh", "-c", "cd apps/api && npx prisma db push --schema prisma/schema.production.prisma --skip-generate && node dist/server.js"]
