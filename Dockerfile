@@ -21,6 +21,9 @@ RUN cd apps/api && npx prisma generate --schema prisma/schema.production.prisma
 # Build TypeScript
 RUN cd apps/api && npx tsc -p tsconfig.json
 
+# Create uploads directory (required by @fastify/static, not in .dockerignore)
+RUN mkdir -p /app/apps/api/uploads
+
 EXPOSE 4000
 
 WORKDIR /app/apps/api
