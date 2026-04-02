@@ -16,6 +16,12 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
+function summarizeReasons(reasons: string[]) {
+  if (reasons.length === 0) return null;
+  const [first, ...rest] = reasons;
+  return rest.length > 0 ? `${first} +${rest.length}` : first;
+}
+
 const statusLabel: Record<string, string> = {
   PENDING_REVIEW: 'Ausstehend',
   APPROVED: 'Freigegeben',
@@ -44,6 +50,16 @@ const blockingReasonLabel: Record<string, string> = {
   no_confirmed_link: 'Keine Praxis',
   pending_link_only: 'Praxis ausstehend',
   practice_not_approved: 'Praxis nicht freigegeben',
+  no_home_visit: 'Kein Hausbesuch',
+  no_service_radius: 'Kein Einzugsgebiet',
+  no_kassenart: 'Keine Kassenart',
+  no_confirmed_practice_link: 'Keine Praxis bestätigt',
+  booking_mode_disabled: 'Direkte Anfragen sind ausgeschaltet',
+};
+
+const bookingModeLabel: Record<string, string> = {
+  DIRECTORY_ONLY: 'Nur Verzeichnis',
+  FIRST_APPOINTMENT_REQUEST: 'Ersttermin anfragbar',
 };
 
 const statusPriority: Record<string, number> = {
@@ -163,13 +179,13 @@ export default async function TherapistsPage({ searchParams }: { searchParams: S
           <tr>
             <th>Name</th>
             <th>Priorität</th>
-            <th>Titel</th>
             <th>Ort</th>
-            <th>Spezialisierungen</th>
+            <th>Fachliches</th>
             <th>Eingereicht</th>
             <th>Frist (48h)</th>
-            <th>Status</th>
-            <th>Sichtbarkeit</th>
+            <th>Review</th>
+            <th>Öffentlich</th>
+            <th>Ersttermin</th>
             <th>Aktionen</th>
           </tr>
         </thead>
@@ -183,14 +199,25 @@ export default async function TherapistsPage({ searchParams }: { searchParams: S
                   : t.reviewStatus === 'APPROVED' && !t.isVisible
                     ? { label: 'Freigegeben, aber versteckt', className: 'badge badge--PENDING_REVIEW' }
                     : { label: 'Nicht öffentlich', className: 'badge badge--DRAFT' };
+              const bookingModeBadge =
+                t.bookingMode === 'FIRST_APPOINTMENT_REQUEST'
+                  ? {
+                    label: t.requestability?.requestable ? 'Ersttermin anfragbar' : 'Anfragbar geplant',
+                    className: t.requestability?.requestable ? 'badge badge--APPROVED' : 'badge badge--PENDING_REVIEW',
+                  }
+                  : { label: 'Nur Verzeichnis', className: 'badge badge--DRAFT' };
               const isApprovedButNotVisible = t.reviewStatus === 'APPROVED' && t.visibility.visibilityState !== 'visible';
+              const isRequestModeBlocked = t.bookingMode === 'FIRST_APPOINTMENT_REQUEST' && !t.requestability?.requestable;
               const blockerReasons = (
                 t.visibility.blockingReasons.length > 0
                   ? t.visibility.blockingReasons
-                  : !t.isVisible
+                  : isApprovedButNotVisible
                     ? ['manually_hidden']
-                    : ['profile_incomplete']
+                    : []
               ).map((reason) => blockingReasonLabel[reason] ?? reason);
+              const requestBlockers = (t.requestability?.blockingReasons ?? []).map((reason) => blockingReasonLabel[reason] ?? reason);
+              const visibilitySummary = summarizeReasons(blockerReasons);
+              const requestSummary = summarizeReasons(requestBlockers);
               return (
               <tr key={t.id}>
                 <td data-label="Name">
@@ -210,60 +237,65 @@ export default async function TherapistsPage({ searchParams }: { searchParams: S
                     )}
                   </div>
                 </td>
-                <td data-label="Titel">{t.professionalTitle}</td>
                 <td data-label="Ort">{t.city}</td>
-                <td data-label="Spezialisierungen"><div className="tag-list">{t.specializations.slice(0, 3).map((spec) => <span key={spec} className="tag">{spec}</span>)}</div></td>
+                <td data-label="Fachliches">
+                  <div className="priority-stack">
+                    <strong style={{ fontSize: 14 }}>{t.professionalTitle}</strong>
+                    <div className="tag-list">
+                      {t.specializations.slice(0, 2).map((spec) => <span key={spec} className="tag">{spec}</span>)}
+                      {t.specializations.length > 2 && <span className="tag">+{t.specializations.length - 2}</span>}
+                    </div>
+                  </div>
+                </td>
                 <td data-label="Eingereicht">{formatDate(t.createdAt)}</td>
                 <td data-label="Frist (48h)">
                   <DeadlineTimer createdAt={t.createdAt} status={t.reviewStatus} />
                 </td>
-                <td data-label="Status">
+                <td data-label="Review">
                   <div className="priority-stack">
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                      <span className={`badge badge--${t.reviewStatus}`}>
-                        {statusLabel[t.reviewStatus] ?? t.reviewStatus}
-                      </span>
-                      <span className={publicVisibilityBadge.className}>
-                        {publicVisibilityBadge.label}
-                      </span>
-                    </div>
+                    <span className={`badge badge--${t.reviewStatus}`}>
+                      {statusLabel[t.reviewStatus] ?? t.reviewStatus}
+                    </span>
+                    {priority.missingCount > 0 && t.reviewStatus !== 'APPROVED' ? (
+                      <span className="entity-meta">Profil braucht Ergänzungen</span>
+                    ) : null}
                   </div>
                 </td>
-                <td data-label="Sichtbarkeit">
-                  {isApprovedButNotVisible ? (
-                    <div className="priority-stack">
-                      <div
-                        style={{
-                          borderRadius: 12,
-                          background: 'rgba(217, 119, 6, 0.08)',
-                          border: '1px solid rgba(217, 119, 6, 0.22)',
-                          padding: '10px 12px',
-                          color: 'var(--warning)',
-                          fontSize: 13,
-                          lineHeight: 1.5,
-                        }}
-                      >
-                        <strong>Nicht sichtbar weil:</strong> {blockerReasons.join(', ')}
-                      </div>
-                    </div>
-                  ) : (
-                    (() => {
-                      const vis = t.visibility;
-                      return (
-                        <div className="priority-stack">
-                          <span className={`badge ${visibilityBadgeClass[vis.visibilityState] ?? 'badge--DRAFT'}`}>
-                            {visibilityLabel[vis.visibilityState] ?? vis.visibilityState}
-                          </span>
-                          {vis.blockingReasons.length > 0 && (
-                            <span className="entity-meta" title={vis.blockingReasons.map((r) => blockingReasonLabel[r] ?? r).join(', ')}>
-                              {blockingReasonLabel[vis.blockingReasons[0]] ?? vis.blockingReasons[0]}
-                              {vis.blockingReasons.length > 1 && ` +${vis.blockingReasons.length - 1}`}
-                            </span>
-                          )}
-                        </div>
-                      );
-                    })()
-                  )}
+                <td data-label="Öffentlich">
+                  <div className="priority-stack">
+                    <span className={publicVisibilityBadge.className}>
+                      {publicVisibilityBadge.label}
+                    </span>
+                    {isApprovedButNotVisible && visibilitySummary ? (
+                      <span className="entity-meta" title={blockerReasons.join(', ')}>
+                        {visibilitySummary}
+                      </span>
+                    ) : t.visibility.blockingReasons.length > 0 ? (
+                      <span className="entity-meta" title={blockerReasons.join(', ')}>
+                        {summarizeReasons(t.visibility.blockingReasons.map((r) => blockingReasonLabel[r] ?? r))}
+                      </span>
+                    ) : (
+                      <span className="entity-meta">In der öffentlichen Suche</span>
+                    )}
+                  </div>
+                </td>
+                <td data-label="Ersttermin">
+                  <div className="priority-stack">
+                    <span className={bookingModeBadge.className}>
+                      {bookingModeBadge.label}
+                    </span>
+                    {isRequestModeBlocked && requestSummary ? (
+                      <span className="entity-meta" title={requestBlockers.join(', ')}>
+                        {requestSummary}
+                      </span>
+                    ) : t.nextFreeSlotAt ? (
+                      <span className="entity-meta">Ab {formatDate(t.nextFreeSlotAt)}</span>
+                    ) : t.bookingMode === 'FIRST_APPOINTMENT_REQUEST' ? (
+                      <span className="entity-meta">Noch kein Terminfenster</span>
+                    ) : (
+                      <span className="entity-meta">Keine Direktanfrage</span>
+                    )}
+                  </div>
                 </td>
                 <td data-label="Aktionen">
                   <TherapistActions

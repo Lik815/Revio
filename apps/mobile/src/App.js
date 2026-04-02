@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import * as Sharing from 'expo-sharing';
 import {
@@ -49,6 +49,7 @@ import {
   normalizeLanguageCodes,
   normalizeTherapistProfile,
   regSpecOptions,
+  resolveMediaUrl,
   softenErrorMessage,
   tabs,
   GERMAN_CITIES,
@@ -229,20 +230,63 @@ export default function App() {
 
   // Favorites — stored locally on device only
   const [favorites, setFavorites] = useState([]);
+  const [bookingNotes, setBookingNotes] = useState({});
   useEffect(() => {
     AsyncStorage.getItem('revio_favorites').then(val => {
       if (val) setFavorites(JSON.parse(val));
     });
   }, []);
+  useEffect(() => {
+    AsyncStorage.getItem('revio_booking_notes').then(val => {
+      if (val) setBookingNotes(JSON.parse(val));
+    });
+  }, []);
+  // ── Toast notification ────────────────────────────────────────────────────
+  const [toastMsg, setToastMsg] = useState(null);
+  const toastAnim = useRef(new Animated.Value(-80)).current;
+  const toastTimer = useRef(null);
+  const showToast = (message) => {
+    setToastMsg(message);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    Animated.spring(toastAnim, { toValue: 0, useNativeDriver: true, tension: 80, friction: 10 }).start();
+    toastTimer.current = setTimeout(() => {
+      Animated.timing(toastAnim, { toValue: -80, duration: 250, useNativeDriver: true }).start(() => setToastMsg(null));
+    }, 2500);
+  };
+
   const toggleFavorite = (therapist) => {
     setFavorites(prev => {
       const exists = prev.some(f => f.id === therapist.id);
       const next = exists ? prev.filter(f => f.id !== therapist.id) : [...prev, therapist];
       AsyncStorage.setItem('revio_favorites', JSON.stringify(next));
+      if (!exists) showToast(`♥ ${therapist.fullName} gespeichert`);
+      else showToast(`${therapist.fullName} entfernt`);
       return next;
     });
   };
   const isFavorite = (id) => favorites.some(f => f.id === id);
+  const ensureFavorite = (therapist) => {
+    setFavorites(prev => {
+      if (prev.some(f => f.id === therapist.id)) return prev;
+      const next = [...prev, therapist];
+      AsyncStorage.setItem('revio_favorites', JSON.stringify(next));
+      return next;
+    });
+  };
+  const handleBookingSuccess = async (therapist, { preferredDays, preferredTimeWindows, message }) => {
+    ensureFavorite(therapist);
+    const note = {
+      preferredDays,
+      preferredTimeWindows,
+      message: message || null,
+      submittedAt: new Date().toISOString(),
+    };
+    setBookingNotes((prev) => {
+      const next = { ...prev, [therapist.id]: note };
+      AsyncStorage.setItem('revio_booking_notes', JSON.stringify(next));
+      return next;
+    });
+  };
 
   // Practice favorites — stored locally
   const [favoritePractices, setFavoritePractices] = useState([]);
@@ -258,6 +302,8 @@ export default function App() {
       const exists = prev.some(f => f.id === practice.id);
       const next = exists ? prev.filter(f => f.id !== practice.id) : [...prev, practiceData];
       AsyncStorage.setItem('revio_fav_practices', JSON.stringify(next));
+      if (!exists) showToast(`♥ ${practice.name} gespeichert`);
+      else showToast(`${practice.name} entfernt`);
       return next;
     });
   };
@@ -330,11 +376,16 @@ export default function App() {
   const [regSpecializations, setRegSpecializations] = useState([]);
   const [regLanguages, setRegLanguages] = useState(['de']);
   const [regFortbildungen, setRegFortbildungen] = useState([]);
+  const [regFreelance, setRegFreelance] = useState(null);
+  const [regHomeVisit, setRegHomeVisit] = useState(false);
+  const [regServiceRadius, setRegServiceRadius] = useState(null);
+  const [regKassenart, setRegKassenart] = useState('');
   const [regSpecSearch, setRegSpecSearch] = useState('');
   const [regLangSearch, setRegLangSearch] = useState('');
   const [showRegFortbildungen, setShowRegFortbildungen] = useState(false);
   const [showRegPassword, setShowRegPassword] = useState(false);
   const [showRegPasswordConfirm, setShowRegPasswordConfirm] = useState(false);
+  const [showRegStepInfo, setShowRegStepInfo] = useState(false);
 
   const toggleRegSpec = (s) => setRegSpecializations(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]);
   const toggleRegLang = (l) => setRegLanguages(prev => prev.includes(l) ? prev.filter(x => x !== l) : [...prev, l]);
@@ -355,8 +406,12 @@ export default function App() {
   const [editSpecializations, setEditSpecializations] = useState('');
   const [editLanguages, setEditLanguages] = useState([]);
   const [editHomeVisit, setEditHomeVisit] = useState(false);
+  const [editServiceRadius, setEditServiceRadius] = useState(null);
+  const [editKassenart, setEditKassenart] = useState('');
   const [editIsVisible, setEditIsVisible] = useState(true);
   const [editAvailability, setEditAvailability] = useState('');
+  const [editBookingMode, setEditBookingMode] = useState('DIRECTORY_ONLY');
+  const [editNextFreeSlotAt, setEditNextFreeSlotAt] = useState('');
   const [profileSaving, setProfileSaving] = useState(false);
   const [therapistDocuments, setTherapistDocuments] = useState([]);
   const [documentUploading, setDocumentUploading] = useState(false);
@@ -565,6 +620,25 @@ export default function App() {
     }
   }, [authToken, accountType]);
 
+  // Deep link: tapping a push notification navigates to the right screen
+  useEffect(() => {
+    const sub = Notifications.addNotificationResponseReceivedListener((response) => {
+      const data = response.notification.request.content.data ?? {};
+      if (data.screen === 'BookingRequests') {
+        setSelectedTherapist(null);
+        setSelectedPractice(null);
+        setShowCreatePractice(false);
+        setShowPracticeSearch(false);
+        setShowPracticeAdmin(false);
+        setShowInvitePage(false);
+        setShowLogin(false);
+        setShowRegister(false);
+        setActiveTab('therapist');
+      }
+    });
+    return () => sub.remove();
+  }, []);
+
   // Fetch therapist's uploaded documents on login/session restore
   useEffect(() => {
     if (authToken && accountType === 'therapist') {
@@ -769,8 +843,12 @@ export default function App() {
           specializations: editSpecializations.split(',').map(s => s.trim()).filter(Boolean),
           languages: editLanguages.map(l => l.toLowerCase()),
           homeVisit: editHomeVisit,
+          serviceRadiusKm: editHomeVisit ? (editServiceRadius ?? null) : null,
+          kassenart: editKassenart,
           isVisible: editIsVisible,
           availability: editAvailability,
+          bookingMode: editBookingMode,
+          nextFreeSlotAt: editNextFreeSlotAt || null,
         }),
       });
       if (res.ok) {
@@ -1324,7 +1402,7 @@ export default function App() {
   }, [searchRadius]);
 
   const applyFilters = (list, coords) => {
-    const origin = coords ?? userCoords;
+    const origin = coords === undefined ? userCoords : coords;
     return list.filter(t => {
       if (homeVisit && !t.homeVisit) return false;
       if (kassenart && t.kassenart && t.kassenart !== kassenart) return false;
@@ -1355,6 +1433,27 @@ export default function App() {
       .sort((a, b) => (a.distKm ?? 9999) - (b.distKm ?? 9999));
   };
 
+  const fetchSearchResults = async (q, effectiveCity, origin) => {
+    const response = await fetch(`${getBaseUrl()}/search`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...TUNNEL_HEADERS },
+      body: JSON.stringify({
+        query: q || 'physiotherapie',
+        city: effectiveCity,
+        origin: origin ? {
+          lat: origin.lat,
+          lng: origin.lng,
+        } : undefined,
+        radiusKm: origin ? searchRadius : undefined,
+        homeVisit: homeVisit || undefined,
+        kassenart: kassenart || undefined,
+      }),
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const payload = await response.json();
+    return (payload.therapists ?? []).map(mapApiTherapist);
+  };
+
   const runSearchWith = async (q, coords, cityOverride, originOverride) => {
     const effectiveCity = cityOverride ?? city;
     const effectiveOrigin = originOverride !== undefined ? originOverride : (coords ?? userCoords);
@@ -1368,32 +1467,28 @@ export default function App() {
     setSearched(true);
     setSearchLoading(true);
     try {
-      const response = await fetch(`${getBaseUrl()}/search`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...TUNNEL_HEADERS },
-        body: JSON.stringify({
-          query: q || 'physiotherapie',
-          city: effectiveCity,
-          origin: effectiveOrigin ? {
-            lat: effectiveOrigin.lat,
-            lng: effectiveOrigin.lng,
-          } : undefined,
-          radiusKm: effectiveOrigin ? searchRadius : undefined,
-          homeVisit: homeVisit || undefined,
-          kassenart: kassenart || undefined,
-        }),
-      });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const payload = await response.json();
-      const mapped = (payload.therapists ?? []).map(mapApiTherapist);
+      const mapped = await fetchSearchResults(q, effectiveCity, effectiveOrigin);
       const origin = effectiveOrigin;
       const withDist = withDistances(mapped, origin);
-      const filtered = applyFilters(withDist, origin);
+      let filtered = applyFilters(withDist, origin);
+      let sourceList = withDist;
+
+      // If the current radius leaves the user with no visible results, fall back
+      // to city-wide matches so the seeded dataset still feels searchable in dev.
+      if (origin && filtered.length === 0) {
+        const cityOnlyMapped = await fetchSearchResults(q, effectiveCity, null);
+        const cityOnlyFiltered = applyFilters(cityOnlyMapped, null);
+        if (cityOnlyFiltered.length > 0) {
+          filtered = cityOnlyFiltered;
+          sourceList = cityOnlyMapped;
+        }
+      }
+
       if (filtered.length === 0 && withDist.length > 0) {
         Alert.alert('Radius zu klein', `${withDist.length} Therapeut:innen gefunden, aber alle außerhalb von ${searchRadius} km. Radius erhöhen?`);
       }
       setResults(filtered);
-      setAllApiTherapists(withDist);
+      setAllApiTherapists(sourceList);
     } catch (err) {
       const message = String(err?.message ?? 'Unbekannter Fehler');
       const usingLocalTunnel = getBaseUrl().includes('.loca.lt');
@@ -1769,6 +1864,7 @@ export default function App() {
         c={c}
         callPhone={callPhone}
         isFavorite={isFavorite}
+        onBookingSuccess={handleBookingSuccess}
         openPractice={openPractice}
         setSelectedTherapist={setSelectedTherapist}
         styles={styles}
@@ -1807,8 +1903,12 @@ export default function App() {
       setEditSpecializations((th.specializations ?? []).join(', '));
       setEditLanguages(normalizeLanguageCodes(th.languages));
       setEditHomeVisit(th.homeVisit ?? false);
+      setEditServiceRadius(th.serviceRadiusKm ?? null);
+      setEditKassenart(th.kassenart ?? '');
       setEditIsVisible(th.isVisible ?? true);
       setEditAvailability(th.availability ?? '');
+      setEditBookingMode(th.bookingMode ?? 'DIRECTORY_ONLY');
+      setEditNextFreeSlotAt(th.nextFreeSlotAt ?? '');
       setEditMode(true);
     };
 
@@ -1820,8 +1920,12 @@ export default function App() {
         editBio={editBio}
         editHomeVisit={editHomeVisit}
         editIsVisible={editIsVisible}
+        editKassenart={editKassenart}
         editLanguages={editLanguages}
         editMode={editMode}
+        editBookingMode={editBookingMode}
+        editNextFreeSlotAt={editNextFreeSlotAt}
+        editServiceRadius={editServiceRadius}
         editSpecializations={editSpecializations}
         handleLoadInviteToken={handleLoadInviteToken}
         documentUploading={documentUploading}
@@ -1840,8 +1944,12 @@ export default function App() {
         setEditBio={setEditBio}
         setEditHomeVisit={setEditHomeVisit}
         setEditIsVisible={setEditIsVisible}
+        setEditKassenart={setEditKassenart}
         setEditLanguages={setEditLanguages}
         setEditMode={setEditMode}
+        setEditBookingMode={setEditBookingMode}
+        setEditNextFreeSlotAt={setEditNextFreeSlotAt}
+        setEditServiceRadius={setEditServiceRadius}
         setEditSpecializations={setEditSpecializations}
         setInvitePageTab={setInvitePageTab}
         setPracticeSearchQuery={setPracticeSearchQuery}
@@ -1875,7 +1983,7 @@ export default function App() {
 
   const renderOptions = () => (
     <View style={{ flex: 1 }}>
-      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 20 }]}>
+      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 20 }]} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <View style={[styles.logoMark, { backgroundColor: c.primary }]}><Text style={styles.logoText}>R</Text></View>
           <View style={{ flex: 1 }}>
@@ -1883,6 +1991,64 @@ export default function App() {
             <Text style={[styles.headerSub, { color: c.muted }]}>{t('optionsSubtitle')}</Text>
           </View>
         </View>
+
+        {(loggedInTherapist || loggedInManager) && (() => {
+          const isManager = accountType === 'manager' && loggedInManager;
+          const mgrTherapistProfile = isManager ? (loggedInManager.therapistProfile ?? null) : null;
+
+          const ProfileCard = ({ name, sub, photo, status, statusColor, onPress }) => (
+            <View style={[styles.infoCard, { backgroundColor: c.card, borderColor: c.border }]}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <Text style={[styles.filterSectionTitle, { color: c.muted, marginBottom: 0 }]}>MEIN PROFIL</Text>
+                <Pressable onPress={onPress} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Ionicons name="eye-outline" size={15} color={c.primary} />
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: c.primary }}>Anzeigen</Text>
+                </Pressable>
+              </View>
+              <Pressable onPress={onPress} style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <View style={{ width: 56, height: 56, borderRadius: 999, backgroundColor: c.mutedBg, overflow: 'hidden', justifyContent: 'center', alignItems: 'center' }}>
+                  {photo
+                    ? <Image source={{ uri: photo.startsWith('http') ? photo : `${getBaseUrl()}${photo}` }} style={{ width: 56, height: 56, borderRadius: 999 }} />
+                    : <Text style={{ fontSize: 22, fontWeight: '700', color: c.muted }}>{(name ?? '?')[0].toUpperCase()}</Text>
+                  }
+                </View>
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text style={{ fontSize: 17, fontWeight: '600', color: c.text }}>{name}</Text>
+                  {sub ? <Text style={{ fontSize: 13, fontWeight: '500', color: c.muted }}>{sub}</Text> : null}
+                  <Text style={{ fontSize: 13, fontWeight: '500', color: statusColor }}>{status}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={c.muted} />
+              </Pressable>
+            </View>
+          );
+
+          return (
+            <>
+              {/* Therapeuten-Profil */}
+              {loggedInTherapist && (
+                <ProfileCard
+                  name={loggedInTherapist.fullName ?? '—'}
+                  sub={loggedInTherapist.professionalTitle ?? 'Therapeut'}
+                  photo={loggedInTherapist.photo}
+                  status={loggedInTherapist.isVisible && loggedInTherapist.reviewStatus === 'APPROVED' ? 'Öffentlich sichtbar' : 'Noch nicht öffentlich'}
+                  statusColor={loggedInTherapist.isVisible && loggedInTherapist.reviewStatus === 'APPROVED' ? c.success : c.muted}
+                  onPress={() => setActiveTab('therapist')}
+                />
+              )}
+              {/* Manager hat auch Therapeuten-Profil */}
+              {isManager && mgrTherapistProfile && (
+                <ProfileCard
+                  name={mgrTherapistProfile.fullName ?? '—'}
+                  sub={mgrTherapistProfile.professionalTitle ?? 'Therapeut'}
+                  photo={mgrTherapistProfile.photo ?? null}
+                  status={mgrTherapistProfile.isVisible && mgrTherapistProfile.reviewStatus === 'APPROVED' ? 'Öffentlich sichtbar' : 'Noch nicht öffentlich'}
+                  statusColor={mgrTherapistProfile.isVisible && mgrTherapistProfile.reviewStatus === 'APPROVED' ? c.success : c.muted}
+                  onPress={() => setActiveTab('therapist')}
+                />
+              )}
+            </>
+          );
+        })()}
 
         {[
           { label: t('privacyOption'), value: t('comingSoon') },
@@ -1947,23 +2113,6 @@ export default function App() {
 
         {loggedInTherapist && (
           <>
-            <Text style={[styles.filterSectionTitle, { color: c.muted, marginTop: 4 }]}>PROFILUEBERSICHT</Text>
-            <View style={[styles.infoCard, { backgroundColor: c.card, borderColor: c.border, gap: 0 }]}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 4 }}>
-                <Text style={{ color: c.muted, fontSize: 13 }}>Name</Text>
-                <Text style={{ color: c.text, fontSize: 14, fontWeight: '600', flex: 1, textAlign: 'right', marginLeft: 16 }}>
-                  {formatProfileOverviewName(loggedInTherapist.fullName ?? '') || '—'}
-                </Text>
-              </View>
-              <View style={{ height: 1, backgroundColor: c.border, marginVertical: 12 }} />
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 4 }}>
-                <Text style={{ color: c.muted, fontSize: 13 }}>E-Mail</Text>
-                <Text style={{ color: c.text, fontSize: 14, fontWeight: '600', flex: 1, textAlign: 'right', marginLeft: 16 }}>
-                  {loggedInTherapist.email ?? '—'}
-                </Text>
-              </View>
-            </View>
-
             <Text style={[styles.filterSectionTitle, { color: c.muted, marginTop: 4 }]}>{t('myPractice')}</Text>
             {loggedInTherapist.adminPractice ? (
               <Pressable
@@ -2019,27 +2168,25 @@ export default function App() {
             <Text style={[styles.optionValue, { color: c.primary }]}>{t('loginAction')} ›</Text>
           </Pressable>
         )}
-      </ScrollView>
-
-      {/* Abmelden + Konto löschen — fixed am unteren Rand */}
-      {(loggedInTherapist || accountType === 'manager') && (
-        <View style={{ marginHorizontal: 16, marginBottom: 16, gap: 10 }}>
-          <Pressable
-            onPress={accountType === 'manager' ? handleManagerLogout : handleLogout}
-            style={{ borderRadius: 12, paddingVertical: 14, alignItems: 'center', borderWidth: 1.5, borderColor: c.border }}
-          >
-            <Text style={{ color: c.text, fontSize: 16, fontWeight: '600' }}>{t('logoutBtn')}</Text>
-          </Pressable>
-          {loggedInTherapist && (
+        {(loggedInTherapist || accountType === 'manager') && (
+          <View style={{ gap: 10, marginTop: 8 }}>
             <Pressable
-              onPress={handleDeleteAccount}
-              style={{ borderRadius: 12, paddingVertical: 14, alignItems: 'center' }}
+              onPress={accountType === 'manager' ? handleManagerLogout : handleLogout}
+              style={{ borderRadius: 12, paddingVertical: 14, alignItems: 'center', borderWidth: 1.5, borderColor: c.border, backgroundColor: c.card }}
             >
-              <Text style={{ color: c.muted, fontSize: 14 }}>{t('deleteAccount')}</Text>
+              <Text style={{ color: c.text, fontSize: 16, fontWeight: '600' }}>{t('logoutBtn')}</Text>
             </Pressable>
-          )}
-        </View>
-      )}
+            {loggedInTherapist && (
+              <Pressable
+                onPress={handleDeleteAccount}
+                style={{ borderRadius: 12, paddingVertical: 14, alignItems: 'center' }}
+              >
+                <Text style={{ color: c.muted, fontSize: 14 }}>{t('deleteAccount')}</Text>
+              </Pressable>
+            )}
+          </View>
+        )}
+      </ScrollView>
     </View>
   );
 
@@ -2226,6 +2373,26 @@ export default function App() {
                 </Pressable>
                 <ThemedHeartButton isSaved={true} onToggle={() => toggleFavorite(fav)} hitSlop={ICON_HIT_SLOP} />
               </View>
+              {bookingNotes[fav.id] ? (() => {
+                const note = bookingNotes[fav.id];
+                const days = note.preferredDays?.join(', ');
+                const times = note.preferredTimeWindows?.join(', ');
+                const date = new Date(note.submittedAt).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+                return (
+                  <View style={{ paddingHorizontal: 12, paddingVertical: 8, borderTopWidth: 1, borderTopColor: c.border, gap: 3 }}>
+                    <Text style={{ fontSize: 11, color: c.muted, fontWeight: '600' }}>
+                      Anfrage vom {date}
+                    </Text>
+                    {days ? <Text style={{ fontSize: 12, color: c.text }}>Wunschtage: {days}</Text> : null}
+                    {times ? <Text style={{ fontSize: 12, color: c.text }}>Zeitfenster: {times}</Text> : null}
+                    {note.message ? (
+                      <Text style={{ fontSize: 12, color: c.muted, marginTop: 2 }} numberOfLines={2}>
+                        {note.message}
+                      </Text>
+                    ) : null}
+                  </View>
+                );
+              })() : null}
               {fav.practices?.length > 0 && (
                 <Pressable
                   onPress={() => openPractice(fav.practices[0])}
@@ -2261,7 +2428,7 @@ export default function App() {
               <Pressable onPress={() => openPractice(p)} style={styles.cardTop}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
                   {p.logo ? (
-                    <Image source={{ uri: p.logo }} style={[styles.avatar, { borderRadius: 10 }]} />
+                    <Image source={{ uri: resolveMediaUrl(p.logo) }} style={[styles.avatar, { borderRadius: 10 }]} />
                   ) : (
                     <View style={[styles.avatar, { backgroundColor: c.primary, borderRadius: 10, alignItems: 'center', justifyContent: 'center' }]}>
                       <Text style={{ color: '#fff', fontWeight: '700', fontSize: 16 }}>
@@ -2343,9 +2510,9 @@ export default function App() {
         case 1:
           return regEmail.length > 3 && regPassword.length >= 6 && regPassword === regPasswordConfirm;
         case 2:
-          return regFirstName.trim().length > 0 && regLastName.trim().length > 0;
+          return regFirstName.trim().length > 0 && regLastName.trim().length > 0 && regCity.trim().length > 0;
         case 3:
-          return regLanguages.length > 0;
+          return regFreelance !== null;
         default:
           return true;
       }
@@ -2356,8 +2523,18 @@ export default function App() {
         case 1:
           return (
             <>
-              <Text style={[styles.regStepTitle, { color: c.text }]}>Account erstellen</Text>
-              <Text style={[styles.regStepSub, { color: c.muted }]}>Erstelle dein Revio-Konto</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
+                <Text style={[styles.regStepTitle, { color: c.text, marginBottom: 0 }]}>Account erstellen</Text>
+                <Pressable onPress={() => setShowRegStepInfo(v => !v)} hitSlop={ICON_HIT_SLOP} style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                  <Text style={{ fontSize: 12, color: c.muted }}>Info</Text>
+                  <Ionicons name={showRegStepInfo ? 'chevron-up' : 'chevron-down'} size={13} color={c.muted} />
+                </Pressable>
+              </View>
+              {showRegStepInfo && (
+                <View style={{ backgroundColor: c.mutedBg, borderRadius: 10, padding: 12, borderWidth: 1, borderColor: c.border }}>
+                  <Text style={{ fontSize: 13, color: c.muted, lineHeight: 19 }}>{REG_STEP_INFO[1]}</Text>
+                </View>
+              )}
               <TextInput value={regEmail} onChangeText={setRegEmail} placeholder="E-Mail-Adresse" placeholderTextColor={c.muted} keyboardType="email-address" autoCapitalize="none" style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text }]} />
               <View style={{ position: 'relative' }}>
                 <TextInput value={regPassword} onChangeText={setRegPassword} placeholder="Passwort (mind. 6 Zeichen)" placeholderTextColor={c.muted} secureTextEntry={!showRegPassword} style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text, paddingRight: 44 }]} />
@@ -2379,8 +2556,18 @@ export default function App() {
         case 2:
           return (
             <>
-              <Text style={[styles.regStepTitle, { color: c.text }]}>Persönliche Angaben</Text>
-              <Text style={[styles.regStepSub, { color: c.muted }]}>Wie sollen wir dich ansprechen?</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
+                <Text style={[styles.regStepTitle, { color: c.text, marginBottom: 0 }]}>Persönliche Angaben</Text>
+                <Pressable onPress={() => setShowRegStepInfo(v => !v)} hitSlop={ICON_HIT_SLOP} style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                  <Text style={{ fontSize: 12, color: c.muted }}>Info</Text>
+                  <Ionicons name={showRegStepInfo ? 'chevron-up' : 'chevron-down'} size={13} color={c.muted} />
+                </Pressable>
+              </View>
+              {showRegStepInfo && (
+                <View style={{ backgroundColor: c.mutedBg, borderRadius: 10, padding: 12, borderWidth: 1, borderColor: c.border }}>
+                  <Text style={{ fontSize: 13, color: c.muted, lineHeight: 19 }}>{REG_STEP_INFO[2]}</Text>
+                </View>
+              )}
               <TextInput value={regFirstName} onChangeText={setRegFirstName} placeholder="Vorname" placeholderTextColor={c.muted} style={[styles.regInput, { backgroundColor: c.card, borderColor: regFirstName.length > 0 && regFirstName.trim().length === 0 ? c.saved : c.border, color: c.text }]} />
               {regFirstName.length > 0 && regFirstName.trim().length === 0 && (
                 <Text style={{ color: c.saved, fontSize: 13, marginTop: -6 }}>Vorname ist erforderlich</Text>
@@ -2400,7 +2587,7 @@ export default function App() {
                   <TextInput
                     value={regCitySearch}
                     onChangeText={setRegCitySearch}
-                    placeholder="Stadt suchen (optional)"
+                    placeholder="Stadt suchen"
                     placeholderTextColor={c.muted}
                     style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text }]}
                   />
@@ -2425,16 +2612,121 @@ export default function App() {
             </>
           );
         case 3: {
-          const specSuggestions = regSpecSearch.length > 0
-            ? regSpecOptions.filter(s => s.toLowerCase().includes(regSpecSearch.toLowerCase()) && !regSpecializations.includes(s)).slice(0, 6)
-            : [];
-          const langSuggestions = regLangSearch.length > 0
+          return (
+            <>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
+                <Text style={[styles.regStepTitle, { color: c.text, marginBottom: 0 }]}>Wie bist du tätig?</Text>
+                <Pressable onPress={() => setShowRegStepInfo(v => !v)} hitSlop={ICON_HIT_SLOP} style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                  <Text style={{ fontSize: 12, color: c.muted }}>Info</Text>
+                  <Ionicons name={showRegStepInfo ? 'chevron-up' : 'chevron-down'} size={13} color={c.muted} />
+                </Pressable>
+              </View>
+              {showRegStepInfo && (
+                <View style={{ backgroundColor: c.mutedBg, borderRadius: 10, padding: 12, borderWidth: 1, borderColor: c.border, marginBottom: SPACE.sm }}>
+                  <Text style={{ fontSize: 13, color: c.muted, lineHeight: 19 }}>{REG_STEP_INFO[3]}</Text>
+                </View>
+              )}
+
+              <View style={{ flexDirection: 'row', gap: 8, marginBottom: SPACE.md }}>
+                {[
+                  { key: true, label: 'Freiberuflich' },
+                  { key: false, label: 'Angestellt' },
+                ].map(({ key, label }) => {
+                  const active = regFreelance === key;
+                  return (
+                    <Pressable
+                      key={String(key)}
+                      onPress={() => {
+                        setRegFreelance(key);
+                        if (key === true && (regKassenart === 'gesetzlich' || regKassenart === 'alle')) {
+                          setRegKassenart('');
+                        }
+                      }}
+                      style={{ flex: 1, paddingVertical: 11, borderRadius: RADIUS.md, borderWidth: 2, borderColor: active ? c.primary : c.border, backgroundColor: active ? c.primaryBg : c.card, alignItems: 'center' }}
+                    >
+                      <Text style={{ fontSize: 14, fontWeight: '600', color: active ? c.primary : c.text }}>{label}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+
+              {regFreelance === true && (
+                <View style={[{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: SPACE.md, borderRadius: RADIUS.md, borderWidth: 1, marginBottom: SPACE.sm }, { borderColor: regHomeVisit ? c.success : c.border, backgroundColor: regHomeVisit ? (c.successBg ?? c.mutedBg) : c.card }]}>
+                  <Text style={{ flex: 1, fontSize: 14, fontWeight: '600', color: c.text }}>Hausbesuche anbieten</Text>
+                  <Switch value={!!regHomeVisit} onValueChange={(v) => { setRegHomeVisit(v); if (!v) setRegServiceRadius(null); }} trackColor={{ true: c.success }} />
+                </View>
+              )}
+
+              {regFreelance === true && regHomeVisit && (
+                <View style={{ marginBottom: SPACE.sm }}>
+                  <Text style={[styles.filterSectionTitle, { color: c.muted }]}>Wie weit fährst du?</Text>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 6 }}>
+                    {[5, 10, 15, 20, 30, 50].map((km) => (
+                      <Pressable
+                        key={km}
+                        onPress={() => setRegServiceRadius(km)}
+                        style={[styles.kassenartBtn, {
+                          backgroundColor: regServiceRadius === km ? c.success : c.mutedBg,
+                          borderColor: regServiceRadius === km ? c.success : c.border,
+                        }]}
+                      >
+                        <Text style={[styles.kassenartText, { color: regServiceRadius === km ? '#fff' : c.text }]}>
+                          {km} km
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </View>
+              )}
+
+              <Text style={[styles.filterSectionTitle, { color: c.muted, marginBottom: 6 }]}>Kassenart</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                {[
+                  { key: 'gesetzlich', label: 'Gesetzlich' },
+                  { key: 'privat', label: 'Privat' },
+                  { key: 'selbstzahler', label: 'Selbstzahler' },
+                  { key: 'alle', label: 'Alle Kassen' },
+                ]
+                  .filter((option) => regFreelance !== true || ['privat', 'selbstzahler'].includes(option.key))
+                  .map((option) => (
+                  <Pressable
+                    key={option.key}
+                    onPress={() => setRegKassenart(option.key)}
+                    style={[styles.kassenartBtn, {
+                      backgroundColor: regKassenart === option.key ? c.primary : c.mutedBg,
+                      borderColor: regKassenart === option.key ? c.primary : c.border,
+                    }]}
+                  >
+                    <Text style={[styles.kassenartText, { color: regKassenart === option.key ? '#fff' : c.text }]}>
+                      {option.label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </>
+          );
+        }
+        case 4: {
+          const langSuggestions4 = regLangSearch.length > 0
             ? languageOptions.filter(l => getLangLabel(l).toLowerCase().includes(regLangSearch.toLowerCase()) && !regLanguages.includes(l)).slice(0, 6)
+            : [];
+          const specSuggestions4 = regSpecSearch.length > 0
+            ? regSpecOptions.filter(s => s.toLowerCase().includes(regSpecSearch.toLowerCase()) && !regSpecializations.includes(s)).slice(0, 6)
             : [];
           return (
             <>
-              <Text style={[styles.regStepTitle, { color: c.text }]}>Fachliches Profil</Text>
-              <Text style={[styles.regStepSub, { color: c.muted }]}>Spezialisierungen, Sprachen & Fortbildungen</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
+                <Text style={[styles.regStepTitle, { color: c.text, marginBottom: 0 }]}>Sprachen & Spezialisierungen</Text>
+                <Pressable onPress={() => setShowRegStepInfo(v => !v)} hitSlop={ICON_HIT_SLOP} style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                  <Text style={{ fontSize: 12, color: c.muted }}>Info</Text>
+                  <Ionicons name={showRegStepInfo ? 'chevron-up' : 'chevron-down'} size={13} color={c.muted} />
+                </Pressable>
+              </View>
+              {showRegStepInfo && (
+                <View style={{ backgroundColor: c.mutedBg, borderRadius: 10, padding: 12, borderWidth: 1, borderColor: c.border, marginBottom: SPACE.sm }}>
+                  <Text style={{ fontSize: 13, color: c.muted, lineHeight: 19 }}>{REG_STEP_INFO[4]}</Text>
+                </View>
+              )}
 
               <View style={styles.sectionBadgeRow}>
                 <Text style={[styles.filterSectionTitle, { color: c.muted, marginBottom: 0 }]}>Sprachen</Text>
@@ -2450,9 +2742,9 @@ export default function App() {
                 placeholderTextColor={c.muted}
                 style={[styles.regInput, { backgroundColor: c.card, borderColor: regLanguages.length > 0 ? c.primary : c.border, color: c.text }]}
               />
-              {langSuggestions.length > 0 && (
+              {langSuggestions4.length > 0 && (
                 <View style={{ borderRadius: RADIUS.sm, borderWidth: 1, borderColor: c.border, marginTop: -8, marginBottom: 8, overflow: 'hidden', backgroundColor: c.card }}>
-                  {langSuggestions.map((l, i) => (
+                  {langSuggestions4.map((l, i) => (
                     <Pressable key={l} onPress={() => { toggleRegLang(l); setRegLangSearch(''); }}
                       style={{ padding: SPACE.md, borderTopWidth: i > 0 ? 1 : 0, borderColor: c.border }}>
                       <Text style={{ ...TYPE.body, color: c.text }}>{getLangLabel(l)}</Text>
@@ -2461,7 +2753,7 @@ export default function App() {
                 </View>
               )}
               {regLanguages.length > 0 && (
-                <View style={[styles.tagRow, { marginBottom: 4 }]}>
+                <View style={[styles.tagRow, { marginBottom: 8 }]}>
                   {regLanguages.map(l => (
                     <Pressable key={l} onPress={() => toggleRegLang(l)} style={[styles.chip, { backgroundColor: c.primary, borderColor: c.primary }]}>
                       <Text style={[styles.chipText, { color: '#FFFFFF' }]}>{getLangLabel(l)} ×</Text>
@@ -2469,12 +2761,6 @@ export default function App() {
                   ))}
                 </View>
               )}
-
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACE.md, marginVertical: SPACE.lg }}>
-                <View style={{ flex: 1, height: 1, backgroundColor: c.border }} />
-                <Text style={{ ...TYPE.label, color: c.textMuted }}>Optional</Text>
-                <View style={{ flex: 1, height: 1, backgroundColor: c.border }} />
-              </View>
 
               <Text style={[styles.filterSectionTitle, { color: c.muted }]}>
                 Spezialisierungen <Text style={styles.optionalInlineLabel}>(optional)</Text>
@@ -2486,9 +2772,9 @@ export default function App() {
                 placeholderTextColor={c.muted}
                 style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text }]}
               />
-              {specSuggestions.length > 0 && (
+              {specSuggestions4.length > 0 && (
                 <View style={{ borderRadius: RADIUS.sm, borderWidth: 1, borderColor: c.border, marginTop: -8, marginBottom: 8, overflow: 'hidden', backgroundColor: c.card }}>
-                  {specSuggestions.map((s, i) => (
+                  {specSuggestions4.map((s, i) => (
                     <Pressable
                       key={s}
                       onPress={() => { toggleRegSpec(s); setRegSpecSearch(''); }}
@@ -2533,15 +2819,28 @@ export default function App() {
             </>
           );
         }
-        case 4:
+        case 5:
           return (
             <>
-              <Text style={[styles.regStepTitle, { color: c.text }]}>Vorschau & Einreichen</Text>
-              <Text style={[styles.regStepSub, { color: c.muted }]}>Überprüfe deine Angaben vor dem Einreichen</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
+                <Text style={[styles.regStepTitle, { color: c.text, marginBottom: 0 }]}>Vorschau & Einreichen</Text>
+                <Pressable onPress={() => setShowRegStepInfo(v => !v)} hitSlop={ICON_HIT_SLOP} style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                  <Text style={{ fontSize: 12, color: c.muted }}>Info</Text>
+                  <Ionicons name={showRegStepInfo ? 'chevron-up' : 'chevron-down'} size={13} color={c.muted} />
+                </Pressable>
+              </View>
+              {showRegStepInfo && (
+                <View style={{ backgroundColor: c.mutedBg, borderRadius: 10, padding: 12, borderWidth: 1, borderColor: c.border }}>
+                  <Text style={{ fontSize: 13, color: c.muted, lineHeight: 19 }}>{REG_STEP_INFO[5]}</Text>
+                </View>
+              )}
               {[
                 { label: 'Name', value: `${regFirstName} ${regLastName}`.trim() || '—' },
                 { label: 'E-Mail', value: regEmail || '—' },
                 { label: 'Stadt', value: regCity || '—' },
+                { label: 'Tätigkeit', value: regFreelance === true ? 'Freiberuflich' : regFreelance === false ? 'Angestellt' : '—' },
+                { label: 'Hausbesuche', value: regHomeVisit ? `Ja · ${regServiceRadius ? regServiceRadius + ' km' : 'Radius fehlt'}` : 'Nein' },
+                { label: 'Kassenart', value: regKassenart || '—' },
                 { label: 'Spezialisierungen', value: regSpecializations.join(', ') || '—' },
                 { label: 'Sprachen', value: regLanguages.map(getLangLabel).join(', ') || '—' },
                 { label: 'Fortbildungen', value: regFortbildungen.map(getCertificationLabel).join(', ') || '—' },
@@ -2564,8 +2863,20 @@ export default function App() {
       }
     };
 
+    const REG_STEP_INFO = {
+      1: 'Erstelle dein persönliches Revio-Konto. Du benötigst eine gültige E-Mail-Adresse und ein sicheres Passwort (mind. 6 Zeichen).',
+      2: 'Dein Name erscheint auf deinem öffentlichen Profil. Dein Standort hilft Patienten, dich in ihrer Nähe zu finden.',
+      3: 'Wähle deinen Beschäftigungsstatus, Kassenart und ob du Hausbesuche anbietest — das bestimmt, wie Patienten dich finden.',
+      4: 'Sprachen und Spezialisierungen machen dein Profil attraktiver. Fortbildungen sind optional, helfen aber bei der Sichtbarkeit.',
+      5: 'Prüfe alle Angaben vor dem Einreichen. Dein Profil wird nach dem Absenden manuell geprüft — das dauert in der Regel unter 48h.',
+    };
+
     return (
-      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 20 }]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        contentContainerStyle={[styles.scrollContent, { paddingHorizontal: 20, paddingBottom: 20, gap: SPACE.sm }]}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
         <Pressable
           onPress={() => {
             if (regStep === 1) {
@@ -2573,6 +2884,7 @@ export default function App() {
               setShowRegFortbildungen(false);
             } else {
               setRegStep(s => s - 1);
+              setShowRegStepInfo(false);
             }
           }}
           style={styles.backBtn}
@@ -2580,14 +2892,10 @@ export default function App() {
           <Text style={[styles.backBtnText, { color: c.primary }]}>‹ {regStep === 1 ? 'Abbrechen' : t('backBtn')}</Text>
         </Pressable>
 
-        <View style={styles.header}>
-          <View style={[styles.logoMark, { backgroundColor: c.primary }]}>
-            <Text style={styles.logoText}>R</Text>
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.headerTitle, { color: c.text }]}>Registrierung</Text>
-            <Text style={[styles.headerSub, { color: c.muted }]}>Schritt {regStep} von {REG_STEPS}</Text>
-          </View>
+        {/* Header */}
+        <View style={{ marginBottom: 2 }}>
+          <Text style={{ fontSize: 16, fontWeight: '700', color: c.text }}>Registrierung</Text>
+          <Text style={{ fontSize: 11, color: c.muted }}>Schritt {regStep} von {REG_STEPS}</Text>
         </View>
 
         {renderProgress()}
@@ -2600,6 +2908,7 @@ export default function App() {
             if (!canProceed()) return;
             if (regStep < REG_STEPS) {
               setRegStep(s => s + 1);
+              setShowRegStepInfo(false);
             } else {
               try {
                 const res = await fetch(`${getBaseUrl()}/register/therapist`, {
@@ -2613,6 +2922,10 @@ export default function App() {
                     specializations: regSpecializations,
                     languages: regLanguages.map(l => l.toLowerCase()),
                     certifications: regFortbildungen,
+                    homeVisit: regHomeVisit === true,
+                    serviceRadiusKm: regHomeVisit === true ? (regServiceRadius ?? null) : null,
+                    kassenart: regKassenart || undefined,
+                    bookingMode: regFreelance === true ? 'FIRST_APPOINTMENT_REQUEST' : 'DIRECTORY_ONLY',
                   }),
                 });
                 const resData = await res.json().catch(() => ({}));
@@ -3630,9 +3943,22 @@ export default function App() {
       if (showInviteClaim) return renderInviteClaimScreen();
       if (loggedInTherapist) return renderTherapistDashboard();
       if (showManagerReg) return renderManagerReg();
-      if (showLogin) return renderLogin();
-      if (showRegister) return renderRegister();
-      return renderTherapist();
+      const isAuthFlow = showLogin || showRegister || true;
+      return (
+        <View style={{ flex: 1 }}>
+          <View style={styles.authBrandSlot}>
+            <View style={styles.authBrandRow}>
+              <View style={[styles.logoMark, styles.authBrandMark, { backgroundColor: c.primary }]}>
+                <Text style={[styles.logoText, styles.authBrandLogoText]}>R</Text>
+              </View>
+              <Text style={[styles.authBrandWordmark, { color: c.text }]}>evio</Text>
+            </View>
+          </View>
+          <View style={{ flex: 1 }}>
+            {showLogin ? renderLogin() : showRegister ? renderRegister() : renderTherapist()}
+          </View>
+        </View>
+      );
     }
     if (activeTab === 'options') return renderOptions();
     return renderDiscover();
@@ -3641,6 +3967,38 @@ export default function App() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: c.background }]}>
       <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
+
+      {/* ── Favoriten-Toast ──────────────────────────────────────────────────── */}
+      {toastMsg && (
+        <Animated.View
+          style={{
+            position: 'absolute',
+            top: 52,
+            left: 16,
+            right: 16,
+            zIndex: 9999,
+            transform: [{ translateY: toastAnim }],
+          }}
+          pointerEvents="none"
+        >
+          <View style={{
+            backgroundColor: c.text,
+            borderRadius: 14,
+            paddingVertical: 12,
+            paddingHorizontal: 16,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 10,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.18,
+            shadowRadius: 12,
+            elevation: 8,
+          }}>
+            <Text style={{ color: c.background, fontSize: 14, fontWeight: '600', flex: 1 }}>{toastMsg}</Text>
+          </View>
+        </Animated.View>
+      )}
 
       {/* ── Practice Deletion Flow ───────────────────────────────────────────── */}
       <Modal visible={deletionFlowStep === 'reason'} transparent animationType="slide" onRequestClose={() => setDeletionFlowStep(null)}>
@@ -3892,11 +4250,20 @@ export default function App() {
               style={styles.navItem}
             >
               <View style={[styles.navPill, active && { backgroundColor: c.primaryBg }]}>
-                <Ionicons
-                  name={active ? tab.icon : `${tab.icon}-outline`}
-                  size={22}
-                  color={active ? c.primary : c.muted}
-                />
+                <View style={{ position: 'relative' }}>
+                  <Ionicons
+                    name={active ? tab.icon : `${tab.icon}-outline`}
+                    size={22}
+                    color={active ? c.primary : c.muted}
+                  />
+                  {tab.key === 'therapist' && loggedInTherapist && notifications.filter(n => n.type === 'BOOKING_REQUEST').length > 0 && (
+                    <View style={{ position: 'absolute', top: -3, right: -5, backgroundColor: '#E53E3E', borderRadius: 6, minWidth: 12, height: 12, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 2 }}>
+                      <Text style={{ color: '#fff', fontSize: 8, fontWeight: '800', lineHeight: 12 }}>
+                        {notifications.filter(n => n.type === 'BOOKING_REQUEST').length}
+                      </Text>
+                    </View>
+                  )}
+                </View>
               </View>
               <Text style={[styles.navLabel, { color: active ? c.primary : c.muted }]}>
                 {t(tab.labelKey)}
@@ -3920,7 +4287,33 @@ const styles = StyleSheet.create({
   heroTitle: { ...TYPE.xl },
   heroSub: { ...TYPE.body },
 
-  header: { flexDirection: 'row', alignItems: 'center', gap: SPACE.md, paddingBottom: SPACE.xs },
+  authBrandSlot: {
+    width: '100%',
+    minHeight: 64,
+    paddingHorizontal: 20,
+    paddingTop: 14,
+    paddingBottom: 10,
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  authBrandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    minHeight: 40,
+  },
+  authBrandMark: { borderRadius: 13 },
+  authBrandLogoText: { fontSize: 18, lineHeight: 18, letterSpacing: -1 },
+  authBrandWordmark: { ...TYPE.lg, marginLeft: 4, letterSpacing: 0.4 },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACE.md,
+    paddingBottom: SPACE.xs,
+    width: '100%',
+    minHeight: 48,
+    alignSelf: 'stretch',
+  },
   logoMark: { width: 40, height: 40, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center' },
   logoText: { color: '#FFFFFF', fontSize: 20, fontWeight: '800', lineHeight: 20 },
   brandName: { ...TYPE.lg, letterSpacing: 3, marginLeft: 4 },
@@ -4002,7 +4395,98 @@ const styles = StyleSheet.create({
   goBtnText: { ...TYPE.heading, color: '#FFFFFF' },
 
   filterPanel: { borderWidth: 1, borderRadius: RADIUS.md, padding: SPACE.lg, gap: SPACE.md },
+  filterCompactPanel: { padding: SPACE.md, gap: SPACE.md },
+  filterPanelHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SPACE.sm },
+  filterCompactHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SPACE.sm },
+  filterCompactTitle: { ...TYPE.heading },
+  filterSectionBlock: { gap: SPACE.sm },
+  filterSectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SPACE.sm },
   filterSectionTitle: { ...TYPE.label, marginBottom: 10 },
+  filterCompactSection: { gap: SPACE.sm },
+  filterCompactSectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SPACE.sm },
+  filterCompactSectionTitle: { ...TYPE.label },
+  filterResetBtn: {
+    minHeight: 30,
+    borderRadius: RADIUS.full,
+    paddingHorizontal: SPACE.sm,
+    paddingVertical: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  filterResetBtnText: { ...TYPE.meta },
+  filterChipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACE.sm },
+  kassenartCompactToggle: {
+    borderWidth: 1,
+    borderRadius: RADIUS.lg,
+    padding: 4,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+  },
+  kassenartCompactToggleBtn: {
+    flexBasis: '48%',
+    flexGrow: 1,
+    minHeight: 36,
+    borderWidth: 1,
+    borderRadius: RADIUS.full,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  kassenartCompactToggleText: { ...TYPE.meta },
+  filterCompactChip: {
+    minHeight: 36,
+    borderWidth: 1,
+    borderRadius: RADIUS.full,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+  },
+  filterCompactChipText: { ...TYPE.meta },
+  filterSearchField: {
+    minHeight: 40,
+    borderWidth: 1,
+    borderRadius: RADIUS.full,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  filterSearchInput: { flex: 1, ...TYPE.meta, paddingVertical: 0 },
+  filterSearchResults: {
+    borderWidth: 1,
+    borderRadius: RADIUS.md,
+    overflow: 'hidden',
+  },
+  filterSearchResultItem: {
+    minHeight: 40,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: SPACE.sm,
+  },
+  filterSearchResultText: { ...TYPE.meta, flex: 1 },
+  filterSelectedChip: {
+    maxWidth: '100%',
+    minHeight: 34,
+    borderWidth: 1,
+    borderRadius: RADIUS.full,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  filterSelectedChipText: { ...TYPE.meta, maxWidth: 220 },
+  filterEmptyText: { ...TYPE.meta },
   sectionBadgeRow: { flexDirection: 'row', alignItems: 'center', gap: SPACE.sm, flexWrap: 'wrap', marginBottom: 6 },
   inlineMetaPill: { borderRadius: RADIUS.full, paddingHorizontal: 10, paddingVertical: 5 },
   inlineMetaPillText: { ...TYPE.label, fontSize: 11, lineHeight: 11 },
@@ -4028,6 +4512,100 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   kassenartText: { ...TYPE.meta },
+  kassenartToggleGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACE.sm },
+  kassenartToggleCard: {
+    flexBasis: '47%',
+    flexGrow: 1,
+    minHeight: 52,
+    borderWidth: 1,
+    borderRadius: RADIUS.md,
+    paddingHorizontal: SPACE.md,
+    paddingVertical: SPACE.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: SPACE.sm,
+  },
+  kassenartToggleText: { ...TYPE.meta, flex: 1 },
+  kassenartToggleCheck: {
+    width: 22,
+    height: 22,
+    borderRadius: RADIUS.full,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  filterTile: {
+    minHeight: 56,
+    borderWidth: 1,
+    borderRadius: RADIUS.md,
+    paddingHorizontal: SPACE.md,
+    paddingVertical: SPACE.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACE.md,
+  },
+  filterTileIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: RADIUS.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  filterTileTitle: { ...TYPE.heading },
+  filterTileMeta: { ...TYPE.meta },
+  filterTileCheck: {
+    width: 22,
+    height: 22,
+    borderRadius: RADIUS.full,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selectedFiltersRow: { gap: SPACE.sm, paddingVertical: 2, paddingRight: SPACE.sm },
+  selectedFilterChip: {
+    maxWidth: 220,
+    borderWidth: 1,
+    borderRadius: RADIUS.full,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    minHeight: 36,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  selectedFilterChipText: { ...TYPE.meta, flexShrink: 1 },
+  multiSelectList: { gap: SPACE.sm },
+  multiSelectOption: {
+    minHeight: 52,
+    borderWidth: 1,
+    borderRadius: RADIUS.md,
+    paddingHorizontal: SPACE.md,
+    paddingVertical: SPACE.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACE.md,
+  },
+  multiSelectOptionText: { ...TYPE.body, flex: 1 },
+  multiSelectCheck: {
+    width: 22,
+    height: 22,
+    borderRadius: RADIUS.full,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  filterMoreBtn: {
+    minHeight: 40,
+    borderWidth: 1,
+    borderRadius: RADIUS.full,
+    paddingHorizontal: SPACE.md,
+    paddingVertical: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'flex-start',
+  },
+  filterMoreBtnText: { ...TYPE.meta },
   checkRow: { flexDirection: 'row', alignItems: 'center', gap: SPACE.sm, paddingVertical: 8, minHeight: 44 },
   checkbox: { width: 22, height: 22, borderRadius: RADIUS.sm, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
   checkmark: { color: '#FFFFFF', ...TYPE.label, fontSize: 12, lineHeight: 12, letterSpacing: 0, textTransform: 'none' },
@@ -4264,14 +4842,14 @@ const styles = StyleSheet.create({
 
   regProgressRow: { flexDirection: 'row', gap: 4, marginBottom: 4 },
   regProgressBar: { height: 4, borderRadius: 2, flex: 1 },
-  regStepTitle: { ...TYPE.lg, marginBottom: 4 },
+  regStepTitle: { fontSize: 15, fontWeight: '700', marginBottom: 4 },
   regStepSub: { ...TYPE.body, marginBottom: 4 },
   regInput: {
     borderWidth: 1,
     borderRadius: RADIUS.md,
     paddingHorizontal: 14,
-    paddingVertical: 12,
-    minHeight: 48,
+    paddingVertical: 10,
+    minHeight: 44,
     ...TYPE.body,
     outlineWidth: 0,
   },

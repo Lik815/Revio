@@ -9,6 +9,13 @@ export type ReviewStatus =
   | 'SUSPENDED';
 
 export type LinkStatus = 'PROPOSED' | 'CONFIRMED' | 'DISPUTED' | 'REJECTED';
+export type BookingMode = 'DIRECTORY_ONLY' | 'FIRST_APPOINTMENT_REQUEST';
+export type BookingRequestStatus = 'PENDING' | 'CONFIRMED' | 'DECLINED' | 'EXPIRED';
+
+export interface TherapistRequestability {
+  requestable: boolean;
+  blockingReasons: string[];
+}
 
 // ─── Core Entities ────────────────────────────────────────────────────────────
 
@@ -21,11 +28,16 @@ export interface Therapist {
   languages: string[];
   certifications: string[];
   homeVisit: boolean;
+  serviceRadiusKm?: number | null;
+  kassenart: string;
   city: string;
   bio?: string;
   reviewStatus: ReviewStatus;
   isVisible: boolean;
   isPublished: boolean;
+  bookingMode?: BookingMode;
+  nextFreeSlotAt?: string | null;
+  requestability?: TherapistRequestability;
   onboardingStatus: string | null;
   createdAt: string;
 }
@@ -64,6 +76,7 @@ export interface SearchInput {
   homeVisit?: boolean;
   specialization?: string;
   kassenart?: string;
+  requestable?: boolean;
 }
 
 export interface SearchPractice {
@@ -91,6 +104,12 @@ export interface SearchTherapist {
   kassenart: string;
   availability?: string;
   homeVisit: boolean;
+  serviceRadiusKm?: number | null;
+  homeLat?: number;
+  homeLng?: number;
+  bookingMode?: BookingMode;
+  requestable?: boolean;
+  nextFreeSlotAt?: string | null;
   city: string;
   bio?: string;
   photo?: string;
@@ -103,6 +122,33 @@ export interface SearchResponse {
   therapists: SearchTherapist[];
   practices: SearchPractice[];
   meta: { note: string };
+}
+
+export interface BookingRequest {
+  id: string;
+  therapistId: string;
+  status: BookingRequestStatus;
+  patientName: string;
+  patientEmail?: string | null;
+  patientPhone?: string | null;
+  preferredDays: string[];
+  preferredTimeWindows: string[];
+  message?: string | null;
+  createdAt: string;
+  responseDueAt: string;
+  respondedAt?: string | null;
+  confirmedSlotAt?: string | null;
+}
+
+export interface CreateBookingRequestInput {
+  therapistId: string;
+  patientName: string;
+  patientEmail?: string;
+  patientPhone?: string;
+  preferredDays?: string[];
+  preferredTimeWindows?: string[];
+  message?: string;
+  consentAccepted: true;
 }
 
 // ─── Registration ─────────────────────────────────────────────────────────────

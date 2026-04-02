@@ -18,6 +18,7 @@ import { uploadRoutes } from './routes/upload.js';
 import { inviteRoutes } from './routes/invite.js';
 import { managerAuthRoutes } from './routes/manager-auth.js';
 import { configRoutes } from './routes/config.js';
+import { bookingRequestRoutes } from './routes/booking-requests.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -28,7 +29,7 @@ export async function buildApp() {
   await app.register(sensible);
   await app.register(multipart, { limits: { fileSize: 5 * 1024 * 1024 } }); // 5MB max image
   await app.register(staticPlugin, {
-    root: join(__dirname, '../../uploads'),
+    root: join(__dirname, '../uploads'),
     prefix: '/uploads/',
     decorateReply: false,
   });
@@ -46,6 +47,7 @@ export async function buildApp() {
   await app.register(uploadRoutes);
   await app.register(inviteRoutes);
   await app.register(managerAuthRoutes);
+  await app.register(bookingRequestRoutes);
 
   return app;
 }

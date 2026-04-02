@@ -39,6 +39,16 @@ const blockingReasonLabel: Record<string, string> = {
   no_confirmed_link: 'Keine bestätigte Praxis-Verknüpfung',
   pending_link_only: 'Nur ausstehende/strittige Praxis-Links',
   practice_not_approved: 'Alle verknüpften Praxen nicht freigegeben',
+  no_home_visit: 'Kein Hausbesuch aktiviert (Mobile-Pfad erfordert homeVisit = true)',
+  no_service_radius: 'Kein Einzugsgebiet angegeben (serviceRadiusKm fehlt)',
+  no_kassenart: 'Keine Kassenart angegeben',
+  no_confirmed_practice_link: 'Keine bestätigte Praxis-Verknüpfung (Praxis-Pfad)',
+  booking_mode_disabled: 'Direkte Anfragen sind ausgeschaltet',
+};
+
+const bookingModeLabel: Record<string, string> = {
+  DIRECTORY_ONLY: 'Nur Verzeichnis',
+  FIRST_APPOINTMENT_REQUEST: 'Ersttermin anfragbar',
 };
 
 function mimeIcon(mimetype: string) {
@@ -54,6 +64,12 @@ function formatDate(iso: string) {
   });
 }
 
+function summarizeReasons(reasons: string[]) {
+  if (reasons.length === 0) return null;
+  const [first, ...rest] = reasons;
+  return rest.length > 0 ? `${first} +${rest.length}` : first;
+}
+
 export default async function TherapistDetailPage({ params }: Props) {
   const { id } = await params;
 
@@ -67,20 +83,31 @@ export default async function TherapistDetailPage({ params }: Props) {
       : therapist.reviewStatus === 'APPROVED' && !therapist.isVisible
         ? { label: 'Freigegeben, aber versteckt', className: 'badge badge--PENDING_REVIEW' }
         : { label: 'Nicht öffentlich', className: 'badge badge--DRAFT' };
+  const bookingModeBadge =
+    therapist.bookingMode === 'FIRST_APPOINTMENT_REQUEST'
+      ? {
+        label: therapist.requestability?.requestable ? 'Ersttermin anfragbar' : 'Anfragbar geplant',
+        className: therapist.requestability?.requestable ? 'badge badge--APPROVED' : 'badge badge--PENDING_REVIEW',
+      }
+      : { label: 'Nur Verzeichnis', className: 'badge badge--DRAFT' };
   const isApprovedButNotVisible = therapist.reviewStatus === 'APPROVED' && therapist.visibility.visibilityState !== 'visible';
+  const isRequestModeBlocked = therapist.bookingMode === 'FIRST_APPOINTMENT_REQUEST' && !therapist.requestability?.requestable;
   const blockerReasons = (
     therapist.visibility.blockingReasons.length > 0
       ? therapist.visibility.blockingReasons
-      : !therapist.isVisible
+      : isApprovedButNotVisible
         ? ['manually_hidden']
-        : ['profile_incomplete']
+      : []
   ).map((reason) => blockingReasonLabel[reason] ?? reason);
+  const requestabilityBlockers = (therapist.requestability?.blockingReasons ?? []).map((reason) => blockingReasonLabel[reason] ?? reason);
+  const visibilitySummary = summarizeReasons(blockerReasons);
+  const requestabilitySummary = summarizeReasons(requestabilityBlockers);
 
   return (
     <PageShell
       title={therapist.fullName}
       description={`${therapist.professionalTitle} · ${therapist.city} · ${therapist.email}`}
-      eyebrow={<Link href="/therapists" style={{ color: 'var(--muted)', fontSize: 13 }}>← Zurück zur Liste</Link>}
+      eyebrow={<Link href="/therapists" className="page-back-link">← Zurück zur Liste</Link>}
       actions={
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <span className={`badge badge--${therapist.reviewStatus}`}>
@@ -89,25 +116,66 @@ export default async function TherapistDetailPage({ params }: Props) {
           <span className={publicVisibilityBadge.className}>
             {publicVisibilityBadge.label}
           </span>
+          <span className={bookingModeBadge.className}>
+            {bookingModeBadge.label}
+          </span>
         </div>
       }
     >
       {isApprovedButNotVisible && (
-        <div
-          style={{
-            marginBottom: 16,
-            borderRadius: 12,
-            background: 'rgba(217, 119, 6, 0.08)',
-            border: '1px solid rgba(217, 119, 6, 0.22)',
-            padding: '10px 12px',
-            color: 'var(--warning)',
-            fontSize: 13,
-            lineHeight: 1.5,
-          }}
-        >
-          <strong>Nicht sichtbar weil:</strong> {blockerReasons.join(', ')}
+        <div className="notice-box notice-box--warning">
+          <div className="notice-box__icon">!</div>
+          <div>
+            <strong>Nicht sichtbar weil:</strong> {blockerReasons.join(', ')}
+          </div>
         </div>
       )}
+
+      {isRequestModeBlocked && (
+        <div className="notice-box notice-box--warning">
+          <div className="notice-box__icon">!</div>
+          <div>
+            <strong>Nicht anfragbar weil:</strong> {requestabilityBlockers.join(', ')}
+          </div>
+        </div>
+      )}
+
+      <section className="card-grid" style={{ marginBottom: 24 }}>
+        <article className="card">
+          <div className="kicker">Review</div>
+          <div className={`badge badge--${therapist.reviewStatus}`} style={{ width: 'fit-content', marginTop: 8 }}>
+            {statusLabel[therapist.reviewStatus] ?? therapist.reviewStatus}
+          </div>
+          <p style={{ margin: '12px 0 0', color: 'var(--muted)', fontSize: 13, lineHeight: 1.5 }}>
+            {therapist.reviewStatus === 'APPROVED'
+              ? 'Profil ist administrativ freigegeben.'
+              : therapist.reviewStatus === 'PENDING_REVIEW'
+                ? 'Profil wartet aktuell auf Prüfung.'
+                : 'Der Review-Status braucht Aufmerksamkeit.'}
+          </p>
+        </article>
+
+        <article className="card">
+          <div className="kicker">Öffentlichkeit</div>
+          <div className={publicVisibilityBadge.className} style={{ width: 'fit-content', marginTop: 8 }}>
+            {publicVisibilityBadge.label}
+          </div>
+          <p style={{ margin: '12px 0 0', color: 'var(--muted)', fontSize: 13, lineHeight: 1.5 }}>
+            {visibilitySummary ?? 'Profil erscheint in der öffentlichen Suche.'}
+          </p>
+        </article>
+
+        <article className="card">
+          <div className="kicker">Ersttermin</div>
+          <div className={bookingModeBadge.className} style={{ width: 'fit-content', marginTop: 8 }}>
+            {bookingModeBadge.label}
+          </div>
+          <p style={{ margin: '12px 0 0', color: 'var(--muted)', fontSize: 13, lineHeight: 1.5 }}>
+            {requestabilitySummary
+              ?? (therapist.nextFreeSlotAt ? `Nächster freier Termin: ${formatDate(therapist.nextFreeSlotAt)}` : 'Aktuell ohne hinterlegten freien Termin.')}
+          </p>
+        </article>
+      </section>
 
       {/* Visibility state */}
       {(() => {
@@ -166,7 +234,7 @@ export default async function TherapistDetailPage({ params }: Props) {
       </div>
 
       {/* Profile details */}
-      <section style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginBottom: 32 }}>
+      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 24, marginBottom: 32 }}>
         <div className="card" style={{ padding: '20px 24px' }}>
           <div className="kicker" style={{ marginBottom: 12 }}>Profil</div>
           <dl style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '6px 16px', margin: 0 }}>
@@ -178,6 +246,10 @@ export default async function TherapistDetailPage({ params }: Props) {
             <dd style={{ margin: 0 }}>{therapist.city || '–'}</dd>
             <dt style={{ color: 'var(--muted)', fontSize: 13 }}>Hausbesuche</dt>
             <dd style={{ margin: 0 }}>{therapist.homeVisit ? 'Ja' : 'Nein'}</dd>
+            <dt style={{ color: 'var(--muted)', fontSize: 13 }}>Einzugsgebiet</dt>
+            <dd style={{ margin: 0 }}>{therapist.serviceRadiusKm ? `${therapist.serviceRadiusKm} km` : '–'}</dd>
+            <dt style={{ color: 'var(--muted)', fontSize: 13 }}>Kassenart</dt>
+            <dd style={{ margin: 0 }}>{therapist.kassenart || '–'}</dd>
             <dt style={{ color: 'var(--muted)', fontSize: 13 }}>Eingereicht</dt>
             <dd style={{ margin: 0 }}>{new Date(therapist.createdAt).toLocaleDateString('de-DE')}</dd>
           </dl>

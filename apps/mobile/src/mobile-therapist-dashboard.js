@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import {
+  Alert,
   Image,
   Pressable,
   ScrollView,
@@ -11,9 +12,11 @@ import {
 } from 'react-native';
 
 import {
+  getBaseUrl,
   getLangLabel,
   languageOptions,
   RADIUS,
+  resolveMediaUrl,
   SPACE,
   TYPE,
 } from './mobile-utils';
@@ -46,10 +49,14 @@ export function TherapistDashboardScreen(props) {
     documentUploading,
     editAvailability,
     editBio,
+    editBookingMode,
+    editNextFreeSlotAt,
     editHomeVisit,
     editIsVisible,
+    editKassenart,
     editLanguages,
     editMode,
+    editServiceRadius,
     editSpecializations,
     handleLoadInviteToken,
     handlePickDocument,
@@ -62,10 +69,14 @@ export function TherapistDashboardScreen(props) {
     setAdminPracticeDetail,
     setEditAvailability,
     setEditBio,
+    setEditBookingMode,
+    setEditNextFreeSlotAt,
     setEditHomeVisit,
     setEditIsVisible,
+    setEditKassenart,
     setEditLanguages,
     setEditMode,
+    setEditServiceRadius,
     setEditSpecializations,
     setInvitePageTab,
     setPracticeSearchQuery,
@@ -85,6 +96,81 @@ export function TherapistDashboardScreen(props) {
   const reviewStatusColor = th.reviewStatus === 'APPROVED' ? c.success : th.reviewStatus === 'CHANGES_REQUESTED' ? c.warning : c.muted;
   const hasPractice = (th.practices ?? []).length > 0;
   const hasDocuments = (therapistDocuments ?? []).length > 0;
+  const [bookingRequests, setBookingRequests] = useState([]);
+  const [bookingRequestsLoading, setBookingRequestsLoading] = useState(false);
+  const [bookingRequestActionId, setBookingRequestActionId] = useState(null);
+  const pendingRequests = bookingRequests.filter((request) => request.status === 'PENDING');
+  const handledRequests = bookingRequests.filter((request) => request.status !== 'PENDING').slice(0, 5);
+  const bookingBlockerLabels = {
+    not_approved: 'Profil noch nicht freigegeben',
+    manually_hidden: 'Profil ist aktuell verborgen',
+    publication_missing: 'Veröffentlichung noch nicht abgeschlossen',
+    no_home_visit: 'Hausbesuche sind noch nicht aktiviert',
+    no_service_radius: 'Einzugsgebiet fehlt',
+    no_kassenart: 'Kassenart fehlt',
+    no_confirmed_practice_link: 'Praxisverknüpfung fehlt',
+    booking_mode_disabled: 'Direkte Anfragen sind noch ausgeschaltet',
+  };
+
+  const formatBookingDate = (value) => {
+    if (!value) return '—';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return value;
+    return parsed.toLocaleString('de-DE', {
+      day: '2-digit',
+      month: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  const formatBlockingReasons = (reasons = []) =>
+    reasons.map((reason) => bookingBlockerLabels[reason] ?? reason).join(', ');
+
+  const loadBookingRequests = async () => {
+    if (!authToken) {
+      setBookingRequests([]);
+      return;
+    }
+    setBookingRequestsLoading(true);
+    try {
+      const res = await fetch(`${getBaseUrl()}/auth/booking-requests`, {
+        headers: { Authorization: `Bearer ${authToken}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setBookingRequests(Array.isArray(data.requests) ? data.requests : []);
+      }
+    } catch {}
+    setBookingRequestsLoading(false);
+  };
+
+  const handleBookingRequestAction = async (requestId, action) => {
+    if (!authToken) return;
+    setBookingRequestActionId(requestId);
+    try {
+      const res = await fetch(`${getBaseUrl()}/auth/booking-requests/${requestId}/${action}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify(action === 'confirm' ? { confirmedSlotAt: th.nextFreeSlotAt ?? null } : {}),
+      });
+      if (res.ok) {
+        await loadBookingRequests();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        Alert.alert('Hinweis', err.message ?? 'Hat nicht geklappt – bitte nochmal versuchen');
+      }
+    } catch {
+      Alert.alert('Hinweis', 'Hat nicht geklappt – bitte nochmal versuchen');
+    }
+    setBookingRequestActionId(null);
+  };
+
+  React.useEffect(() => {
+    loadBookingRequests();
+    const interval = setInterval(loadBookingRequests, 60_000);
+    return () => clearInterval(interval);
+  }, [authToken, th.id]);
 
   return (
     <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 20 }]}>
@@ -121,7 +207,7 @@ export function TherapistDashboardScreen(props) {
           <StatusMiniCard
             icon="business-outline"
             label="Praxis"
-            value={hasPractice ? 'Verknüpft' : 'Fehlt'}
+            value={hasPractice ? 'Verknüpft' : 'Keine'}
             color={hasPractice ? c.success : c.warning}
             c={c}
           />
@@ -179,24 +265,103 @@ export function TherapistDashboardScreen(props) {
           />
           <Text style={[styles.filterSectionTitle, { color: c.muted, marginTop: 12 }]}>Sprachen</Text>
           <LangMultiselect editLanguages={editLanguages} setEditLanguages={setEditLanguages} c={c} styles={styles} />
-          {(th.practices ?? []).length === 0 && (
-            <View style={[styles.detailInfoRow, { marginTop: 12 }]}>
-              <Text style={[styles.detailInfoLabel, { color: c.text, flex: 1 }]}>Hausbesuch</Text>
-              <Switch value={editHomeVisit} onValueChange={setEditHomeVisit} trackColor={{ true: c.primary }} />
+          <View style={[styles.detailInfoRow, { marginTop: 12 }]}>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.detailInfoLabel, { color: c.text }]}>Hausbesuche anbieten</Text>
+              <Text style={{ fontSize: 12, color: c.muted, marginTop: 2 }}>Du fährst zu Patienten nach Hause</Text>
+            </View>
+            <Switch value={editHomeVisit} onValueChange={setEditHomeVisit} trackColor={{ true: c.success }} />
+          </View>
+          {editHomeVisit && (
+            <View style={{ marginTop: 10 }}>
+              <Text style={[styles.filterSectionTitle, { color: c.muted }]}>Einzugsgebiet (wie weit fährst du?)</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 6 }}>
+                {[5, 10, 15, 20, 30, 50].map((km) => (
+                  <Pressable
+                    key={km}
+                    onPress={() => setEditServiceRadius(km)}
+                    style={[styles.kassenartBtn, {
+                      backgroundColor: editServiceRadius === km ? c.success : c.mutedBg,
+                      borderColor: editServiceRadius === km ? c.success : c.border,
+                    }]}
+                  >
+                    <Text style={[styles.kassenartText, { color: editServiceRadius === km ? '#fff' : c.text }]}>
+                      {km} km
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
             </View>
           )}
+          <Text style={[styles.filterSectionTitle, { color: c.muted, marginTop: 12 }]}>Kassenart</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 6 }}>
+            {[
+              { key: 'gesetzlich', label: 'Gesetzlich' },
+              { key: 'privat', label: 'Privat' },
+              { key: 'selbstzahler', label: 'Selbstzahler' },
+              { key: 'alle', label: 'Alle' },
+            ].map((option) => (
+              <Pressable
+                key={option.key}
+                onPress={() => setEditKassenart(option.key)}
+                style={[styles.kassenartBtn, {
+                  backgroundColor: editKassenart === option.key ? c.primary : c.mutedBg,
+                  borderColor: editKassenart === option.key ? c.primary : c.border,
+                }]}
+              >
+                <Text style={[styles.kassenartText, { color: editKassenart === option.key ? '#fff' : c.text }]}>
+                  {option.label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
           <View style={[styles.detailInfoRow, { marginTop: 12 }]}>
             <Text style={[styles.detailInfoLabel, { color: c.text, flex: 1 }]}>In Suche sichtbar</Text>
             <Switch value={editIsVisible} onValueChange={setEditIsVisible} trackColor={{ true: c.primary }} />
           </View>
-          <Text style={[styles.detailInfoLabel, { color: c.muted, marginTop: 14, marginBottom: 4 }]}>Sprechzeiten</Text>
+          <Text style={[styles.detailInfoLabel, { color: c.muted, marginTop: 14, marginBottom: 4 }]}>Verfügbarkeit</Text>
           <TextInput
             style={[styles.registerInput, { color: c.text, borderColor: c.border, backgroundColor: c.card }]}
             value={editAvailability}
             onChangeText={setEditAvailability}
-            placeholder="z.B. Mo–Fr 8:00–18:00 Uhr"
+            placeholder="z.B. ab sofort, Mo–Fr 8:00–18:00 Uhr"
             placeholderTextColor={c.muted}
           />
+          <Text style={[styles.filterSectionTitle, { color: c.muted, marginTop: 14 }]}>Direkt über Revio</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 6 }}>
+            {[
+              { key: 'DIRECTORY_ONLY', label: 'Nur sichtbar' },
+              { key: 'FIRST_APPOINTMENT_REQUEST', label: 'Ersttermin anfragbar' },
+            ].map((option) => (
+              <Pressable
+                key={option.key}
+                onPress={() => setEditBookingMode(option.key)}
+                style={[styles.kassenartBtn, {
+                  backgroundColor: editBookingMode === option.key ? c.primary : c.mutedBg,
+                  borderColor: editBookingMode === option.key ? c.primary : c.border,
+                }]}
+              >
+                <Text style={[styles.kassenartText, { color: editBookingMode === option.key ? '#fff' : c.text }]}>
+                  {option.label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+          {editBookingMode === 'FIRST_APPOINTMENT_REQUEST' && (
+            <View style={{ marginTop: 12 }}>
+              <Text style={[styles.detailInfoLabel, { color: c.muted, marginBottom: 4 }]}>Nächster freier Termin</Text>
+              <TextInput
+                style={[styles.registerInput, { color: c.text, borderColor: c.border, backgroundColor: c.card }]}
+                value={editNextFreeSlotAt}
+                onChangeText={setEditNextFreeSlotAt}
+                placeholder="z.B. 2026-04-02T09:00"
+                placeholderTextColor={c.muted}
+              />
+              <Text style={{ ...TYPE.meta, color: c.muted, marginTop: 6 }}>
+                Optional. Wird Patienten als erster freier Termin angezeigt.
+              </Text>
+            </View>
+          )}
           <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
             <Pressable style={[styles.registerBtn, { flex: 1, backgroundColor: c.border, marginTop: 0 }]} onPress={() => setEditMode(false)}>
               <Text style={{ ...TYPE.heading, color: c.text }}>Abbrechen</Text>
@@ -259,6 +424,115 @@ export function TherapistDashboardScreen(props) {
           <Pressable style={[styles.registerBtn, { backgroundColor: c.primary }]} onPress={props.onEnterEdit}>
             <Text style={styles.registerBtnText}>✏️ Profil bearbeiten</Text>
           </Pressable>
+
+          <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
+            <Text style={[styles.filterSectionTitle, { color: c.muted }]}>Ersttermine über Revio</Text>
+            <View style={[styles.detailInfoRow, { marginBottom: 8 }]}>
+              <Text style={[styles.detailInfoLabel, { color: c.muted, flex: 1 }]}>Status</Text>
+              <Text style={[styles.detailInfoValue, { color: th.requestability?.requestable ? c.success : c.text }]}>
+                {th.bookingMode === 'FIRST_APPOINTMENT_REQUEST'
+                  ? th.requestability?.requestable ? 'Direkt anfragbar' : 'Noch nicht anfragbar'
+                  : 'Nur sichtbar'}
+              </Text>
+            </View>
+            {th.nextFreeSlotAt ? (
+              <View style={[styles.detailInfoRow, { marginTop: 8 }]}>
+                <Text style={[styles.detailInfoLabel, { color: c.muted, flex: 1 }]}>Nächster Termin</Text>
+                <Text style={[styles.detailInfoValue, { color: c.text }]}>{formatBookingDate(th.nextFreeSlotAt)}</Text>
+              </View>
+            ) : null}
+            {th.bookingMode === 'FIRST_APPOINTMENT_REQUEST' && !th.requestability?.requestable && (th.requestability?.blockingReasons ?? []).length > 0 ? (
+              <Text style={{ ...TYPE.meta, color: c.warning, marginTop: 8 }}>
+                Noch blockiert: {formatBlockingReasons(th.requestability?.blockingReasons ?? [])}
+              </Text>
+            ) : null}
+          </View>
+
+          <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
+            <Text style={[styles.filterSectionTitle, { color: c.muted }]}>Anfragen</Text>
+            {bookingRequestsLoading ? (
+              <Text style={{ ...TYPE.meta, color: c.muted }}>Lade Anfragen…</Text>
+            ) : pendingRequests.length === 0 && handledRequests.length === 0 ? (
+              <Text style={{ ...TYPE.meta, color: c.muted }}>Noch keine Ersttermin-Anfragen.</Text>
+            ) : (
+              <>
+                {pendingRequests.map((request) => (
+                  <View
+                    key={request.id}
+                    style={{
+                      borderWidth: 1,
+                      borderColor: c.border,
+                      borderRadius: RADIUS.md,
+                      padding: SPACE.md,
+                      gap: SPACE.sm,
+                      backgroundColor: c.mutedBg,
+                      marginBottom: 10,
+                    }}
+                  >
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 10 }}>
+                      <Text style={{ ...TYPE.heading, color: c.text, flex: 1 }}>{request.patientName}</Text>
+                      <View style={{ backgroundColor: c.warningBg, borderRadius: RADIUS.full, paddingHorizontal: 10, paddingVertical: 4 }}>
+                        <Text style={{ ...TYPE.meta, color: c.warning }}>Offen bis {formatBookingDate(request.responseDueAt)}</Text>
+                      </View>
+                    </View>
+                    <Text style={{ ...TYPE.meta, color: c.muted }}>
+                      {request.patientEmail || request.patientPhone || 'Kein Kontakt'}
+                    </Text>
+                    {request.preferredDays?.length ? (
+                      <Text style={{ ...TYPE.meta, color: c.text }}>
+                        Tage: {request.preferredDays.join(', ')}
+                      </Text>
+                    ) : null}
+                    {request.preferredTimeWindows?.length ? (
+                      <Text style={{ ...TYPE.meta, color: c.text }}>
+                        Zeitfenster: {request.preferredTimeWindows.join(', ')}
+                      </Text>
+                    ) : null}
+                    {request.message ? (
+                      <Text style={{ ...TYPE.body, color: c.text }}>{request.message}</Text>
+                    ) : null}
+                    <View style={{ flexDirection: 'row', gap: 10 }}>
+                      <Pressable
+                        onPress={() => handleBookingRequestAction(request.id, 'confirm')}
+                        disabled={bookingRequestActionId === request.id}
+                        style={[styles.registerBtn, { flex: 1, marginTop: 0, backgroundColor: c.primary }]}
+                      >
+                        <Text style={styles.registerBtnText}>
+                          {bookingRequestActionId === request.id ? 'Speichern…' : 'Bestätigen'}
+                        </Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={() => handleBookingRequestAction(request.id, 'decline')}
+                        disabled={bookingRequestActionId === request.id}
+                        style={[styles.registerBtn, { flex: 1, marginTop: 0, backgroundColor: c.border }]}
+                      >
+                        <Text style={{ ...TYPE.heading, color: c.text }}>
+                          {bookingRequestActionId === request.id ? 'Speichern…' : 'Ablehnen'}
+                        </Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                ))}
+                {handledRequests.length > 0 ? (
+                  <View style={{ marginTop: pendingRequests.length ? 6 : 0 }}>
+                    <Text style={{ ...TYPE.label, color: c.muted, marginBottom: 8 }}>Zuletzt bearbeitet</Text>
+                    {handledRequests.map((request) => (
+                      <View key={request.id} style={[styles.detailInfoRow, { marginTop: 8 }]}>
+                        <Text style={[styles.detailInfoLabel, { color: c.muted, flex: 1 }]}>{request.patientName}</Text>
+                        <Text style={[styles.detailInfoValue, { color: request.status === 'CONFIRMED' ? c.success : c.muted }]}>
+                          {request.status === 'CONFIRMED'
+                            ? `Bestätigt${request.confirmedSlotAt ? ` · ${formatBookingDate(request.confirmedSlotAt)}` : ''}`
+                            : request.status === 'DECLINED'
+                              ? 'Abgelehnt'
+                              : 'Abgelaufen'}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
+              </>
+            )}
+          </View>
 
           <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
             <Text style={[styles.filterSectionTitle, { color: c.muted }]}>Nachweise & Dokumente</Text>
@@ -442,7 +716,7 @@ export function PracticeAdminScreen(props) {
 
       <View style={[styles.practiceHeader, { backgroundColor: c.card, borderColor: c.border }]}>
         {p.logo ? (
-          <Image source={{ uri: p.logo }} style={[styles.practiceHeaderInitial, { borderRadius: RADIUS.md }]} />
+          <Image source={{ uri: resolveMediaUrl(p.logo) }} style={[styles.practiceHeaderInitial, { borderRadius: RADIUS.md }]} />
         ) : (
           <View style={[styles.practiceHeaderInitial, { backgroundColor: c.primary }]}>
             <Text style={styles.practiceHeaderInitialText}>{p.name.charAt(0)}</Text>

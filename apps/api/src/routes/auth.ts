@@ -2,7 +2,12 @@ import { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { randomBytes } from 'crypto';
 import { hashPassword, verifyPassword, getToken } from './auth-utils.js';
-import { getTherapistProfileCompletion, getTherapistPublicationState } from '../utils/profile-completeness.js';
+import {
+  getTherapistProfileCompletion,
+  getTherapistPublicationState,
+  getTherapistRequestabilityState,
+} from '../utils/profile-completeness.js';
+import { geocodeAddress } from '../utils/geocode.js';
 
 export { hashPassword, verifyPassword, getToken };
 
@@ -15,9 +20,14 @@ const updateMeSchema = z.object({
   fullName: z.string().min(2).optional(),
   professionalTitle: z.string().min(2).optional(),
   bio: z.string().optional(),
+  city: z.string().min(2).optional(),
   homeVisit: z.boolean().optional(),
+  serviceRadiusKm: z.number().min(1).max(200).nullable().optional(),
   isVisible: z.boolean().optional(),
   availability: z.string().optional(),
+  kassenart: z.string().optional(),
+  bookingMode: z.enum(['DIRECTORY_ONLY', 'FIRST_APPOINTMENT_REQUEST']).optional(),
+  nextFreeSlotAt: z.string().trim().min(10).nullable().optional(),
   specializations: z.array(z.string()).optional(),
   languages: z.array(z.string()).optional(),
   certifications: z.array(z.string()).optional(),
@@ -268,6 +278,9 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     });
     const adminPractice = managerAccount?.assignments[0]?.practice ?? null;
 
+    const publication = getTherapistPublicationState(therapist, { links: therapist.links });
+    const requestability = getTherapistRequestabilityState(therapist, { links: therapist.links });
+
     return {
       id: therapist.id,
       email: therapist.email,
@@ -276,6 +289,12 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       city: therapist.city,
       bio: therapist.bio,
       homeVisit: therapist.homeVisit,
+      serviceRadiusKm: (therapist as any).serviceRadiusKm ?? null,
+      kassenart: (therapist as any).kassenart ?? '',
+      bookingMode: (therapist as any).bookingMode ?? 'DIRECTORY_ONLY',
+      nextFreeSlotAt: (therapist as any).nextFreeSlotAt
+        ? new Date((therapist as any).nextFreeSlotAt).toISOString()
+        : null,
       emailVerified: !!(user?.emailVerifiedAt ?? true),
       specializations: splitList(therapist.specializations),
       languages: splitList(therapist.languages),
@@ -287,7 +306,8 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       visibilityPreference: therapist.visibilityPreference,
       isPublished: therapist.isPublished,
       onboardingStatus: therapist.onboardingStatus,
-      ...getTherapistPublicationState(therapist),
+      requestability,
+      ...publication,
       adminPractice: adminPractice ?? null,
       practices: therapist.links.map((l: any) => ({
         id: l.practice.id,
@@ -335,18 +355,46 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     if (data.professionalTitle !== undefined) updateData.professionalTitle = data.professionalTitle;
     if (data.bio !== undefined) updateData.bio = data.bio;
     if (data.homeVisit !== undefined) updateData.homeVisit = data.homeVisit;
+    if (data.serviceRadiusKm !== undefined) updateData.serviceRadiusKm = data.serviceRadiusKm;
     if (data.isVisible !== undefined) updateData.isVisible = data.isVisible;
     if (data.availability !== undefined) updateData.availability = data.availability;
+    if (data.kassenart !== undefined) updateData.kassenart = data.kassenart;
+    if (data.bookingMode !== undefined) updateData.bookingMode = data.bookingMode;
+    if (data.nextFreeSlotAt !== undefined) {
+      updateData.nextFreeSlotAt = data.nextFreeSlotAt ? new Date(data.nextFreeSlotAt) : null;
+    }
     if (data.specializations !== undefined) updateData.specializations = data.specializations.join(', ');
     if (data.languages !== undefined) updateData.languages = data.languages.join(', ');
     if (data.certifications !== undefined) updateData.certifications = data.certifications.join(', ');
     if (data.photo !== undefined) updateData.photo = data.photo;
 
+    // Wenn city geändert: Stadt geocodieren → homeLat/homeLng setzen
+    if (data.city !== undefined) {
+      updateData.city = data.city;
+      const coords = await geocodeAddress('', data.city);
+      if (coords) {
+        updateData.homeLat = coords.lat;
+        updateData.homeLng = coords.lng;
+      }
+    } else if (therapist.homeLat === 0 && therapist.homeLng === 0 && therapist.city) {
+      // Einmalige Nachrüstung: bestehender Therapeut ohne Koordinaten
+      const coords = await geocodeAddress('', therapist.city);
+      if (coords) {
+        updateData.homeLat = coords.lat;
+        updateData.homeLng = coords.lng;
+      }
+    }
+
     const nextTherapist = {
       ...therapist,
       ...updateData,
     };
-    const completion = getTherapistProfileCompletion(nextTherapist);
+    const requiresExplicitPublication =
+      therapist.onboardingStatus === 'manager_onboarding' ||
+      therapist.onboardingStatus === 'invited' ||
+      therapist.onboardingStatus === 'claimed' ||
+      therapist.visibilityPreference === 'visible';
+    const completion = getTherapistProfileCompletion(nextTherapist, { requireBio: requiresExplicitPublication });
     if (therapist.visibilityPreference === 'visible') {
       updateData.isPublished = completion.complete;
       if (!completion.complete && therapist.onboardingStatus === 'complete') {
@@ -354,16 +402,35 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       }
     }
 
-    const updated = await fastify.prisma.therapist.update({
+    await fastify.prisma.therapist.update({
       where: { id: therapist.id },
       data: updateData,
     });
+
+    const updated = await fastify.prisma.therapist.findUnique({
+      where: { id: therapist.id },
+      include: {
+        links: {
+          where: { status: 'CONFIRMED' },
+          include: { practice: true },
+        },
+      },
+    });
+    if (!updated) return reply.notFound('Therapeuten-Profil nicht gefunden');
+
+    const publication = getTherapistPublicationState(updated, { links: updated.links });
+    const requestability = getTherapistRequestabilityState(updated, { links: updated.links });
 
     return {
       success: true,
       fullName: updated.fullName,
       isPublished: updated.isPublished,
-      ...getTherapistPublicationState(updated),
+      bookingMode: (updated as any).bookingMode ?? 'DIRECTORY_ONLY',
+      nextFreeSlotAt: (updated as any).nextFreeSlotAt
+        ? new Date((updated as any).nextFreeSlotAt).toISOString()
+        : null,
+      requestability,
+      ...publication,
     };
   });
 

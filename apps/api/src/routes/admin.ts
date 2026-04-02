@@ -5,7 +5,10 @@ import { join, dirname, basename } from 'path';
 import { fileURLToPath } from 'url';
 import { getEnv } from '../env.js';
 import { geocodeAddress } from '../utils/geocode.js';
-import { getTherapistPublicationState } from '../utils/profile-completeness.js';
+import {
+  getTherapistPublicationState,
+  getTherapistRequestabilityState,
+} from '../utils/profile-completeness.js';
 import { sendPushNotification } from '../utils/push-notify.js';
 import { sendProfileApprovedEmail, sendProfileRejectedEmail, sendProfileChangesRequestedEmail } from '../utils/mailer.js';
 import { ensureDefaultCertificationOptions } from '../utils/certification-options.js';
@@ -20,6 +23,8 @@ type TherapistRow = {
   id: string; email: string; fullName: string; professionalTitle: string;
   city: string; bio: string | null; homeVisit: boolean; specializations: string;
   languages: string; certifications: string; reviewStatus: string;
+  serviceRadiusKm: number | null; kassenart: string;
+  bookingMode?: string | null; nextFreeSlotAt?: Date | null;
   isVisible: boolean; isPublished: boolean; onboardingStatus: string | null;
   createdAt: Date; updatedAt: Date;
   links?: Array<{ id: string; status: string; practice: { id: string; name: string; city: string; address: string | null; phone: string | null; hours: string | null; lat: number; lng: number; reviewStatus: string; createdAt: Date; updatedAt: Date } }>;
@@ -30,11 +35,14 @@ function computeVisibility(t: TherapistRow) {
     return { visibilityState: 'not_approved' as const, publicSearchEligible: false, blockingReasons: [] };
   }
 
-  const pubState = getTherapistPublicationState(t);
-  const blockingReasons: string[] = [];
+  const pubState = getTherapistPublicationState(t, { links: t.links });
+  // pubState.blockingReasons already includes: manually_hidden, no_home_visit,
+  // no_service_radius, no_kassenart, no_confirmed_practice_link
+  const blockingReasons: string[] = [...(pubState.blockingReasons ?? [])];
 
-  if (!pubState.complete) blockingReasons.push('profile_incomplete');
-  if (!t.isVisible) blockingReasons.push('manually_hidden');
+  if (!pubState.publicSearchEligible && pubState.complete === false) {
+    blockingReasons.push('profile_incomplete');
+  }
 
   const requiresExplicitPublication =
     t.onboardingStatus === 'manager_onboarding' ||
@@ -42,26 +50,26 @@ function computeVisibility(t: TherapistRow) {
     t.onboardingStatus === 'claimed';
   if (requiresExplicitPublication && !t.isPublished) blockingReasons.push('publication_missing');
 
-  const confirmedLinks = (t.links ?? []).filter((l) => l.status === 'CONFIRMED');
-  if (confirmedLinks.length === 0) {
-    const hasPending = (t.links ?? []).some((l) => l.status === 'PROPOSED' || l.status === 'DISPUTED');
-    blockingReasons.push(hasPending ? 'pending_link_only' : 'no_confirmed_link');
-  } else if (confirmedLinks.every((l) => l.practice.reviewStatus !== 'APPROVED')) {
-    blockingReasons.push('practice_not_approved');
-  }
+  // Deduplicate and remove internal 'not_approved' (handled by outer check)
+  const uniqueReasons = [...new Set(blockingReasons.filter(r => r !== 'not_approved'))];
 
   return {
-    visibilityState: blockingReasons.length === 0 ? 'visible' as const : 'blocked' as const,
-    publicSearchEligible: blockingReasons.length === 0,
-    blockingReasons,
+    visibilityState: uniqueReasons.length === 0 ? 'visible' as const : 'blocked' as const,
+    publicSearchEligible: uniqueReasons.length === 0,
+    blockingReasons: uniqueReasons,
   };
 }
 
 function mapTherapist(t: TherapistRow) {
+  const requestability = getTherapistRequestabilityState(t, { links: t.links });
   return {
     id: t.id, email: t.email, fullName: t.fullName,
     professionalTitle: t.professionalTitle, city: t.city,
     bio: t.bio ?? undefined, homeVisit: t.homeVisit,
+    serviceRadiusKm: t.serviceRadiusKm ?? undefined,
+    kassenart: t.kassenart,
+    bookingMode: t.bookingMode ?? 'DIRECTORY_ONLY',
+    nextFreeSlotAt: t.nextFreeSlotAt ? t.nextFreeSlotAt.toISOString() : null,
     specializations: splitList(t.specializations),
     languages: splitList(t.languages),
     certifications: splitList(t.certifications),
@@ -72,6 +80,7 @@ function mapTherapist(t: TherapistRow) {
     createdAt: t.createdAt.toISOString(),
     links: t.links?.map((l) => ({ id: l.id, status: l.status, practice: mapPractice(l.practice) })),
     visibility: computeVisibility(t),
+    requestability,
   };
 }
 
@@ -273,7 +282,7 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
     }> = [];
 
     for (const t of therapists) {
-      const pubState = getTherapistPublicationState(t);
+      const pubState = getTherapistPublicationState(t, { links: t.links });
       const confirmedLinks = t.links.filter((l) => l.status === 'CONFIRMED');
       const linkedPractices = t.links.map((l) => ({
         id: l.practice.id,

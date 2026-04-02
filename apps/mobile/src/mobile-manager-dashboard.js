@@ -13,6 +13,7 @@ import {
   formatMissingProfileFields,
   getBaseUrl,
   RADIUS,
+  resolveMediaUrl,
   SPACE,
   TYPE,
 } from './mobile-utils';
@@ -391,7 +392,7 @@ export function ManagerDashboardContent(props) {
             {practice.logo ? (
               <View style={{ marginTop: 10 }}>
                 <Text style={[styles.filterSectionTitle, { color: c.muted, marginBottom: 6 }]}>Logo</Text>
-                <Image source={{ uri: practice.logo }} style={{ width: 64, height: 64, borderRadius: RADIUS.sm }} />
+                <Image source={{ uri: resolveMediaUrl(practice.logo) }} style={{ width: 64, height: 64, borderRadius: RADIUS.sm }} />
               </View>
             ) : null}
             {practicePhotos.length > 0 ? (

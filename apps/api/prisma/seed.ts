@@ -168,9 +168,31 @@ async function main() {
     const adminEmail = i === 0 ? 'test@revio.de' : `admin@${practiceSlug}.de`;
     const adminPwHash = await hashPassword(i === 0 ? 'password' : 'praxis123');
 
-    // Deterministic picsum photo IDs (offset to get clinic/interior-ish images)
-    const photoId1 = 200 + (i * 17) % 800;
-    const photoId2 = 201 + (i * 23) % 800;
+    // Physiotherapy clinic photos from Unsplash
+    const PHYSIO_PHOTOS = [
+      'https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=600&h=400&fit=crop',
+      'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=600&h=400&fit=crop',
+      'https://images.unsplash.com/photo-1559757175-0eb30cd8c063?w=600&h=400&fit=crop',
+      'https://images.unsplash.com/photo-1540479859555-17af45c78602?w=600&h=400&fit=crop',
+      'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=600&h=400&fit=crop',
+      'https://images.unsplash.com/photo-1594381898411-846e7d193883?w=600&h=400&fit=crop',
+      'https://images.unsplash.com/photo-1582719471384-894fbb16e074?w=600&h=400&fit=crop',
+      'https://images.unsplash.com/photo-1584432438571-c11ee56ef3ec?w=600&h=400&fit=crop',
+      'https://images.unsplash.com/photo-1519823551278-64ac92734fb1?w=600&h=400&fit=crop',
+      'https://images.unsplash.com/photo-1571019614099-07cfc9b5803b?w=600&h=400&fit=crop',
+      'https://images.unsplash.com/photo-1609220136736-443140cfeaa5?w=600&h=400&fit=crop',
+      'https://images.unsplash.com/photo-1607619056574-7b8d3ee536b2?w=600&h=400&fit=crop',
+      'https://images.unsplash.com/photo-1629909613654-28e377c37b09?w=600&h=400&fit=crop',
+      'https://images.unsplash.com/photo-1598966739654-5e9a252d8c32?w=600&h=400&fit=crop',
+      'https://images.unsplash.com/photo-1572536147248-ac59a8abfa4b?w=600&h=400&fit=crop',
+      'https://images.unsplash.com/photo-1666214280250-f8ffe0b61d10?w=600&h=400&fit=crop',
+      'https://images.unsplash.com/photo-1530026405186-ed1f139313f8?w=600&h=400&fit=crop',
+      'https://images.unsplash.com/photo-1511688878353-3a2f5be94cd7?w=600&h=400&fit=crop',
+      'https://images.unsplash.com/photo-1631217868264-e5b90bb7e133?w=600&h=400&fit=crop',
+      'https://images.unsplash.com/photo-1623854767648-e7bb8009f0db?w=600&h=400&fit=crop',
+    ];
+    const photo1 = PHYSIO_PHOTOS[(i * 2) % PHYSIO_PHOTOS.length];
+    const photo2 = PHYSIO_PHOTOS[(i * 2 + 1) % PHYSIO_PHOTOS.length];
     const logo = ensurePracticeLogoAsset(PRACTICE_NAMES[i], cityName);
 
     const p = await prisma.practice.create({
@@ -184,10 +206,7 @@ async function main() {
         lng: jitter(lng, i * 31),
         reviewStatus: 'APPROVED',
         logo,
-        photos: JSON.stringify([
-          `https://picsum.photos/id/${photoId1}/600/400`,
-          `https://picsum.photos/id/${photoId2}/600/400`,
-        ]),
+        photos: JSON.stringify([photo1, photo2]),
       },
     });
 
@@ -241,6 +260,11 @@ async function main() {
     const photoGender = isFemale ? 'women' : 'men';
     const photo = `https://randomuser.me/api/portraits/${photoGender}/${photoIndex}.jpg`;
 
+    const hasHomeVisit = i % 3 !== 0;
+    // Every other home-visit therapist is directly requestable
+    const isRequestable = hasHomeVisit && i % 6 !== 3;
+    const SERVICE_RADII = [10, 15, 20, 25, 30];
+
     await prisma.therapist.create({
       data: {
         email,
@@ -248,7 +272,9 @@ async function main() {
         professionalTitle: isFemale ? 'Physiotherapeutin' : 'Physiotherapeut',
         city: practice.city,
         bio: pick(BIOS, i),
-        homeVisit: i % 3 !== 0,
+        homeVisit: hasHomeVisit,
+        serviceRadiusKm: hasHomeVisit ? pick(SERVICE_RADII, i) : null,
+        bookingMode: isRequestable ? 'FIRST_APPOINTMENT_REQUEST' : 'DIRECTORY_ONLY',
         specializations: specs.join(', '),
         languages: langs.join(', '),
         certifications: certs.join(', '),

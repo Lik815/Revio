@@ -1,8 +1,11 @@
 import { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import type { SearchInput, SearchTherapist, SearchPractice } from '@revio/shared';
-import { normalizeText, bestScore, scoreMatch } from '../utils/search-utils.js';
-import { getTherapistPublicationState } from '../utils/profile-completeness.js';
+import { normalizeText, scoreMatch } from '../utils/search-utils.js';
+import {
+  getTherapistPublicationState,
+  getTherapistRequestabilityState,
+} from '../utils/profile-completeness.js';
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
@@ -10,8 +13,31 @@ const GENERIC_QUERIES = new Set([
   'physiotherapie', 'physio', 'therapeut', 'physiotherapeut', 'krankengymnastik',
 ]);
 
+const MOBILE_QUERY_TERMS = ['mobile', 'mobil', 'hausbesuch'];
+const PHYSIO_QUERY_TERMS = [
+  'physio',
+  'physiotherapie',
+  'physiotherapeut',
+  'physiotherapeutin',
+  'krankengymnastik',
+];
+
 const splitList = (value: string) =>
   value.split(',').map((s) => s.trim()).filter(Boolean);
+
+function isMobilePhysioQuery(value: string): boolean {
+  const normalized = normalizeText(value);
+  const words = normalized.split(/\s+/).filter(Boolean);
+
+  const hasMobileIntent = MOBILE_QUERY_TERMS.some((term) =>
+    words.includes(term) || normalized.includes(term),
+  );
+  const hasPhysioIntent = PHYSIO_QUERY_TERMS.some((term) =>
+    words.includes(term) || normalized.includes(term),
+  );
+
+  return hasMobileIntent && hasPhysioIntent;
+}
 
 function haversine(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371;
@@ -29,67 +55,107 @@ function haversine(lat1: number, lng1: number, lat2: number, lng2: number): numb
  * Score a therapist against a normalized query string.
  *
  * Priority (highest → lowest):
- *  10  exact therapist name match
- *   9  prefix match on therapist name
- *   8  exact practice name match
- *   7  prefix match on practice name
- *   6  exact specialization match
- *   5  partial specialization match
- *   4  word-level specialization match
- *   3  certification match
- *   2  bio / name contains query
- *   1  generic query (all therapists)
- * 0.5  base score for approved therapists
+ *  12  exact therapist name match
+ *  11  multi-word therapist name match
+ *  10  exact specialization match           + homeVisit boost
+ *   8  partial specialization match         + homeVisit boost
+ *   6  word-level specialization match      + homeVisit boost
+ *   5  certification match                  + homeVisit boost
+ *   4  bio contains query                   + homeVisit boost
+ *   4  strong single-token therapist name match
+ *   3  loose therapist name match
+ *   9  mobile physio intent + standalone mobile therapist
+ *   6  mobile physio intent + mobile therapist with practice
+ *   1  generic query (all home-visit therapists first)
+ *   0  no match
+ *
+ * homeVisit boost: ×1.4 wenn Patient nach homeVisit filtert, ×1.2 sonst
  */
+function scoreNameQuery(fullName: string, query: string): number {
+  const normalizedName = normalizeText(fullName);
+  const normalizedQuery = normalizeText(query);
+  if (!normalizedQuery) return 0;
+
+  const nameWords = normalizedName.split(/\s+/).filter(Boolean);
+  const queryWords = normalizedQuery.split(/\s+/).filter(Boolean);
+
+  if (normalizedName === normalizedQuery) return 12;
+
+  if (queryWords.length > 1) {
+    const exactAllWords = queryWords.every((queryWord) =>
+      nameWords.some((nameWord) => nameWord === queryWord),
+    );
+    if (exactAllWords) return 11;
+
+    const prefixAllWords = queryWords.every((queryWord) =>
+      nameWords.some((nameWord) => nameWord.startsWith(queryWord)),
+    );
+    if (prefixAllWords) return 10;
+
+    const fuzzyAllWords = queryWords.every((queryWord) =>
+      nameWords.some((nameWord) => nameWord.includes(queryWord) || queryWord.includes(nameWord)),
+    );
+    if (fuzzyAllWords) return 8;
+  }
+
+  const singleScore = scoreMatch(normalizedName, normalizedQuery);
+  if (singleScore >= 9) return 9;
+  if (singleScore >= 6) return 7;
+  if (singleScore >= 3) return 5;
+  return 0;
+}
+
 function scoreTherapist(
   t: {
     specializations: string;
     certifications: string;
     bio: string | null;
     fullName: string;
+    homeVisit: boolean;
   },
   query: string,
   practiceNames: string[],
+  homeVisitFilter?: boolean,
 ): number {
   const q = normalizeText(query);
-  const name = normalizeText(t.fullName);
   const specs = splitList(t.specializations).map(normalizeText);
   const certs = splitList(t.certifications).map(normalizeText);
   const bio = normalizeText(t.bio ?? '');
-  const practices = practiceNames.map(normalizeText);
+  const nameScore = scoreNameQuery(t.fullName, query);
 
-  // Therapist name
-  const nameScore = scoreMatch(name, q);
-  if (nameScore >= 9) return 10;   // exact
-  if (nameScore >= 6) return 9;    // prefix word
-  if (nameScore >= 4) return 8.5;  // substring
+  const boost = (base: number) => {
+    if (t.homeVisit && homeVisitFilter === true) return base * 1.4;
+    if (t.homeVisit) return base * 1.2;
+    return base;
+  };
 
-  // Practice name
-  const practiceScore = bestScore(practices, q);
-  if (practiceScore >= 9) return 8;
-  if (practiceScore >= 6) return 7;
-  if (practiceScore >= 4) return 6.5;
+  // Starke Namenssuche zuerst, damit "Anna Becker" oder "Becker An"
+  // zuverlässig zum Profil führen.
+  if (nameScore >= 10) return nameScore;
 
-  // Exact specialization match
-  if (specs.some((s) => s === q)) return 6;
-
-  // Partial specialization (e.g., "rücken" ↔ "rückenschmerzen")
-  if (specs.some((s) => s.includes(q) || q.includes(s))) return 5;
-
-  // Word-level specialization (compound terms)
+  // Problem-match zuerst (Patient sucht nach Beschwerden/Behandlung)
+  if (specs.some((s) => s === q)) return boost(10);
+  if (specs.some((s) => s.includes(q) || q.includes(s))) return boost(8);
   const wordsQ = q.split(/\s+/);
-  if (specs.some((s) => wordsQ.some((w) => s.includes(w) || w.includes(s)))) return 4;
+  if (specs.some((s) => wordsQ.some((w) => s.includes(w) || w.includes(s)))) return boost(6);
+  if (certs.some((c) => c.includes(q) || q.includes(c))) return boost(5);
+  if (bio.includes(q)) return boost(4);
 
-  // Certification match
-  if (certs.some((c) => c.includes(q) || q.includes(c))) return 3;
+  // Name-Match sekundär (Patienten suchen nach Problem, nicht nach Name)
+  if (nameScore >= 9) return 4;
+  if (nameScore >= 5) return 3;
 
-  // Bio or name contains query
-  if (bio.includes(q) || name.includes(q)) return 2;
+  // "mobile physio" soll mobile, eigenständige Therapeut:innen sichtbar machen,
+  // auch wenn der Begriff nicht als Spezialisierung gepflegt wurde.
+  if (isMobilePhysioQuery(q)) {
+    if (t.homeVisit && practiceNames.length === 0) return boost(9);
+    if (t.homeVisit) return boost(6);
+  }
 
-  // Generic query → everyone qualifies
-  if (GENERIC_QUERIES.has(q)) return 1;
+  // Generischer Begriff
+  if (GENERIC_QUERIES.has(q)) return boost(1);
 
-  return 0.5;
+  return 0;
 }
 
 // ── Routes ─────────────────────────────────────────────────────────────────
@@ -106,6 +172,7 @@ const searchBodySchema = z.object({
   homeVisit: z.boolean().optional(),
   specialization: z.string().optional(),
   kassenart: z.string().optional(),
+  requestable: z.boolean().optional(),
 }).refine((data) => Boolean(data.city) || Boolean(data.origin), {
   message: 'city oder origin ist erforderlich',
 });
@@ -153,16 +220,20 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
 
       const languages = splitList(t.languages).map((l) => l.toLowerCase());
       const specializations = splitList(t.specializations).map((s) => s.toLowerCase());
+      const requestability = getTherapistRequestabilityState(t, { links: t.links });
 
       if (input.language && !languages.includes(input.language.toLowerCase())) return false;
       if (typeof input.homeVisit === 'boolean' && t.homeVisit !== input.homeVisit) return false;
       if (input.specialization && !specializations.includes(input.specialization.toLowerCase())) return false;
       if (input.kassenart && (t as any).kassenart && (t as any).kassenart !== input.kassenart) return false;
+      if (typeof input.requestable === 'boolean' && requestability.requestable !== input.requestable) return false;
 
       return true;
     };
 
-    const publicTherapists = therapists.filter((t) => getTherapistPublicationState(t).publicSearchEligible);
+    const publicTherapists = therapists.filter((t) =>
+      getTherapistPublicationState(t, { links: t.links }).publicSearchEligible,
+    );
     const shouldRequireCityMatch = !input.origin && Boolean(normalizedCity);
     const cityMatchedTherapists = shouldRequireCityMatch
       ? publicTherapists.filter((t) => passesFilters(t, { requireCityMatch: true }))
@@ -174,65 +245,94 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
     const results: SearchTherapist[] = [];
 
     filteredTherapists.forEach((t) => {
-        const practiceNames = t.links.map((l) => l.practice.name);
-        const relevance = scoreTherapist(t, input.query, practiceNames);
-        const specializations = splitList(t.specializations);
+      const practiceNames = t.links.map((l) => l.practice.name);
+      const relevance = scoreTherapist(t, input.query, practiceNames, input.homeVisit);
+      const specializations = splitList(t.specializations);
+      const requestability = getTherapistRequestabilityState(t, { links: t.links });
 
-        const practices: SearchPractice[] = t.links
-          .map((link) => {
-            let photos: string[] | undefined;
-            if (link.practice.photos) {
-              try { photos = JSON.parse(link.practice.photos); } catch {}
-            }
+      // Distanz für mobile Therapeuten ohne Praxis (homeLat/homeLng)
+      const tAny = t as any;
+      const therapistDistKm =
+        input.origin && tAny.homeLat && tAny.homeLat !== 0
+          ? haversine(input.origin.lat, input.origin.lng, tAny.homeLat, tAny.homeLng)
+          : undefined;
 
-            const distKm = input.origin && link.practice.lat !== 0 && link.practice.lng !== 0
-              ? haversine(input.origin.lat, input.origin.lng, link.practice.lat, link.practice.lng)
-              : undefined;
+      const practices: SearchPractice[] = t.links
+        .map((link) => {
+          let photos: string[] | undefined;
+          if (link.practice.photos) {
+            try { photos = JSON.parse(link.practice.photos); } catch {}
+          }
 
-            return {
-              id: link.practice.id,
-              name: link.practice.name,
-              city: link.practice.city,
-              address: link.practice.address ?? undefined,
-              phone: link.practice.phone ?? undefined,
-              hours: link.practice.hours ?? undefined,
-              description: link.practice.description ?? undefined,
-              lat: link.practice.lat,
-              lng: link.practice.lng,
-              distKm,
-              logo: link.practice.logo ?? undefined,
-              photos,
-            };
-          })
-          .filter((practice) => {
-            if (!input.origin) return true;
-            if (practice.distKm == null) return false;
-            if (input.radiusKm == null) return true;
-            return practice.distKm <= input.radiusKm;
-          })
-          .sort((a, b) => (a.distKm ?? Number.POSITIVE_INFINITY) - (b.distKm ?? Number.POSITIVE_INFINITY));
+          const distKm = input.origin && link.practice.lat !== 0 && link.practice.lng !== 0
+            ? haversine(input.origin.lat, input.origin.lng, link.practice.lat, link.practice.lng)
+            : undefined;
 
-        if (practices.length === 0 || relevance <= 0.5) return;
+          return {
+            id: link.practice.id,
+            name: link.practice.name,
+            city: link.practice.city,
+            address: link.practice.address ?? undefined,
+            phone: link.practice.phone ?? undefined,
+            hours: link.practice.hours ?? undefined,
+            description: link.practice.description ?? undefined,
+            lat: link.practice.lat,
+            lng: link.practice.lng,
+            distKm,
+            logo: link.practice.logo ?? undefined,
+            photos,
+          };
+        })
+        .filter((practice) => {
+          if (!input.origin) return true;
+          if (practice.distKm == null) return false;
+          if (input.radiusKm == null) return true;
+          return practice.distKm <= input.radiusKm;
+        })
+        .sort((a, b) => (a.distKm ?? Number.POSITIVE_INFINITY) - (b.distKm ?? Number.POSITIVE_INFINITY));
 
-        const nearestDistance = practices[0]?.distKm;
+      // Kein In-Radius-Ergebnis: nur mobile Therapeuten dürfen ohne Praxis erscheinen
+      if (practices.length === 0 && input.origin && input.radiusKm != null && !t.homeVisit) return;
 
-        results.push({
-          id: t.id,
-          fullName: t.fullName,
-          professionalTitle: t.professionalTitle,
-          specializations,
-          languages: splitList(t.languages),
-          certifications: splitList(t.certifications),
-          kassenart: (t as any).kassenart ?? '',
-          availability: (t as any).availability ?? '',
-          homeVisit: t.homeVisit,
-          city: t.city,
-          bio: t.bio ?? undefined,
-          photo: t.photo ?? undefined,
-          relevance,
-          distKm: nearestDistance,
-          practices,
-      });
+      // Mobile Therapeuten ohne Praxis: Radius-Check gegen serviceRadiusKm
+      if (practices.length === 0 && t.homeVisit) {
+        const svcRadius = tAny.serviceRadiusKm as number | null;
+        if (input.origin && therapistDistKm != null && svcRadius != null) {
+          if (therapistDistKm > svcRadius) return; // Patient außerhalb Einzugsgebiet
+        }
+      }
+
+      // Score 0 ausschließen (kein Match und kein generischer Begriff)
+      if (relevance <= 0) return;
+
+      const nearestPracticeDistance = practices[0]?.distKm;
+      const effectiveDistKm = practices.length > 0 ? nearestPracticeDistance : therapistDistKm;
+
+      results.push({
+        id: t.id,
+        fullName: t.fullName,
+        professionalTitle: t.professionalTitle,
+        specializations,
+        languages: splitList(t.languages),
+        certifications: splitList(t.certifications),
+        kassenart: tAny.kassenart ?? '',
+        availability: tAny.availability ?? '',
+        homeVisit: t.homeVisit,
+        bookingMode: tAny.bookingMode ?? 'DIRECTORY_ONLY',
+        requestable: requestability.requestable,
+        nextFreeSlotAt: tAny.nextFreeSlotAt ? new Date(tAny.nextFreeSlotAt).toISOString() : null,
+        city: t.city,
+        bio: t.bio ?? undefined,
+        photo: t.photo ?? undefined,
+        relevance,
+        distKm: effectiveDistKm,
+        practices,
+        // Neue Felder für mobile Therapeuten
+        ...(tAny.serviceRadiusKm != null ? { serviceRadiusKm: tAny.serviceRadiusKm } : {}),
+        ...(practices.length === 0 && t.homeVisit && tAny.homeLat && tAny.homeLat !== 0
+          ? { homeLat: tAny.homeLat, homeLng: tAny.homeLng }
+          : {}),
+      } as SearchTherapist & { serviceRadiusKm?: number; homeLat?: number; homeLng?: number });
     });
 
     results.sort((a, b) => {
@@ -267,7 +367,8 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
       },
     });
     if (!t) return reply.notFound('Therapeut nicht gefunden');
-    const publication = getTherapistPublicationState(t);
+    const publication = getTherapistPublicationState(t, { links: t.links });
+    const requestability = getTherapistRequestabilityState(t, { links: t.links });
     if (!publication.publicSearchEligible) return reply.notFound('Therapeut nicht gefunden');
     const practices = t.links.map((link) => {
       let photos: string[] | undefined;
@@ -286,7 +387,15 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
         specializations: splitList(t.specializations),
         languages: splitList(t.languages),
         certifications: splitList(t.certifications),
+        kassenart: (t as any).kassenart ?? '',
+        availability: (t as any).availability ?? '',
         homeVisit: t.homeVisit, city: t.city, bio: t.bio ?? undefined,
+        bookingMode: (t as any).bookingMode ?? 'DIRECTORY_ONLY',
+        requestable: requestability.requestable,
+        nextFreeSlotAt: (t as any).nextFreeSlotAt
+          ? new Date((t as any).nextFreeSlotAt).toISOString()
+          : null,
+        ...((t as any).serviceRadiusKm != null ? { serviceRadiusKm: (t as any).serviceRadiusKm } : {}),
         photo: t.photo ?? undefined, practices,
       },
     };
@@ -321,6 +430,8 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
                 photo: true, specializations: true, city: true,
                 homeVisit: true, bio: true,
                 languages: true,
+                bookingMode: true,
+                nextFreeSlotAt: true,
                 reviewStatus: true,
                 isVisible: true,
                 isPublished: true,
@@ -343,8 +454,16 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
         logo: practice.logo ?? undefined, photos,
       },
       therapists: practice.links
-        .filter((l) => getTherapistPublicationState(l.therapist).publicSearchEligible)
-        .map((l) => ({
+        .filter((l) =>
+          getTherapistPublicationState(l.therapist, {
+            links: [{ status: l.status, practice: { reviewStatus: practice.reviewStatus } }],
+          }).publicSearchEligible,
+        )
+        .map((l) => {
+        const requestability = getTherapistRequestabilityState(l.therapist, {
+          links: [{ status: l.status, practice: { reviewStatus: practice.reviewStatus } }],
+        });
+        return ({
         id: l.therapist.id,
         fullName: l.therapist.fullName,
         professionalTitle: l.therapist.professionalTitle,
@@ -352,8 +471,13 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
         specializations: splitList(l.therapist.specializations),
         city: l.therapist.city,
         homeVisit: l.therapist.homeVisit,
+        bookingMode: (l.therapist as any).bookingMode ?? 'DIRECTORY_ONLY',
+        requestable: requestability.requestable,
+        nextFreeSlotAt: (l.therapist as any).nextFreeSlotAt
+          ? new Date((l.therapist as any).nextFreeSlotAt).toISOString()
+          : null,
         bio: l.therapist.bio ?? undefined,
-      })),
+      })}),
     };
   });
 

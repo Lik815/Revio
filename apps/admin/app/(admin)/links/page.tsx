@@ -137,7 +137,7 @@ export default async function LinksPage({ searchParams }: { searchParams: Search
             const isBroken = l.status !== 'CONFIRMED' && tStatus === 'APPROVED' && pStatus === 'APPROVED';
 
             return (
-              <tr key={l.id} style={isBroken ? { background: 'var(--warning-bg, #FFF8E1)' } : undefined}>
+              <tr key={l.id} className={isBroken ? 'row--warning' : undefined}>
                 <td data-label="Priorität">
                   <div className="priority-stack">
                     <span className={`badge ${isBroken ? 'badge--REJECTED' : l.status === 'DISPUTED' ? 'badge--DISPUTED' : 'badge--PROPOSED'}`}>
@@ -146,7 +146,7 @@ export default async function LinksPage({ searchParams }: { searchParams: Search
                     {isBroken && <span className="entity-meta">Suche blockiert</span>}
                   </div>
                 </td>
-                <td>
+                <td data-label="Therapeut:in">
                   <div>{l.therapist.fullName}</div>
                   {tStatus && (
                     <span className={`badge badge--${tStatus}`} style={{ fontSize: 11 }}>
@@ -154,7 +154,7 @@ export default async function LinksPage({ searchParams }: { searchParams: Search
                     </span>
                   )}
                 </td>
-                <td>
+                <td data-label="Praxis">
                   <div>{l.practice.name}</div>
                   {pStatus && (
                     <span className={`badge badge--${pStatus}`} style={{ fontSize: 11 }}>
@@ -162,14 +162,14 @@ export default async function LinksPage({ searchParams }: { searchParams: Search
                     </span>
                   )}
                 </td>
-                <td>
+                <td data-label="Link-Status">
                   <span className={`badge badge--${l.status}`}>
                     {statusLabel[l.status] ?? l.status}
                   </span>
                   {isBroken && <span style={{ marginLeft: 6, fontSize: 13 }}>⚠️</span>}
                 </td>
-                <td>{formatDate(l.createdAt)}</td>
-                <td>
+                <td data-label="Eingereicht">{formatDate(l.createdAt)}</td>
+                <td data-label="Aktionen">
                   <LinkActions
                     id={l.id}
                     status={l.status}

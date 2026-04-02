@@ -22,6 +22,7 @@ afterAll(async () => {
 afterEach(async () => {
   await prisma.practiceManager.deleteMany();
   await prisma.user.deleteMany();
+  await prisma.bookingRequest.deleteMany();
   await prisma.therapistPracticeLink.deleteMany();
   await prisma.therapist.deleteMany();
   await prisma.practice.deleteMany();
@@ -153,6 +154,133 @@ describe('POST /search', () => {
     const body = res.json();
     expect(body.therapists).toHaveLength(1);
     expect(body.therapists[0].fullName).toBe('Home Visitor');
+  });
+
+  it('finds standalone mobile therapists for "mobile physio"', async () => {
+    const practice = await prisma.practice.create({
+      data: { name: 'Test Praxis', city: 'Köln', reviewStatus: 'APPROVED' },
+    });
+
+    await prisma.therapist.create({
+      data: {
+        email: 'standalone-mobile@test.com',
+        fullName: 'Mobile Köln',
+        professionalTitle: 'PT',
+        city: 'Köln',
+        homeVisit: true,
+        serviceRadiusKm: 15,
+        kassenart: 'ALLE',
+        specializations: 'orthopädie',
+        languages: 'de',
+        certifications: '',
+        reviewStatus: 'APPROVED',
+      },
+    });
+
+    await prisma.therapist.create({
+      data: {
+        email: 'linked-mobile@test.com',
+        fullName: 'Praxis Mobil',
+        professionalTitle: 'PT',
+        city: 'Köln',
+        homeVisit: true,
+        specializations: 'orthopädie',
+        languages: 'de',
+        certifications: '',
+        reviewStatus: 'APPROVED',
+        links: { create: { practiceId: practice.id, status: 'CONFIRMED' } },
+      },
+    });
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/search',
+      payload: { query: 'mobile physio', city: 'Köln' },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.therapists).toHaveLength(2);
+    expect(body.therapists[0].fullName).toBe('Mobile Köln');
+    expect(body.therapists[0].homeVisit).toBe(true);
+  });
+
+  it('returns requestable fields for a directly requestable therapist', async () => {
+    await prisma.therapist.create({
+      data: {
+        email: 'requestable@test.com',
+        fullName: 'Requestable Therapist',
+        professionalTitle: 'PT',
+        city: 'Köln',
+        homeVisit: true,
+        serviceRadiusKm: 15,
+        kassenart: 'ALLE',
+        specializations: 'orthopädie',
+        languages: 'de',
+        certifications: '',
+        reviewStatus: 'APPROVED',
+        bookingMode: 'FIRST_APPOINTMENT_REQUEST',
+        nextFreeSlotAt: new Date('2026-04-02T09:00:00.000Z'),
+      },
+    });
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/search',
+      payload: { query: 'mobile physio', city: 'Köln', requestable: true },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.therapists).toHaveLength(1);
+    expect(body.therapists[0].requestable).toBe(true);
+    expect(body.therapists[0].bookingMode).toBe('FIRST_APPOINTMENT_REQUEST');
+    expect(body.therapists[0].nextFreeSlotAt).toBe('2026-04-02T09:00:00.000Z');
+  });
+
+  it('finds therapists by reversed and partial name queries', async () => {
+    const practice = await prisma.practice.create({
+      data: { name: 'Name Praxis', city: 'Köln', reviewStatus: 'APPROVED' },
+    });
+
+    await prisma.therapist.create({
+      data: {
+        email: 'anna-becker@test.com',
+        fullName: 'Anna Becker',
+        professionalTitle: 'PT',
+        city: 'Köln',
+        specializations: 'rücken',
+        languages: 'de',
+        certifications: '',
+        reviewStatus: 'APPROVED',
+        links: { create: { practiceId: practice.id, status: 'CONFIRMED' } },
+      },
+    });
+
+    await prisma.therapist.create({
+      data: {
+        email: 'maria-schmitz@test.com',
+        fullName: 'Maria Schmitz',
+        professionalTitle: 'PT',
+        city: 'Köln',
+        specializations: 'rücken',
+        languages: 'de',
+        certifications: '',
+        reviewStatus: 'APPROVED',
+        links: { create: { practiceId: practice.id, status: 'CONFIRMED' } },
+      },
+    });
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/search',
+      payload: { query: 'becker an', city: 'Köln' },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.therapists.length).toBeGreaterThan(0);
+    expect(body.therapists[0].fullName).toBe('Anna Becker');
   });
 
   it('supports nearby search with origin and radius', async () => {
@@ -457,6 +585,58 @@ describe('GET /practice-detail/:id', () => {
     expect(body.therapists[0].id).toBe(visibleTherapist.id);
     expect(body.therapists[0].fullName).toBe('Visible Therapist');
     expect(body.therapists[0].specializations).toEqual(['Manuelle Therapie', 'Lymphdrainage']);
+  });
+});
+
+// ─── Booking Requests ─────────────────────────────────────────────────────────
+
+describe('Booking Requests', () => {
+  it('creates and lists a guest booking request for a requestable therapist', async () => {
+    const therapist = await prisma.therapist.create({
+      data: {
+        email: 'bookable@test.com',
+        fullName: 'Bookable Therapist',
+        professionalTitle: 'PT',
+        city: 'Köln',
+        homeVisit: true,
+        serviceRadiusKm: 15,
+        kassenart: 'ALLE',
+        specializations: 'orthopädie',
+        languages: 'de',
+        certifications: '',
+        reviewStatus: 'APPROVED',
+        bookingMode: 'FIRST_APPOINTMENT_REQUEST',
+        sessionToken: 'therapist-booking-token',
+      },
+    });
+
+    const createRes = await app.inject({
+      method: 'POST',
+      url: '/booking-requests',
+      payload: {
+        therapistId: therapist.id,
+        patientName: 'Max Mustermann',
+        patientEmail: 'max@example.com',
+        preferredDays: ['Montag', 'Dienstag'],
+        preferredTimeWindows: ['Vormittag'],
+        message: 'Bitte um einen Ersttermin',
+        consentAccepted: true,
+      },
+    });
+
+    expect(createRes.statusCode).toBe(201);
+    expect(createRes.json().status).toBe('PENDING');
+
+    const listRes = await app.inject({
+      method: 'GET',
+      url: '/auth/booking-requests',
+      headers: { authorization: 'Bearer therapist-booking-token' },
+    });
+
+    expect(listRes.statusCode).toBe(200);
+    expect(listRes.json().requests).toHaveLength(1);
+    expect(listRes.json().requests[0].patientName).toBe('Max Mustermann');
+    expect(listRes.json().requests[0].status).toBe('PENDING');
   });
 });
 

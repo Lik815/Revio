@@ -30,55 +30,73 @@ export function LoginScreen(props) {
     t,
   } = props;
   const [showPassword, setShowPassword] = useState(false);
+  const [showInfo, setShowInfo] = useState(false);
 
   return (
-    <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 20, flexGrow: 1 }]}>
+    <ScrollView
+      contentContainerStyle={[styles.scrollContent, { paddingHorizontal: 20, paddingBottom: 40, flexGrow: 1 }]}
+      keyboardShouldPersistTaps="handled"
+    >
       <Pressable onPress={() => setShowLogin(false)} style={styles.backBtn}>
         <Text style={[styles.backBtnText, { color: c.primary }]}>‹ {t('backBtn')}</Text>
       </Pressable>
-      <View style={styles.header}>
-        <View style={[styles.logoMark, { backgroundColor: c.primary }]}><Text style={styles.logoText}>R</Text></View>
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.headerTitle, { color: c.text }]}>Anmelden</Text>
-          <Text style={[styles.headerSub, { color: c.muted }]}>Ein Login für alle Konten</Text>
-        </View>
+
+      {/* Headline */}
+      <View style={{ alignItems: 'center', paddingTop: 12, paddingBottom: 28 }}>
+        <Text style={{ fontSize: 24, fontWeight: '700', color: c.text, marginBottom: 6 }}>Willkommen zurück</Text>
+        <Pressable onPress={() => setShowInfo(v => !v)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <Text style={{ fontSize: 13, color: c.muted }}>Mehr erfahren</Text>
+          <Ionicons name={showInfo ? 'chevron-up' : 'chevron-down'} size={13} color={c.muted} />
+        </Pressable>
+        {showInfo && (
+          <View style={{ backgroundColor: c.mutedBg, borderRadius: 12, padding: 14, marginTop: 10, borderWidth: 1, borderColor: c.border }}>
+            <Text style={{ fontSize: 13, color: c.muted, lineHeight: 20, textAlign: 'center' }}>
+              Mit deinem Revio-Konto verwaltest du als Physiotherapeut:in dein Profil und erreichst Patienten in deiner Nähe. Ein Konto — alle Funktionen.
+            </Text>
+          </View>
+        )}
       </View>
 
-      <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
-        <Text style={[styles.filterSectionTitle, { color: c.muted }]}>E-Mail</Text>
-        <TextInput
-          style={[styles.inputField, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg }]}
-          value={loginEmail}
-          onChangeText={setLoginEmail}
-          placeholder="deine@email.de"
-          placeholderTextColor={c.muted}
-          autoCapitalize="none"
-          keyboardType="email-address"
-        />
-        <Text style={[styles.filterSectionTitle, { color: c.muted, marginTop: 12 }]}>Passwort</Text>
-        <View style={{ position: 'relative' }}>
+      {/* Inputs */}
+      <View style={{ gap: 14 }}>
+        <View>
+          <Text style={{ fontSize: 11, fontWeight: '700', color: c.muted, marginBottom: 7, letterSpacing: 0.8, textTransform: 'uppercase' }}>E-Mail</Text>
           <TextInput
-            style={[styles.inputField, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg, paddingRight: 44 }]}
-            value={loginPassword}
-            onChangeText={setLoginPassword}
-            placeholder="••••••••"
+            style={[styles.regInput, { color: c.text, borderColor: loginEmail.length > 0 ? c.primary : c.border, backgroundColor: c.card }]}
+            value={loginEmail}
+            onChangeText={setLoginEmail}
+            placeholder="deine@email.de"
             placeholderTextColor={c.muted}
-            secureTextEntry={!showPassword}
+            autoCapitalize="none"
+            keyboardType="email-address"
           />
-          <Pressable onPress={() => setShowPassword(v => !v)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={{ position: 'absolute', right: 12, top: 0, bottom: 0, justifyContent: 'center' }}>
-            <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color={c.muted} />
-          </Pressable>
+        </View>
+        <View>
+          <Text style={{ fontSize: 11, fontWeight: '700', color: c.muted, marginBottom: 7, letterSpacing: 0.8, textTransform: 'uppercase' }}>Passwort</Text>
+          <View style={{ position: 'relative' }}>
+            <TextInput
+              style={[styles.regInput, { color: c.text, borderColor: loginPassword.length > 0 ? c.primary : c.border, backgroundColor: c.card, paddingRight: 44 }]}
+              value={loginPassword}
+              onChangeText={setLoginPassword}
+              placeholder="••••••••"
+              placeholderTextColor={c.muted}
+              secureTextEntry={!showPassword}
+            />
+            <Pressable onPress={() => setShowPassword(v => !v)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={{ position: 'absolute', right: 12, top: 0, bottom: 0, justifyContent: 'center' }}>
+              <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color={c.muted} />
+            </Pressable>
+          </View>
         </View>
       </View>
 
       {loginError ? (
-        <View style={[styles.noticeBox, { backgroundColor: c.errorBg, borderColor: c.error, marginBottom: 8 }]}>
+        <View style={[styles.noticeBox, { backgroundColor: c.errorBg, borderColor: c.error, marginTop: 12 }]}>
           <Text style={{ color: c.error, flex: 1 }}>{softenErrorMessage(loginError)}</Text>
         </View>
       ) : null}
 
       <Pressable
-        style={[styles.registerBtn, { backgroundColor: loginLoading ? c.border : c.primary }]}
+        style={[styles.registerBtn, { backgroundColor: loginLoading ? c.border : c.primary, marginTop: 24 }]}
         onPress={handleLogin}
         disabled={loginLoading}
       >
@@ -99,59 +117,66 @@ export function TherapistLandingScreen(props) {
     setShowRegister,
     styles,
   } = props;
+  const [showInfo, setShowInfo] = useState(false);
 
   return (
-    <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 20, flexGrow: 1 }]}>
-      <View style={styles.header}>
-        <View style={[styles.logoMark, { backgroundColor: c.primary }]}><Text style={styles.logoText}>R</Text></View>
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.headerTitle, { color: c.text }]}>Für Therapeuten</Text>
-          <Text style={[styles.headerSub, { color: c.muted }]}>Dein Profil auf Revio</Text>
-        </View>
+    <View style={{ flex: 1, paddingHorizontal: 20, justifyContent: 'center', paddingBottom: 16 }}>
+
+      {/* Headline */}
+      <View style={{ alignItems: 'center', marginBottom: 20 }}>
+        <Text style={{ fontSize: 20, fontWeight: '700', color: c.text, marginBottom: 4 }}>Für Therapeuten</Text>
+        <Text style={{ fontSize: 13, color: c.muted, textAlign: 'center', paddingHorizontal: 16, marginBottom: 6 }}>
+          Erstelle dein Profil und werde von Patienten gefunden.
+        </Text>
+        <Pressable onPress={() => setShowInfo(v => !v)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <Text style={{ fontSize: 12, color: c.muted }}>Mehr erfahren</Text>
+          <Ionicons name={showInfo ? 'chevron-up' : 'chevron-down'} size={12} color={c.muted} />
+        </Pressable>
+        {showInfo && (
+          <View style={{ backgroundColor: c.mutedBg, borderRadius: 10, padding: 12, marginTop: 8, borderWidth: 1, borderColor: c.border }}>
+            <Text style={{ fontSize: 12, color: c.muted, lineHeight: 18, textAlign: 'center' }}>
+              Nur für zugelassene Physiotherapeuten. Dein Profil wird vor der Veröffentlichung manuell geprüft — in der Regel innerhalb von 48 Stunden.{__DEV__ ? '\n\nEntwicklungsmodus: sofort freigegeben.' : ''}
+            </Text>
+          </View>
+        )}
       </View>
 
-      <View style={[styles.infoCard, { backgroundColor: c.card, borderColor: c.border, flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 }]}>
-        <Text style={{ fontSize: 28 }}>⚕️</Text>
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.infoTitle, { color: c.text, marginBottom: 2 }]}>Werde auf Revio sichtbar</Text>
-          <Text style={[styles.noticeBody, { color: c.muted }]}>
-            Nur für zugelassene Physiotherapeuten. Dein Profil wird vor der Veröffentlichung manuell geprüft.
-          </Text>
-        </View>
+      {/* Steps */}
+      <View style={{ gap: 7, marginBottom: 20 }}>
+        {[
+          { icon: 'mail-outline', title: 'Konto anlegen', body: 'E-Mail und Passwort' },
+          { icon: 'person-outline', title: 'Profil ausfüllen', body: 'Spezialisierungen, Sprachen, Praxis' },
+          { icon: 'checkmark-circle-outline', title: 'Einreichen & prüfen lassen', body: 'Manuell freigegeben' },
+          { icon: 'search-outline', title: 'Öffentlich sichtbar', body: 'Patienten finden dich in der Suche' },
+        ].map((step, i) => (
+          <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: c.card, borderRadius: RADIUS.md, borderWidth: 1, borderColor: c.border, paddingVertical: 8, paddingHorizontal: 12 }}>
+            <View style={{ width: 30, height: 30, borderRadius: RADIUS.full, backgroundColor: c.primaryBg, alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name={step.icon} size={15} color={c.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 13, fontWeight: '600', color: c.text }}>{step.title}</Text>
+              <Text style={{ fontSize: 11, color: c.muted, marginTop: 1 }}>{step.body}</Text>
+            </View>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: c.primary }}>{i + 1}</Text>
+          </View>
+        ))}
       </View>
-
-      {[
-        { num: '1', title: 'Registrieren', body: 'Konto mit E-Mail anlegen' },
-        { num: '2', title: 'Profil ausfüllen', body: 'Spezialisierungen, Ausbildung, Sprachen, Praxis' },
-        { num: '3', title: 'Zur Prüfung einreichen', body: __DEV__ ? 'Entwicklungsmodus: sofort freigegeben' : 'Manuell geprüft — in der Regel innerhalb von 48 h' },
-        { num: '4', title: 'Öffentlich sichtbar', body: 'Dein Profil erscheint in den Suchergebnissen' },
-      ].map((step) => (
-        <View key={step.num} style={[styles.stepRow, { borderColor: c.border }]}>
-          <View style={[styles.stepNum, { backgroundColor: c.primary }]}>
-            <Text style={styles.stepNumText}>{step.num}</Text>
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.stepTitle, { color: c.text }]}>{step.title}</Text>
-            <Text style={[styles.stepBody, { color: c.muted }]}>{step.body}</Text>
-          </View>
-        </View>
-      ))}
 
       <Pressable style={[styles.registerBtn, { backgroundColor: c.primary }]} onPress={() => { setRegStep(1); setRegSubmitted(false); setShowRegister(true); }}>
         <Text style={styles.registerBtnText}>Jetzt registrieren</Text>
       </Pressable>
 
       <Pressable
-        style={[styles.registerBtn, { backgroundColor: c.card, borderWidth: 1, borderColor: c.border, marginTop: 10 }]}
+        style={[styles.registerBtn, { backgroundColor: c.card, borderWidth: 1, borderColor: c.border, marginTop: 8 }]}
         onPress={() => setShowLogin(true)}
       >
-        <Text style={{ ...TYPE.heading, color: c.text }}>Anmelden</Text>
+        <Text style={{ fontSize: 15, fontWeight: '600', color: c.text }}>Anmelden</Text>
       </Pressable>
 
-      <Pressable onPress={() => setShowManagerReg(true)} style={{ alignSelf: 'center', paddingVertical: 10, marginTop: 12 }}>
-        <Text style={{ ...TYPE.body, color: c.muted }}>Praxis als Manager registrieren</Text>
+      <Pressable onPress={() => setShowManagerReg(true)} style={{ alignSelf: 'center', paddingVertical: 8, marginTop: 4 }}>
+        <Text style={{ fontSize: 12, color: c.muted }}>Praxis als Manager registrieren</Text>
       </Pressable>
-    </ScrollView>
+    </View>
   );
 }
 

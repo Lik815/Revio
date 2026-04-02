@@ -66,6 +66,7 @@ export default async function PracticesPage({ searchParams }: { searchParams: Se
   const pendingCount = filtered.filter((p) => p.reviewStatus === 'PENDING_REVIEW').length;
   const overdueCount = filtered.filter((p) => getPracticePriority(p).overdue).length;
   const linkedCount = filtered.filter((p) => getPracticePriority(p).proposedLinks > 0).length;
+  const approvedCount = filtered.filter((p) => p.reviewStatus === 'APPROVED').length;
 
   return (
     <PageShell
@@ -89,6 +90,11 @@ export default async function PracticesPage({ searchParams }: { searchParams: Se
           <div className="kicker">Mit Links</div>
           <strong>{linkedCount}</strong>
           <span>Diese Praxen haben parallele Verknüpfungen im Review</span>
+        </article>
+        <article className="review-summary-card">
+          <div className="kicker">Freigegeben</div>
+          <strong>{approvedCount}</strong>
+          <span>Diese Praxen sind bereits stabil veröffentlicht</span>
         </article>
       </div>
 
@@ -117,9 +123,7 @@ export default async function PracticesPage({ searchParams }: { searchParams: Se
           <tr>
             <th>Name</th>
             <th>Priorität</th>
-            <th>Ort</th>
-            <th>Adresse</th>
-            <th>Verknüpfte Therapeut:innen</th>
+            <th>Überblick</th>
             <th>Eingereicht</th>
             <th>Frist (48h)</th>
             <th>Status</th>
@@ -149,17 +153,24 @@ export default async function PracticesPage({ searchParams }: { searchParams: Se
                   )}
                 </div>
               </td>
-              <td data-label="Ort">{p.city}</td>
-              <td data-label="Adresse" style={{ color: 'var(--muted)', fontSize: 13 }}>{p.address ?? '—'}</td>
-              <td data-label="Verknüpfte Therapeut:innen">{p.links?.length ?? 0}</td>
+              <td data-label="Überblick">
+                <div className="priority-stack">
+                  <strong style={{ fontSize: 14 }}>{p.city}</strong>
+                  <span className="entity-meta">{p.address ?? 'Keine Adresse hinterlegt'}</span>
+                  <span className="entity-meta">{p.links?.length ?? 0} verknüpfte Therapeut:innen</span>
+                </div>
+              </td>
               <td data-label="Eingereicht">{formatDate(p.createdAt)}</td>
               <td data-label="Frist (48h)">
                 <DeadlineTimer createdAt={p.createdAt} status={p.reviewStatus} />
               </td>
               <td data-label="Status">
-                <span className={`badge badge--${p.reviewStatus}`}>
-                  {statusLabel[p.reviewStatus] ?? p.reviewStatus}
-                </span>
+                <div className="priority-stack">
+                  <span className={`badge badge--${p.reviewStatus}`}>
+                    {statusLabel[p.reviewStatus] ?? p.reviewStatus}
+                  </span>
+                  {p.phone ? <span className="entity-meta">{p.phone}</span> : <span className="entity-meta">Keine Telefonnummer</span>}
+                </div>
               </td>
               <td data-label="Aktionen">
                 <PracticeActions

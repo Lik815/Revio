@@ -23,6 +23,11 @@ export function Sidebar({
   const pathname = usePathname();
   const router = useRouter();
 
+  const isActive = (href: string) => {
+    if (href === '/') return pathname === '/';
+    return pathname === href || pathname.startsWith(`${href}/`);
+  };
+
   return (
     <aside className="sidebar">
       <div className="sidebar-top">
@@ -38,7 +43,7 @@ export function Sidebar({
           <button
             key={link.href}
             type="button"
-            className={`nav-link ${pathname === link.href ? 'nav-link--active' : ''}`}
+            className={`nav-link ${isActive(link.href) ? 'nav-link--active' : ''}`}
             onClick={() => {
               router.push(link.href);
               onNavigate?.();

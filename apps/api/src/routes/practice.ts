@@ -493,6 +493,18 @@ export const practiceRoutes: FastifyPluginAsync = async (fastify) => {
           createdAt: link.createdAt,
         });
       }
+      // Pending booking requests for this therapist
+      const pendingRequests = await fastify.prisma.bookingRequest.findMany({
+        where: { therapistId: therapist.id, status: 'PENDING' },
+        orderBy: { createdAt: 'desc' },
+      });
+      for (const req of pendingRequests) {
+        notifications.push({
+          id: req.id, type: 'BOOKING_REQUEST',
+          message: `${req.patientName} möchte einen Termin vereinbaren.`,
+          createdAt: req.createdAt,
+        });
+      }
       return { notifications };
     }
 

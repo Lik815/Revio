@@ -6,7 +6,6 @@ import {
   Platform,
   Pressable,
   ScrollView,
-  Switch,
   Text,
   TextInput,
   View,
@@ -101,7 +100,36 @@ export function DiscoverScreen(props) {
 
   const mutedText = c.textMuted ?? c.muted;
   const iconHitSlop = { top: 10, bottom: 10, left: 10, right: 10 };
+  const formatBookingDate = (value) => {
+    if (!value) return '';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return value;
+    return parsed.toLocaleString('de-DE', {
+      day: '2-digit',
+      month: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
   const showHeaderToggle = viewMode === 'map' || searched || results.length > 0;
+  const [fortbildungQuery, setFortbildungQuery] = React.useState('');
+  const selectedCertificationOptions = fortbildungen.map((key) =>
+    certificationOptions.find((option) => option.key === key) ?? { key, label: key }
+  );
+  const normalizedFortbildungQuery = fortbildungQuery.trim().toLowerCase();
+  const filteredCertificationOptions = certificationOptions.filter((option) =>
+    option.label.toLowerCase().includes(normalizedFortbildungQuery) ||
+    option.key.toLowerCase().includes(normalizedFortbildungQuery)
+  );
+  const certificationSuggestions = filteredCertificationOptions
+    .filter((option) => !fortbildungen.includes(option.key))
+    .slice(0, 6);
+  const resetFilters = () => {
+    setHomeVisit(false);
+    setKassenart(null);
+    setFortbildungen([]);
+    setFortbildungQuery('');
+  };
   const headerToggle = (
     <View style={{ flexDirection: 'row', borderRadius: RADIUS.full, borderWidth: 1, borderColor: c.border, overflow: 'hidden' }}>
       {[{ key: 'list', icon: 'list' }, { key: 'map', icon: 'map' }].map((button, index) => (
@@ -122,6 +150,135 @@ export function DiscoverScreen(props) {
           </Pressable>
         </View>
       ))}
+    </View>
+  );
+  const filtersPanel = (
+    <View style={[styles.filterPanel, styles.filterCompactPanel, { backgroundColor: c.card, borderColor: c.border }]}>
+      <View style={styles.filterCompactHeader}>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.filterCompactTitle, { color: c.text }]}>Filter</Text>
+        </View>
+        {activeFilterCount > 0 ? (
+          <Pressable
+            onPress={resetFilters}
+            style={styles.filterResetBtn}
+          >
+            <Text style={[styles.filterResetBtnText, { color: c.primary }]}>Zuruecksetzen</Text>
+          </Pressable>
+        ) : null}
+      </View>
+
+      <View style={styles.filterCompactSection}>
+        <Text style={[styles.filterCompactSectionTitle, { color: c.muted }]}>Leistungen</Text>
+        <Pressable
+          onPress={() => setHomeVisit(!homeVisit)}
+          style={[
+            styles.filterCompactChip,
+            {
+              borderColor: homeVisit ? c.success : c.border,
+              backgroundColor: homeVisit ? c.successBg : c.mutedBg,
+            },
+          ]}
+        >
+          <Ionicons name="home-outline" size={13} color={homeVisit ? c.success : mutedText} />
+          <Text style={[styles.filterCompactChipText, { color: homeVisit ? c.success : c.text }]}>Hausbesuch</Text>
+          {homeVisit ? <Ionicons name="checkmark" size={12} color={c.success} /> : null}
+        </Pressable>
+      </View>
+
+      <View style={styles.filterCompactSection}>
+        <Text style={[styles.filterCompactSectionTitle, { color: c.muted }]}>{t('kassenartLabel')}</Text>
+        <View style={[styles.kassenartCompactToggle, { backgroundColor: c.mutedBg, borderColor: c.border }]}>
+          {kassenartOptions.map((option) => {
+            const active = kassenart === option.key;
+            return (
+              <Pressable
+                key={option.key ?? 'all'}
+                onPress={() => setKassenart(option.key)}
+                style={[
+                  styles.kassenartCompactToggleBtn,
+                  {
+                    borderColor: active ? c.primary : 'transparent',
+                    backgroundColor: active ? c.card : 'transparent',
+                  },
+                ]}
+              >
+                <Text style={[styles.kassenartCompactToggleText, { color: active ? c.primary : c.textMuted ?? c.muted }]}>
+                  {option.label}
+                </Text>
+                {active ? <Ionicons name="checkmark" size={12} color={c.primary} /> : null}
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+
+      <View style={styles.filterCompactSection}>
+        <View style={styles.filterCompactSectionHeader}>
+          <Text style={[styles.filterCompactSectionTitle, { color: c.muted }]}>{t('fortbildungLabel')}</Text>
+          <Text style={[styles.metaNote, { color: mutedText }]}>
+            {selectedCertificationOptions.length > 0 ? `${selectedCertificationOptions.length} gewaehlt` : 'Suche + Mehrfachauswahl'}
+          </Text>
+        </View>
+
+        <View style={[styles.filterSearchField, { borderColor: c.border, backgroundColor: c.mutedBg }]}>
+          <Ionicons name="search-outline" size={14} color={mutedText} />
+          <TextInput
+            value={fortbildungQuery}
+            onChangeText={setFortbildungQuery}
+            placeholder="Fortbildung suchen"
+            placeholderTextColor={mutedText}
+            style={[styles.filterSearchInput, { color: c.text }]}
+          />
+          {fortbildungQuery.length > 0 ? (
+            <Pressable onPress={() => setFortbildungQuery('')} hitSlop={iconHitSlop}>
+              <Ionicons name="close-circle" size={14} color={mutedText} />
+            </Pressable>
+          ) : null}
+        </View>
+
+        {normalizedFortbildungQuery.length > 0 && certificationSuggestions.length > 0 ? (
+          <View style={[styles.filterSearchResults, { backgroundColor: c.card, borderColor: c.border }]}>
+            {certificationSuggestions.map((option, index) => (
+              <Pressable
+                key={option.key}
+                onPress={() => {
+                  toggleFortbildung(option.key);
+                  setFortbildungQuery('');
+                }}
+                style={[
+                  styles.filterSearchResultItem,
+                  index < certificationSuggestions.length - 1 && { borderBottomWidth: 1, borderBottomColor: c.border },
+                ]}
+              >
+                <Text style={[styles.filterSearchResultText, { color: c.text }]}>{option.label}</Text>
+                <Ionicons name="add" size={14} color={mutedText} />
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
+
+        {selectedCertificationOptions.length > 0 ? (
+          <View style={styles.filterChipWrap}>
+            {selectedCertificationOptions.map((option) => (
+              <Pressable
+                key={`selected-${option.key}`}
+                onPress={() => toggleFortbildung(option.key)}
+                style={[styles.filterSelectedChip, { backgroundColor: c.primaryBg, borderColor: c.primary }]}
+              >
+                <Text numberOfLines={1} style={[styles.filterSelectedChipText, { color: c.primary }]}>
+                  {option.label}
+                </Text>
+                <Ionicons name="close" size={12} color={c.primary} />
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
+
+        {normalizedFortbildungQuery.length > 0 && certificationSuggestions.length === 0 ? (
+          <Text style={[styles.filterEmptyText, { color: mutedText }]}>Keine passende Fortbildung gefunden.</Text>
+        ) : null}
+      </View>
     </View>
   );
 
@@ -169,32 +326,25 @@ export function DiscoverScreen(props) {
               </Pressable>
             )}
             <View style={[styles.searchDivider, { backgroundColor: c.border }]} />
-            <Pressable onPress={() => setShowFilters(!showFilters)} style={styles.searchFilterArea} hitSlop={iconHitSlop}>
-              <Ionicons name="options-outline" size={20} color={showFilters || activeFilterCount > 0 ? c.primary : c.muted} />
-              {activeFilterCount > 0 && (
-                <>
-                  <Text style={{ ...TYPE.label, color: c.primary, textTransform: 'none', letterSpacing: 0.3 }}>Filter aktiv</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Pressable onPress={() => { setLocationSheetCity(locationLabel || city); setShowLocationSheet(true); }} style={[styles.searchFilterArea, { paddingRight: 6 }]} hitSlop={iconHitSlop}>
+                <View>
+                  <Ionicons name="location-outline" size={20} color={city ? c.primary : c.muted} />
+                  {city && <View style={{ position: 'absolute', top: -1, right: -1, width: 7, height: 7, borderRadius: 4, backgroundColor: c.success, borderWidth: 1.5, borderColor: c.card }} />}
+                </View>
+              </Pressable>
+              <Pressable onPress={() => setShowFilters(!showFilters)} style={[styles.searchFilterArea, { paddingLeft: 6 }]} hitSlop={iconHitSlop}>
+                <Ionicons name="options-outline" size={20} color={showFilters || activeFilterCount > 0 ? c.primary : c.muted} />
+                {activeFilterCount > 0 && (
                   <View style={[styles.filterBadge, { backgroundColor: c.primary }]}>
                     <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
                   </View>
-                </>
-              )}
-            </Pressable>
-          </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SPACE.sm }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACE.sm, flex: 1 }}>
-              <Pressable
-                onPress={() => { setLocationSheetCity(locationLabel || city); setShowLocationSheet(true); }}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderColor: city ? c.primary : c.border, borderRadius: RADIUS.full, paddingHorizontal: 12, paddingVertical: 7, maxWidth: 210, backgroundColor: c.card }}
-              >
-                <Ionicons name="location-outline" size={13} color={mutedText} />
-                <Text numberOfLines={1} style={{ ...TYPE.meta, color: city ? c.text : mutedText, flexShrink: 1 }}>
-                  {locationLabel || city || t('locationPlaceholder')}
-                </Text>
+                )}
               </Pressable>
             </View>
-            {showHeaderToggle ? headerToggle : null}
           </View>
+          {showHeaderToggle && <View style={{ alignItems: 'flex-end' }}>{headerToggle}</View>}
+          {showFilters ? filtersPanel : null}
           {(searched || results.length > 0) && (
             <Text style={{ ...TYPE.meta, color: mutedText }}>
               {searched ? `${results.length} ${results.length !== 1 ? t('resultsLabelPlural') : t('resultsLabel')}` : 'Vorschläge'}
@@ -203,7 +353,7 @@ export function DiscoverScreen(props) {
         </View>
 
         {/* Fullscreen map */}
-        <View style={{ flex: 1, position: 'relative' }}>
+        <View style={{ flex: 1, position: 'relative' }} onTouchStart={() => { if (showFilters) setShowFilters(false); }}>
           <MapView
             style={{ flex: 1 }}
             region={getMapRegion()}
@@ -232,6 +382,22 @@ export function DiscoverScreen(props) {
                   <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700', maxWidth: 100 }} numberOfLines={1}>{practice.name}</Text>
                 </View>
               </Marker>
+            ))}
+            {results.filter(th => th.homeVisit && th.homeLat && th.homeLng && th.serviceRadiusKm).map((th) => (
+              <React.Fragment key={`radius-${th.id}`}>
+                <Circle
+                  center={{ latitude: th.homeLat, longitude: th.homeLng }}
+                  radius={th.serviceRadiusKm * 1000}
+                  strokeColor="rgba(52,199,89,0.5)"
+                  fillColor="rgba(52,199,89,0.07)"
+                  strokeWidth={1.5}
+                />
+                <Marker coordinate={{ latitude: th.homeLat, longitude: th.homeLng }} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false} onPress={() => openTherapistById(th.id)}>
+                  <View style={{ backgroundColor: c.success, borderRadius: 16, paddingHorizontal: 9, paddingVertical: 4, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 3, shadowOffset: { width: 0, height: 1 }, elevation: 3 }}>
+                    <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>🏠 {th.fullName.split(' ')[0]}</Text>
+                  </View>
+                </Marker>
+              </React.Fragment>
             ))}
           </MapView>
 
@@ -284,183 +450,145 @@ export function DiscoverScreen(props) {
   }
 
   return (
-    <ScrollView
-      ref={discoverScrollRef}
-      scrollEnabled={mapScrollEnabled}
-      contentContainerStyle={[styles.scrollContent, { paddingBottom: 20 }]}
-      showsVerticalScrollIndicator={false}
-      keyboardShouldPersistTaps="handled"
-    >
-      <View style={[styles.header, { justifyContent: 'space-between' }]}>
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <View style={[styles.logoMark, { backgroundColor: c.primary }]}>
-            <Text style={styles.logoText}>R</Text>
+    <View style={{ flex: 1, backgroundColor: c.background }}>
+      {/* Sticky header — logo, search, chips, location, filters */}
+      <View style={{ backgroundColor: c.background, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 10, zIndex: 10, gap: SPACE.sm }}>
+        <View style={[styles.header, { justifyContent: 'space-between' }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <View style={[styles.logoMark, { backgroundColor: c.primary }]}>
+              <Text style={styles.logoText}>R</Text>
+            </View>
+            <Text style={[styles.brandName, { color: c.text }]}>evio</Text>
           </View>
-          <Text style={[styles.brandName, { color: c.text }]}>evio</Text>
-        </View>
-        {authToken && (
-          <Pressable
-            onPress={() => setShowNotifications(true)}
-            hitSlop={iconHitSlop}
-            style={{ width: 40, height: 40, borderRadius: RADIUS.full, backgroundColor: c.card, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' }}
-          >
-            <Ionicons name="notifications-outline" size={18} color={mutedText} />
-            {notifications.length > 0 && (
-              <View style={{ position: 'absolute', top: 3, right: 3, width: 8, height: 8, borderRadius: RADIUS.full, backgroundColor: c.error }} />
-            )}
-          </Pressable>
-        )}
-      </View>
-
-      {!searched && (
-        <View style={styles.hero}>
-          <Text style={[styles.heroTitle, { color: c.text }]}>{t('heroTitle')}</Text>
-          <Text style={[styles.heroSub, { color: c.muted }]}>{t('heroSub')}</Text>
-        </View>
-      )}
-
-      <View style={{ zIndex: 10 }}>
-        <View
-          style={[
-            styles.searchBox,
-            { backgroundColor: c.card, borderColor: showAutocomplete && acSuggestions.length > 0 ? c.primary : c.border },
-          ]}
-        >
-          <Ionicons name="search-outline" size={18} color={c.muted} />
-          <TextInput
-            value={query}
-            onChangeText={(text) => {
-              setQuery(text);
-              setShowAutocomplete(true);
-              setActiveChip(null);
-            }}
-            onSubmitEditing={() => runSearch()}
-            onFocus={() => setShowAutocomplete(true)}
-            onBlur={() => setTimeout(() => setShowAutocomplete(false), 150)}
-            returnKeyType="search"
-            placeholder={t('searchPlaceholder')}
-            placeholderTextColor={c.muted}
-            style={[styles.searchInput, { color: c.text }]}
-          />
-          {query.length > 0 && (
-            <Pressable onPress={() => { setQuery(''); setShowAutocomplete(false); }} hitSlop={iconHitSlop}>
-              <Ionicons name="close-circle" size={16} color={c.muted} />
+          {authToken && (
+            <Pressable
+              onPress={() => setShowNotifications(true)}
+              hitSlop={iconHitSlop}
+              style={{ width: 40, height: 40, borderRadius: RADIUS.full, backgroundColor: c.card, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' }}
+            >
+              <Ionicons name="notifications-outline" size={18} color={mutedText} />
+              {notifications.length > 0 && (
+                <View style={{ position: 'absolute', top: 3, right: 3, width: 8, height: 8, borderRadius: RADIUS.full, backgroundColor: c.error }} />
+              )}
             </Pressable>
           )}
-          <View style={[styles.searchDivider, { backgroundColor: c.border }]} />
-          <Pressable onPress={() => setShowFilters(!showFilters)} style={styles.searchFilterArea} hitSlop={iconHitSlop}>
-            <Ionicons name="options-outline" size={20} color={showFilters || activeFilterCount > 0 ? c.primary : c.muted} />
-            {activeFilterCount > 0 && (
-              <>
-                <Text style={{ ...TYPE.label, color: c.primary, textTransform: 'none', letterSpacing: 0.3 }}>Filter aktiv</Text>
-                <View style={[styles.filterBadge, { backgroundColor: c.primary }]}>
-                  <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
-                </View>
-              </>
-            )}
-          </Pressable>
         </View>
 
-        {showAutocomplete && acSuggestions.length > 0 && (
-          <View style={[styles.autocompleteBox, { backgroundColor: c.card, borderColor: c.primary }]}>
-            {acSuggestions.map((suggestion, index) => (
-              <Pressable
-                key={suggestion}
-                onPress={() => selectSuggestion(suggestion)}
-                style={[
-                  styles.acItem,
-                  index < acSuggestions.length - 1 && { borderBottomWidth: 1, borderBottomColor: c.border },
-                ]}
-              >
-                <Text style={[styles.acSearchIcon, { color: c.muted }]}>⌕</Text>
-                <Text style={[styles.acItemText, { color: c.text }]}>{suggestion}</Text>
-              </Pressable>
-            ))}
+        {!searched && (
+          <View style={styles.hero}>
+            <Text style={[styles.heroTitle, { color: c.text }]}>{t('heroTitle')}</Text>
+            <Text style={[styles.heroSub, { color: c.muted }]}>{t('heroSub')}</Text>
           </View>
         )}
-      </View>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
-        {quickChips.map((chip) => {
-          const active = activeChip?.label === chip.label;
-          return (
-            <Pressable
-              key={chip.label}
-              onPress={() => selectChip(chip)}
-              style={[
-                styles.chip,
-                active
-                  ? { backgroundColor: c.primary, borderColor: c.primary }
-                  : { backgroundColor: c.card, borderColor: c.border },
-              ]}
-            >
-              <Text style={[styles.chipText, { color: active ? '#FFFFFF' : c.text }]}>{chip.label}</Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
-
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SPACE.sm }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACE.sm, flex: 1 }}>
-          <Pressable
-            onPress={() => { setLocationSheetCity(locationLabel || city); setShowLocationSheet(true); }}
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderColor: city ? c.primary : c.border, borderRadius: RADIUS.full, paddingHorizontal: 12, paddingVertical: 7, maxWidth: 210, backgroundColor: c.card }}
+        <View style={{ zIndex: 10 }}>
+          <View
+            style={[
+              styles.searchBox,
+              { backgroundColor: c.card, borderColor: showAutocomplete && acSuggestions.length > 0 ? c.primary : c.border },
+            ]}
           >
-            <Ionicons name="location-outline" size={13} color={mutedText} />
-            <Text numberOfLines={1} style={{ ...TYPE.meta, color: city ? c.text : mutedText, flexShrink: 1 }}>
-              {locationLabel || city || t('locationPlaceholder')}
-            </Text>
-          </Pressable>
-        </View>
-        {showHeaderToggle ? headerToggle : null}
-      </View>
+            <Ionicons name="search-outline" size={18} color={c.muted} />
+            <TextInput
+              value={query}
+              onChangeText={(text) => {
+                setQuery(text);
+                setShowAutocomplete(true);
+                setActiveChip(null);
+              }}
+              onSubmitEditing={() => runSearch()}
+              onFocus={() => setShowAutocomplete(true)}
+              onBlur={() => setTimeout(() => setShowAutocomplete(false), 150)}
+              returnKeyType="search"
+              placeholder={t('searchPlaceholder')}
+              placeholderTextColor={c.muted}
+              style={[styles.searchInput, { color: c.text }]}
+            />
+            {query.length > 0 && (
+              <Pressable onPress={() => { setQuery(''); setShowAutocomplete(false); }} hitSlop={iconHitSlop}>
+                <Ionicons name="close-circle" size={16} color={c.muted} />
+              </Pressable>
+            )}
+            <View style={[styles.searchDivider, { backgroundColor: c.border }]} />
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Pressable onPress={() => { setLocationSheetCity(locationLabel || city); setShowLocationSheet(true); }} style={[styles.searchFilterArea, { paddingRight: 6 }]} hitSlop={iconHitSlop}>
+                <View>
+                  <Ionicons name="location-outline" size={20} color={city ? c.primary : c.muted} />
+                  {city && <View style={{ position: 'absolute', top: -1, right: -1, width: 7, height: 7, borderRadius: 4, backgroundColor: c.success, borderWidth: 1.5, borderColor: c.card }} />}
+                </View>
+              </Pressable>
+              <Pressable onPress={() => setShowFilters(!showFilters)} style={[styles.searchFilterArea, { paddingLeft: 6 }]} hitSlop={iconHitSlop}>
+                <Ionicons name="options-outline" size={20} color={showFilters || activeFilterCount > 0 ? c.primary : c.muted} />
+                {activeFilterCount > 0 && (
+                  <View style={[styles.filterBadge, { backgroundColor: c.primary }]}>
+                    <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
+                  </View>
+                )}
+              </Pressable>
+            </View>
+          </View>
 
-      {showFilters && (
-        <View style={[styles.filterPanel, { backgroundColor: c.card, borderColor: c.border }]}>
-          <Text style={[styles.filterSectionTitle, { color: c.muted }]}>{t('kassenartLabel')}</Text>
-          <View style={styles.kassenartRow}>
-            {kassenartOptions.map((option) => {
-              const active = kassenart === option.key;
-              return (
+          {showAutocomplete && acSuggestions.length > 0 && (
+            <View style={[styles.autocompleteBox, { backgroundColor: c.card, borderColor: c.primary }]}>
+              {acSuggestions.map((suggestion, index) => (
                 <Pressable
-                  key={String(option.key)}
-                  onPress={() => setKassenart(option.key)}
+                  key={suggestion}
+                  onPress={() => selectSuggestion(suggestion)}
                   style={[
-                    styles.kassenartBtn,
-                    active
-                      ? { backgroundColor: c.primary, borderColor: c.primary }
-                      : { backgroundColor: c.mutedBg, borderColor: c.border },
+                    styles.acItem,
+                    index < acSuggestions.length - 1 && { borderBottomWidth: 1, borderBottomColor: c.border },
                   ]}
                 >
-                  <Text style={[styles.kassenartText, { color: active ? '#FFFFFF' : c.text }]}>{option.label}</Text>
+                  <Text style={[styles.acSearchIcon, { color: c.muted }]}>⌕</Text>
+                  <Text style={[styles.acItemText, { color: c.text }]}>{suggestion}</Text>
                 </Pressable>
-              );
-            })}
-          </View>
-
-          <Text style={[styles.filterSectionTitle, { color: c.muted, marginTop: 14 }]}>{t('fortbildungLabel')}</Text>
-          {certificationOptions.map((option) => {
-            const checked = fortbildungen.includes(option.key);
-            return (
-              <Pressable key={option.key} onPress={() => toggleFortbildung(option.key)} style={styles.checkRow}>
-                <View style={[styles.checkbox, { borderColor: checked ? c.primary : c.border, backgroundColor: checked ? c.primary : 'transparent' }]}>
-                  {checked && <Text style={styles.checkmark}>✓</Text>}
-                </View>
-                <Text style={[styles.checkLabel, { color: c.text }]}>{option.label}</Text>
-              </Pressable>
-            );
-          })}
-
-          <View style={[styles.switchRow, { marginTop: 14, paddingTop: 14, borderTopWidth: 1, borderTopColor: c.border }]}>
-            <View>
-              <Text style={[styles.switchTitle, { color: c.text }]}>{t('homeVisitLabel')}</Text>
-              <Text style={[styles.switchLabel, { color: c.muted }]}>{t('homeVisitToggle')}</Text>
+              ))}
             </View>
-            <Switch value={homeVisit} onValueChange={setHomeVisit} trackColor={{ true: c.success }} />
-          </View>
+          )}
         </View>
-      )}
 
+        {!showFilters && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACE.sm }}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={{ flex: 1 }}
+              contentContainerStyle={styles.chipsRow}
+            >
+              {quickChips.map((chip) => {
+                const active = activeChip?.label === chip.label;
+                return (
+                  <Pressable
+                    key={chip.label}
+                    onPress={() => selectChip(chip)}
+                    style={[
+                      styles.chip,
+                      active
+                        ? { backgroundColor: c.primary, borderColor: c.primary }
+                        : { backgroundColor: c.card, borderColor: c.border },
+                    ]}
+                  >
+                    <Text style={[styles.chipText, { color: active ? '#FFFFFF' : c.text }]}>{chip.label}</Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+            {showHeaderToggle ? headerToggle : null}
+          </View>
+        )}
+
+        {showFilters ? filtersPanel : null}
+      </View>
+
+      {/* Scrollbare Ergebnisse */}
+      <ScrollView
+        ref={discoverScrollRef}
+        scrollEnabled={mapScrollEnabled}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: 20 }]}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        onTouchStart={() => { if (showFilters) setShowFilters(false); }}
+      >
       {(searched || results.length > 0) ? (
         <View style={styles.sectionRow}>
           <View style={{ flex: 1, gap: 4 }}>
@@ -469,7 +597,7 @@ export function DiscoverScreen(props) {
             </Text>
             <Text style={{ ...TYPE.meta, color: mutedText }}>
               {city ? `In ${city}` : 'Standort auswaehlen'}
-              {activeFilterCount > 0 ? ` · ${activeFilterCount} Filter aktiv` : ''}
+              {activeFilterCount > 0 ? ` · ${activeFilterCount} Filter` : ''}
             </Text>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -520,11 +648,33 @@ export function DiscoverScreen(props) {
               </View>
             )}
             {therapist.homeVisit && (
-              <View style={[styles.tag, { backgroundColor: c.successBg }]}>
-                <Text style={[styles.tagText, { color: c.success }]}>{t('homeVisitTag')}</Text>
+              <View style={[styles.tag, { backgroundColor: c.successBg, borderWidth: 1, borderColor: c.success }]}>
+                <Text style={[styles.tagText, { color: c.success }]}>🏠 {therapist.serviceRadiusKm ? `bis ${therapist.serviceRadiusKm} km` : t('homeVisitTag')}</Text>
+              </View>
+            )}
+            {therapist.kassenart && therapist.kassenart !== 'Alle' && (
+              <View style={[styles.tag, { backgroundColor: c.mutedBg }]}>
+                <Text style={[styles.tagText, { color: mutedText }]}>{therapist.kassenart}</Text>
+              </View>
+            )}
+            {therapist.requestable && (
+              <View style={[styles.tag, { backgroundColor: c.primaryBg, borderWidth: 1, borderColor: c.primary }]}>
+                <Text style={[styles.tagText, { color: c.primary }]}>Ersttermin anfragbar</Text>
               </View>
             )}
           </View>
+
+          {therapist.requestable && therapist.nextFreeSlotAt ? (
+            <Text style={{ ...TYPE.meta, color: c.primary }}>
+              Nächster Termin: {formatBookingDate(therapist.nextFreeSlotAt)}
+            </Text>
+          ) : null}
+
+          {therapist.requestable ? (
+            <Text style={{ ...TYPE.meta, color: c.primary }}>
+              Ersten Termin direkt über die App anfragen.
+            </Text>
+          ) : null}
 
           {therapist.fortbildungen?.length > 0 && (
             <View style={styles.tagRow}>
@@ -536,7 +686,7 @@ export function DiscoverScreen(props) {
             </View>
           )}
 
-          {therapist.practices?.length > 0 && (
+          {therapist.practices?.length > 0 ? (
             <Pressable onPress={() => openPractice(therapist.practices[0])} style={[styles.practiceBtn, { borderColor: c.border, backgroundColor: c.mutedBg }]}>
               <View style={[styles.practiceInitial, { backgroundColor: c.primary }]}>
                 <Text style={[styles.practiceInitialText, { color: '#FFFFFF' }]}>
@@ -557,13 +707,36 @@ export function DiscoverScreen(props) {
               )}
               <Text style={[styles.practiceArrow, { color: c.muted }]}>›</Text>
             </Pressable>
-          )}
+          ) : therapist.homeVisit && therapist.city ? (
+            <View style={[styles.practiceBtn, { borderColor: c.border, backgroundColor: c.mutedBg }]}>
+              <View style={[styles.practiceInitial, { backgroundColor: c.successBg }]}>
+                <Ionicons name="home-outline" size={16} color={c.success} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.practiceName, { color: c.text }]}>{therapist.city}</Text>
+                {therapist.availability ? (
+                  <Text style={[styles.practiceCity, { color: c.muted }]} numberOfLines={1}>{therapist.availability}</Text>
+                ) : null}
+              </View>
+              {therapist.distKm != null && (
+                <View style={[styles.distBadge, { backgroundColor: c.successBg }]}>
+                  <Text style={[styles.distBadgeText, { color: c.success }]}>{formatDist(therapist.distKm)}</Text>
+                </View>
+              )}
+            </View>
+          ) : null}
 
           <Pressable
             style={[styles.ctaBtn, { backgroundColor: c.primary, marginTop: 2 }]}
-            onPress={() => callPhone(therapist.practices?.[0]?.phone)}
+            onPress={() => therapist.practices?.[0]?.phone ? callPhone(therapist.practices[0].phone) : openTherapistById(therapist.id)}
           >
-            <Text style={styles.ctaBtnText}>Anrufen</Text>
+            <Text style={styles.ctaBtnText}>
+              {therapist.requestable
+                ? 'Ersttermin anfragen'
+                : therapist.practices?.[0]?.phone
+                  ? 'Anrufen'
+                  : 'Profil ansehen'}
+            </Text>
           </Pressable>
         </View>
       ))}
@@ -594,6 +767,7 @@ export function DiscoverScreen(props) {
           </View>
         </View>
       )}
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }

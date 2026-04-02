@@ -185,10 +185,16 @@ const radiusOptions = [1, 3, 5, 10, 25];
 const GENERIC_SEARCH_LABELS = ['physiotherapie', 'physio', 'therapeut', 'physiotherapeut', 'krankengymnastik'];
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:4000';
-const REG_STEPS = 4;
+const REG_STEPS = 5;
 const languageOptions = Object.keys(LANGUAGE_MAP);
 
 const getBaseUrl = () => BASE_URL;
+
+const resolveMediaUrl = (value) => {
+  if (!value || typeof value !== 'string') return value ?? null;
+  if (value.startsWith('http') || value.startsWith('data:')) return value;
+  return value.startsWith('/') ? `${BASE_URL}${value}` : value;
+};
 
 // Required to bypass tunnel interstitial pages in dev
 const TUNNEL_HEADERS = BASE_URL.includes('loca.lt')
@@ -234,13 +240,17 @@ const mapApiTherapist = (t) => ({
   city: t.city ?? '',
   bio: t.bio ?? '',
   kassenart: t.kassenart ?? null,
+  bookingMode: t.bookingMode ?? 'DIRECTORY_ONLY',
+  requestable: t.requestable ?? false,
+  nextFreeSlotAt: t.nextFreeSlotAt ?? null,
+  requestability: t.requestability ?? null,
   fortbildungen: parseStringOrArray(t.certifications),
   distKm: typeof t.distKm === 'number' ? t.distKm : null,
   verifiziert: true,
   behandlungsbereiche: parseStringOrArray(t.specializations),
   verfügbareZeiten: '',
   website: '',
-  photo: t.photo ? (t.photo.startsWith('http') ? t.photo : `${BASE_URL}${t.photo}`) : `https://i.pravatar.cc/96?u=${t.id}`,
+  photo: resolveMediaUrl(t.photo) ?? `https://i.pravatar.cc/96?u=${t.id}`,
   practices: (t.practices ?? []).map((p) => ({
     id: p.id,
     name: p.name,
@@ -252,7 +262,7 @@ const mapApiTherapist = (t) => ({
     lat: p.lat,
     lng: p.lng,
     distKm: typeof p.distKm === 'number' ? p.distKm : null,
-    logo: p.logo ? (p.logo.startsWith('http') ? p.logo : `${BASE_URL}${p.logo}`) : null,
+    logo: resolveMediaUrl(p.logo),
     photos: p.photos ?? [],
   })),
 });
@@ -262,7 +272,16 @@ const normalizeTherapistProfile = (therapist) => {
   return {
     ...therapist,
     languages: normalizeLanguageCodes(therapist.languages),
-    photo: therapist.photo ? (therapist.photo.startsWith('http') ? therapist.photo : `${BASE_URL}${therapist.photo}`) : therapist.photo,
+    photo: resolveMediaUrl(therapist.photo),
+    practices: Array.isArray(therapist.practices)
+      ? therapist.practices.map((practice) => ({
+          ...practice,
+          logo: resolveMediaUrl(practice.logo),
+          photos: Array.isArray(practice.photos)
+            ? practice.photos.map(resolveMediaUrl)
+            : practice.photos,
+        }))
+      : therapist.practices,
   };
 };
 
@@ -368,6 +387,7 @@ export {
   normalizeTherapistProfile,
   quickChips,
   regSpecOptions,
+  resolveMediaUrl,
   softenErrorMessage,
   tabs,
   GERMAN_CITIES,

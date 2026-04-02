@@ -12,9 +12,11 @@ export default function LoginPage() {
 
         <LoginForm />
 
-        <div className="login-hint">
-          Standard lokal: <strong>admin@revio.de</strong> / <strong>admin123</strong>
-        </div>
+        {process.env.NODE_ENV === 'development' ? (
+          <div className="login-hint">
+            Lokaler Hinweis: Admin-Zugangsdaten bitte nur in der Entwicklungsumgebung verwenden.
+          </div>
+        ) : null}
       </div>
     </div>
   );

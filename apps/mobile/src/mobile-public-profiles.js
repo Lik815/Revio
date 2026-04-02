@@ -1,22 +1,27 @@
 import React from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import {
+  Alert,
   ActivityIndicator,
   Image,
   Linking,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
   Share,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import {
   formatDist,
+  getBaseUrl,
   getLangLabel,
   getPracticeInitials,
   getPrimaryPractice,
   RADIUS,
+  resolveMediaUrl,
   softenErrorMessage,
   TYPE,
 } from './mobile-utils';
@@ -84,7 +89,7 @@ export function PracticeProfileScreen(props) {
 
       <View style={[styles.practiceHeader, { backgroundColor: c.card, borderColor: c.border }]}>
         {practice.logo ? (
-          <Image source={{ uri: practice.logo }} style={[styles.practiceLogoLarge, { borderRadius: RADIUS.md }]} />
+          <Image source={{ uri: resolveMediaUrl(practice.logo) }} style={[styles.practiceLogoLarge, { borderRadius: RADIUS.md }]} />
         ) : (
           <View style={[styles.practiceLogoLarge, { backgroundColor: c.primary }]}>
             <View style={styles.practiceLogoCross}>
@@ -181,6 +186,7 @@ export function TherapistProfileScreen(props) {
     c,
     callPhone,
     isFavorite,
+    onBookingSuccess,
     openPractice,
     setSelectedTherapist,
     styles,
@@ -191,8 +197,112 @@ export function TherapistProfileScreen(props) {
 
   const primaryPractice = getPrimaryPractice(th);
   const iconHitSlop = { top: 10, bottom: 10, left: 10, right: 10 };
+  const [showRequestForm, setShowRequestForm] = React.useState(false);
+  const [patientName, setPatientName] = React.useState('');
+  const [patientEmail, setPatientEmail] = React.useState('');
+  const [patientPhone, setPatientPhone] = React.useState('');
+  const [preferredDays, setPreferredDays] = React.useState([]);
+  const [preferredTimeWindows, setPreferredTimeWindows] = React.useState([]);
+  const [requestMessage, setRequestMessage] = React.useState('');
+  const [consentAccepted, setConsentAccepted] = React.useState(false);
+  const [requestLoading, setRequestLoading] = React.useState(false);
+  const [showBookingSuccessModal, setShowBookingSuccessModal] = React.useState(false);
+  const [bookingSuccessSummary, setBookingSuccessSummary] = React.useState({
+    preferredDays: [],
+    preferredTimeWindows: [],
+    message: '',
+  });
+  const requestDayOptions = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag'];
+  const requestTimeOptions = ['Vormittag', 'Nachmittag', 'Abend'];
+
+  const toggleRequestValue = (setter, current, value) => {
+    setter(current.includes(value) ? current.filter((item) => item !== value) : [...current, value]);
+  };
+
+  const formatBookingDate = (value) => {
+    if (!value) return '—';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return value;
+    return parsed.toLocaleString('de-DE', {
+      day: '2-digit',
+      month: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  const resetRequestForm = () => {
+    setShowRequestForm(false);
+    setPatientName('');
+    setPatientEmail('');
+    setPatientPhone('');
+    setPreferredDays([]);
+    setPreferredTimeWindows([]);
+    setRequestMessage('');
+    setConsentAccepted(false);
+  };
+
+  React.useEffect(() => {
+    resetRequestForm();
+    setShowBookingSuccessModal(false);
+    setBookingSuccessSummary({ preferredDays: [], preferredTimeWindows: [], message: '' });
+  }, [th.id]);
+
+  const handleSubmitBookingRequest = async () => {
+    if (!patientName.trim()) {
+      Alert.alert('Hinweis', 'Bitte deinen Namen eingeben');
+      return;
+    }
+    if (!patientEmail.trim() && !patientPhone.trim()) {
+      Alert.alert('Hinweis', 'Bitte E-Mail oder Telefonnummer angeben');
+      return;
+    }
+    if (!consentAccepted) {
+      Alert.alert('Hinweis', 'Bitte der Verarbeitung deiner Anfrage zustimmen');
+      return;
+    }
+    setRequestLoading(true);
+    try {
+      const res = await fetch(`${getBaseUrl()}/booking-requests`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          therapistId: th.id,
+          patientName: patientName.trim(),
+          patientEmail: patientEmail.trim() || undefined,
+          patientPhone: patientPhone.trim() || undefined,
+          preferredDays,
+          preferredTimeWindows,
+          message: requestMessage.trim() || undefined,
+          consentAccepted: true,
+        }),
+      });
+      if (res.ok) {
+        const successSummary = {
+          preferredDays: [...preferredDays],
+          preferredTimeWindows: [...preferredTimeWindows],
+          message: requestMessage.trim(),
+        };
+        await onBookingSuccess?.(th, {
+          preferredDays,
+          preferredTimeWindows,
+          message: requestMessage.trim(),
+        });
+        resetRequestForm();
+        setBookingSuccessSummary(successSummary);
+        setShowBookingSuccessModal(true);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        Alert.alert('Hinweis', softenErrorMessage(err.message ?? 'Hat nicht geklappt – bitte nochmal versuchen'));
+      }
+    } catch {
+      Alert.alert('Hinweis', 'Hat nicht geklappt – bitte nochmal versuchen');
+    }
+    setRequestLoading(false);
+  };
 
   return (
+    <>
     <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 20 }]}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <Pressable onPress={() => setSelectedTherapist(null)} style={styles.backBtn}>
@@ -236,16 +346,26 @@ export function TherapistProfileScreen(props) {
               </View>
             ))}
             {th.homeVisit && (
-              <View style={[styles.tag, { backgroundColor: c.successBg }]}>
-                <Text style={[styles.tagText, { color: c.success }]}>{t('homeVisitTag')}</Text>
+              <View style={[styles.tag, { backgroundColor: c.successBg, borderWidth: 1, borderColor: c.success }]}>
+                <Text style={[styles.tagText, { color: c.success }]}>🏠 {th.serviceRadiusKm ? `Hausbesuch bis ${th.serviceRadiusKm} km` : t('homeVisitTag')}</Text>
               </View>
             )}
+            {th.kassenart ? (
+              <View style={[styles.tag, { backgroundColor: c.mutedBg }]}>
+                <Text style={[styles.tagText, { color: c.muted }]}>{th.kassenart}</Text>
+              </View>
+            ) : null}
+            {th.requestable ? (
+              <View style={[styles.tag, { backgroundColor: c.primaryBg, borderWidth: 1, borderColor: c.primary }]}>
+                <Text style={[styles.tagText, { color: c.primary }]}>Ersttermin anfragbar</Text>
+              </View>
+            ) : null}
           </View>
         )}
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8, marginTop: 8 }}>
-          {primaryPractice?.city ? (
+          {(primaryPractice?.city || th.city) ? (
             <View style={[styles.metaPill, { backgroundColor: c.mutedBg }]}>
-              <Text style={[styles.metaPillText, { color: c.text }]}>{primaryPractice.city}</Text>
+              <Text style={[styles.metaPillText, { color: c.text }]}>{primaryPractice?.city || th.city}</Text>
             </View>
           ) : null}
           {th.distKm != null ? (
@@ -260,6 +380,166 @@ export function TherapistProfileScreen(props) {
           ) : null}
         </View>
       </View>
+
+      {th.homeVisit && (th.serviceRadiusKm || th.availability) && (
+        <View style={[styles.infoSection, { backgroundColor: c.successBg, borderColor: c.success, borderWidth: 1 }]}>
+          <Text style={[styles.filterSectionTitle, { color: c.success }]}>Hausbesuch</Text>
+          {th.serviceRadiusKm ? (
+            <View style={styles.detailInfoRow}>
+              <Text style={styles.detailIcon}>📍</Text>
+              <View>
+                <Text style={[styles.detailInfoLabel, { color: c.success }]}>Einzugsgebiet</Text>
+                <Text style={[styles.detailInfoValue, { color: c.text }]}>Bis {th.serviceRadiusKm} km</Text>
+              </View>
+            </View>
+          ) : null}
+          {th.availability ? (
+            <View style={styles.detailInfoRow}>
+              <Text style={styles.detailIcon}>🕐</Text>
+              <View>
+                <Text style={[styles.detailInfoLabel, { color: c.success }]}>{t('availabilityLabel')}</Text>
+                <Text style={[styles.detailInfoValue, { color: c.text }]}>{th.availability}</Text>
+              </View>
+            </View>
+          ) : null}
+        </View>
+      )}
+
+      {th.requestable && (
+        <View style={[styles.infoSection, { backgroundColor: c.primaryBg, borderColor: c.primary, borderWidth: 1 }]}>
+          <Text style={[styles.filterSectionTitle, { color: c.primary }]}>Ersttermin über Revio</Text>
+          <Text style={{ ...TYPE.body, color: c.text }}>
+            Dieser Therapeut kann direkt für einen ersten Termin angefragt werden.
+          </Text>
+          {th.nextFreeSlotAt ? (
+            <Text style={{ ...TYPE.meta, color: c.primary, marginTop: 8 }}>
+              Nächster freier Termin: {formatBookingDate(th.nextFreeSlotAt)}
+            </Text>
+          ) : null}
+          {!showRequestForm ? (
+            <Pressable
+              style={[styles.ctaBtn, { backgroundColor: c.primary, marginTop: 14 }]}
+              onPress={() => setShowRequestForm(true)}
+            >
+              <Text style={styles.ctaBtnText}>Ersttermin anfragen</Text>
+            </Pressable>
+          ) : (
+            <View style={{ gap: 10, marginTop: 14 }}>
+              <TextInput
+                style={[styles.registerInput, { color: c.text, borderColor: c.border, backgroundColor: c.card }]}
+                value={patientName}
+                onChangeText={setPatientName}
+                placeholder="Dein Name"
+                placeholderTextColor={c.muted}
+              />
+              <TextInput
+                style={[styles.registerInput, { color: c.text, borderColor: c.border, backgroundColor: c.card }]}
+                value={patientEmail}
+                onChangeText={setPatientEmail}
+                placeholder="E-Mail"
+                placeholderTextColor={c.muted}
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+              <TextInput
+                style={[styles.registerInput, { color: c.text, borderColor: c.border, backgroundColor: c.card }]}
+                value={patientPhone}
+                onChangeText={setPatientPhone}
+                placeholder="Telefonnummer"
+                placeholderTextColor={c.muted}
+                keyboardType="phone-pad"
+              />
+              <View>
+                <Text style={{ ...TYPE.label, color: c.muted, marginBottom: 6, textTransform: 'none' }}>Bevorzugte Tage</Text>
+                <View style={styles.tagRow}>
+                  {requestDayOptions.map((day) => (
+                    <Pressable
+                      key={day}
+                      onPress={() => toggleRequestValue(setPreferredDays, preferredDays, day)}
+                      style={[styles.kassenartBtn, {
+                        backgroundColor: preferredDays.includes(day) ? c.primary : c.card,
+                        borderColor: preferredDays.includes(day) ? c.primary : c.border,
+                      }]}
+                    >
+                      <Text style={[styles.kassenartText, { color: preferredDays.includes(day) ? '#fff' : c.text }]}>
+                        {day}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+              <View>
+                <Text style={{ ...TYPE.label, color: c.muted, marginBottom: 6, textTransform: 'none' }}>Bevorzugte Zeitfenster</Text>
+                <View style={styles.tagRow}>
+                  {requestTimeOptions.map((slot) => (
+                    <Pressable
+                      key={slot}
+                      onPress={() => toggleRequestValue(setPreferredTimeWindows, preferredTimeWindows, slot)}
+                      style={[styles.kassenartBtn, {
+                        backgroundColor: preferredTimeWindows.includes(slot) ? c.primary : c.card,
+                        borderColor: preferredTimeWindows.includes(slot) ? c.primary : c.border,
+                      }]}
+                    >
+                      <Text style={[styles.kassenartText, { color: preferredTimeWindows.includes(slot) ? '#fff' : c.text }]}>
+                        {slot}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+              <TextInput
+                style={[styles.inputField, {
+                  color: c.text,
+                  borderColor: c.border,
+                  backgroundColor: c.card,
+                  minHeight: 90,
+                  textAlignVertical: 'top',
+                }]}
+                value={requestMessage}
+                onChangeText={setRequestMessage}
+                placeholder="Kurze Nachricht (optional)"
+                placeholderTextColor={c.muted}
+                multiline
+              />
+              <Pressable
+                onPress={() => setConsentAccepted((value) => !value)}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 44 }}
+              >
+                <View style={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: 6,
+                  borderWidth: 1,
+                  borderColor: consentAccepted ? c.primary : c.border,
+                  backgroundColor: consentAccepted ? c.primary : c.card,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                  {consentAccepted ? <Ionicons name="checkmark" size={14} color="#fff" /> : null}
+                </View>
+                <Text style={{ ...TYPE.meta, color: c.text, flex: 1 }}>
+                  Ich stimme zu, dass meine Angaben für diese Terminanfrage verarbeitet werden.
+                </Text>
+              </Pressable>
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <Pressable
+                  style={[styles.registerBtn, { flex: 1, marginTop: 0, backgroundColor: c.border }]}
+                  onPress={resetRequestForm}
+                >
+                  <Text style={{ ...TYPE.heading, color: c.text }}>Abbrechen</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.registerBtn, { flex: 1, marginTop: 0, backgroundColor: requestLoading ? c.border : c.primary }]}
+                  onPress={handleSubmitBookingRequest}
+                  disabled={requestLoading}
+                >
+                  <Text style={styles.registerBtnText}>{requestLoading ? 'Senden…' : 'Anfrage senden'}</Text>
+                </Pressable>
+              </View>
+            </View>
+          )}
+        </View>
+      )}
 
       {th.bio ? (
         <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
@@ -349,7 +629,7 @@ export function TherapistProfileScreen(props) {
         </View>
       )}
 
-      {primaryPractice && (
+      {primaryPractice ? (
         <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
           <Text style={[styles.filterSectionTitle, { color: c.muted }]}>Schnellkontakt</Text>
           <Text style={{ color: c.text, fontSize: 16, fontWeight: '700' }}>{primaryPractice.name}</Text>
@@ -368,7 +648,14 @@ export function TherapistProfileScreen(props) {
             </Pressable>
           </View>
         </View>
-      )}
+      ) : th.homeVisit ? (
+        <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
+          <Text style={[styles.filterSectionTitle, { color: c.muted }]}>Kontakt</Text>
+          <Text style={{ color: c.muted, fontSize: 13, marginTop: 4 }}>
+            Dieser Therapeut kommt zu Ihnen nach Hause{th.city ? ` (${th.city})` : ''}.
+          </Text>
+        </View>
+      ) : null}
 
       {th.practices?.length > 0 && (
         <>
@@ -393,5 +680,65 @@ export function TherapistProfileScreen(props) {
         </>
       )}
     </ScrollView>
+    <Modal
+      visible={showBookingSuccessModal}
+      transparent
+      animationType="fade"
+      onRequestClose={() => setShowBookingSuccessModal(false)}
+    >
+      <Pressable
+        style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 24 }}
+        onPress={() => setShowBookingSuccessModal(false)}
+      >
+        <Pressable onPress={(e) => e.stopPropagation()}>
+          <View style={{ backgroundColor: c.card, borderRadius: RADIUS.lg, padding: 24, gap: 14 }}>
+            <View style={{ alignItems: 'center', gap: 10 }}>
+              <View style={{ width: 56, height: 56, borderRadius: RADIUS.full, backgroundColor: c.successBg, alignItems: 'center', justifyContent: 'center' }}>
+                <Ionicons name="checkmark" size={28} color={c.success} />
+              </View>
+              <Text style={{ ...TYPE.lg, color: c.text, textAlign: 'center' }}>Terminanfrage gesendet</Text>
+              <Text style={{ ...TYPE.body, color: c.muted, textAlign: 'center' }}>
+                Der Therapeut wurde in deinen Favoriten gespeichert. Deine Angaben bleiben dort lokal auf deinem Gerät sichtbar.
+              </Text>
+            </View>
+
+            {(bookingSuccessSummary.preferredDays.length > 0 || bookingSuccessSummary.preferredTimeWindows.length > 0 || bookingSuccessSummary.message) ? (
+              <View style={[styles.infoSection, { backgroundColor: c.mutedBg, borderColor: c.border, padding: 14 }]}>
+                <Text style={[styles.filterSectionTitle, { color: c.muted, marginBottom: 0 }]}>Deine Anfrage</Text>
+                {bookingSuccessSummary.preferredDays.length > 0 ? (
+                  <Text style={{ ...TYPE.meta, color: c.text }}>Wunschtage: {bookingSuccessSummary.preferredDays.join(', ')}</Text>
+                ) : null}
+                {bookingSuccessSummary.preferredTimeWindows.length > 0 ? (
+                  <Text style={{ ...TYPE.meta, color: c.text }}>Zeitfenster: {bookingSuccessSummary.preferredTimeWindows.join(', ')}</Text>
+                ) : null}
+                {bookingSuccessSummary.message ? (
+                  <Text style={{ ...TYPE.meta, color: c.muted }} numberOfLines={3}>{bookingSuccessSummary.message}</Text>
+                ) : null}
+              </View>
+            ) : null}
+
+            <View style={[styles.noticeBox, { backgroundColor: c.primaryBg, borderColor: c.border }]}>
+              <View style={[styles.lockBadge, { backgroundColor: c.card }]}>
+                <Ionicons name="time-outline" size={16} color={c.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.noticeTitle, { color: c.text }]}>Antwortzeit</Text>
+                <Text style={[styles.noticeBody, { color: c.muted }]}>
+                  Der Therapeut hat in der Regel bis zu 24 Stunden Zeit, um auf deine Anfrage zu reagieren.
+                </Text>
+              </View>
+            </View>
+
+            <Pressable
+              style={[styles.registerBtn, { marginTop: 0, backgroundColor: c.primary }]}
+              onPress={() => setShowBookingSuccessModal(false)}
+            >
+              <Text style={styles.registerBtnText}>Verstanden</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
+    </>
   );
 }
