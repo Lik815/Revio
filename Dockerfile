@@ -23,4 +23,5 @@ RUN cd apps/api && npx tsc -p tsconfig.json
 
 EXPOSE 4000
 
-CMD ["sh", "-c", "cd apps/api && npx prisma db push --schema prisma/schema.production.prisma --skip-generate && node dist/server.js"]
+WORKDIR /app/apps/api
+CMD ["sh", "start.sh"]
