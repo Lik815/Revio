@@ -15,7 +15,7 @@ export function LoginForm() {
         <input
           name="email"
           type="email"
-          placeholder="admin@revio.de"
+          placeholder="admin@my-revio.de"
           autoComplete="username"
           required
         />
