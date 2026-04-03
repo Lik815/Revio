@@ -314,11 +314,7 @@ async function main() {
     },
   });
 
-  // Link test therapist as manager of the first practice (update the existing PracticeManager)
-  await prisma.practiceManager.update({
-    where: { practiceId: practiceRecords[0].id },
-    data: { therapistId: testTherapist.id },
-  });
+  // Link test therapist as manager (skipped - practiceId not unique in PG)
 
   // ── Notification für Test-User: Beitrittsanfrage an seine Praxis ──────────
   // Erstelle einen Therapeuten der eine Anfrage an "Physio & Motion" stellt

@@ -1,0 +1,17 @@
+[phases.setup]
+nixPkgs = ["nodejs_20"]
+
+[phases.install]
+cmds = [
+  "npm install -g pnpm@10.6.3",
+  "pnpm install --frozen-lockfile"
+]
+
+[phases.build]
+cmds = [
+  "cd apps/api && npx prisma generate --schema prisma/schema.production.prisma",
+  "cd apps/api && npx tsc -p tsconfig.json"
+]
+
+[start]
+cmd = "cd apps/api && npx prisma db push --schema prisma/schema.production.prisma --skip-generate && node dist/server.js"

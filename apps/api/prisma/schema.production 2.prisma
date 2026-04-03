@@ -1,0 +1,248 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ReviewStatus {
+  DRAFT
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+  CHANGES_REQUESTED
+  SUSPENDED
+}
+
+enum LinkStatus {
+  PROPOSED
+  CONFIRMED
+  DISPUTED
+  REJECTED
+}
+
+enum SuggestionType {
+  THERAPIST_NAME
+  PRACTICE_NAME
+  SPECIALTY
+  CITY
+}
+
+enum Role {
+  therapist
+  manager
+  admin
+}
+
+enum BookingMode {
+  DIRECTORY_ONLY
+  FIRST_APPOINTMENT_REQUEST
+}
+
+enum BookingRequestStatus {
+  PENDING
+  CONFIRMED
+  DECLINED
+  EXPIRED
+}
+
+model User {
+  id                     String                  @id @default(cuid())
+  email                  String                  @unique
+  passwordHash           String?
+  sessionToken           String?                 @unique
+  role                   Role
+  emailVerificationToken      String?
+  emailVerifiedAt             DateTime?
+  requiresEmailVerification   Boolean   @default(false)
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  therapistProfile       Therapist?              @relation("TherapistUser")
+  managerProfile         PracticeManager?
+}
+
+model Therapist {
+  id                    String       @id @default(cuid())
+  email                 String       @unique
+  userId                String?      @unique
+  user                  User?        @relation("TherapistUser", fields: [userId], references: [id], onDelete: SetNull)
+  fullName              String
+  professionalTitle     String
+  city                  String
+  bio                   String?
+  homeVisit             Boolean      @default(false)
+  specializations       String
+  languages             String
+  certifications        String       @default("")
+  kassenart             String       @default("")
+  availability          String       @default("")
+  serviceRadiusKm       Float?
+  homeLat               Float        @default(0)
+  homeLng               Float        @default(0)
+  isVisible             Boolean      @default(true)
+  reviewStatus          ReviewStatus @default(PENDING_REVIEW)
+  passwordHash          String?
+  sessionToken          String?      @unique
+  photo                 String?
+  expoPushToken         String?
+  invitedByPracticeId   String?
+  onboardingStatus      String       @default("none")
+  visibilityPreference  String       @default("hidden")
+  isPublished           Boolean      @default(false)
+  bookingMode           BookingMode  @default(DIRECTORY_ONLY)
+  nextFreeSlotAt        DateTime?
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+  links                 TherapistPracticeLink[]
+  invitations           Invitation[]
+  managerAccount        PracticeManager? @relation("ManagerTherapist")
+  documents             TherapistDocument[]
+  bookingRequests       BookingRequest[]
+}
+
+model Practice {
+  id                String       @id @default(cuid())
+  name              String
+  city              String
+  address           String?
+  phone             String?
+  hours             String?
+  lat               Float        @default(0)
+  lng               Float        @default(0)
+  reviewStatus      ReviewStatus @default(PENDING_REVIEW)
+  description       String?
+  homeVisit         Boolean      @default(false)
+  inviteToken       String?      @unique
+  logo              String?
+  photos            String?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  links             TherapistPracticeLink[]
+  invitations       Invitation[]
+  assignments       ManagerPracticeAssignment[]
+}
+
+model PracticeManager {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  userId       String?   @unique
+  user         User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  passwordHash String
+  sessionToken String?   @unique
+  practiceId   String?
+  therapistId  String?   @unique
+  therapist    Therapist? @relation("ManagerTherapist", fields: [therapistId], references: [id])
+  assignments  ManagerPracticeAssignment[]
+  createdAt    DateTime  @default(now())
+}
+
+model Invitation {
+  id          String    @id @default(cuid())
+  token       String    @unique
+  therapistId String
+  practiceId  String
+  email       String
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdAt   DateTime  @default(now())
+  therapist   Therapist @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+  practice    Practice  @relation(fields: [practiceId], references: [id], onDelete: Cascade)
+}
+
+model SearchSuggestion {
+  id         String         @id @default(cuid())
+  text       String
+  normalized String
+  type       SuggestionType
+  entityId   String?
+  weight     Int            @default(1)
+
+  @@index([normalized])
+}
+
+model TherapistPracticeLink {
+  id           String     @id @default(cuid())
+  therapistId  String
+  practiceId   String
+  status       LinkStatus @default(PROPOSED)
+  initiatedBy  String     @default("THERAPIST") // "ADMIN" | "THERAPIST"
+  createdAt    DateTime   @default(now())
+  therapist    Therapist  @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+  practice     Practice   @relation(fields: [practiceId], references: [id], onDelete: Cascade)
+
+  @@unique([therapistId, practiceId])
+}
+
+model TherapistDocument {
+  id           String    @id @default(cuid())
+  therapistId  String
+  filename     String    // stored filename (UUID-based, no path)
+  originalName String    // original filename from upload
+  mimetype     String
+  uploadedAt   DateTime  @default(now())
+  therapist    Therapist @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+}
+
+model BookingRequest {
+  id                   String               @id @default(cuid())
+  therapistId          String
+  therapist            Therapist            @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+  status               BookingRequestStatus @default(PENDING)
+  patientName          String
+  patientEmail         String?
+  patientPhone         String?
+  preferredDays        String               @default("")
+  preferredTimeWindows String               @default("")
+  message              String?
+  consentAcceptedAt    DateTime
+  createdAt            DateTime             @default(now())
+  responseDueAt        DateTime
+  respondedAt          DateTime?
+  confirmedSlotAt      DateTime?
+
+  @@index([therapistId, status, createdAt])
+}
+
+model TherapistRemovalLog {
+  id          String   @id @default(cuid())
+  therapistId String
+  practiceId  String
+  managerId   String
+  createdAt   DateTime @default(now())
+}
+
+model PracticeDeletionLog {
+  id             String   @id @default(cuid())
+  practiceId     String
+  practiceName   String
+  managerId      String
+  reason         String
+  reasonDetail   String?
+  linkedTherapists Int    @default(0)
+  createdAt      DateTime @default(now())
+}
+
+model CertificationOption {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  label     String   @unique
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, sortOrder, label])
+}
+
+model ManagerPracticeAssignment {
+  id         String          @id @default(cuid())
+  managerId  String
+  practiceId String
+  manager    PracticeManager @relation(fields: [managerId], references: [id], onDelete: Cascade)
+  practice   Practice        @relation(fields: [practiceId], references: [id], onDelete: Cascade)
+  createdAt  DateTime        @default(now())
+
+  @@unique([managerId, practiceId])
+}
