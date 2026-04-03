@@ -1,6 +1,6 @@
 import { Resend } from 'resend';
 
-const FROM = 'Revio <revioclub.app@gmail.com>';
+const FROM = 'Revio <noreply@my-revio.de>';
 
 function getResend() {
   if (!process.env.RESEND_API_KEY) {
