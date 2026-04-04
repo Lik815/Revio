@@ -14,15 +14,21 @@ export default async function SettingsPage() {
     api.getSiteSettings(),
   ]);
   const activeCount = certifications.filter((option) => option.isActive).length;
+  const websiteStateLabel = siteSettings.underConstruction ? 'Under Construction aktiv' : 'Website normal sichtbar';
 
   return (
     <PageShell
       title="Einstellungen"
       description="Verwalte die wichtigsten globalen Optionen für Website und App, ohne unnötige Produktlogik aufzubauen."
       eyebrow="Konfiguration"
-      actions={<div className="hero-pill">{activeCount} Fortbildungen aktiv</div>}
+      actions={<div className="hero-pill">{websiteStateLabel} · {activeCount} Fortbildungen</div>}
     >
-      <article className="panel" style={{ marginBottom: 24 }}>
+      <div className="settings-subnav" aria-label="Einstellungsbereiche">
+        <a href="#website-settings" className="settings-chip settings-chip--active">Web settings</a>
+        <a href="#certification-settings" className="settings-chip">Fortbildungen</a>
+      </div>
+
+      <article id="website-settings" className="panel" style={{ marginBottom: 24 }}>
         <div className="panel-header">
           <div>
             <div className="kicker">Website</div>
@@ -37,17 +43,37 @@ export default async function SettingsPage() {
           </span>
         </div>
 
-        <div className="action-row" style={{ marginTop: 18 }}>
-          <form action={updateSiteUnderConstruction}>
-            <input type="hidden" name="underConstruction" value={siteSettings.underConstruction ? 'false' : 'true'} />
-            <button className={`primary-btn ${siteSettings.underConstruction ? 'primary-btn--muted' : ''}`} type="submit">
-              {siteSettings.underConstruction ? 'Website wieder freigeben' : 'Under Construction aktivieren'}
-            </button>
-          </form>
+        <div className="settings-feature-grid">
+          <div className="settings-feature-card">
+            <div className="settings-feature-card__label">Website</div>
+            <h4>Präsentationsseite</h4>
+            <p>
+              Mit diesem Schalter kannst du die öffentliche Website vorübergehend auf einen ruhigen „Under Construction“-Zustand setzen, ohne sie offline zu nehmen.
+            </p>
+            <div className="settings-feature-actions">
+              <form action={updateSiteUnderConstruction}>
+                <input type="hidden" name="underConstruction" value={siteSettings.underConstruction ? 'false' : 'true'} />
+                <button className={`primary-btn ${siteSettings.underConstruction ? 'primary-btn--muted' : ''}`} type="submit">
+                  {siteSettings.underConstruction ? 'Website wieder freigeben' : 'Under Construction aktivieren'}
+                </button>
+              </form>
+            </div>
+          </div>
+
+          <aside className="settings-status-card">
+            <div className="settings-status-card__eyebrow">Live-Status</div>
+            <strong>{siteSettings.underConstruction ? 'Under Construction aktiv' : 'Website normal sichtbar'}</strong>
+            <p>
+              Domain: <span>my-revio.de</span>
+            </p>
+            <p>
+              Der Schalter wirkt direkt auf die öffentliche Präsentationsseite und lässt Impressum sowie Datenschutz weiter erreichbar.
+            </p>
+          </aside>
         </div>
       </article>
 
-      <article className="panel">
+      <article id="certification-settings" className="panel">
         <div className="panel-header">
           <div>
             <div className="kicker">Fortbildungen</div>

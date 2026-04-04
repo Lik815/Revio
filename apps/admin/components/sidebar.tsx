@@ -16,7 +16,7 @@ const links = [
   { href: '/practices', label: 'Praxen', icon: 'M3 21h18M9 21V10m6 11V10M3 10l9-7 9 7' },
   { href: '/links', label: 'Verknüpfungen', icon: 'M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71' },
   { href: '/managers', label: 'Manager', icon: 'M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 3a4 4 0 100 8 4 4 0 000-8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75' },
-  { href: '/settings', label: 'Fortbildungen', icon: 'M4 19.5A2.5 2.5 0 016.5 17H20M4 19.5A2.5 2.5 0 014 17V4h16v13M4 19.5V21' },
+  { href: '/settings', label: 'Einstellungen', icon: 'M4 19.5A2.5 2.5 0 016.5 17H20M4 19.5A2.5 2.5 0 014 17V4h16v13M4 19.5V21' },
 ];
 
 export function Sidebar({

@@ -1,13 +1,11 @@
 import Link from 'next/link';
+import { Brand } from './brand';
 
 export function MaintenanceScreen() {
   return (
     <main className="maintenance-shell">
       <div className="maintenance-card">
-        <div className="brand brand--maintenance" aria-label="Revio">
-          <span className="brand-mark">R</span>
-          <span className="brand-word">evio</span>
-        </div>
+        <Brand variant="maintenance" />
         <div className="eyebrow">Under Construction</div>
         <h1 className="maintenance-title">Die Website wird gerade überarbeitet.</h1>
         <p className="maintenance-copy">

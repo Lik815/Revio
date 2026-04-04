@@ -57,3 +57,27 @@ export const principles = [
   'Vertrauen statt Marktplatzgefühl',
   'Ein digitales Produkt, das medizinisch ernst genommen werden kann',
 ];
+
+export const showcaseScreens = [
+  {
+    src: '/screenshot-1.png',
+    alt: 'Revio Suche mit passenden Physiotherapeut:innen in der App',
+    title: 'Suche mit klarem Fokus',
+    body: 'Beschwerden, Ort und mobile Behandlung werden ruhig und verständlich zusammengeführt.',
+    tone: 'left' as const,
+  },
+  {
+    src: '/screenshot-2.png',
+    alt: 'Revio Favoritenansicht mit gespeicherten Therapeut:innen',
+    title: 'Favoriten mit Gedächtnis',
+    body: 'Gefundene Therapeut:innen bleiben schnell wieder auffindbar, ohne dass die App unnötig kompliziert wird.',
+    tone: 'center' as const,
+  },
+  {
+    src: '/screenshot-3.png',
+    alt: 'Revio Optionen und ruhige Kontoansicht in der App',
+    title: 'Ruhige Produktoberfläche',
+    body: 'Die App bleibt bewusst reduziert und wirkt eher wie ein hochwertiges Gesundheitsprodukt als wie ein Marktplatz.',
+    tone: 'right' as const,
+  },
+];

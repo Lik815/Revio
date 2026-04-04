@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { Brand } from './brand';
 import { siteConfig } from '../lib/content';
 
 export function SiteFooter() {
@@ -6,10 +7,7 @@ export function SiteFooter() {
     <footer className="site-footer">
       <div className="shell site-footer__grid">
         <div>
-          <div className="brand brand--footer">
-            <span className="brand-mark">R</span>
-            <span className="brand-word">evio</span>
-          </div>
+          <Brand variant="footer" />
           <p className="site-footer__copy">
             Revio ist ein ruhiger, hochwertiger Zugang zu moderner Physiotherapie.
           </p>

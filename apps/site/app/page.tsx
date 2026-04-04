@@ -1,7 +1,8 @@
+import Image from 'next/image';
 import Link from 'next/link';
 import { Hero } from '../components/hero';
 import { Section } from '../components/section';
-import { homeHighlights, patientBenefits, therapistBenefits } from '../lib/content';
+import { homeHighlights, patientBenefits, showcaseScreens, therapistBenefits } from '../lib/content';
 
 export default function HomePage() {
   return (
@@ -24,15 +25,24 @@ export default function HomePage() {
             <p>Revio ist als App für iOS und Android verfügbar. Suche nach Beschwerde, finde geprüfte Therapeut:innen in deiner Nähe und nimm direkt Kontakt auf.</p>
           </div>
           <div className="phone-row">
-            <div className="phone-frame phone-frame--left">
-              <img src="/screenshot-1.png" alt="Revio App – Suche" />
-            </div>
-            <div className="phone-frame phone-frame--center">
-              <img src="/screenshot-2.png" alt="Revio App – Favoriten" />
-            </div>
-            <div className="phone-frame phone-frame--right">
-              <img src="/screenshot-3.png" alt="Revio App – Optionen" />
-            </div>
+            {showcaseScreens.map((screen) => (
+              <article key={screen.src} className={`showcase-card showcase-card--${screen.tone}`}>
+                <div className={`phone-frame phone-frame--${screen.tone}`}>
+                  <Image
+                    src={screen.src}
+                    alt={screen.alt}
+                    width={1179}
+                    height={2556}
+                    sizes="(max-width: 720px) 82vw, (max-width: 1080px) 32vw, 260px"
+                    className="showcase-image"
+                  />
+                </div>
+                <div className="showcase-card__meta">
+                  <h3>{screen.title}</h3>
+                  <p>{screen.body}</p>
+                </div>
+              </article>
+            ))}
           </div>
         </div>
       </section>
