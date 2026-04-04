@@ -1,6 +1,6 @@
 {
   "framework": "nextjs",
-  "installCommand": "cd ../.. && pnpm install --frozen-lockfile",
-  "buildCommand": "cd ../.. && pnpm --filter @revio/site build",
+  "installCommand": "npm ci",
+  "buildCommand": "npm run build",
   "outputDirectory": ".next"
 }
