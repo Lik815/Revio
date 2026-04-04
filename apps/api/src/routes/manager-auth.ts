@@ -608,7 +608,7 @@ export const managerAuthRoutes: FastifyPluginAsync = async (fastify) => {
       data: { token: inviteToken, therapistId: newTherapist.id, practiceId: practice.id, email, expiresAt },
     });
 
-    const baseUrl = process.env.MOBILE_URL ?? 'http://localhost:8081';
+    const baseUrl = process.env.MOBILE_URL ?? 'https://my-revio.de';
     const inviteLink = `${baseUrl}/invite?token=${inviteToken}`;
 
     try {

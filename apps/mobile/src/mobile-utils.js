@@ -184,7 +184,7 @@ const radiusOptions = [1, 3, 5, 10, 25];
 
 const GENERIC_SEARCH_LABELS = ['physiotherapie', 'physio', 'therapeut', 'physiotherapeut', 'krankengymnastik'];
 
-const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:4000';
+const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://api.my-revio.de';
 const REG_STEPS = 5;
 const languageOptions = Object.keys(LANGUAGE_MAP);
 

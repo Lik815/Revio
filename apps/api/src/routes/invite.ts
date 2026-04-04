@@ -101,7 +101,7 @@ export const inviteRoutes: FastifyPluginAsync = async (fastify) => {
       },
     });
 
-    const baseUrl = process.env.MOBILE_URL ?? 'http://localhost:8081';
+    const baseUrl = process.env.MOBILE_URL ?? 'https://my-revio.de';
     const inviteLink = `${baseUrl}/invite?token=${inviteToken}`;
 
     // Send invitation email (best-effort — don't fail the request if mail fails)
@@ -316,7 +316,7 @@ export const inviteRoutes: FastifyPluginAsync = async (fastify) => {
       },
     });
 
-    const baseUrl = process.env.MOBILE_URL ?? 'http://localhost:8081';
+    const baseUrl = process.env.MOBILE_URL ?? 'https://my-revio.de';
     const inviteLink = `${baseUrl}/invite?token=${inviteToken}`;
 
     try {

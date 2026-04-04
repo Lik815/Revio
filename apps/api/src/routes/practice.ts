@@ -399,7 +399,7 @@ export const practiceRoutes: FastifyPluginAsync = async (fastify) => {
       data: { token: inviteToken, therapistId: newTherapist.id, practiceId: practice.id, email, expiresAt },
     });
 
-    const baseUrl = process.env.MOBILE_URL ?? 'http://localhost:8081';
+    const baseUrl = process.env.MOBILE_URL ?? 'https://my-revio.de';
     const inviteLink = `${baseUrl}/invite?token=${inviteToken}`;
 
     try {
@@ -442,7 +442,7 @@ export const practiceRoutes: FastifyPluginAsync = async (fastify) => {
       data: { token: inviteToken, therapistId, practiceId: practice.id, email: target.email, expiresAt },
     });
 
-    const baseUrl = process.env.MOBILE_URL ?? 'http://localhost:8081';
+    const baseUrl = process.env.MOBILE_URL ?? 'https://my-revio.de';
     const inviteLink = `${baseUrl}/invite?token=${inviteToken}`;
 
     try {
