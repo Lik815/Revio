@@ -39,3 +39,4 @@ revioApp/
 
 # Uploaded user files (use S3/CDN in production)
 apps/api/uploads/
+.next_stale_*/
