@@ -470,45 +470,6 @@ export function DiscoverScreen(props) {
           </View>
         )}
 
-        {/* ── Problem categories ─────────────────────────────────────── */}
-        {!searched && (
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingBottom: 4 }}>
-            {[
-              { icon: '🦴', label: 'Rücken & Wirbelsäule', query: 'Rückenschmerzen' },
-              { icon: '🦵', label: 'Knie & Hüfte', query: 'Kniereha' },
-              { icon: '💪', label: 'Schulter & Nacken', query: 'Nackenschmerzen' },
-              { icon: '⚽', label: 'Sportverletzungen', query: 'Sportphysiotherapie' },
-              { icon: '🧠', label: 'Neurologische Reha', query: 'Neurologische Rehabilitation' },
-              { icon: '🏠', label: 'Hausbesuch', query: 'Hausbesuch' },
-              { icon: '👶', label: 'Kinder-Physio', query: 'Pädiatrische Physiotherapie' },
-              { icon: '💆', label: 'Manuelle Therapie', query: 'Manualtherapie' },
-            ].map((cat) => (
-              <Pressable
-                key={cat.label}
-                onPress={() => {
-                  setQuery(cat.query);
-                  setActiveChip(null);
-                  runSearchWith(cat.query, userCoords);
-                }}
-                style={{
-                  flexBasis: '47%',
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 10,
-                  paddingVertical: 12,
-                  paddingHorizontal: 14,
-                  borderRadius: RADIUS.md,
-                  backgroundColor: c.card,
-                  borderWidth: 1,
-                  borderColor: c.border,
-                }}
-              >
-                <Text style={{ fontSize: 20 }}>{cat.icon}</Text>
-                <Text numberOfLines={1} style={{ fontSize: 13, fontWeight: '600', color: c.text, flex: 1 }}>{cat.label}</Text>
-              </Pressable>
-            ))}
-          </View>
-        )}
 
         <View style={{ zIndex: 10 }}>
           <View
