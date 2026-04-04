@@ -182,10 +182,11 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       where: { emailVerificationToken: token },
     });
     if (!user) {
+      reply.header('Content-Type', 'text/html; charset=utf-8');
       return reply.code(400).send(`
-        <html><body style="font-family:sans-serif;text-align:center;padding:60px">
+        <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="font-family:sans-serif;text-align:center;padding:60px 20px;background:#f9fafb">
           <h2 style="color:#e05a77">Ungültiger oder abgelaufener Link</h2>
-          <p>Bitte registriere dich erneut oder kontaktiere den Support.</p>
+          <p style="color:#6b7280">Bitte registriere dich erneut oder kontaktiere den Support.</p>
         </body></html>
       `);
     }
@@ -195,10 +196,10 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       data: { emailVerifiedAt: new Date(), emailVerificationToken: null },
     });
 
-    reply.header('Content-Type', 'text/html');
+    reply.header('Content-Type', 'text/html; charset=utf-8');
     return reply.send(`
       <html>
-        <head><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+        <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
         <body style="font-family:sans-serif;text-align:center;padding:60px 20px;background:#f9fafb">
           <div style="max-width:400px;margin:0 auto;background:#fff;border-radius:16px;padding:40px;box-shadow:0 2px 12px rgba(0,0,0,0.08)">
             <div style="font-size:48px;margin-bottom:16px">✅</div>
