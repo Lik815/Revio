@@ -4756,8 +4756,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    borderWidth: 1,
-    borderRadius: RADIUS.md,
     paddingHorizontal: 16,
     paddingVertical: 14,
     minHeight: 56,
