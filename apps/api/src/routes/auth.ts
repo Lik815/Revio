@@ -451,6 +451,16 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     return { success: true };
   });
 
+  fastify.patch('/auth/push-token', async (request, reply) => {
+    const token = getToken(request);
+    if (!token) return reply.unauthorized('Kein Token');
+    const { expoPushToken } = z.object({ expoPushToken: z.string() }).parse(request.body);
+    const therapist = await fastify.prisma.therapist.findUnique({ where: { sessionToken: token } });
+    if (!therapist) return reply.unauthorized('Ungültiger Token');
+    await fastify.prisma.therapist.update({ where: { id: therapist.id }, data: { expoPushToken } });
+    return { success: true };
+  });
+
   // Returns the document list for the authenticated therapist (no stored filenames exposed)
   fastify.get('/auth/documents', async (request, reply) => {
     const token = getToken(request);

@@ -8,6 +8,7 @@ import { geocodeAddress } from '../utils/geocode.js';
 import { tryEnsurePracticeLogoAsset } from '../../prisma/practice-logo.js';
 import { getTherapistPublicationState } from '../utils/profile-completeness.js';
 import { sendProfileApprovedEmail, sendProfileRejectedEmail, sendProfileChangesRequestedEmail } from '../utils/mailer.js';
+import { sendPushNotification } from '../utils/push.js';
 import { ensureDefaultCertificationOptions } from '../utils/certification-options.js';
 import { getPublicSiteSettings, setBooleanAppSetting, SITE_UNDER_CONSTRUCTION_KEY } from '../utils/app-settings.js';
 
@@ -405,6 +406,15 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
     sendProfileApprovedEmail({ to: t.email, name: t.fullName }).catch((err) =>
       fastify.log.error({ err }, 'Failed to send profile approved email'),
     );
+
+    if (t.expoPushToken) {
+      sendPushNotification(
+        t.expoPushToken,
+        '🎉 Profil freigegeben!',
+        'Dein Revio-Profil wurde vom Admin bestätigt. Du bist jetzt sichtbar.',
+        { type: 'profile_approved' },
+      ).catch(() => {});
+    }
 
     return {
       message: 'Therapeut freigegeben.',

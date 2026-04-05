@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import * as Sharing from 'expo-sharing';
+import * as Notifications from 'expo-notifications';
 import {
   ActivityIndicator,
   Animated,
@@ -93,14 +94,14 @@ const ICON_HIT_SLOP = { top: 10, bottom: 10, left: 10, right: 10 };
 
 // ─── App ──────────────────────────────────────────────────────────────────────
 
-function callPhone(phone) {
+function callPhone(phone, t) {
   if (!phone) {
-    Alert.alert('Keine Nummer', 'Für diesen Therapeuten ist keine Telefonnummer hinterlegt.');
+    Alert.alert(t('alertNoPhone'), t('alertNoPhoneBody'));
     return;
   }
-  Alert.alert(phone, 'Jetzt anrufen?', [
-    { text: 'Anrufen', onPress: () => Linking.openURL(`tel:${phone}`) },
-    { text: 'Abbrechen', style: 'cancel' },
+  Alert.alert(phone, t('callBtn') + '?', [
+    { text: t('callBtn'), onPress: () => Linking.openURL(`tel:${phone}`) },
+    { text: t('cancelBtn'), style: 'cancel' },
   ]);
 }
 
@@ -230,8 +231,8 @@ export default function App() {
       const exists = prev.some(f => f.id === therapist.id);
       const next = exists ? prev.filter(f => f.id !== therapist.id) : [...prev, therapist];
       AsyncStorage.setItem('revio_favorites', JSON.stringify(next));
-      if (!exists) showToast(`♥ ${therapist.fullName} gespeichert`);
-      else showToast(`${therapist.fullName} entfernt`);
+      if (!exists) showToast(t('favSaved').replace('{name}', therapist.fullName));
+      else showToast(`${therapist.fullName} ✕`);
       return next;
     });
   };
@@ -251,8 +252,8 @@ export default function App() {
       const exists = prev.some(f => f.id === practice.id);
       const next = exists ? prev.filter(f => f.id !== practice.id) : [...prev, practiceData];
       AsyncStorage.setItem('revio_fav_practices', JSON.stringify(next));
-      if (!exists) showToast(`♥ ${practice.name} gespeichert`);
-      else showToast(`${practice.name} entfernt`);
+      if (!exists) showToast(t('favSaved').replace('{name}', practice.name));
+      else showToast(`${practice.name} ✕`);
       return next;
     });
   };
@@ -490,7 +491,7 @@ export default function App() {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        setEmailVerifyError(err.message ?? 'Bestätigung fehlgeschlagen.');
+        setEmailVerifyError(err.message ?? t('alertVerifyFailed'));
         setEmailVerifyStatus('error');
         return;
       }
@@ -510,7 +511,7 @@ export default function App() {
       setEmailVerifyStatus('success');
       setTimeout(() => setShowEmailVerify(false), 2500);
     } catch {
-      setEmailVerifyError('Verbindungsfehler. Bitte prüfe deine Internetverbindung.');
+      setEmailVerifyError(t('alertConnectionError') + '. ' + t('alertConnectionErrorBody'));
       setEmailVerifyStatus('error');
     }
   };
@@ -537,7 +538,7 @@ export default function App() {
           const res = await fetch(`${getBaseUrl()}/invite/validate?token=${encodeURIComponent(token)}`);
           if (!res.ok) {
             const err = await res.json().catch(() => ({}));
-            setInviteClaimError(err.message ?? 'Ungültige Einladung');
+            setInviteClaimError(err.message ?? t('alertInvalidInvite'));
             setShowInviteClaim(true);
             return;
           }
@@ -552,7 +553,7 @@ export default function App() {
           setShowRegister(false);
           setShowInviteClaim(true);
         } catch {
-          setInviteClaimError('Verbindungsfehler beim Validieren der Einladung.');
+          setInviteClaimError(t('alertInviteConnectionError'));
           setShowInviteClaim(true);
         } finally {
           setInviteClaimLoading(false);
@@ -599,6 +600,19 @@ export default function App() {
     return () => clearInterval(notificationPollRef.current);
   }, [authToken]);
 
+  const registerPushToken = async (token) => {
+    try {
+      const { status } = await Notifications.requestPermissionsAsync();
+      if (status !== 'granted') return;
+      const { data: expoPushToken } = await Notifications.getExpoPushTokenAsync();
+      await fetch(`${getBaseUrl()}/auth/push-token`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ expoPushToken }),
+      });
+    } catch { /* best-effort */ }
+  };
+
   const handleLogin = async () => {
     setLoginError('');
     setLoginLoading(true);
@@ -610,7 +624,7 @@ export default function App() {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        setLoginError(err.message ?? 'Ungültige Zugangsdaten');
+        setLoginError(err.message ?? t('alertInvalidCredentials'));
         return;
       }
       const data = await res.json();
@@ -636,6 +650,7 @@ export default function App() {
         if (profileRes.ok) {
           const profile = normalizeTherapistProfile(await profileRes.json());
           setLoggedInTherapist(profile);
+          registerPushToken(data.token);
           if (!profile.photo) {
             const dismissed = await AsyncStorage.getItem('revio_photo_prompt_dismissed');
             if (!dismissed) setShowPhotoPrompt(true);
@@ -646,7 +661,7 @@ export default function App() {
       setLoginEmail('');
       setLoginPassword('');
     } catch {
-      setLoginError('Verbindungsfehler. Bitte prüfe deine Internetverbindung.');
+      setLoginError(t('alertConnectionError') + '. ' + t('alertConnectionErrorBody'));
     } finally {
       setLoginLoading(false);
     }
@@ -681,9 +696,9 @@ export default function App() {
 
   const handleDeleteAccount = () => {
     if (loggedInTherapist?.adminPractice) {
-      const msg = `Du bist Admin von „${loggedInTherapist.adminPractice.name}". Bitte lösche zuerst die Praxis, bevor du dein Konto löschst.`;
-      if (Platform.OS === 'web') { showWebAlert(`Praxis zuerst löschen\n\n${msg}`); }
-      else { Alert.alert('Praxis zuerst löschen', msg, [{ text: 'OK' }]); }
+      const msg = t('alertDeleteAdminWarning').replace('{name}', loggedInTherapist.adminPractice.name);
+      if (Platform.OS === 'web') { showWebAlert(msg); }
+      else { Alert.alert(t('alertHint'), msg, [{ text: 'OK' }]); }
       return;
     }
     const msg = t('deleteAccountConfirmMsg');
@@ -691,7 +706,7 @@ export default function App() {
       if (showWebConfirm(`${t('deleteAccountConfirmTitle')}\n\n${msg}`)) deleteAccountConfirmed();
     } else {
       Alert.alert(t('deleteAccountConfirmTitle'), msg, [
-        { text: t('cancelBtn') ?? 'Abbrechen', style: 'cancel' },
+        { text: t('cancelBtn'), style: 'cancel' },
         { text: t('deleteAccountConfirmBtn'), style: 'destructive', onPress: deleteAccountConfirmed },
       ]);
     }
@@ -741,10 +756,10 @@ export default function App() {
           if (meRes.ok) setLoggedInTherapist(normalizeTherapistProfile(await meRes.json()));
         }
       } else {
-        Alert.alert('Fehler', 'Praxis konnte nicht gelöscht werden.');
+        Alert.alert(t('alertError'), t('alertPracticeDeleteFail'));
       }
     } catch {
-      Alert.alert('Fehler', 'Verbindungsfehler beim Löschen.');
+      Alert.alert(t('alertError'), t('alertDeleteConnectionError'));
     } finally {
       setDeletionLoading(false);
     }
@@ -788,13 +803,13 @@ export default function App() {
         });
         if (profileRes.ok) setLoggedInTherapist(normalizeTherapistProfile(await profileRes.json()));
         setEditMode(false);
-        Alert.alert('Gespeichert', 'Dein Profil wurde erfolgreich aktualisiert.');
+        Alert.alert(t('alertSaved'), t('alertProfileSaved'));
       } else {
         const err = await res.json().catch(() => ({}));
-        Alert.alert('Fehler', err.message ?? 'Profil konnte nicht gespeichert werden.');
+        Alert.alert(t('alertError'), err.message ?? t('alertProfileSaveFail'));
       }
     } catch {
-      Alert.alert('Verbindungsfehler', 'Bitte prüfe deine Internetverbindung.');
+      Alert.alert(t('alertConnectionError'), t('alertConnectionErrorBody'));
     }
     setProfileSaving(false);
   };
@@ -829,13 +844,13 @@ export default function App() {
       if (uploadRes.ok) {
         await uploadRes.json();
         setLoggedInTherapist(prev => ({ ...prev, photo: uri }));
-        Alert.alert('Erfolg', 'Profilbild gespeichert.');
+        Alert.alert(t('alertSuccess'), t('alertAvatarSaved'));
       } else {
         const status = uploadRes.status;
-        Alert.alert('Fehler', `Foto konnte nicht hochgeladen werden (${status}).`);
+        Alert.alert(t('alertError'), t('alertPhotoUploadFail') + ` (${status})`);
       }
     } catch {
-      Alert.alert('Verbindungsfehler', 'Bitte prüfe deine Internetverbindung.');
+      Alert.alert(t('alertConnectionError'), t('alertConnectionErrorBody'));
     }
   };
 
@@ -865,13 +880,13 @@ export default function App() {
       if (res.ok) {
         const { id, originalName } = await res.json();
         setTherapistDocuments((prev) => [{ id, originalName, mimetype: asset.mimeType }, ...prev]);
-        Alert.alert('Hochgeladen', `„${originalName}" wurde erfolgreich übermittelt.`);
+        Alert.alert(t('alertUploaded'), t('alertUploadedBody').replace('{name}', originalName));
       } else {
         const errData = await res.json().catch(() => ({}));
-        Alert.alert('Fehler', errData.message ?? 'Dokument konnte nicht hochgeladen werden.');
+        Alert.alert(t('alertError'), errData.message ?? t('alertDocUploadFail'));
       }
     } catch {
-      Alert.alert('Verbindungsfehler', 'Bitte prüfe deine Internetverbindung.');
+      Alert.alert(t('alertConnectionError'), t('alertConnectionErrorBody'));
     } finally {
       setDocumentUploading(false);
     }
@@ -880,7 +895,7 @@ export default function App() {
   // Practice: create new practice
   const handleCreatePractice = async () => {
     if (!authToken || !createPracticeName.trim() || !createPracticeCity.trim()) {
-      Alert.alert('Fehlende Angaben', 'Name und Stadt sind Pflichtfelder.');
+      Alert.alert(t('alertMissingFields'), t('alertMissingFieldsBody'));
       return;
     }
     setCreatePracticeLoading(true);
@@ -904,13 +919,13 @@ export default function App() {
         setCreatePracticeName(''); setCreatePracticeCity('');
         setCreatePracticeAddress(''); setCreatePracticePhone(''); setCreatePracticeHours('');
         setShowCreatePractice(false);
-        Alert.alert('Praxis erstellt', 'Deine Praxis wurde erfolgreich erstellt.');
+        Alert.alert(t('alertPracticeCreated'), t('alertPracticeCreatedBody'));
       } else {
         const err = await res.json().catch(() => ({}));
-        Alert.alert('Fehler', err.message ?? 'Praxis konnte nicht erstellt werden.');
+        Alert.alert(t('alertError'), err.message ?? t('alertPracticeDeleteFail'));
       }
     } catch {
-      Alert.alert('Verbindungsfehler', 'Bitte prüfe deine Internetverbindung.');
+      Alert.alert(t('alertConnectionError'), t('alertConnectionErrorBody'));
     } finally {
       setCreatePracticeLoading(false);
     }
@@ -938,13 +953,13 @@ export default function App() {
         headers: { Authorization: `Bearer ${authToken}` },
       });
       if (res.ok) {
-        Alert.alert('Anfrage gesendet', 'Deine Verbindungsanfrage wurde gesendet. Die Praxis muss sie bestätigen.');
+        Alert.alert(t('alertRequestSent'), t('alertRequestSentBody'));
       } else {
         const err = await res.json().catch(() => ({}));
-        Alert.alert('Hinweis', err.message ?? 'Anfrage konnte nicht gesendet werden.');
+        Alert.alert(t('alertHint'), err.message ?? t('alertRequestFail'));
       }
     } catch {
-      Alert.alert('Verbindungsfehler', 'Bitte prüfe deine Internetverbindung.');
+      Alert.alert(t('alertConnectionError'), t('alertConnectionErrorBody'));
     }
   };
 
@@ -957,9 +972,9 @@ export default function App() {
         setSelectedTherapist(mapApiTherapist(data.therapist));
         return;
       }
-      Alert.alert('Therapeut konnte nicht geladen werden', 'Bitte pruefe, ob die API erreichbar ist und versuche es erneut.');
+      Alert.alert(t('alertTherapistLoadFail'), t('alertTherapistLoadFailBody'));
     } catch {
-      Alert.alert('Verbindungsfehler', 'Die Therapeuten-Details konnten nicht geladen werden. Bitte pruefe die API-Verbindung der Expo-App.');
+      Alert.alert(t('alertConnectionError'), t('alertTherapistLoadFailDetail'));
     }
   };
 
@@ -989,7 +1004,7 @@ export default function App() {
   // Practice: create new therapist profile and send invitation
   const handleCreateTherapist = async () => {
     if (!createTherapistName.trim() || !createTherapistEmail.trim() || !createTherapistTitle.trim()) {
-      setCreateTherapistError('Bitte alle Pflichtfelder ausfüllen.');
+      setCreateTherapistError(t('alertFillRequired'));
       return;
     }
     setCreateTherapistLoading(true);
@@ -1023,7 +1038,7 @@ export default function App() {
         setCreateTherapistCity(''); setCreateTherapistBio(''); setCreateTherapistSpecs([]);
         setCreateTherapistCerts([]); setCreateTherapistKassenart(''); setCreateTherapistHomeVisit(false);
         setCreateTherapistAvailability(''); setCreateTherapistError('');
-        Alert.alert('Profil erstellt', 'Eine Einladungs-E-Mail wurde verschickt.');
+        Alert.alert(t('alertProfileCreated'), t('alertInviteSent'));
         if (isManager) {
           const meRes = await fetch(`${getBaseUrl()}/manager/me`, { headers: { Authorization: `Bearer ${authToken}` } });
           if (meRes.ok) setLoggedInManager(await meRes.json());
@@ -1031,10 +1046,10 @@ export default function App() {
           await loadAdminPracticeDetail();
         }
       } else {
-        setCreateTherapistError(data.message ?? 'Profil konnte nicht erstellt werden.');
+        setCreateTherapistError(data.message ?? t('alertProfileSaveFail'));
       }
     } catch {
-      setCreateTherapistError('Verbindungsfehler. Bitte prüfe deine Internetverbindung.');
+      setCreateTherapistError(t('alertConnectionError') + '. ' + t('alertConnectionErrorBody'));
     } finally {
       setCreateTherapistLoading(false);
     }
@@ -1048,13 +1063,13 @@ export default function App() {
         headers: { Authorization: `Bearer ${authToken}` },
       });
       if (res.ok) {
-        Alert.alert('Einladung erneut gesendet', 'Eine neue Einladungs-E-Mail wurde verschickt.');
+        Alert.alert(t('alertInviteResent'), t('alertInviteResentBody'));
       } else {
         const err = await res.json().catch(() => ({}));
-        Alert.alert('Fehler', err.message ?? 'Einladung konnte nicht erneut gesendet werden.');
+        Alert.alert(t('alertError'), err.message ?? t('alertInviteResendFail'));
       }
     } catch {
-      Alert.alert('Verbindungsfehler', 'Bitte prüfe deine Internetverbindung.');
+      Alert.alert(t('alertConnectionError'), t('alertConnectionErrorBody'));
     }
   };
 
@@ -1093,10 +1108,10 @@ export default function App() {
         );
       } else {
         const err = await res.json().catch(() => ({}));
-        Alert.alert('Fehler', err.message ?? 'Einladung fehlgeschlagen.');
+        Alert.alert(t('alertError'), err.message ?? t('alertInviteFailed'));
       }
     } catch {
-      Alert.alert('Verbindungsfehler');
+      Alert.alert(t('alertConnectionError'));
     }
   };
 
@@ -1115,22 +1130,22 @@ export default function App() {
           });
           setPendingTherapistsList(prev => prev.filter(t => t.id !== therapistId));
         } else {
-          Alert.alert('Fehler', 'Einladung konnte nicht zurückgezogen werden.');
+          Alert.alert(t('alertError'), t('alertInviteRevokeFail'));
         }
       } catch {
-        Alert.alert('Verbindungsfehler');
+        Alert.alert(t('alertConnectionError'));
       }
     };
 
     if (Platform.OS === 'web') {
-      if (showWebConfirm(`Einladung an ${therapistName} zurückziehen?`)) doCancel();
+      if (showWebConfirm(t('alertRevokeBody').replace('{name}', therapistName))) doCancel();
     } else {
       Alert.alert(
-        'Einladung zurückziehen',
-        `Möchtest du die Einladung an ${therapistName} zurückziehen?`,
+        t('alertRevokeTitle'),
+        t('alertRevokeBody').replace('{name}', therapistName),
         [
-          { text: 'Abbrechen', style: 'cancel' },
-          { text: 'Zurückziehen', style: 'destructive', onPress: doCancel },
+          { text: t('cancelBtn'), style: 'cancel' },
+          { text: t('revokeBtn'), style: 'destructive', onPress: doCancel },
         ]
       );
     }
@@ -1155,7 +1170,7 @@ export default function App() {
     const link = `https://revio.app/join/${inviteToken.token}`;
     const message = `Du wurdest eingeladen, der Praxis „${inviteToken.practiceName}" auf Revio beizutreten:\n${link}`;
     try {
-      await Share.share({ message, url: link, title: 'Revio – Einladung' });
+      await Share.share({ message, url: link, title: t('shareInviteTitle') });
     } catch {}
   };
 
@@ -1181,14 +1196,14 @@ export default function App() {
         body: JSON.stringify(body),
       });
       if (res.ok) {
-        Alert.alert('Gespeichert', 'Praxisdaten wurden aktualisiert.');
+        Alert.alert(t('alertSaved'), t('alertPracticeUpdated'));
         await loadAdminPracticeDetail();
       } else {
         const err = await res.json().catch(() => ({}));
-        Alert.alert('Fehler', err.message ?? 'Speichern fehlgeschlagen.');
+        Alert.alert(t('alertError'), err.message ?? t('alertProfileSaveFail'));
       }
     } catch {
-      Alert.alert('Verbindungsfehler', 'Bitte prüfe deine Internetverbindung.');
+      Alert.alert(t('alertConnectionError'), t('alertConnectionErrorBody'));
     } finally {
       setPracticeEditSaving(false);
     }
@@ -1453,7 +1468,7 @@ export default function App() {
       const tunnelHint = usingLocalTunnel
         ? '\n\nHinweis: Deine API-URL zeigt auf einen localtunnel-Link. Prüfe, ob der Tunnel noch aktiv ist oder nutze lokal besser die LAN-IP deines Rechners.'
         : '';
-      Alert.alert('Verbindungsfehler', `Suche fehlgeschlagen: ${message}\n\nAPI-URL: ${getBaseUrl()}${tunnelHint}`);
+      Alert.alert(t('alertConnectionError'), `${t('alertSearchFail')}: ${message}\n\nAPI-URL: ${getBaseUrl()}${tunnelHint}`);
       setResults([]);
     } finally {
       setSearchLoading(false);
@@ -1686,10 +1701,10 @@ export default function App() {
       } else {
         const body = await res.json().catch(() => ({}));
         console.error('[openPractice] status:', res.status, 'body:', JSON.stringify(body));
-        setSelectedPracticeError(softenErrorMessage(body.message ?? 'Konnte nicht geladen werden – bitte erneut versuchen'));
+        setSelectedPracticeError(softenErrorMessage(body.message ?? t('alertLoadFail')));
       }
     } catch {
-      setSelectedPracticeError('Keine Verbindung – bitte erneut versuchen.');
+      setSelectedPracticeError(t('alertNoConnection'));
     } finally {
       setSelectedPracticeLoading(false);
     }
@@ -1748,7 +1763,7 @@ export default function App() {
       activeFilterCount={activeFilterCount}
       authToken={authToken}
       c={c}
-      callPhone={callPhone}
+      callPhone={(phone) => callPhone(phone, t)}
       certificationOptions={certificationOptions}
       city={city}
       discoverScrollRef={discoverScrollRef}
@@ -1802,7 +1817,7 @@ export default function App() {
     return (
       <PracticeProfileScreen
         c={c}
-        callPhone={callPhone}
+        callPhone={(phone) => callPhone(phone, t)}
         isPracticeFavorite={isPracticeFavorite}
         openPractice={openPractice}
         openTherapistById={openTherapistById}
@@ -1823,7 +1838,7 @@ export default function App() {
       <TherapistProfileScreen
         HeartButton={ThemedHeartButton}
         c={c}
-        callPhone={callPhone}
+        callPhone={(phone) => callPhone(phone, t)}
         isFavorite={isFavorite}
         openPractice={openPractice}
         setSelectedTherapist={setSelectedTherapist}
@@ -1930,6 +1945,7 @@ export default function App() {
       setShowLogin={setShowLogin}
       setShowRegister={setShowRegister}
       styles={styles}
+      t={t}
     />
   );
 
@@ -1960,14 +1976,16 @@ export default function App() {
 
     return (
       <View style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 32 }]} showsVerticalScrollIndicator={false}>
-          <View style={styles.header}>
+        <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 10, backgroundColor: c.background }}>
+          <View style={[styles.header, { marginBottom: 0 }]}>
             <Image source={require('../assets/icon.png')} style={styles.logoMark} />
             <View style={{ flex: 1 }}>
               <Text style={[styles.headerTitle, { color: c.text }]}>{t('optionsTitle')}</Text>
               <Text style={[styles.headerSub, { color: c.muted }]}>{t('optionsSubtitle')}</Text>
             </View>
           </View>
+        </View>
+        <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 32, paddingTop: SPACE.sm }]} showsVerticalScrollIndicator={false}>
 
           {/* ── Mein Profil ── */}
           {(loggedInTherapist || isManager) && (
@@ -2046,7 +2064,7 @@ export default function App() {
                   <Pressable onPress={() => { setMgrNewPracticeName(''); setMgrNewPracticeCity(''); setMgrNewPracticeAddress(''); setMgrNewPracticePhone(''); setAddPracticeStep(1); setShowAddPracticeScreen(true); }} style={[styles.optionRow, { backgroundColor: c.card, borderColor: 'transparent' }]}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                       <Ionicons name="add-circle-outline" size={18} color={c.muted} />
-                      <Text style={[styles.optionLabel, { color: c.text }]}>Weitere Praxis hinzufügen</Text>
+                      <Text style={[styles.optionLabel, { color: c.text }]}>{t('addPracticeBtn')}</Text>
                     </View>
                     <Text style={[styles.optionValue, { color: c.primary }]}>＋</Text>
                   </Pressable>
@@ -2087,9 +2105,9 @@ export default function App() {
             <View style={[styles.optionRow, { backgroundColor: c.card, borderColor: 'transparent', borderTopWidth: 1, borderTopColor: c.border }]}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                 <Ionicons name="notifications-outline" size={18} color={c.muted} />
-                <Text style={[styles.optionLabel, { color: c.text }]}>Benachrichtigungen</Text>
+                <Text style={[styles.optionLabel, { color: c.text }]}>{t('notificationsOption')}</Text>
               </View>
-              <Text style={[styles.optionValue, { color: c.muted }]}>Bald verfügbar ›</Text>
+              <Text style={[styles.optionValue, { color: c.muted }]}>{t('comingSoon')} ›</Text>
             </View>
             <Pressable onPress={() => Linking.openSettings()} style={[styles.optionRow, { backgroundColor: c.card, borderColor: 'transparent', borderTopWidth: 1, borderTopColor: c.border }]}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -2314,11 +2332,14 @@ export default function App() {
   // ── Favorites tab ─────────────────────────────────────────────────────────
 
   const renderFavorites = () => (
-    <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 20 }]} showsVerticalScrollIndicator={false}>
-      <View style={styles.header}>
-        <Image source={require('../assets/icon.png')} style={styles.logoMark} />
-        <Text style={[styles.headerTitle, { color: c.text }]}>{t('favoritesTitle')}</Text>
+    <View style={{ flex: 1 }}>
+      <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 10, backgroundColor: c.background }}>
+        <View style={[styles.header, { marginBottom: 0 }]}>
+          <Image source={require('../assets/icon.png')} style={styles.logoMark} />
+          <Text style={[styles.headerTitle, { color: c.text }]}>{t('favoritesTitle')}</Text>
+        </View>
       </View>
+    <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 20, paddingTop: SPACE.sm }]} showsVerticalScrollIndicator={false}>
 
       <View style={[styles.noticeBox, { backgroundColor: c.mutedBg, borderColor: c.border, marginBottom: 4 }]}>
         <View style={styles.lockBadge}>
@@ -2370,10 +2391,10 @@ export default function App() {
               )}
               <Pressable
                 style={[styles.ctaBtn, { backgroundColor: c.accent }]}
-                onPress={() => fav.practices?.[0]?.phone ? callPhone(fav.practices[0].phone) : openTherapistById(fav.id)}
+                onPress={() => fav.practices?.[0]?.phone ? callPhone(fav.practices[0].phone, t) : openTherapistById(fav.id)}
               >
                 <Ionicons name={fav.practices?.[0]?.phone ? 'call-outline' : 'person-outline'} size={16} color="#fff" style={{ marginRight: 6 }} />
-                <Text style={styles.ctaBtnText}>{fav.practices?.[0]?.phone ? t('callPractice') : 'Profil ansehen'}</Text>
+                <Text style={styles.ctaBtnText}>{fav.practices?.[0]?.phone ? t('callPractice') : t('viewProfileBtn')}</Text>
               </Pressable>
             </View>
           ))}
@@ -2407,7 +2428,7 @@ export default function App() {
               {p.phone && (
                 <Pressable
                   style={[styles.ctaBtn, { backgroundColor: c.accent }]}
-                  onPress={() => callPhone(p.phone)}
+                  onPress={() => callPhone(p.phone, t)}
                 >
                   <Ionicons name="call-outline" size={16} color="#fff" style={{ marginRight: 6 }} />
                   <Text style={styles.ctaBtnText}>{t('callPractice')}</Text>
@@ -2419,6 +2440,7 @@ export default function App() {
         </>
       )}
     </ScrollView>
+    </View>
   );
 
   // ── Register flow ──────────────────────────────────────────────────────────
@@ -2429,11 +2451,11 @@ export default function App() {
         <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 20 }]}>
           <View style={[styles.infoCard, { backgroundColor: c.card, borderColor: c.border, alignItems: 'center', paddingVertical: 40 }]}>
             <Text style={{ fontSize: 48, marginBottom: 16 }}>🎉</Text>
-            <Text style={[styles.infoTitle, { color: c.text, textAlign: 'center' }]}>Registrierung abgeschlossen!</Text>
+            <Text style={[styles.infoTitle, { color: c.text, textAlign: 'center' }]}>{t('regCompleteTitle')}</Text>
             <Text style={[styles.infoBody, { color: c.muted, textAlign: 'center', marginTop: 8 }]}>
               {__DEV__
-                ? 'Entwicklungsmodus: Dein Profil wurde automatisch freigegeben und ist sofort in der Suche sichtbar.'
-                : 'Wir haben dir eine Bestätigungs-E-Mail gesendet. Bitte klicke auf den Link darin, um dein Konto zu aktivieren. Dein Profil wird anschließend innerhalb von 48 Stunden manuell geprüft.'}
+                ? t('registrationInfoBodyDev')
+                : t('regCompleteBody')}
             </Text>
             <Pressable
               style={[styles.registerBtn, { backgroundColor: c.primary, marginTop: 24, paddingHorizontal: 32 }]}
@@ -2441,7 +2463,7 @@ export default function App() {
                 Linking.openURL(Platform.OS === 'ios' ? 'message://' : 'mailto:').catch(() => {});
               }}
             >
-              <Text style={styles.registerBtnText}>E-Mail bestätigen</Text>
+              <Text style={styles.registerBtnText}>{t('verifyEmailBtn')}</Text>
             </Pressable>
             <Pressable onPress={() => { setShowRegister(false); setRegSubmitted(false); setRegStep(1); setRegSpecSearch(''); setRegLangSearch(''); setShowRegFortbildungen(false); }} style={{ marginTop: 12 }}>
               <Text style={{ color: c.muted, fontSize: 13 }}>Später</Text>
@@ -2492,15 +2514,15 @@ export default function App() {
                   <Text style={{ fontSize: 13, color: c.muted, lineHeight: 19 }}>{REG_STEP_INFO[1]}</Text>
                 </View>
               )}
-              <TextInput value={regEmail} onChangeText={setRegEmail} placeholder="E-Mail-Adresse" placeholderTextColor={c.muted} keyboardType="email-address" autoCapitalize="none" style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text }]} />
+              <TextInput value={regEmail} onChangeText={setRegEmail} placeholder={t('emailLabel')} placeholderTextColor={c.muted} keyboardType="email-address" autoCapitalize="none" style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text }]} />
               <View style={{ position: 'relative' }}>
-                <TextInput value={regPassword} onChangeText={setRegPassword} placeholder="Passwort (mind. 6 Zeichen)" placeholderTextColor={c.muted} secureTextEntry={!showRegPassword} textContentType="newPassword" autoComplete="new-password" style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text, paddingRight: 44 }]} />
+                <TextInput value={regPassword} onChangeText={setRegPassword} placeholder={t('passwordPlaceholder')} placeholderTextColor={c.muted} secureTextEntry={!showRegPassword} textContentType="newPassword" autoComplete="new-password" style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text, paddingRight: 44 }]} />
                 <Pressable onPress={() => setShowRegPassword(v => !v)} hitSlop={ICON_HIT_SLOP} style={{ position: 'absolute', right: 12, top: 0, bottom: 0, justifyContent: 'center' }}>
                   <Ionicons name={showRegPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color={c.muted} />
                 </Pressable>
               </View>
               <View style={{ position: 'relative' }}>
-                <TextInput value={regPasswordConfirm} onChangeText={setRegPasswordConfirm} placeholder="Passwort bestätigen" placeholderTextColor={c.muted} secureTextEntry={!showRegPasswordConfirm} textContentType="newPassword" autoComplete="new-password" style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text, paddingRight: 44 }]} />
+                <TextInput value={regPasswordConfirm} onChangeText={setRegPasswordConfirm} placeholder={t('passwordConfirmPlaceholder')} placeholderTextColor={c.muted} secureTextEntry={!showRegPasswordConfirm} textContentType="newPassword" autoComplete="new-password" style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text, paddingRight: 44 }]} />
                 <Pressable onPress={() => setShowRegPasswordConfirm(v => !v)} hitSlop={ICON_HIT_SLOP} style={{ position: 'absolute', right: 12, top: 0, bottom: 0, justifyContent: 'center' }}>
                   <Ionicons name={showRegPasswordConfirm ? 'eye-off-outline' : 'eye-outline'} size={20} color={c.muted} />
                 </Pressable>
@@ -2525,13 +2547,13 @@ export default function App() {
                   <Text style={{ fontSize: 13, color: c.muted, lineHeight: 19 }}>{REG_STEP_INFO[2]}</Text>
                 </View>
               )}
-              <TextInput value={regFirstName} onChangeText={setRegFirstName} placeholder="Vorname" placeholderTextColor={c.muted} style={[styles.regInput, { backgroundColor: c.card, borderColor: regFirstName.length > 0 && regFirstName.trim().length === 0 ? c.saved : c.border, color: c.text }]} />
+              <TextInput value={regFirstName} onChangeText={setRegFirstName} placeholder={t('firstNamePlaceholder')} placeholderTextColor={c.muted} style={[styles.regInput, { backgroundColor: c.card, borderColor: regFirstName.length > 0 && regFirstName.trim().length === 0 ? c.saved : c.border, color: c.text }]} />
               {regFirstName.length > 0 && regFirstName.trim().length === 0 && (
-                <Text style={{ color: c.saved, fontSize: 13, marginTop: -6 }}>Vorname ist erforderlich</Text>
+                <Text style={{ color: c.saved, fontSize: 13, marginTop: -6 }}>{t('firstNameRequired')}</Text>
               )}
-              <TextInput value={regLastName} onChangeText={setRegLastName} placeholder="Nachname" placeholderTextColor={c.muted} style={[styles.regInput, { backgroundColor: c.card, borderColor: regLastName.length > 0 && regLastName.trim().length === 0 ? c.saved : c.border, color: c.text }]} />
+              <TextInput value={regLastName} onChangeText={setRegLastName} placeholder={t('lastNamePlaceholder')} placeholderTextColor={c.muted} style={[styles.regInput, { backgroundColor: c.card, borderColor: regLastName.length > 0 && regLastName.trim().length === 0 ? c.saved : c.border, color: c.text }]} />
               {regLastName.length > 0 && regLastName.trim().length === 0 && (
-                <Text style={{ color: c.saved, fontSize: 13, marginTop: -6 }}>Nachname ist erforderlich</Text>
+                <Text style={{ color: c.saved, fontSize: 13, marginTop: -6 }}>{t('lastNamePlaceholder')} ist erforderlich</Text>
               )}
               {regCity ? (
                 <View style={[styles.tagRow, { marginBottom: 8 }]}>
@@ -2792,8 +2814,8 @@ export default function App() {
                 </View>
               )}
               {[
-                { label: 'Name', value: `${regFirstName} ${regLastName}`.trim() || '—' },
-                { label: 'E-Mail', value: regEmail || '—' },
+                { label: t('nameLabel'), value: `${regFirstName} ${regLastName}`.trim() || '—' },
+                { label: t('emailLabel'), value: regEmail || '—' },
                 { label: 'Stadt', value: regCity || '—' },
                 { label: 'Tätigkeit', value: regFreelance === true ? 'Freiberuflich' : regFreelance === false ? 'Angestellt' : '—' },
                 { label: 'Hausbesuche', value: regHomeVisit ? `Ja · ${regServiceRadius ? regServiceRadius + ' km' : 'Radius fehlt'}` : 'Nein' },
@@ -2847,7 +2869,7 @@ export default function App() {
           }}
           style={styles.backBtn}
         >
-          <Text style={[styles.backBtnText, { color: c.primary }]}>‹ {regStep === 1 ? 'Abbrechen' : t('backBtn')}</Text>
+          <Text style={[styles.backBtnText, { color: c.primary }]}>‹ {regStep === 1 ? t('cancelBtn') : t('backBtn')}</Text>
         </Pressable>
 
         {/* Header */}
@@ -3499,7 +3521,7 @@ export default function App() {
         'Therapeut entfernen',
         `Möchtest du ${therapistName} aus der Praxis entfernen?\n\nDas Therapeuten-Konto bleibt erhalten. Falls dies die letzte aktive Praxis ist, wird das Profil automatisch nicht mehr öffentlich sichtbar.`,
         [
-          { text: 'Abbrechen', style: 'cancel' },
+          { text: t('cancelBtn'), style: 'cancel' },
           { text: 'Entfernen', style: 'destructive', onPress: doRemove },
         ]
       );
@@ -3767,7 +3789,7 @@ export default function App() {
         </Pressable>
         <View style={{ flex: 1 }}>
           <Text style={[styles.headerTitle, { color: c.text }]}>
-            {addPracticeStep === 1 ? 'Neue Praxis' : 'Übersicht & Bestätigung'}
+            {addPracticeStep === 1 ? t('newPracticeStep1') : t('newPracticeStep2')}
           </Text>
           <Text style={[styles.headerSub, { color: c.muted }]}>Schritt {addPracticeStep} von 2</Text>
         </View>
@@ -3845,8 +3867,8 @@ export default function App() {
             {[
               { label: 'Praxisname', value: mgrNewPracticeName },
               { label: 'Stadt', value: mgrNewPracticeCity },
-              { label: 'Adresse', value: mgrNewPracticeAddress || '—' },
-              { label: 'Telefon', value: mgrNewPracticePhone || '—' },
+              { label: t('addressLabel'), value: mgrNewPracticeAddress || '—' },
+              { label: t('phoneLabel'), value: mgrNewPracticePhone || '—' },
             ].map(({ label, value }) => (
               <View key={label} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <Text style={{ color: c.muted, fontSize: 13, flex: 1 }}>{label}</Text>
