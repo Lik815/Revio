@@ -112,9 +112,6 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
   const siteSettingsSchema = z.object({
     underConstruction: z.boolean(),
   });
-  const freelancerBackfillSchema = z.object({
-    confirmation: z.literal('MARK_ALL_THERAPISTS_AS_FREELANCER'),
-  });
 
   fastify.post('/login', async (request, reply) => {
     const parsed = loginSchema.safeParse(request.body);
@@ -172,32 +169,6 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
     return {
       success: true,
       underConstruction: parsed.data.underConstruction,
-    };
-  });
-
-  fastify.post('/maintenance/backfill-freelancers', async (request, reply) => {
-    const parsed = freelancerBackfillSchema.safeParse(request.body);
-    if (!parsed.success) return reply.badRequest('Bestätigung fehlt');
-
-    const totalTherapists = await fastify.prisma.therapist.count();
-    const beforeFalse = await fastify.prisma.therapist.count({
-      where: { isFreelancer: false },
-    });
-
-    const updated = await fastify.prisma.therapist.updateMany({
-      data: { isFreelancer: true },
-    });
-
-    const afterFalse = await fastify.prisma.therapist.count({
-      where: { isFreelancer: false },
-    });
-
-    return {
-      success: true,
-      totalTherapists,
-      updatedCount: updated.count,
-      beforeFalse,
-      afterFalse,
     };
   });
 
