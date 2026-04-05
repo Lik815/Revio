@@ -152,7 +152,7 @@ export function DiscoverScreen(props) {
             onPress={resetFilters}
             style={styles.filterResetBtn}
           >
-            <Text style={[styles.filterResetBtnText, { color: c.primary }]}>Zuruecksetzen</Text>
+            <Text style={[styles.filterResetBtnText, { color: c.primary }]}>{t('resetFilters')}</Text>
           </Pressable>
         ) : null}
       </View>
@@ -206,7 +206,7 @@ export function DiscoverScreen(props) {
         <View style={styles.filterCompactSectionHeader}>
           <Text style={[styles.filterCompactSectionTitle, { color: c.muted }]}>{t('fortbildungLabel')}</Text>
           <Text style={[styles.metaNote, { color: mutedText }]}>
-            {selectedCertificationOptions.length > 0 ? `${selectedCertificationOptions.length} gewaehlt` : 'Suche + Mehrfachauswahl'}
+            {selectedCertificationOptions.length > 0 ? t('nSelected').replace('{n}', selectedCertificationOptions.length) : t('searchMultiSelect')}
           </Text>
         </View>
 
@@ -265,7 +265,7 @@ export function DiscoverScreen(props) {
         ) : null}
 
         {normalizedFortbildungQuery.length > 0 && certificationSuggestions.length === 0 ? (
-          <Text style={[styles.filterEmptyText, { color: mutedText }]}>Keine passende Fortbildung gefunden.</Text>
+          <Text style={[styles.filterEmptyText, { color: mutedText }]}>{t('noCertsFound')}</Text>
         ) : null}
       </View>
     </View>
@@ -334,7 +334,7 @@ export function DiscoverScreen(props) {
           {showFilters ? filtersPanel : null}
           {(searched || results.length > 0) && (
             <Text style={{ ...TYPE.meta, color: mutedText }}>
-              {searched ? `${results.length} ${results.length !== 1 ? t('resultsLabelPlural') : t('resultsLabel')}` : 'Vorschläge'}
+              {searched ? `${results.length} ${results.length !== 1 ? t('resultsLabelPlural') : t('resultsLabel')}` : t('suggestions')}
             </Text>
           )}
         </View>
@@ -413,19 +413,19 @@ export function DiscoverScreen(props) {
               {userCoords ? (
                 <>
                   <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700', textAlign: 'center', marginTop: 10 }}>
-                    Keine Praxen im Umkreis von {searchRadius} km
+                    {t('noNearbyPractices').replace('{n}', searchRadius)}
                   </Text>
                   <Text style={{ color: 'rgba(255,255,255,0.72)', fontSize: 13, textAlign: 'center', marginTop: 6 }}>
-                    Versuche einen anderen Ort oder einen größeren Radius.
+                    {t('tryAnotherLocation')}
                   </Text>
                 </>
               ) : (
                 <>
                   <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700', textAlign: 'center', marginTop: 10 }}>
-                    Keine Praxen mit Standortdaten
+                    {t('noGeoData')}
                   </Text>
                   <Text style={{ color: 'rgba(255,255,255,0.72)', fontSize: 13, textAlign: 'center', marginTop: 6 }}>
-                    Fuer diese Ergebnisse liegen noch keine Koordinaten vor.
+                    {t('noGeoDataBody')}
                   </Text>
                 </>
               )}
@@ -598,10 +598,10 @@ export function DiscoverScreen(props) {
         <View style={styles.sectionRow}>
           <View style={{ flex: 1, gap: 4 }}>
             <Text style={{ ...TYPE.meta, color: mutedText }}>
-              {searched ? `${results.length} ${results.length !== 1 ? t('resultsLabelPlural') : t('resultsLabel')}` : 'Vorschlaege'}
+              {searched ? `${results.length} ${results.length !== 1 ? t('resultsLabelPlural') : t('resultsLabel')}` : t('suggestions')}
             </Text>
             <Text style={{ ...TYPE.meta, color: mutedText }}>
-              {city ? `In ${city}` : 'Standort auswaehlen'}
+              {city ? `In ${city}` : t('locationPlaceholder')}
               {activeFilterCount > 0 ? ` · ${activeFilterCount} Filter` : ''}
             </Text>
           </View>
@@ -719,7 +719,7 @@ export function DiscoverScreen(props) {
             onPress={() => therapist.practices?.[0]?.phone ? callPhone(therapist.practices[0].phone) : openTherapistById(therapist.id)}
           >
             <Text style={styles.ctaBtnText}>
-              {therapist.practices?.[0]?.phone ? 'Anrufen' : 'Profil ansehen'}
+              {therapist.practices?.[0]?.phone ? t('callBtn') : t('viewProfileBtn')}
             </Text>
           </Pressable>
         </View>
@@ -740,13 +740,13 @@ export function DiscoverScreen(props) {
               }}
               style={[styles.emptyActionBtn, { backgroundColor: c.primary }]}
             >
-              <Text style={[styles.emptyActionText, { color: '#fff' }]}>Filter zuruecksetzen</Text>
+              <Text style={[styles.emptyActionText, { color: '#fff' }]}>{t('resetFilters')}</Text>
             </Pressable>
             <Pressable
               onPress={() => { setLocationSheetCity(locationLabel || city); setShowLocationSheet(true); }}
               style={[styles.emptyActionBtn, { backgroundColor: c.mutedBg, borderColor: c.border, borderWidth: 1 }]}
             >
-              <Text style={[styles.emptyActionText, { color: c.text }]}>Standort aendern</Text>
+              <Text style={[styles.emptyActionText, { color: c.text }]}>{t('changeLocation')}</Text>
             </Pressable>
           </View>
         </View>

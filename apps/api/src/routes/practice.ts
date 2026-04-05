@@ -459,11 +459,53 @@ export const practiceRoutes: FastifyPluginAsync = async (fastify) => {
     const token = getToken(request);
     if (!token) return reply.unauthorized('Kein Token');
 
-    const notifications: { id: string; type: string; message: string; createdAt: Date }[] = [];
+    const notifications: { id: string; type: string; message: string; createdAt: Date; reviewStatus?: string; therapistId?: string }[] = [];
 
-    // Try therapist token first
-    const therapist = await fastify.prisma.therapist.findUnique({ where: { sessionToken: token } });
+    // Try therapist token first, but also support the user session token path.
+    const user = await fastify.prisma.user.findUnique({
+      where: { sessionToken: token },
+      include: { therapistProfile: true },
+    });
+    const therapist = user?.therapistProfile ?? await fastify.prisma.therapist.findUnique({ where: { sessionToken: token } });
     if (therapist) {
+      if (therapist.reviewStatus === 'APPROVED') {
+        notifications.push({
+          id: `review-${therapist.id}-approved`,
+          type: 'PROFILE_APPROVED',
+          message: 'Dein Profil wurde freigegeben.',
+          createdAt: therapist.updatedAt,
+          reviewStatus: therapist.reviewStatus,
+          therapistId: therapist.id,
+        });
+      } else if (therapist.reviewStatus === 'CHANGES_REQUESTED') {
+        notifications.push({
+          id: `review-${therapist.id}-changes-requested`,
+          type: 'PROFILE_CHANGES_REQUESTED',
+          message: 'Für dein Profil wurden Änderungen angefordert.',
+          createdAt: therapist.updatedAt,
+          reviewStatus: therapist.reviewStatus,
+          therapistId: therapist.id,
+        });
+      } else if (therapist.reviewStatus === 'REJECTED') {
+        notifications.push({
+          id: `review-${therapist.id}-rejected`,
+          type: 'PROFILE_REJECTED',
+          message: 'Dein Profil wurde aktuell nicht freigegeben.',
+          createdAt: therapist.updatedAt,
+          reviewStatus: therapist.reviewStatus,
+          therapistId: therapist.id,
+        });
+      } else if (therapist.reviewStatus === 'SUSPENDED') {
+        notifications.push({
+          id: `review-${therapist.id}-suspended`,
+          type: 'PROFILE_SUSPENDED',
+          message: 'Dein Profil wurde vorübergehend pausiert.',
+          createdAt: therapist.updatedAt,
+          reviewStatus: therapist.reviewStatus,
+          therapistId: therapist.id,
+        });
+      }
+
       // Therapist-as-admin: join requests for their managed practice
       const adminPractice = await getAdminPractice(fastify, therapist.id);
       if (adminPractice) {

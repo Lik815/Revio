@@ -53,7 +53,7 @@ export function LoginScreen(props) {
         {showInfo && (
           <View style={{ backgroundColor: c.mutedBg, borderRadius: 12, padding: 14, marginTop: 10, borderWidth: 1, borderColor: c.border }}>
             <Text style={{ fontSize: 13, color: c.muted, lineHeight: 20, textAlign: 'center' }}>
-              Mit deinem Revio-Konto verwaltest du als Physiotherapeut:in dein Profil und erreichst Patienten in deiner Nähe. Ein Konto — alle Funktionen.
+              {t('loginInfoBody')}
             </Text>
           </View>
         )}
@@ -62,7 +62,7 @@ export function LoginScreen(props) {
       {/* Inputs */}
       <View style={{ gap: 14 }}>
         <View>
-          <Text style={{ fontSize: 11, fontWeight: '700', color: c.muted, marginBottom: 7, letterSpacing: 0.8, textTransform: 'uppercase' }}>E-Mail</Text>
+          <Text style={{ fontSize: 11, fontWeight: '700', color: c.muted, marginBottom: 7, letterSpacing: 0.8, textTransform: 'uppercase' }}>{t('emailLabel')}</Text>
           <TextInput
             style={[styles.regInput, { color: c.text, borderColor: loginEmail.length > 0 ? c.primary : c.border, backgroundColor: c.card }]}
             value={loginEmail}
@@ -76,7 +76,7 @@ export function LoginScreen(props) {
           />
         </View>
         <View>
-          <Text style={{ fontSize: 11, fontWeight: '700', color: c.muted, marginBottom: 7, letterSpacing: 0.8, textTransform: 'uppercase' }}>Passwort</Text>
+          <Text style={{ fontSize: 11, fontWeight: '700', color: c.muted, marginBottom: 7, letterSpacing: 0.8, textTransform: 'uppercase' }}>{t('passwordLabel')}</Text>
           <View style={{ position: 'relative' }}>
             <TextInput
               style={[styles.regInput, { color: c.text, borderColor: loginPassword.length > 0 ? c.primary : c.border, backgroundColor: c.card, paddingRight: 44 }]}
@@ -106,7 +106,7 @@ export function LoginScreen(props) {
         onPress={handleLogin}
         disabled={loginLoading}
       >
-        <Text style={styles.registerBtnText}>{loginLoading ? 'Anmelden…' : 'Anmelden'}</Text>
+        <Text style={styles.registerBtnText}>{loginLoading ? t('loginLoading') : t('loginAction')}</Text>
       </Pressable>
     </ScrollView>
   );
@@ -122,6 +122,7 @@ export function TherapistLandingScreen(props) {
     setShowLogin,
     setShowRegister,
     styles,
+    t,
   } = props;
   const [showInfo, setShowInfo] = useState(false);
 
@@ -130,9 +131,9 @@ export function TherapistLandingScreen(props) {
 
       {/* Headline */}
       <View style={{ alignItems: 'center', marginBottom: 20 }}>
-        <Text style={{ fontSize: 20, fontWeight: '700', color: c.text, marginBottom: 4 }}>Für Therapeuten</Text>
+        <Text style={{ fontSize: 20, fontWeight: '700', color: c.text, marginBottom: 4 }}>{t('forTherapistsTitle')}</Text>
         <Text style={{ fontSize: 13, color: c.muted, textAlign: 'center', paddingHorizontal: 16, marginBottom: 6 }}>
-          Erstelle dein Profil und werde von Patienten gefunden.
+          {t('forTherapistsSub')}
         </Text>
         <Pressable onPress={() => setShowInfo(v => !v)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
           <Text style={{ fontSize: 12, color: c.muted }}>Mehr erfahren</Text>
@@ -141,7 +142,7 @@ export function TherapistLandingScreen(props) {
         {showInfo && (
           <View style={{ backgroundColor: c.mutedBg, borderRadius: 10, padding: 12, marginTop: 8, borderWidth: 1, borderColor: c.border }}>
             <Text style={{ fontSize: 12, color: c.muted, lineHeight: 18, textAlign: 'center' }}>
-              Nur für zugelassene Physiotherapeuten. Dein Profil wird vor der Veröffentlichung manuell geprüft — in der Regel innerhalb von 48 Stunden.{__DEV__ ? '\n\nEntwicklungsmodus: sofort freigegeben.' : ''}
+              {t('registrationInfoBody')}{__DEV__ ? t('registrationInfoBodyDev') : ''}
             </Text>
           </View>
         )}
@@ -150,10 +151,10 @@ export function TherapistLandingScreen(props) {
       {/* Steps */}
       <View style={{ gap: 7, marginBottom: 20 }}>
         {[
-          { icon: 'mail-outline', title: 'Konto anlegen', body: 'E-Mail und Passwort' },
-          { icon: 'person-outline', title: 'Profil ausfüllen', body: 'Spezialisierungen, Sprachen, Praxis' },
-          { icon: 'checkmark-circle-outline', title: 'Einreichen & prüfen lassen', body: 'Manuell freigegeben' },
-          { icon: 'search-outline', title: 'Öffentlich sichtbar', body: 'Patienten finden dich in der Suche' },
+          { icon: 'mail-outline', title: t('regStep1Title'), body: t('regStep1Body') },
+          { icon: 'person-outline', title: t('regStep2Title'), body: t('regStep2Body') },
+          { icon: 'checkmark-circle-outline', title: t('regStep3Title'), body: t('regStep3Body') },
+          { icon: 'search-outline', title: t('regStep4Title'), body: t('regStep4Body') },
         ].map((step, i) => (
           <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: c.card, borderRadius: RADIUS.md, borderWidth: 1, borderColor: c.border, paddingVertical: 8, paddingHorizontal: 12 }}>
             <View style={{ width: 30, height: 30, borderRadius: RADIUS.full, backgroundColor: c.primaryBg, alignItems: 'center', justifyContent: 'center' }}>
@@ -169,18 +170,18 @@ export function TherapistLandingScreen(props) {
       </View>
 
       <Pressable style={[styles.registerBtn, { backgroundColor: c.primary }]} onPress={() => { setRegStep(1); setRegSubmitted(false); setShowRegister(true); }}>
-        <Text style={styles.registerBtnText}>Jetzt registrieren</Text>
+        <Text style={styles.registerBtnText}>{t('registerBtn')}</Text>
       </Pressable>
 
       <Pressable
         style={[styles.registerBtn, { backgroundColor: c.card, borderWidth: 1, borderColor: c.border, marginTop: 8 }]}
         onPress={() => setShowLogin(true)}
       >
-        <Text style={{ fontSize: 15, fontWeight: '600', color: c.text }}>Anmelden</Text>
+        <Text style={{ fontSize: 15, fontWeight: '600', color: c.text }}>{t('loginAction')}</Text>
       </Pressable>
 
       <Pressable onPress={() => setShowManagerReg(true)} style={{ alignSelf: 'center', paddingVertical: 8, marginTop: 4 }}>
-        <Text style={{ fontSize: 12, color: c.muted }}>Praxis als Manager registrieren</Text>
+        <Text style={{ fontSize: 12, color: c.muted }}>{t('registerAsManager')}</Text>
       </Pressable>
     </View>
   );
@@ -229,7 +230,7 @@ export function CreatePracticeScreen(props) {
       </View>
 
       <Pressable style={[styles.registerBtn, { backgroundColor: createPracticeLoading ? c.border : c.primary }]} onPress={handleCreatePractice} disabled={createPracticeLoading}>
-        <Text style={styles.registerBtnText}>{createPracticeLoading ? 'Wird erstellt…' : 'Praxis erstellen'}</Text>
+        <Text style={styles.registerBtnText}>{createPracticeLoading ? t('creatingBtn') : t('createPracticeBtn')}</Text>
       </Pressable>
     </ScrollView>
   );
@@ -293,7 +294,7 @@ export function PracticeSearchScreen(props) {
         </View>
 
         {practiceSearchLoading && (
-          <Text style={[styles.infoBody, { color: c.muted, textAlign: 'center' }]}>Suche…</Text>
+          <Text style={[styles.infoBody, { color: c.muted, textAlign: 'center' }]}>{t('searchingLabel')}</Text>
         )}
 
         {practiceSearchResults.map((practice) => (
@@ -322,7 +323,7 @@ export function PracticeSearchScreen(props) {
               ]}
             >
               <Text style={[styles.kassenartText, { color: '#fff' }]}>
-                {connectingPracticeId === practice.id ? 'Wird gesendet…' : 'Anfrage senden'}
+                {connectingPracticeId === practice.id ? t('sendingBtn') : t('sendRequestBtn')}
               </Text>
             </Pressable>
           </View>
@@ -348,7 +349,7 @@ export function PracticeSearchScreen(props) {
         <View style={{ flex: 1, backgroundColor: 'rgba(14, 20, 24, 0.5)', justifyContent: 'center', padding: 24 }}>
           <View style={{ backgroundColor: c.card, borderRadius: 24, borderWidth: 1, borderColor: c.border, padding: 20, gap: 16 }}>
             <View style={{ gap: 6 }}>
-              <Text style={{ fontSize: 24, fontWeight: '800', color: c.text }}>Praxis bestätigen</Text>
+              <Text style={{ fontSize: 24, fontWeight: '800', color: c.text }}>{t('confirmPracticeTitle')}</Text>
               <Text style={{ fontSize: 14, lineHeight: 21, color: c.muted }}>
                 Ist das die richtige Praxis? Erst nach deiner Bestätigung wird die Verbindungsanfrage gesendet.
               </Text>
@@ -402,7 +403,7 @@ export function PracticeSearchScreen(props) {
 
             <View style={{ backgroundColor: c.mutedBg, borderRadius: 16, padding: 14 }}>
               <Text style={{ fontSize: 13, lineHeight: 20, color: c.muted }}>
-                Nach dem Absenden muss die Praxis deine Anfrage noch bestätigen.
+                {t('confirmPracticeHint')}
               </Text>
             </View>
 
@@ -421,7 +422,7 @@ export function PracticeSearchScreen(props) {
                   backgroundColor: c.card,
                 }}
               >
-                <Text style={{ fontSize: 15, fontWeight: '600', color: c.text }}>Abbrechen</Text>
+                <Text style={{ fontSize: 15, fontWeight: '600', color: c.text }}>{t('cancelBtn')}</Text>
               </Pressable>
 
               <Pressable
@@ -437,7 +438,7 @@ export function PracticeSearchScreen(props) {
                 }}
               >
                 <Text style={{ fontSize: 15, fontWeight: '700', color: '#fff' }}>
-                  {connectingPracticeId ? 'Wird gesendet…' : 'Jetzt bestätigen'}
+                  {connectingPracticeId ? t('sendingBtn') : t('confirmNowBtn')}
                 </Text>
               </Pressable>
             </View>
@@ -515,7 +516,7 @@ export function InvitePageScreen(props) {
       <Text style={[styles.profileName, { color: c.text, marginBottom: 16 }]}>Therapeuten einladen</Text>
 
       <View style={{ flexDirection: 'row', backgroundColor: c.mutedBg, borderRadius: RADIUS.md, padding: 3, marginBottom: 20 }}>
-        {[{ key: 'new', label: 'Neuer Therapeut' }, { key: 'link', label: 'Einladungslink' }].map((tab) => (
+        {[{ key: 'new', label: t('newTherapistTab') }, { key: 'link', label: t('inviteLinkTab') }].map((tab) => (
           <Pressable
             key={tab.key}
             onPress={() => setInvitePageTab(tab.key)}
@@ -689,12 +690,12 @@ export function InvitePageScreen(props) {
           ) : inviteToken ? (
             <>
               <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border, gap: 8 }]}>
-                <Text style={[styles.filterSectionTitle, { color: c.muted }]}>Einladungslink</Text>
+                <Text style={[styles.filterSectionTitle, { color: c.muted }]}>{t('inviteLinkTitle')}</Text>
                 <Text selectable style={{ color: c.text, fontSize: 13, fontFamily: 'monospace', backgroundColor: c.mutedBg, padding: 10, borderRadius: 8 }}>
                   {getInviteLink(inviteToken.token)}
                 </Text>
                 <Text style={{ color: c.muted, fontSize: 12 }}>
-                  Teile diesen Link mit Therapeuten. Sie können damit eine Beitrittsanfrage an deine Praxis senden.
+                  {t('inviteLinkBody')}
                 </Text>
               </View>
               <Pressable onPress={handleShareInviteLink} style={{ backgroundColor: c.primary, borderRadius: RADIUS.md, paddingVertical: 14, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 }}>

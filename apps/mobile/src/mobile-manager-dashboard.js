@@ -18,14 +18,14 @@ import {
   TYPE,
 } from './mobile-utils';
 
-const statusLabels = {
-  APPROVED: 'Freigegeben',
-  PENDING_REVIEW: 'In Pruefung',
-  DRAFT: 'Entwurf',
-  REJECTED: 'Abgelehnt',
-  SUSPENDED: 'Gesperrt',
-  CHANGES_REQUESTED: 'Aenderungen noetig',
-};
+const getStatusLabels = (t) => ({
+  APPROVED: t('statusApproved'),
+  PENDING_REVIEW: t('statusInReview'),
+  DRAFT: t('statusDraft'),
+  REJECTED: t('statusRejected'),
+  SUSPENDED: t('statusSuspended'),
+  CHANGES_REQUESTED: t('statusChangesRequested'),
+});
 
 export function ManagerDashboardContent(props) {
   const {
@@ -82,6 +82,7 @@ export function ManagerDashboardContent(props) {
     setInvitePageTab,
     setInviteToken,
     styles,
+    t,
   } = props;
 
   const [managerProfileExpanded, setManagerProfileExpanded] = React.useState(false);
@@ -135,7 +136,7 @@ export function ManagerDashboardContent(props) {
     return (
       <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <Text style={[styles.filterSectionTitle, { color: c.muted }]}>MEIN PROFIL</Text>
+          <Text style={[styles.filterSectionTitle, { color: c.muted }]}>{t('myProfileLabel')}</Text>
           {!mgrProfileEditMode ? (
             <Pressable
               onPress={() => {
@@ -157,12 +158,12 @@ export function ManagerDashboardContent(props) {
             >
               <Ionicons name={managerProfileIsReady && !managerProfileExpanded ? 'chevron-down-outline' : 'pencil-outline'} size={15} color={c.primary} />
               <Text style={{ ...TYPE.meta, color: c.primary, fontWeight: '600' }}>
-                {managerProfileIsReady && !managerProfileExpanded ? 'Anzeigen' : 'Bearbeiten'}
+                {managerProfileIsReady && !managerProfileExpanded ? t('showBtn') : t('editBtn')}
               </Text>
             </Pressable>
           ) : (
             <Pressable onPress={() => setMgrProfileEditMode(false)}>
-              <Text style={{ ...TYPE.meta, color: c.muted }}>Abbrechen</Text>
+              <Text style={{ ...TYPE.meta, color: c.muted }}>{t('cancelBtn')}</Text>
             </Pressable>
           )}
         </View>
@@ -192,7 +193,7 @@ export function ManagerDashboardContent(props) {
               <Text style={{ ...TYPE.heading, color: c.text }}>{mgr.therapistProfile.fullName}</Text>
               <Text style={{ ...TYPE.meta, color: c.textMuted ?? c.muted }}>{mgr.therapistProfile.professionalTitle}</Text>
               <Text style={{ ...TYPE.meta, color: managerProfileIsPublic ? c.success : c.textMuted ?? c.muted }}>
-                {managerProfileIsPublic ? 'Öffentlich sichtbar' : 'Noch nicht öffentlich'}
+                {managerProfileIsPublic ? t('publiclyVisible') : t('notPublicYet')}
               </Text>
             </View>
             <Ionicons name="chevron-down-outline" size={18} color={c.primary} />
@@ -226,35 +227,35 @@ export function ManagerDashboardContent(props) {
               <View style={{ flexDirection: 'row', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
                 <View style={{ backgroundColor: mgr.therapistProfile.isVisible ? c.successBg : c.mutedBg, borderRadius: RADIUS.sm, paddingHorizontal: 8, paddingVertical: 3 }}>
                   <Text style={{ ...TYPE.label, color: mgr.therapistProfile.isVisible ? c.success : c.muted, fontSize: 11, lineHeight: 11, textTransform: 'none' }}>
-                    {mgr.therapistProfile.isVisible ? 'Sichtbar' : 'Versteckt'}
+                    {mgr.therapistProfile.isVisible ? t('visibleLabel') : t('hiddenLabel')}
                   </Text>
                 </View>
                 <View style={{ backgroundColor: mgr.therapistProfile.isPublished ? c.successBg : c.mutedBg, borderRadius: RADIUS.sm, paddingHorizontal: 8, paddingVertical: 3 }}>
                   <Text style={{ ...TYPE.label, color: mgr.therapistProfile.isPublished ? c.success : c.muted, fontSize: 11, lineHeight: 11, textTransform: 'none' }}>
-                    {mgr.therapistProfile.isPublished ? 'Veröffentlicht' : 'Nicht veröffentlicht'}
+                    {mgr.therapistProfile.isPublished ? t('publishedLabel') : t('notPublished')}
                   </Text>
                 </View>
               </View>
               <View style={{ marginTop: 12, backgroundColor: managerProfileIsPublic ? c.successBg : c.mutedBg, borderRadius: RADIUS.md, padding: 12 }}>
                 <Text style={{ ...TYPE.meta, color: managerProfileIsPublic ? c.success : c.text, fontWeight: '700' }}>
-                  {managerProfileIsPublic ? 'Öffentlich sichtbar' : 'Noch nicht öffentlich'}
+                  {managerProfileIsPublic ? t('publiclyVisible') : t('notPublicYet')}
                 </Text>
                 <Text style={{ ...TYPE.meta, color: c.textMuted ?? c.muted, marginTop: 4 }}>
                   {managerProfileIsPublic
-                    ? 'Dein Profil erscheint aktuell in der Therapeutensuche.'
+                    ? t('profileInSearchInfo')
                     : !managerProfile?.reviewApproved
-                      ? 'Dein Profil wird erst nach der Freigabe durch das Revio-Team öffentlich.'
+                      ? t('profilePendingReview')
                       : !managerProfile?.isVisible
-                        ? 'Du hast dein Profil aktuell auf verborgen gestellt.'
+                        ? t('profileHiddenByYou')
                         : !managerProfileIsReady
-                          ? 'Es fehlen noch Pflichtangaben, bevor du veröffentlichen kannst.'
+                          ? t('profileMissingFields')
                           : !managerProfile?.isPublished
-                            ? 'Dein Profil ist vollständig, aber noch nicht ausdrücklich veröffentlicht.'
-                            : 'Dein Profil ist aktuell nicht öffentlich sichtbar.'}
+                            ? t('profileNotPublished')
+                            : t('profileNotVisibleGeneric')}
                 </Text>
                 {!managerProfileIsReady && managerProfileMissingFields.length > 0 && (
                   <Text style={{ ...TYPE.meta, color: c.text, marginTop: 8 }}>
-                    Fehlende Angaben: {managerProfileMissingFields.join(', ')}
+                    {t('missingFieldsLabel')}: {managerProfileMissingFields.join(', ')}
                   </Text>
                 )}
               </View>
@@ -265,7 +266,7 @@ export function ManagerDashboardContent(props) {
                   disabled={!managerProfile?.reviewApproved || mgrProfilePublishLoading}
                 >
                   <Text style={{ ...TYPE.meta, color: '#FFFFFF', fontWeight: '700' }}>
-                    {mgrProfilePublishLoading ? 'Prüfen...' : managerProfile?.isPublished ? 'Erneut prüfen' : 'Jetzt veröffentlichen'}
+                    {mgrProfilePublishLoading ? t('checkingBtn') : managerProfile?.isPublished ? t('recheckBtn') : t('publishNowBtn')}
                   </Text>
                 </Pressable>
                 <Pressable
@@ -273,23 +274,23 @@ export function ManagerDashboardContent(props) {
                   style={{ flex: 1, backgroundColor: c.mutedBg, borderRadius: RADIUS.md, paddingVertical: 12, alignItems: 'center', borderWidth: 1, borderColor: c.border, opacity: mgrProfilePublishLoading ? 0.7 : 1 }}
                   disabled={mgrProfilePublishLoading}
                 >
-                  <Text style={{ ...TYPE.meta, color: c.text, fontWeight: '700' }}>Verbergen</Text>
+                  <Text style={{ ...TYPE.meta, color: c.text, fontWeight: '700' }}>{t('hideBtn')}</Text>
                 </Pressable>
               </View>
             </View>
           </View>
         ) : (
           <View>
-            <Text style={{ ...TYPE.label, color: c.muted, marginBottom: 4 }}>Name</Text>
-            <TextInput style={[styles.input, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg, marginBottom: 10 }]} value={mgrProfileFullName} onChangeText={setMgrProfileFullName} placeholder="Vollständiger Name" placeholderTextColor={c.muted} />
-            <Text style={{ ...TYPE.label, color: c.muted, marginBottom: 4 }}>Berufsbezeichnung</Text>
-            <TextInput style={[styles.input, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg, marginBottom: 10 }]} value={mgrProfileTitle} onChangeText={setMgrProfileTitle} placeholder="z.B. Physiotherapeutin" placeholderTextColor={c.muted} />
-            <Text style={{ ...TYPE.label, color: c.muted, marginBottom: 4 }}>Bio</Text>
-            <TextInput style={[styles.input, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg, marginBottom: 10, minHeight: 80, textAlignVertical: 'top' }]} value={mgrProfileBio} onChangeText={setMgrProfileBio} placeholder="Kurzbeschreibung..." placeholderTextColor={c.muted} multiline />
-            <Text style={{ ...TYPE.label, color: c.muted, marginBottom: 4 }}>Spezialisierungen (kommagetrennt)</Text>
-            <TextInput style={[styles.input, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg, marginBottom: 10 }]} value={mgrProfileSpecializations} onChangeText={setMgrProfileSpecializations} placeholder="z.B. Rücken, Knie, Sport" placeholderTextColor={c.muted} />
-            <Text style={{ ...TYPE.label, color: c.muted, marginBottom: 4 }}>Sprachen (kommagetrennt)</Text>
-            <TextInput style={[styles.input, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg, marginBottom: 12 }]} value={mgrProfileLanguages} onChangeText={setMgrProfileLanguages} placeholder="z.B. Deutsch, Englisch" placeholderTextColor={c.muted} />
+            <Text style={{ ...TYPE.label, color: c.muted, marginBottom: 4 }}>{t('nameLabel')}</Text>
+            <TextInput style={[styles.input, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg, marginBottom: 10 }]} value={mgrProfileFullName} onChangeText={setMgrProfileFullName} placeholder={t('fullNamePlaceholder')} placeholderTextColor={c.muted} />
+            <Text style={{ ...TYPE.label, color: c.muted, marginBottom: 4 }}>{t('professionalTitleLabel')}</Text>
+            <TextInput style={[styles.input, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg, marginBottom: 10 }]} value={mgrProfileTitle} onChangeText={setMgrProfileTitle} placeholder={t('professionalTitlePlaceholder')} placeholderTextColor={c.muted} />
+            <Text style={{ ...TYPE.label, color: c.muted, marginBottom: 4 }}>{t('bioLabel')}</Text>
+            <TextInput style={[styles.input, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg, marginBottom: 10, minHeight: 80, textAlignVertical: 'top' }]} value={mgrProfileBio} onChangeText={setMgrProfileBio} placeholder={t('bioPlaceholder')} placeholderTextColor={c.muted} multiline />
+            <Text style={{ ...TYPE.label, color: c.muted, marginBottom: 4 }}>{t('specsCommaSeparated')}</Text>
+            <TextInput style={[styles.input, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg, marginBottom: 10 }]} value={mgrProfileSpecializations} onChangeText={setMgrProfileSpecializations} placeholder={t('specsPlaceholder')} placeholderTextColor={c.muted} />
+            <Text style={{ ...TYPE.label, color: c.muted, marginBottom: 4 }}>{t('langsCommaSeparated')}</Text>
+            <TextInput style={[styles.input, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg, marginBottom: 12 }]} value={mgrProfileLanguages} onChangeText={setMgrProfileLanguages} placeholder={t('langsPlaceholder')} placeholderTextColor={c.muted} />
             <Pressable
               onPress={() => setMgrProfileIsVisible((value) => !value)}
               style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 }}
@@ -297,17 +298,17 @@ export function ManagerDashboardContent(props) {
               <View style={{ width: 40, height: 22, borderRadius: 11, backgroundColor: mgrProfileIsVisible ? c.primary : c.border, justifyContent: 'center', paddingHorizontal: 2 }}>
                 <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: '#FFFFFF', alignSelf: mgrProfileIsVisible ? 'flex-end' : 'flex-start' }} />
               </View>
-              <Text style={{ ...TYPE.body, color: c.text }}>Nach Veröffentlichung im Verzeichnis sichtbar</Text>
+              <Text style={{ ...TYPE.body, color: c.text }}>{t('visibleAfterPublish')}</Text>
             </Pressable>
             <Text style={{ ...TYPE.meta, color: c.textMuted ?? c.muted, marginBottom: 14 }}>
-              Sichtbarkeit allein reicht nicht aus. Das Profil wird erst öffentlich, wenn alle Pflichtfelder ausgefüllt sind und du die Veröffentlichung bestätigst.
+              {t('visibilityExplanation')}
             </Text>
             <Pressable
               style={{ backgroundColor: mgrProfileSaving ? c.border : c.primary, borderRadius: RADIUS.md, paddingVertical: 13, alignItems: 'center' }}
               onPress={handleManagerProfileSave}
               disabled={mgrProfileSaving}
             >
-              <Text style={{ ...TYPE.heading, color: '#FFFFFF' }}>{mgrProfileSaving ? 'Speichern...' : 'Speichern'}</Text>
+              <Text style={{ ...TYPE.heading, color: '#FFFFFF' }}>{mgrProfileSaving ? t('savingBtn') : t('saveBtn')}</Text>
             </Pressable>
           </View>
         )}
@@ -323,7 +324,7 @@ export function ManagerDashboardContent(props) {
             <Text style={styles.logoText}>R</Text>
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.headerTitle, { color: c.text }]}>Praxis-Dashboard</Text>
+            <Text style={[styles.headerTitle, { color: c.text }]}>{t('practiceDashboard')}</Text>
             <Text style={[styles.headerSub, { color: c.muted }]}>{mgr.email}</Text>
           </View>
         </View>
@@ -369,7 +370,7 @@ export function ManagerDashboardContent(props) {
               </View>
               <View style={{ backgroundColor: statusStyle.bg, borderRadius: RADIUS.sm, paddingHorizontal: 10, paddingVertical: 4 }}>
                 <Text style={{ color: statusStyle.text, fontSize: 12, fontWeight: '600' }}>
-                  {statusLabels[reviewStatus] ?? reviewStatus}
+                  {getStatusLabels(t)[reviewStatus] ?? reviewStatus}
                 </Text>
               </View>
             </View>
@@ -391,13 +392,13 @@ export function ManagerDashboardContent(props) {
             )}
             {practice.logo ? (
               <View style={{ marginTop: 10 }}>
-                <Text style={[styles.filterSectionTitle, { color: c.muted, marginBottom: 6 }]}>Logo</Text>
+                <Text style={[styles.filterSectionTitle, { color: c.muted, marginBottom: 6 }]}>{t('logoLabel')}</Text>
                 <Image source={{ uri: resolveMediaUrl(practice.logo) }} style={{ width: 64, height: 64, borderRadius: RADIUS.sm }} />
               </View>
             ) : null}
             {practicePhotos.length > 0 ? (
               <View style={{ marginTop: 10 }}>
-                <Text style={[styles.filterSectionTitle, { color: c.muted, marginBottom: 6 }]}>Praxisfotos</Text>
+                <Text style={[styles.filterSectionTitle, { color: c.muted, marginBottom: 6 }]}>{t('practicePhotosLabel')}</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
                   {practicePhotos.map((uri, index) => (
                     <Image key={`${uri}-${index}`} source={{ uri }} style={{ width: 80, height: 80, borderRadius: RADIUS.sm }} />
@@ -408,23 +409,23 @@ export function ManagerDashboardContent(props) {
 
             {mgrEditMode ? (
               <View style={{ marginTop: 16, gap: 10 }}>
-                <Text style={[styles.filterSectionTitle, { color: c.muted }]}>Praxisname</Text>
+                <Text style={[styles.filterSectionTitle, { color: c.muted }]}>{t('practiceNamePlaceholder')}</Text>
                 <TextInput value={mgrEditName} onChangeText={setMgrEditName} placeholder={practice.name} placeholderTextColor={c.muted} style={[styles.inputField, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg }]} />
-                <Text style={[styles.filterSectionTitle, { color: c.muted }]}>Stadt</Text>
+                <Text style={[styles.filterSectionTitle, { color: c.muted }]}>{t('cityPlaceholder')}</Text>
                 <TextInput value={mgrEditCity} onChangeText={setMgrEditCity} placeholder={practice.city} placeholderTextColor={c.muted} style={[styles.inputField, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg }]} />
-                <Text style={[styles.filterSectionTitle, { color: c.muted }]}>Adresse</Text>
-                <TextInput value={mgrEditAddress} onChangeText={setMgrEditAddress} placeholder={practice.address ?? 'Strasse und Hausnummer'} placeholderTextColor={c.muted} style={[styles.inputField, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg }]} />
-                <Text style={[styles.filterSectionTitle, { color: c.muted }]}>Telefon</Text>
-                <TextInput value={mgrEditPhone} onChangeText={setMgrEditPhone} placeholder={practice.phone ?? '+49 ...'} placeholderTextColor={c.muted} keyboardType="phone-pad" style={[styles.inputField, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg }]} />
-                <Text style={[styles.filterSectionTitle, { color: c.muted }]}>Oeffnungszeiten</Text>
-                <TextInput value={mgrEditHours} onChangeText={setMgrEditHours} placeholder={practice.hours ?? 'Mo-Fr 8-18 Uhr'} placeholderTextColor={c.muted} style={[styles.inputField, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg }]} />
+                <Text style={[styles.filterSectionTitle, { color: c.muted }]}>{t('addressLabel')}</Text>
+                <TextInput value={mgrEditAddress} onChangeText={setMgrEditAddress} placeholder={practice.address ?? t('addressFallbackPlaceholder')} placeholderTextColor={c.muted} style={[styles.inputField, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg }]} />
+                <Text style={[styles.filterSectionTitle, { color: c.muted }]}>{t('phoneLabel')}</Text>
+                <TextInput value={mgrEditPhone} onChangeText={setMgrEditPhone} placeholder={practice.phone ?? t('phonePlaceholder')} placeholderTextColor={c.muted} keyboardType="phone-pad" style={[styles.inputField, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg }]} />
+                <Text style={[styles.filterSectionTitle, { color: c.muted }]}>{t('hoursLabel')}</Text>
+                <TextInput value={mgrEditHours} onChangeText={setMgrEditHours} placeholder={practice.hours ?? t('hoursFallbackPlaceholder')} placeholderTextColor={c.muted} style={[styles.inputField, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg }]} />
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10, minHeight: 44 }}>
-                  <Text style={[styles.filterSectionTitle, { color: c.text }]}>Hausbesuche</Text>
+                  <Text style={[styles.filterSectionTitle, { color: c.text }]}>{t('homeVisitsSwitch')}</Text>
                   <Switch value={mgrEditHomeVisit} onValueChange={setMgrEditHomeVisit} trackColor={{ true: c.primary }} />
                 </View>
-                <Text style={[styles.filterSectionTitle, { color: c.muted }]}>Beschreibung</Text>
-                <TextInput value={mgrEditDescription} onChangeText={setMgrEditDescription} placeholder={practice.description ?? 'Kurze Beschreibung...'} placeholderTextColor={c.muted} multiline numberOfLines={3} style={[styles.inputField, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg, minHeight: 72, textAlignVertical: 'top' }]} />
-                <Text style={[styles.filterSectionTitle, { color: c.muted }]}>Logo</Text>
+                <Text style={[styles.filterSectionTitle, { color: c.muted }]}>{t('descriptionLabel')}</Text>
+                <TextInput value={mgrEditDescription} onChangeText={setMgrEditDescription} placeholder={practice.description ?? t('shortDescPlaceholder')} placeholderTextColor={c.muted} multiline numberOfLines={3} style={[styles.inputField, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg, minHeight: 72, textAlignVertical: 'top' }]} />
+                <Text style={[styles.filterSectionTitle, { color: c.muted }]}>{t('logoLabel')}</Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                   {mgrEditLogo ? (
                     <Image source={{ uri: mgrEditLogo }} style={{ width: 64, height: 64, borderRadius: RADIUS.sm }} />
@@ -436,15 +437,15 @@ export function ManagerDashboardContent(props) {
                     </View>
                   )}
                   <Pressable onPress={handlePickManagerPracticeLogo} style={[styles.kassenartBtn, { backgroundColor: c.mutedBg, borderColor: c.border }]}>
-                    <Text style={[styles.kassenartText, { color: c.text }]}>Logo aendern</Text>
+                    <Text style={[styles.kassenartText, { color: c.text }]}>{t('changeLogoSimple')}</Text>
                   </Pressable>
                   {mgrEditLogo && (
                     <Pressable onPress={() => setMgrEditLogo(null)} style={[styles.kassenartBtn, { backgroundColor: 'transparent', borderColor: c.error }]}>
-                      <Text style={[styles.kassenartText, { color: c.error }]}>Entfernen</Text>
+                      <Text style={[styles.kassenartText, { color: c.error }]}>{t('removeBtn')}</Text>
                     </Pressable>
                   )}
                 </View>
-                <Text style={[styles.filterSectionTitle, { color: c.muted }]}>Praxisfotos</Text>
+                <Text style={[styles.filterSectionTitle, { color: c.muted }]}>{t('practicePhotosLabel')}</Text>
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                   {mgrEditPhotos.map((photo, index) => (
                     <View key={`${photo}-${index}`} style={{ position: 'relative' }}>
@@ -470,14 +471,14 @@ export function ManagerDashboardContent(props) {
                     style={{ flex: 1, backgroundColor: c.mutedBg, borderRadius: RADIUS.md, paddingVertical: 12, alignItems: 'center', borderWidth: 1, borderColor: c.border }}
                     onPress={() => setMgrEditMode(false)}
                   >
-                    <Text style={{ color: c.text, fontWeight: '600' }}>Abbrechen</Text>
+                    <Text style={{ color: c.text, fontWeight: '600' }}>{t('cancelBtn')}</Text>
                   </Pressable>
                   <Pressable
                     style={{ flex: 1, backgroundColor: mgrEditSaving ? c.border : c.primary, borderRadius: RADIUS.md, paddingVertical: 12, alignItems: 'center' }}
                     onPress={handleManagerPracticeSave}
                     disabled={mgrEditSaving}
                   >
-                    <Text style={{ color: '#fff', fontWeight: '700' }}>{mgrEditSaving ? 'Speichern...' : 'Speichern'}</Text>
+                    <Text style={{ color: '#fff', fontWeight: '700' }}>{mgrEditSaving ? t('savingBtn') : t('saveBtn')}</Text>
                   </Pressable>
                 </View>
               </View>
@@ -498,16 +499,16 @@ export function ManagerDashboardContent(props) {
                 }}
               >
                 <Ionicons name="pencil-outline" size={16} color={c.primary} />
-                <Text style={{ color: c.primary, fontSize: 14, fontWeight: '600' }}>Bearbeiten</Text>
+                <Text style={{ color: c.primary, fontSize: 14, fontWeight: '600' }}>{t('editBtn')}</Text>
               </Pressable>
             )}
           </View>
         )}
 
         <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
-          <Text style={[styles.filterSectionTitle, { color: c.muted, marginBottom: 12 }]}>THERAPEUTEN</Text>
+          <Text style={[styles.filterSectionTitle, { color: c.muted, marginBottom: 12 }]}>{t('therapeutsSection')}</Text>
           {therapists.length === 0 ? (
-            <Text style={{ color: c.muted, fontSize: 14, textAlign: 'center', paddingVertical: 16 }}>Noch keine Therapeuten verknuepft</Text>
+            <Text style={{ color: c.muted, fontSize: 14, textAlign: 'center', paddingVertical: 16 }}>{t('noTherapistsLinked')}</Text>
           ) : (
             therapists.map((therapist) => {
               const isInvited = therapist.onboardingStatus === 'invited';
@@ -527,17 +528,17 @@ export function ManagerDashboardContent(props) {
                   </View>
                   <View style={{ backgroundColor: isInvited ? c.warningBg : c.successBg, borderRadius: RADIUS.sm, paddingHorizontal: 8, paddingVertical: 3 }}>
                     <Text style={{ color: isInvited ? c.warning : c.success, fontSize: 11, fontWeight: '600' }}>
-                      {isInvited ? 'Eingeladen' : 'Aktiv'}
+                      {isInvited ? t('invitedLabel') : t('activeLabel')}
                     </Text>
                   </View>
                   {therapist.id !== loggedInManager?.therapistProfile?.id && (
                     <Pressable
-                      onPress={() => handleRemoveTherapist(therapist.id, therapist.fullName ?? 'Therapeut')}
+                      onPress={() => handleRemoveTherapist(therapist.id, therapist.fullName ?? t('tabTherapist'))}
                       disabled={removingTherapistId === therapist.id}
                       style={{ paddingHorizontal: 10, paddingVertical: 10, minHeight: 44, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: c.error, opacity: removingTherapistId === therapist.id ? 0.4 : 1, justifyContent: 'center' }}
                     >
                       <Text style={{ color: c.error, fontSize: 11, fontWeight: '600' }}>
-                        {removingTherapistId === therapist.id ? '...' : 'Entfernen'}
+                      {removingTherapistId === therapist.id ? '...' : t('removeBtn')}
                       </Text>
                     </Pressable>
                   )}
@@ -561,7 +562,7 @@ export function ManagerDashboardContent(props) {
               style={{ borderRadius: RADIUS.md, paddingVertical: 12, alignItems: 'center', borderWidth: 1.5, borderColor: c.primary, flexDirection: 'row', justifyContent: 'center', gap: 6 }}
             >
               <Ionicons name="person-add-outline" size={18} color={c.primary} />
-              <Text style={{ color: c.primary, fontSize: 15, fontWeight: '600' }}>Therapeut einladen</Text>
+              <Text style={{ color: c.primary, fontSize: 15, fontWeight: '600' }}>{t('inviteTherapistAction')}</Text>
             </Pressable>
           </View>
         )}
@@ -572,7 +573,7 @@ export function ManagerDashboardContent(props) {
               onPress={() => handleDeleteManagerPractice(practice.id)}
               style={{ alignItems: 'center', paddingVertical: 14 }}
             >
-              <Text style={{ ...TYPE.body, color: c.error }}>Praxis löschen</Text>
+              <Text style={{ ...TYPE.body, color: c.error }}>{t('deletePracticeBtn')}</Text>
             </Pressable>
           </View>
         )}

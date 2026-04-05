@@ -31,7 +31,7 @@ async function sharePublicLink({ title, url, message }) {
       return;
     }
     await webNavigator?.clipboard?.writeText?.(url);
-    webAlert?.('Link kopiert!');
+    webAlert?.('Link copied!');
     return;
   }
 
@@ -126,7 +126,7 @@ export function PracticeProfileScreen(props) {
 
       {!!practice.description && (
         <View style={{ marginHorizontal: 16, marginTop: 8, marginBottom: 4, padding: 14, backgroundColor: c.card, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: c.border }}>
-          <Text style={{ ...TYPE.label, color: c.muted, marginBottom: 6, textTransform: 'none', letterSpacing: 0.5 }}>Über die Praxis</Text>
+          <Text style={{ ...TYPE.label, color: c.muted, marginBottom: 6, textTransform: 'none', letterSpacing: 0.5 }}>{t('aboutPractice')}</Text>
           <Text style={{ ...TYPE.body, color: c.text }}>{practice.description}</Text>
         </View>
       )}
@@ -137,15 +137,15 @@ export function PracticeProfileScreen(props) {
       {selectedPracticeLoading ? (
         <View style={{ alignItems: 'center', paddingVertical: 16 }}>
           <ActivityIndicator color={c.primary} />
-          <Text style={{ color: c.muted, marginTop: 8, fontSize: 13 }}>Lade Therapeuten…</Text>
+          <Text style={{ color: c.muted, marginTop: 8, fontSize: 13 }}>{t('loadingTherapists')}</Text>
         </View>
       ) : selectedPracticeError ? (
         <Text style={{ ...TYPE.meta, color: c.error, paddingVertical: 10, marginHorizontal: 16 }}>{softenErrorMessage(selectedPracticeError)}</Text>
       ) : therapists.length === 0 ? (
         <View style={[styles.emptyInlineState, { backgroundColor: c.card, borderColor: c.border }]}>
-          <Text style={{ color: c.text, fontWeight: '700', fontSize: 14 }}>Aktuell keine oeffentlichen Profile</Text>
+          <Text style={{ color: c.text, fontWeight: '700', fontSize: 14 }}>{t('noPublicProfiles')}</Text>
           <Text style={{ color: c.muted, fontSize: 13, lineHeight: 18, marginTop: 4 }}>
-            Diese Praxis hat momentan keine freigeschalteten Therapeut:innen im Verzeichnis.
+            {t('noPublicProfilesBody')}
           </Text>
         </View>
       ) : (
@@ -198,7 +198,7 @@ export function TherapistProfileScreen(props) {
   const iconHitSlop = { top: 10, bottom: 10, left: 10, right: 10 };
   const openEmailComposer = () => {
     if (!th.email) return;
-    const subject = encodeURIComponent(`Kontakt zu ${th.fullName}`);
+    const subject = encodeURIComponent(t('contactSubject').replace('{name}', th.fullName));
     Linking.openURL(`mailto:${th.email}?subject=${subject}`);
   };
 
@@ -247,7 +247,7 @@ export function TherapistProfileScreen(props) {
             ))}
             {th.homeVisit && (
               <View style={[styles.tag, { backgroundColor: c.successBg, borderWidth: 1, borderColor: c.success }]}>
-                <Text style={[styles.tagText, { color: c.success }]}>🏠 {th.serviceRadiusKm ? `Hausbesuch bis ${th.serviceRadiusKm} km` : t('homeVisitTag')}</Text>
+                <Text style={[styles.tagText, { color: c.success }]}>🏠 {th.serviceRadiusKm ? t('homeVisitRadius').replace('{radius}', th.serviceRadiusKm) : t('homeVisitTag')}</Text>
               </View>
             )}
             {th.kassenart ? (
@@ -265,12 +265,12 @@ export function TherapistProfileScreen(props) {
           ) : null}
           {th.distKm != null ? (
             <View style={[styles.metaPill, { backgroundColor: c.successBg }]}>
-              <Text style={[styles.metaPillText, { color: c.success }]}>{`${formatDist(th.distKm)} entfernt`}</Text>
+              <Text style={[styles.metaPillText, { color: c.success }]}>{t('distanceAway').replace('{dist}', formatDist(th.distKm))}</Text>
             </View>
           ) : null}
           {th.practices?.length > 1 ? (
             <View style={[styles.metaPill, { backgroundColor: c.mutedBg }]}>
-              <Text style={[styles.metaPillText, { color: c.text }]}>{`${th.practices.length} Praxen`}</Text>
+              <Text style={[styles.metaPillText, { color: c.text }]}>{t('nPractices').replace('{n}', th.practices.length)}</Text>
             </View>
           ) : null}
         </View>
@@ -278,13 +278,13 @@ export function TherapistProfileScreen(props) {
 
       {(th.homeVisit || th.availability) && (
         <View style={[styles.infoSection, { backgroundColor: c.successBg, borderColor: c.success, borderWidth: 1 }]}>
-          <Text style={[styles.filterSectionTitle, { color: c.success }]}>Kontakt & Einsatzgebiet</Text>
+          <Text style={[styles.filterSectionTitle, { color: c.success }]}>{t('contactAndArea')}</Text>
           {th.serviceRadiusKm ? (
             <View style={styles.detailInfoRow}>
               <Text style={styles.detailIcon}>📍</Text>
               <View>
-                <Text style={[styles.detailInfoLabel, { color: c.success }]}>Einzugsgebiet</Text>
-                <Text style={[styles.detailInfoValue, { color: c.text }]}>Bis {th.serviceRadiusKm} km</Text>
+                <Text style={[styles.detailInfoLabel, { color: c.success }]}>{t('serviceAreaLabel')}</Text>
+                <Text style={[styles.detailInfoValue, { color: c.text }]}>{t('serviceAreaValue').replace('{radius}', th.serviceRadiusKm)}</Text>
               </View>
             </View>
             ) : null}
@@ -363,7 +363,7 @@ export function TherapistProfileScreen(props) {
               <Text style={styles.detailIcon}>📍</Text>
               <View>
                 <Text style={[styles.detailInfoLabel, { color: c.muted }]}>{t('distanceLabel')}</Text>
-                <Text style={[styles.detailInfoValue, { color: c.text }]}>{formatDist(th.distKm)} entfernt</Text>
+                <Text style={[styles.detailInfoValue, { color: c.text }]}>{t('distanceAway').replace('{dist}', formatDist(th.distKm))}</Text>
               </View>
             </View>
           ) : null}
@@ -390,7 +390,7 @@ export function TherapistProfileScreen(props) {
 
       {primaryPractice ? (
         <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
-          <Text style={[styles.filterSectionTitle, { color: c.muted }]}>Schnellkontakt</Text>
+          <Text style={[styles.filterSectionTitle, { color: c.muted }]}>{t('quickContact')}</Text>
           <Text style={{ color: c.text, fontSize: 16, fontWeight: '700' }}>{primaryPractice.name}</Text>
           <Text style={{ color: c.muted, fontSize: 13, marginTop: 4 }}>
             {primaryPractice.address || primaryPractice.city}
@@ -403,19 +403,19 @@ export function TherapistProfileScreen(props) {
               style={[styles.ctaBtnSecondary, { borderColor: c.border, backgroundColor: c.mutedBg, flex: 1 }]}
               onPress={() => { setSelectedTherapist(null); openPractice(primaryPractice); }}
             >
-              <Text style={[styles.ctaBtnSecondaryText, { color: c.text }]}>Praxis ansehen</Text>
+              <Text style={[styles.ctaBtnSecondaryText, { color: c.text }]}>{t('viewPracticeAction')}</Text>
             </Pressable>
           </View>
         </View>
       ) : th.email ? (
         <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
-          <Text style={[styles.filterSectionTitle, { color: c.muted }]}>Kontakt</Text>
+          <Text style={[styles.filterSectionTitle, { color: c.muted }]}>{t('contactTitle')}</Text>
           <Text style={{ color: c.muted, fontSize: 13, marginTop: 4 }}>
-            Kontakt direkt mit dem Therapeuten aufnehmen{th.city ? ` (${th.city})` : ''}.
+            {t('contactBody')}{th.city ? ` (${th.city})` : ''}
           </Text>
           <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
             <Pressable style={[styles.ctaBtn, { backgroundColor: c.primary, flex: 1 }]} onPress={openEmailComposer}>
-              <Text style={styles.ctaBtnText}>E-Mail schreiben</Text>
+              <Text style={styles.ctaBtnText}>{t('writeEmail')}</Text>
             </Pressable>
           </View>
         </View>

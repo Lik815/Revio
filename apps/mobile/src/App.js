@@ -91,6 +91,51 @@ function showWebConfirm(message) {
 }
 
 const ICON_HIT_SLOP = { top: 10, bottom: 10, left: 10, right: 10 };
+const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024;
+const REVIEW_NOTIFICATION_TYPES = new Set([
+  'PROFILE_APPROVED',
+  'PROFILE_CHANGES_REQUESTED',
+  'PROFILE_REJECTED',
+  'PROFILE_SUSPENDED',
+]);
+
+function formatDocumentSize(bytes) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return null;
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${Math.round(bytes / 1024)} KB`;
+}
+
+function validateDocumentSize(asset, t) {
+  if (!asset?.size || asset.size <= 0) return true;
+  if (asset.size <= MAX_DOCUMENT_BYTES) return true;
+
+  Alert.alert(
+    t('alertDocumentTooLargeTitle'),
+    t('alertDocumentTooLargeBody')
+      .replace('{max}', formatDocumentSize(MAX_DOCUMENT_BYTES))
+      .replace('{name}', asset.name || t('documentFallback')),
+  );
+  return false;
+}
+
+function getReviewNotificationSeenKey(therapistId) {
+  return `revio_seen_review_status_${therapistId}`;
+}
+
+function getReviewNotificationTitle(notification, t) {
+  switch (notification?.type) {
+    case 'PROFILE_APPROVED':
+      return t('reviewNotificationApprovedTitle');
+    case 'PROFILE_CHANGES_REQUESTED':
+      return t('reviewNotificationChangesTitle');
+    case 'PROFILE_REJECTED':
+      return t('reviewNotificationRejectedTitle');
+    case 'PROFILE_SUSPENDED':
+      return t('reviewNotificationSuspendedTitle');
+    default:
+      return t('notificationsOption');
+  }
+}
 
 // ─── App ──────────────────────────────────────────────────────────────────────
 
@@ -329,9 +374,10 @@ export default function App() {
   const [regFreelance, setRegFreelance] = useState(null);
   const [regHomeVisit, setRegHomeVisit] = useState(false);
   const [regServiceRadius, setRegServiceRadius] = useState(null);
-  const [regKassenart, setRegKassenart] = useState('');
+  const [regKassenart, setRegKassenart] = useState([]);
   const [regSpecSearch, setRegSpecSearch] = useState('');
   const [regLangSearch, setRegLangSearch] = useState('');
+  const [regDocument, setRegDocument] = useState(null);
   const [showRegFortbildungen, setShowRegFortbildungen] = useState(false);
   const [showRegPassword, setShowRegPassword] = useState(false);
   const [showRegPasswordConfirm, setShowRegPasswordConfirm] = useState(false);
@@ -435,6 +481,7 @@ export default function App() {
   const [showInvitePassword, setShowInvitePassword] = useState(false);
   const [showInvitePasswordConfirm, setShowInvitePasswordConfirm] = useState(false);
   const [showVisibilityModal, setShowVisibilityModal] = useState(false);
+  const [showProfileSavedModal, setShowProfileSavedModal] = useState(false);
   const [visibilityLoading, setVisibilityLoading] = useState(false);
 
   useEffect(() => {
@@ -583,7 +630,12 @@ export default function App() {
   // Poll notifications every 30s when logged in
   useEffect(() => {
     if (notificationPollRef.current) clearInterval(notificationPollRef.current);
-    if (!authToken) { setNotifications([]); return; }
+    if (!authToken) {
+      setNotifications([]);
+      setReviewNotification(null);
+      setShowReviewNotificationModal(false);
+      return;
+    }
     const fetchNotifications = async () => {
       try {
         const res = await fetch(`${getBaseUrl()}/notifications`, {
@@ -591,14 +643,40 @@ export default function App() {
         });
         if (res.ok) {
           const data = await res.json();
-          setNotifications(data.notifications ?? []);
+          let nextNotifications = Array.isArray(data.notifications) ? data.notifications : [];
+          const nextReviewNotification = nextNotifications.find(
+            (item) => REVIEW_NOTIFICATION_TYPES.has(item.type) && item.reviewStatus && item.therapistId,
+          );
+
+          if (accountType === 'therapist' && nextReviewNotification?.therapistId) {
+            const seenStatus = await AsyncStorage.getItem(
+              getReviewNotificationSeenKey(nextReviewNotification.therapistId),
+            );
+
+            if (seenStatus === nextReviewNotification.reviewStatus) {
+              nextNotifications = nextNotifications.filter((item) => item.id !== nextReviewNotification.id);
+            } else {
+              setReviewNotification((prev) =>
+                prev?.id === nextReviewNotification.id ? prev : nextReviewNotification,
+              );
+              setShowReviewNotificationModal(true);
+            }
+
+            setLoggedInTherapist((prev) => (
+              prev?.id === nextReviewNotification.therapistId && prev.reviewStatus !== nextReviewNotification.reviewStatus
+                ? { ...prev, reviewStatus: nextReviewNotification.reviewStatus }
+                : prev
+            ));
+          }
+
+          setNotifications(nextNotifications);
         }
       } catch {}
     };
     fetchNotifications();
     notificationPollRef.current = setInterval(fetchNotifications, 30000);
     return () => clearInterval(notificationPollRef.current);
-  }, [authToken]);
+  }, [authToken, accountType]);
 
   const registerPushToken = async (token) => {
     try {
@@ -694,6 +772,21 @@ export default function App() {
     setLoggedInTherapist(null);
   };
 
+  const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
+  const [deleteNameInput, setDeleteNameInput] = useState('');
+
+  const markReviewNotificationSeen = async (notification = reviewNotification) => {
+    if (notification?.therapistId && notification?.reviewStatus) {
+      await AsyncStorage.setItem(
+        getReviewNotificationSeenKey(notification.therapistId),
+        notification.reviewStatus,
+      );
+    }
+    setNotifications((prev) => prev.filter((item) => item.id !== notification?.id));
+    setShowReviewNotificationModal(false);
+    setReviewNotification(null);
+  };
+
   const handleDeleteAccount = () => {
     if (loggedInTherapist?.adminPractice) {
       const msg = t('alertDeleteAdminWarning').replace('{name}', loggedInTherapist.adminPractice.name);
@@ -701,15 +794,8 @@ export default function App() {
       else { Alert.alert(t('alertHint'), msg, [{ text: 'OK' }]); }
       return;
     }
-    const msg = t('deleteAccountConfirmMsg');
-    if (Platform.OS === 'web') {
-      if (showWebConfirm(`${t('deleteAccountConfirmTitle')}\n\n${msg}`)) deleteAccountConfirmed();
-    } else {
-      Alert.alert(t('deleteAccountConfirmTitle'), msg, [
-        { text: t('cancelBtn'), style: 'cancel' },
-        { text: t('deleteAccountConfirmBtn'), style: 'destructive', onPress: deleteAccountConfirmed },
-      ]);
-    }
+    setDeleteNameInput('');
+    setShowDeleteAccountModal(true);
   };
 
   const [deletionFlowStep, setDeletionFlowStep] = useState(null); // null | 'reason' | 'confirm'
@@ -719,12 +805,12 @@ export default function App() {
   const [deletionPracticeId, setDeletionPracticeId] = useState(null); // null = therapist flow, string = manager flow
 
   const DELETION_REASONS = [
-    'Ich habe die Praxis versehentlich erstellt',
-    'Doppelter Eintrag',
-    'Ich verwalte diese Praxis nicht mehr',
-    'Die Praxis ist geschlossen',
-    'Ich möchte sie durch eine andere ersetzen',
-    'Sonstiges',
+    t('deletionReasonAccidental'),
+    t('deletionReasonDuplicate'),
+    t('deletionReasonNoLongerManage'),
+    t('deletionReasonClosed'),
+    t('deletionReasonReplace'),
+    t('deletionReasonOther'),
   ];
 
   const deletePracticeConfirmed = async () => {
@@ -733,8 +819,8 @@ export default function App() {
       const isManagerFlow = deletionPracticeId !== null;
       const url = isManagerFlow ? `${getBaseUrl()}/manager/practice` : `${getBaseUrl()}/my/practice`;
       const body = isManagerFlow
-        ? { practiceId: deletionPracticeId, reason: deletionReason, reasonDetail: deletionReason === 'Sonstiges' ? deletionReasonDetail : undefined }
-        : { reason: deletionReason, reasonDetail: deletionReason === 'Sonstiges' ? deletionReasonDetail : undefined };
+        ? { practiceId: deletionPracticeId, reason: deletionReason, reasonDetail: deletionReason === t('deletionReasonOther') ? deletionReasonDetail : undefined }
+        : { reason: deletionReason, reasonDetail: deletionReason === t('deletionReasonOther') ? deletionReasonDetail : undefined };
 
       const res = await fetch(url, {
         method: 'DELETE',
@@ -803,7 +889,7 @@ export default function App() {
         });
         if (profileRes.ok) setLoggedInTherapist(normalizeTherapistProfile(await profileRes.json()));
         setEditMode(false);
-        Alert.alert(t('alertSaved'), t('alertProfileSaved'));
+        setShowProfileSavedModal(true);
       } else {
         const err = await res.json().catch(() => ({}));
         Alert.alert(t('alertError'), err.message ?? t('alertProfileSaveFail'));
@@ -863,6 +949,8 @@ export default function App() {
       if (result.canceled || !result.assets?.[0]) return;
 
       const asset = result.assets[0];
+      if (!validateDocumentSize(asset, t)) return;
+
       const formData = new FormData();
       formData.append('document', {
         uri: asset.uri,
@@ -889,6 +977,21 @@ export default function App() {
       Alert.alert(t('alertConnectionError'), t('alertConnectionErrorBody'));
     } finally {
       setDocumentUploading(false);
+    }
+  };
+
+  const handlePickRegistrationDocument = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'],
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled || !result.assets?.[0]) return;
+      const asset = result.assets[0];
+      if (!validateDocumentSize(asset, t)) return;
+      setRegDocument(asset);
+    } catch {
+      Alert.alert(t('alertConnectionError'), t('alertConnectionErrorBody'));
     }
   };
 
@@ -1212,7 +1315,7 @@ export default function App() {
   // Practice: pick logo
   const handlePickPracticeLogo = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) { Alert.alert('Kein Zugriff', 'Bitte Fotobibliothek erlauben.'); return; }
+    if (!perm.granted) { Alert.alert(t('alertNoAccess'), t('alertAllowPhotoLib')); return; }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true, aspect: [1, 1], quality: 0.5, base64: true,
@@ -1225,7 +1328,7 @@ export default function App() {
   // Practice: add a photo
   const handleAddPracticePhoto = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) { Alert.alert('Kein Zugriff', 'Bitte Fotobibliothek erlauben.'); return; }
+    if (!perm.granted) { Alert.alert(t('alertNoAccess'), t('alertAllowPhotoLib')); return; }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true, quality: 0.4, base64: true,
@@ -1240,7 +1343,7 @@ export default function App() {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Standort nicht verfügbar', 'Bitte erlaube den Standortzugriff in den Einstellungen.');
+        Alert.alert(t('alertLocationUnavailable'), t('alertAllowLocation'));
         return;
       }
       const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
@@ -1256,7 +1359,7 @@ export default function App() {
       setUserCoords({ lat: loc.coords.latitude, lng: loc.coords.longitude });
       AsyncStorage.setItem('savedCoords', JSON.stringify({ lat: loc.coords.latitude, lng: loc.coords.longitude }));
     } catch {
-      Alert.alert('Fehler', 'Standort konnte nicht ermittelt werden.');
+      Alert.alert(t('alertError'), t('alertLocationFail'));
     }
   };
 
@@ -1283,6 +1386,8 @@ export default function App() {
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const notificationPollRef = React.useRef(null);
+  const [showReviewNotificationModal, setShowReviewNotificationModal] = useState(false);
+  const [reviewNotification, setReviewNotification] = useState(null);
   const [locationLabel, setLocationLabel] = useState(''); // display: "Hauptstraße 5, München"
   const [showLocationSheet, setShowLocationSheet] = useState(false);
   const [pendingQuery, setPendingQuery] = useState(null);
@@ -1458,15 +1563,15 @@ export default function App() {
       }
 
       if (filtered.length === 0 && withDist.length > 0) {
-        Alert.alert('Radius zu klein', `${withDist.length} Therapeut:innen gefunden, aber alle außerhalb von ${searchRadius} km. Radius erhöhen?`);
+        Alert.alert(t('alertRadiusTooSmall'), t('alertRadiusTooSmallBody').replace('{n}', withDist.length).replace('{radius}', searchRadius));
       }
       setResults(filtered);
       setAllApiTherapists(sourceList);
     } catch (err) {
-      const message = String(err?.message ?? 'Unbekannter Fehler');
+      const message = String(err?.message ?? t('alertUnknownError'));
       const usingLocalTunnel = getBaseUrl().includes('.loca.lt');
       const tunnelHint = usingLocalTunnel
-        ? '\n\nHinweis: Deine API-URL zeigt auf einen localtunnel-Link. Prüfe, ob der Tunnel noch aktiv ist oder nutze lokal besser die LAN-IP deines Rechners.'
+        ? '\n\nHint: Your API URL points to a localtunnel link. Check if the tunnel is still active or use your machine\'s LAN IP locally instead.'
         : '';
       Alert.alert(t('alertConnectionError'), `${t('alertSearchFail')}: ${message}\n\nAPI-URL: ${getBaseUrl()}${tunnelHint}`);
       setResults([]);
@@ -1542,7 +1647,7 @@ export default function App() {
 
     if (Platform.OS === 'web') {
       if (!webNavigator?.geolocation) {
-        Alert.alert('Fehler', 'Standortzugriff wird in diesem Browser nicht unterstützt.');
+        Alert.alert(t('alertError'), t('alertLocationNotSupported'));
         setLocationLoading(false);
         return;
       }
@@ -1557,7 +1662,7 @@ export default function App() {
             const addr = data?.address || {};
             const detectedCity = addr.city || addr.town || addr.village || addr.municipality || '';
             if (!detectedCity) {
-              Alert.alert('Fehler', 'Stadt konnte nicht erkannt werden. Bitte manuell eingeben.');
+              Alert.alert(t('alertError'), t('alertCityNotRecognized'));
               setLocationLoading(false);
               return;
             }
@@ -1566,12 +1671,12 @@ export default function App() {
             pendingGPSResult.current = { city: detectedCity, coords: { lat: latitude, lng: longitude }, label };
             setLocationSheetCity(label);
           } catch {
-            Alert.alert('Fehler', 'Standort konnte nicht ermittelt werden.');
+            Alert.alert(t('alertError'), t('alertLocationFail'));
           }
           setLocationLoading(false);
         },
         () => {
-          Alert.alert('Kein Zugriff', 'Bitte erlaube den Standortzugriff im Browser.');
+          Alert.alert(t('alertNoAccess'), t('alertAllowLocationBrowser'));
           setLocationLoading(false);
         },
         { enableHighAccuracy: true, timeout: 10000 }
@@ -1582,7 +1687,7 @@ export default function App() {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Kein Zugriff', 'Bitte erlaube den Standortzugriff in den Einstellungen.');
+        Alert.alert(t('alertNoAccess'), t('alertAllowLocation'));
         setLocationLoading(false);
         return;
       }
@@ -1590,7 +1695,7 @@ export default function App() {
       const [geo] = await Location.reverseGeocodeAsync(loc.coords);
       const detectedCity = geo?.city || '';
       if (!detectedCity) {
-        Alert.alert('Fehler', 'Stadt konnte nicht erkannt werden. Bitte manuell eingeben.');
+        Alert.alert(t('alertError'), t('alertCityNotRecognized'));
         setLocationLoading(false);
         return;
       }
@@ -1600,7 +1705,7 @@ export default function App() {
       pendingGPSResult.current = { city: detectedCity, coords: { lat: loc.coords.latitude, lng: loc.coords.longitude }, label };
       setLocationSheetCity(label);
     } catch {
-      Alert.alert('Fehler', 'Standort konnte nicht ermittelt werden.');
+      Alert.alert(t('alertError'), t('alertLocationFail'));
     }
     setLocationLoading(false);
   };
@@ -2004,7 +2109,7 @@ export default function App() {
                       <View style={{ flex: 1 }}>
                         <Text style={{ fontSize: 15, fontWeight: '600', color: c.text }}>{loggedInTherapist.fullName ?? '—'}</Text>
                         <Text style={{ fontSize: 12, color: loggedInTherapist.isVisible && loggedInTherapist.reviewStatus === 'APPROVED' ? c.success : c.muted }}>
-                          {loggedInTherapist.isVisible && loggedInTherapist.reviewStatus === 'APPROVED' ? 'Öffentlich sichtbar' : 'Noch nicht öffentlich'}
+                          {loggedInTherapist.isVisible && loggedInTherapist.reviewStatus === 'APPROVED' ? t('publiclyVisible') : t('notYetPublic')}
                         </Text>
                       </View>
                     </View>
@@ -2023,7 +2128,7 @@ export default function App() {
                       <View style={{ flex: 1 }}>
                         <Text style={{ fontSize: 15, fontWeight: '600', color: c.text }}>{mgrTherapistProfile.fullName ?? '—'}</Text>
                         <Text style={{ fontSize: 12, color: mgrTherapistProfile.isVisible && mgrTherapistProfile.reviewStatus === 'APPROVED' ? c.success : c.muted }}>
-                          {mgrTherapistProfile.isVisible && mgrTherapistProfile.reviewStatus === 'APPROVED' ? 'Öffentlich sichtbar' : 'Noch nicht öffentlich'}
+                          {mgrTherapistProfile.isVisible && mgrTherapistProfile.reviewStatus === 'APPROVED' ? t('publiclyVisible') : t('notYetPublic')}
                         </Text>
                       </View>
                     </View>
@@ -2102,17 +2207,19 @@ export default function App() {
                 ))}
               </View>
             </View>
-            <View style={[styles.optionRow, { backgroundColor: c.card, borderColor: 'transparent', borderTopWidth: 1, borderTopColor: c.border }]}>
+            <Pressable onPress={() => setShowNotifications(true)} style={[styles.optionRow, { backgroundColor: c.card, borderColor: 'transparent', borderTopWidth: 1, borderTopColor: c.border }]}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                 <Ionicons name="notifications-outline" size={18} color={c.muted} />
                 <Text style={[styles.optionLabel, { color: c.text }]}>{t('notificationsOption')}</Text>
               </View>
-              <Text style={[styles.optionValue, { color: c.muted }]}>{t('comingSoon')} ›</Text>
-            </View>
+              <Text style={[styles.optionValue, { color: notifications.length > 0 ? c.primary : c.muted }]}>
+                {notifications.length > 0 ? `${notifications.length} ›` : '›'}
+              </Text>
+            </Pressable>
             <Pressable onPress={() => Linking.openSettings()} style={[styles.optionRow, { backgroundColor: c.card, borderColor: 'transparent', borderTopWidth: 1, borderTopColor: c.border }]}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                 <Ionicons name="phone-portrait-outline" size={18} color={c.muted} />
-                <Text style={[styles.optionLabel, { color: c.text }]}>Geräteeinstellungen</Text>
+                <Text style={[styles.optionLabel, { color: c.text }]}>{t('deviceSettings')}</Text>
               </View>
               <Text style={[styles.optionValue, { color: c.muted }]}>›</Text>
             </Pressable>
@@ -2130,38 +2237,38 @@ export default function App() {
           </OptionGroup>
 
           {/* ── Hilfe & Support ── */}
-          <SectionHeader title="Hilfe & Support" />
+          <SectionHeader title={t('helpSupportSection')} />
           <OptionGroup>
             <Pressable style={[styles.optionRow, { backgroundColor: c.card, borderColor: 'transparent' }]}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                 <Ionicons name="help-circle-outline" size={18} color={c.muted} />
-                <Text style={[styles.optionLabel, { color: c.text }]}>FAQ</Text>
+                <Text style={[styles.optionLabel, { color: c.text }]}>{t('faqOption')}</Text>
               </View>
-              <Text style={[styles.optionValue, { color: c.muted }]}>Bald verfügbar ›</Text>
+              <Text style={[styles.optionValue, { color: c.muted }]}>{t('comingSoon')} ›</Text>
             </Pressable>
             <Pressable style={[styles.optionRow, { backgroundColor: c.card, borderColor: 'transparent', borderTopWidth: 1, borderTopColor: c.border }]}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                 <Ionicons name="chatbubble-outline" size={18} color={c.muted} />
-                <Text style={[styles.optionLabel, { color: c.text }]}>App-Feedback</Text>
+                <Text style={[styles.optionLabel, { color: c.text }]}>{t('appFeedback')}</Text>
               </View>
-              <Text style={[styles.optionValue, { color: c.muted }]}>Bald verfügbar ›</Text>
+              <Text style={[styles.optionValue, { color: c.muted }]}>{t('comingSoon')} ›</Text>
             </Pressable>
           </OptionGroup>
 
           {/* ── Rechtliches ── */}
-          <SectionHeader title="Rechtliches & Richtlinien" />
+          <SectionHeader title={t('legalSection')} />
           <OptionGroup>
             <Pressable style={[styles.optionRow, { backgroundColor: c.card, borderColor: 'transparent' }]}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                 <Ionicons name="document-text-outline" size={18} color={c.muted} />
-                <Text style={[styles.optionLabel, { color: c.text }]}>Allgemeine Geschäftsbedingungen</Text>
+                <Text style={[styles.optionLabel, { color: c.text }]}>{t('termsLabel')}</Text>
               </View>
               <Text style={[styles.optionValue, { color: c.muted }]}>›</Text>
             </Pressable>
             <Pressable style={[styles.optionRow, { backgroundColor: c.card, borderColor: 'transparent', borderTopWidth: 1, borderTopColor: c.border }]}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                 <Ionicons name="shield-outline" size={18} color={c.muted} />
-                <Text style={[styles.optionLabel, { color: c.text }]}>Datenschutz</Text>
+                <Text style={[styles.optionLabel, { color: c.text }]}>{t('privacyLabel')}</Text>
               </View>
               <Text style={[styles.optionValue, { color: c.muted }]}>›</Text>
             </Pressable>
@@ -2465,8 +2572,8 @@ export default function App() {
             >
               <Text style={styles.registerBtnText}>{t('verifyEmailBtn')}</Text>
             </Pressable>
-            <Pressable onPress={() => { setShowRegister(false); setRegSubmitted(false); setRegStep(1); setRegSpecSearch(''); setRegLangSearch(''); setShowRegFortbildungen(false); }} style={{ marginTop: 12 }}>
-              <Text style={{ color: c.muted, fontSize: 13 }}>Später</Text>
+            <Pressable onPress={() => { setShowRegister(false); setRegSubmitted(false); setRegStep(1); setRegSpecSearch(''); setRegLangSearch(''); setShowRegFortbildungen(false); setRegDocument(null); }} style={{ marginTop: 12 }}>
+              <Text style={{ color: c.muted, fontSize: 13 }}>{t('laterBtn')}</Text>
             </Pressable>
           </View>
         </ScrollView>
@@ -2492,6 +2599,8 @@ export default function App() {
           return regFirstName.trim().length > 0 && regLastName.trim().length > 0 && regCity.trim().length > 0;
         case 3:
           return regFreelance !== null;
+        case 5:
+          return Boolean(regDocument);
         default:
           return true;
       }
@@ -2503,9 +2612,9 @@ export default function App() {
           return (
             <>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
-                <Text style={[styles.regStepTitle, { color: c.text, marginBottom: 0 }]}>Account erstellen</Text>
+                <Text style={[styles.regStepTitle, { color: c.text, marginBottom: 0 }]}>{t('createAccountTitle')}</Text>
                 <Pressable onPress={() => setShowRegStepInfo(v => !v)} hitSlop={ICON_HIT_SLOP} style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                  <Text style={{ fontSize: 12, color: c.muted }}>Info</Text>
+                  <Text style={{ fontSize: 12, color: c.muted }}>{t('infoLabel')}</Text>
                   <Ionicons name={showRegStepInfo ? 'chevron-up' : 'chevron-down'} size={13} color={c.muted} />
                 </Pressable>
               </View>
@@ -2528,7 +2637,7 @@ export default function App() {
                 </Pressable>
               </View>
               {regPasswordConfirm.length > 0 && regPassword !== regPasswordConfirm && (
-                <Text style={{ color: c.saved, fontSize: 13, marginTop: -6 }}>Passwörter stimmen nicht überein</Text>
+                <Text style={{ color: c.saved, fontSize: 13, marginTop: -6 }}>{t('passwordsMismatch')}</Text>
               )}
             </>
           );
@@ -2536,9 +2645,9 @@ export default function App() {
           return (
             <>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
-                <Text style={[styles.regStepTitle, { color: c.text, marginBottom: 0 }]}>Persönliche Angaben</Text>
+                <Text style={[styles.regStepTitle, { color: c.text, marginBottom: 0 }]}>{t('personalDetailsTitle')}</Text>
                 <Pressable onPress={() => setShowRegStepInfo(v => !v)} hitSlop={ICON_HIT_SLOP} style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                  <Text style={{ fontSize: 12, color: c.muted }}>Info</Text>
+                  <Text style={{ fontSize: 12, color: c.muted }}>{t('infoLabel')}</Text>
                   <Ionicons name={showRegStepInfo ? 'chevron-up' : 'chevron-down'} size={13} color={c.muted} />
                 </Pressable>
               </View>
@@ -2553,7 +2662,7 @@ export default function App() {
               )}
               <TextInput value={regLastName} onChangeText={setRegLastName} placeholder={t('lastNamePlaceholder')} placeholderTextColor={c.muted} style={[styles.regInput, { backgroundColor: c.card, borderColor: regLastName.length > 0 && regLastName.trim().length === 0 ? c.saved : c.border, color: c.text }]} />
               {regLastName.length > 0 && regLastName.trim().length === 0 && (
-                <Text style={{ color: c.saved, fontSize: 13, marginTop: -6 }}>{t('lastNamePlaceholder')} ist erforderlich</Text>
+                <Text style={{ color: c.saved, fontSize: 13, marginTop: -6 }}>{t('lastNameRequired')}</Text>
               )}
               {regCity ? (
                 <View style={[styles.tagRow, { marginBottom: 8 }]}>
@@ -2566,7 +2675,7 @@ export default function App() {
                   <TextInput
                     value={regCitySearch}
                     onChangeText={setRegCitySearch}
-                    placeholder="Stadt suchen"
+                    placeholder={t('searchCityPlaceholder')}
                     placeholderTextColor={c.muted}
                     style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text }]}
                   />
@@ -2594,9 +2703,9 @@ export default function App() {
           return (
             <>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
-                <Text style={[styles.regStepTitle, { color: c.text, marginBottom: 0 }]}>Wie bist du tätig?</Text>
+                <Text style={[styles.regStepTitle, { color: c.text, marginBottom: 0 }]}>{t('howDoYouWork')}</Text>
                 <Pressable onPress={() => setShowRegStepInfo(v => !v)} hitSlop={ICON_HIT_SLOP} style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                  <Text style={{ fontSize: 12, color: c.muted }}>Info</Text>
+                  <Text style={{ fontSize: 12, color: c.muted }}>{t('infoLabel')}</Text>
                   <Ionicons name={showRegStepInfo ? 'chevron-up' : 'chevron-down'} size={13} color={c.muted} />
                 </Pressable>
               </View>
@@ -2608,8 +2717,8 @@ export default function App() {
 
               <View style={{ flexDirection: 'row', gap: 8, marginBottom: SPACE.md }}>
                 {[
-                  { key: true, label: 'Freiberuflich' },
-                  { key: false, label: 'Angestellt' },
+                  { key: true, label: t('freelanceLabel') },
+                  { key: false, label: t('employedLabel') },
                 ].map(({ key, label }) => {
                   const active = regFreelance === key;
                   return (
@@ -2617,8 +2726,8 @@ export default function App() {
                       key={String(key)}
                       onPress={() => {
                         setRegFreelance(key);
-                        if (key === true && (regKassenart === 'gesetzlich' || regKassenart === 'alle')) {
-                          setRegKassenart('');
+                        if (key === true) {
+                          setRegKassenart(prev => prev.filter(k => !['gesetzlich', 'alle'].includes(k)));
                         }
                       }}
                       style={{ flex: 1, paddingVertical: 11, borderRadius: RADIUS.md, borderWidth: 2, borderColor: active ? c.primary : c.border, backgroundColor: active ? c.primaryBg : c.card, alignItems: 'center' }}
@@ -2631,14 +2740,14 @@ export default function App() {
 
               {regFreelance === true && (
                 <View style={[{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: SPACE.md, borderRadius: RADIUS.md, borderWidth: 1, marginBottom: SPACE.sm }, { borderColor: regHomeVisit ? c.success : c.border, backgroundColor: regHomeVisit ? (c.successBg ?? c.mutedBg) : c.card }]}>
-                  <Text style={{ flex: 1, fontSize: 14, fontWeight: '600', color: c.text }}>Hausbesuche anbieten</Text>
+                  <Text style={{ flex: 1, fontSize: 14, fontWeight: '600', color: c.text }}>{t('homeVisitOffer')}</Text>
                   <Switch value={!!regHomeVisit} onValueChange={(v) => { setRegHomeVisit(v); if (!v) setRegServiceRadius(null); }} trackColor={{ true: c.success }} />
                 </View>
               )}
 
               {regFreelance === true && regHomeVisit && (
                 <View style={{ marginBottom: SPACE.sm }}>
-                  <Text style={[styles.filterSectionTitle, { color: c.muted }]}>Wie weit fährst du?</Text>
+                  <Text style={[styles.filterSectionTitle, { color: c.muted }]}>{t('homeVisitDistance')}</Text>
                   <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 6 }}>
                     {[5, 10, 15, 20, 30, 50].map((km) => (
                       <Pressable
@@ -2658,7 +2767,7 @@ export default function App() {
                 </View>
               )}
 
-              <Text style={[styles.filterSectionTitle, { color: c.muted, marginBottom: 6 }]}>Kassenart</Text>
+              <Text style={[styles.filterSectionTitle, { color: c.muted, marginBottom: 6 }]}>{t('kassenartLabel')}</Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                 {[
                   { key: 'gesetzlich', label: 'Gesetzlich' },
@@ -2670,13 +2779,15 @@ export default function App() {
                   .map((option) => (
                   <Pressable
                     key={option.key}
-                    onPress={() => setRegKassenart(option.key)}
+                    onPress={() => setRegKassenart(prev =>
+                      prev.includes(option.key) ? prev.filter(k => k !== option.key) : [...prev, option.key]
+                    )}
                     style={[styles.kassenartBtn, {
-                      backgroundColor: regKassenart === option.key ? c.primary : c.mutedBg,
-                      borderColor: regKassenart === option.key ? c.primary : c.border,
+                      backgroundColor: regKassenart.includes(option.key) ? c.primary : c.mutedBg,
+                      borderColor: regKassenart.includes(option.key) ? c.primary : c.border,
                     }]}
                   >
-                    <Text style={[styles.kassenartText, { color: regKassenart === option.key ? '#fff' : c.text }]}>
+                    <Text style={[styles.kassenartText, { color: regKassenart.includes(option.key) ? '#fff' : c.text }]}>
                       {option.label}
                     </Text>
                   </Pressable>
@@ -2695,9 +2806,9 @@ export default function App() {
           return (
             <>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
-                <Text style={[styles.regStepTitle, { color: c.text, marginBottom: 0 }]}>Sprachen & Spezialisierungen</Text>
+                <Text style={[styles.regStepTitle, { color: c.text, marginBottom: 0 }]}>{t('langAndSpecTitle')}</Text>
                 <Pressable onPress={() => setShowRegStepInfo(v => !v)} hitSlop={ICON_HIT_SLOP} style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                  <Text style={{ fontSize: 12, color: c.muted }}>Info</Text>
+                  <Text style={{ fontSize: 12, color: c.muted }}>{t('infoLabel')}</Text>
                   <Ionicons name={showRegStepInfo ? 'chevron-up' : 'chevron-down'} size={13} color={c.muted} />
                 </Pressable>
               </View>
@@ -2708,29 +2819,12 @@ export default function App() {
               )}
 
               <View style={styles.sectionBadgeRow}>
-                <Text style={[styles.filterSectionTitle, { color: c.muted, marginBottom: 0 }]}>Sprachen</Text>
+                <Text style={[styles.filterSectionTitle, { color: c.muted, marginBottom: 0 }]}>{t('languagesLabel')}</Text>
                 <View style={[styles.inlineMetaPill, { backgroundColor: c.primaryBg }]}>
-                  <Text style={[styles.inlineMetaPillText, { color: c.primary }]}>Pflicht</Text>
+                  <Text style={[styles.inlineMetaPillText, { color: c.primary }]}>{t('requiredBadge')}</Text>
                 </View>
               </View>
-              <Text style={[styles.metaNote, { color: c.textMuted, marginBottom: 8 }]}>Deutsch ist vorausgewählt.</Text>
-              <TextInput
-                value={regLangSearch}
-                onChangeText={setRegLangSearch}
-                placeholder="Weitere Sprache hinzufügen (optional)"
-                placeholderTextColor={c.muted}
-                style={[styles.regInput, { backgroundColor: c.card, borderColor: regLanguages.length > 0 ? c.primary : c.border, color: c.text }]}
-              />
-              {langSuggestions4.length > 0 && (
-                <View style={{ borderRadius: RADIUS.sm, borderWidth: 1, borderColor: c.border, marginTop: -8, marginBottom: 8, overflow: 'hidden', backgroundColor: c.card }}>
-                  {langSuggestions4.map((l, i) => (
-                    <Pressable key={l} onPress={() => { toggleRegLang(l); setRegLangSearch(''); }}
-                      style={{ padding: SPACE.md, borderTopWidth: i > 0 ? 1 : 0, borderColor: c.border }}>
-                      <Text style={{ ...TYPE.body, color: c.text }}>{getLangLabel(l)}</Text>
-                    </Pressable>
-                  ))}
-                </View>
-              )}
+              <Text style={[styles.metaNote, { color: c.textMuted, marginBottom: 8 }]}>{t('germanPreselected')}</Text>
               {regLanguages.length > 0 && (
                 <View style={[styles.tagRow, { marginBottom: 8 }]}>
                   {regLanguages.map(l => (
@@ -2740,14 +2834,31 @@ export default function App() {
                   ))}
                 </View>
               )}
+              {langSuggestions4.length > 0 && (
+                <View style={{ borderRadius: RADIUS.sm, borderWidth: 1, borderColor: c.border, marginBottom: 4, overflow: 'hidden', backgroundColor: c.card }}>
+                  {langSuggestions4.map((l, i) => (
+                    <Pressable key={l} onPress={() => { toggleRegLang(l); setRegLangSearch(''); }}
+                      style={{ padding: SPACE.md, borderTopWidth: i > 0 ? 1 : 0, borderColor: c.border }}>
+                      <Text style={{ ...TYPE.body, color: c.text }}>{getLangLabel(l)}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              )}
+              <TextInput
+                value={regLangSearch}
+                onChangeText={setRegLangSearch}
+                placeholder={t('addLangPlaceholder')}
+                placeholderTextColor={c.muted}
+                style={[styles.regInput, { backgroundColor: c.card, borderColor: regLanguages.length > 0 ? c.primary : c.border, color: c.text }]}
+              />
 
               <Text style={[styles.filterSectionTitle, { color: c.muted }]}>
-                Spezialisierungen <Text style={styles.optionalInlineLabel}>(optional)</Text>
+                {t('specializationsOptional')} <Text style={styles.optionalInlineLabel}>{t('optionalHint')}</Text>
               </Text>
               <TextInput
                 value={regSpecSearch}
                 onChangeText={setRegSpecSearch}
-                placeholder="Spezialisierung suchen…"
+                placeholder={t('searchSpecPlaceholder')}
                 placeholderTextColor={c.muted}
                 style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text }]}
               />
@@ -2779,8 +2890,8 @@ export default function App() {
                 style={[styles.collapseToggle, { backgroundColor: c.card, borderColor: c.border }]}
               >
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.filterSectionTitle, { color: c.muted, marginBottom: 2 }]}>Fortbildungen / Zertifikate</Text>
-                  <Text style={[styles.metaNote, { color: c.textMuted }]}>Optional</Text>
+                  <Text style={[styles.filterSectionTitle, { color: c.muted, marginBottom: 2 }]}>{t('certificationsLabel')}</Text>
+                  <Text style={[styles.metaNote, { color: c.textMuted }]}>{t('optionalBadge')}</Text>
                 </View>
                 <Ionicons name={showRegFortbildungen ? 'chevron-up-outline' : 'chevron-down-outline'} size={18} color={c.textMuted} />
               </Pressable>
@@ -2802,27 +2913,81 @@ export default function App() {
           return (
             <>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
-                <Text style={[styles.regStepTitle, { color: c.text, marginBottom: 0 }]}>Vorschau & Einreichen</Text>
+                <Text style={[styles.regStepTitle, { color: c.text, marginBottom: 0 }]}>{t('registrationDocumentTitle')}</Text>
                 <Pressable onPress={() => setShowRegStepInfo(v => !v)} hitSlop={ICON_HIT_SLOP} style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                  <Text style={{ fontSize: 12, color: c.muted }}>Info</Text>
+                  <Text style={{ fontSize: 12, color: c.muted }}>{t('infoLabel')}</Text>
+                  <Ionicons name={showRegStepInfo ? 'chevron-up' : 'chevron-down'} size={13} color={c.muted} />
+                </Pressable>
+              </View>
+              {showRegStepInfo && (
+                <View style={{ backgroundColor: c.mutedBg, borderRadius: 10, padding: 12, borderWidth: 1, borderColor: c.border, marginBottom: SPACE.sm }}>
+                  <Text style={{ fontSize: 13, color: c.muted, lineHeight: 19 }}>{REG_STEP_INFO[5]}</Text>
+                </View>
+              )}
+
+              <View style={[styles.noticeBox, { backgroundColor: c.mutedBg, borderColor: c.border, marginBottom: SPACE.sm }]}>
+                <Text style={styles.noticeIcon}>📄</Text>
+                <View style={{ flex: 1, gap: 4 }}>
+                  <Text style={[styles.noticeBody, { color: c.muted }]}>{t('registrationDocumentBody')}</Text>
+                  <Text style={{ color: c.muted, fontSize: 12, lineHeight: 18 }}>{t('registrationDocumentSizeHint')}</Text>
+                </View>
+              </View>
+
+              <Pressable
+                onPress={handlePickRegistrationDocument}
+                style={[styles.optionRow, { backgroundColor: c.card, borderColor: c.border, marginBottom: SPACE.sm }]}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <Ionicons name="document-attach-outline" size={18} color={c.primary} />
+                  <Text style={[styles.optionLabel, { color: c.text }]}>
+                    {regDocument ? t('registrationDocumentReplaceBtn') : t('registrationDocumentUploadBtn')}
+                  </Text>
+                </View>
+                <Text style={[styles.optionValue, { color: c.primary }]}>›</Text>
+              </Pressable>
+
+              {regDocument ? (
+                <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
+                  <Text style={[styles.filterSectionTitle, { color: c.muted, marginBottom: 8 }]}>{t('registrationDocumentSelected')}</Text>
+                  <Text style={{ color: c.text, fontSize: 14, fontWeight: '600' }}>{regDocument.name || 'Dokument'}</Text>
+                  <Text style={{ color: c.muted, fontSize: 12, marginTop: 4 }}>
+                    {[
+                      regDocument.mimeType || 'application/octet-stream',
+                      formatDocumentSize(regDocument.size),
+                    ].filter(Boolean).join(' • ')}
+                  </Text>
+                </View>
+              ) : (
+                <Text style={{ color: c.saved, fontSize: 13 }}>{t('registrationDocumentMissing')}</Text>
+              )}
+            </>
+          );
+        case 6:
+          return (
+            <>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
+                <Text style={[styles.regStepTitle, { color: c.text, marginBottom: 0 }]}>{t('previewSubmitTitle')}</Text>
+                <Pressable onPress={() => setShowRegStepInfo(v => !v)} hitSlop={ICON_HIT_SLOP} style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                  <Text style={{ fontSize: 12, color: c.muted }}>{t('infoLabel')}</Text>
                   <Ionicons name={showRegStepInfo ? 'chevron-up' : 'chevron-down'} size={13} color={c.muted} />
                 </Pressable>
               </View>
               {showRegStepInfo && (
                 <View style={{ backgroundColor: c.mutedBg, borderRadius: 10, padding: 12, borderWidth: 1, borderColor: c.border }}>
-                  <Text style={{ fontSize: 13, color: c.muted, lineHeight: 19 }}>{REG_STEP_INFO[5]}</Text>
+                  <Text style={{ fontSize: 13, color: c.muted, lineHeight: 19 }}>{REG_STEP_INFO[6]}</Text>
                 </View>
               )}
               {[
                 { label: t('nameLabel'), value: `${regFirstName} ${regLastName}`.trim() || '—' },
                 { label: t('emailLabel'), value: regEmail || '—' },
-                { label: 'Stadt', value: regCity || '—' },
-                { label: 'Tätigkeit', value: regFreelance === true ? 'Freiberuflich' : regFreelance === false ? 'Angestellt' : '—' },
-                { label: 'Hausbesuche', value: regHomeVisit ? `Ja · ${regServiceRadius ? regServiceRadius + ' km' : 'Radius fehlt'}` : 'Nein' },
-                { label: 'Kassenart', value: regKassenart || '—' },
-                { label: 'Spezialisierungen', value: regSpecializations.join(', ') || '—' },
-                { label: 'Sprachen', value: regLanguages.map(getLangLabel).join(', ') || '—' },
-                { label: 'Fortbildungen', value: regFortbildungen.map(getCertificationLabel).join(', ') || '—' },
+                { label: t('cityLabel'), value: regCity || '—' },
+                { label: t('activityLabel'), value: regFreelance === true ? t('freelanceLabel') : regFreelance === false ? t('employedLabel') : '—' },
+                { label: t('homeVisitsLabel'), value: regHomeVisit ? `${t('yesLabel')} · ${regServiceRadius ? regServiceRadius + ' km' : t('radiusMissing')}` : t('noLabel') },
+                { label: t('kassenartLabel'), value: regKassenart.length ? regKassenart.join(', ') : '—' },
+                { label: t('specsLabel'), value: regSpecializations.join(', ') || '—' },
+                { label: t('languagesLabel'), value: regLanguages.map(getLangLabel).join(', ') || '—' },
+                { label: t('certificationsShort'), value: regFortbildungen.map(getCertificationLabel).join(', ') || '—' },
+                { label: t('documentLabel'), value: regDocument?.name || '—' },
               ].map(row => (
                 <View key={row.label} style={[styles.previewRow, { borderBottomColor: c.border }]}>
                   <Text style={[styles.previewLabel, { color: c.muted }]}>{row.label}</Text>
@@ -2832,7 +2997,7 @@ export default function App() {
               <View style={[styles.noticeBox, { backgroundColor: c.mutedBg, borderColor: c.border }]}>
                 <Text style={styles.noticeIcon}>ℹ️</Text>
                 <Text style={[styles.noticeBody, { color: c.muted }]}>
-                  Dein Profil wird nach dem Einreichen manuell geprüft. Den Status kannst du jederzeit in der App einsehen.
+                  {t('profileReviewNotice')}
                 </Text>
               </View>
             </>
@@ -2843,11 +3008,12 @@ export default function App() {
     };
 
     const REG_STEP_INFO = {
-      1: 'Erstelle dein persönliches Revio-Konto. Du benötigst eine gültige E-Mail-Adresse und ein sicheres Passwort (mind. 6 Zeichen).',
-      2: 'Dein Name erscheint auf deinem öffentlichen Profil. Dein Standort hilft Patienten, dich in ihrer Nähe zu finden.',
-      3: 'Wähle deinen Beschäftigungsstatus, Kassenart und ob du Hausbesuche anbietest — das bestimmt, wie Patienten dich finden.',
-      4: 'Sprachen und Spezialisierungen machen dein Profil attraktiver. Fortbildungen sind optional, helfen aber bei der Sichtbarkeit.',
-      5: 'Prüfe alle Angaben vor dem Einreichen. Dein Profil wird nach dem Absenden manuell geprüft — das dauert in der Regel unter 48h.',
+      1: t('regStepInfoText1'),
+      2: t('regStepInfoText2'),
+      3: t('regStepInfoText3'),
+      4: t('regStepInfoText4'),
+      5: t('regStepInfoText5'),
+      6: t('regStepInfoText6'),
     };
 
     return (
@@ -2862,6 +3028,7 @@ export default function App() {
             if (regStep === 1) {
               setShowRegister(false);
               setShowRegFortbildungen(false);
+              setRegDocument(null);
             } else {
               setRegStep(s => s - 1);
               setShowRegStepInfo(false);
@@ -2874,7 +3041,7 @@ export default function App() {
 
         {/* Header */}
         <View style={{ marginBottom: 2 }}>
-          <Text style={{ fontSize: 16, fontWeight: '700', color: c.text }}>Registrierung</Text>
+          <Text style={{ fontSize: 16, fontWeight: '700', color: c.text }}>{t('registrationTitle')}</Text>
           <Text style={{ fontSize: 11, color: c.muted }}>Schritt {regStep} von {REG_STEPS}</Text>
         </View>
 
@@ -2904,7 +3071,7 @@ export default function App() {
                     certifications: regFortbildungen,
                     homeVisit: regHomeVisit === true,
                     serviceRadiusKm: regHomeVisit === true ? (regServiceRadius ?? null) : null,
-                    kassenart: regKassenart || undefined,
+                    kassenart: regKassenart.length ? regKassenart.join(',') : undefined,
                   }),
                 });
                 const resData = await res.json().catch(() => ({}));
@@ -2918,6 +3085,36 @@ export default function App() {
                   await AsyncStorage.setItem('revio_account_type', 'therapist');
                   setAuthToken(resData.token);
                   setAccountType('therapist');
+
+                  if (regDocument?.uri) {
+                    try {
+                      setDocumentUploading(true);
+                      const formData = new FormData();
+                      formData.append('document', {
+                        uri: regDocument.uri,
+                        name: regDocument.name || 'nachweis',
+                        type: regDocument.mimeType || 'application/octet-stream',
+                      });
+
+                      const uploadRes = await fetch(`${getBaseUrl()}/upload/document`, {
+                        method: 'POST',
+                        headers: { Authorization: `Bearer ${resData.token}` },
+                        body: formData,
+                      });
+
+                      if (uploadRes.ok) {
+                        const { id, originalName } = await uploadRes.json();
+                        setTherapistDocuments((prev) => [{ id, originalName, mimetype: regDocument.mimeType }, ...prev]);
+                      } else {
+                        Alert.alert(t('registrationDocumentUploadFailedTitle'), t('registrationDocumentUploadFailedBody'));
+                      }
+                    } catch {
+                      Alert.alert(t('registrationDocumentUploadFailedTitle'), t('registrationDocumentUploadFailedBody'));
+                    } finally {
+                      setDocumentUploading(false);
+                    }
+                  }
+
                   const profileRes = await fetch(`${getBaseUrl()}/auth/me`, {
                     headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${resData.token}` },
                   });
@@ -2927,10 +3124,11 @@ export default function App() {
                   setRegSpecSearch('');
                   setRegLangSearch('');
                   setShowRegFortbildungen(false);
+                  setRegDocument(null);
                   return;
                 }
               } catch {
-                showWebAlert('Verbindungsfehler. Bitte prüfe deine Internetverbindung.');
+                showWebAlert(`${t('alertConnectionError')}. ${t('alertConnectionErrorBody')}`);
                 return;
               }
               setRegSubmitted(true);
@@ -2968,24 +3166,24 @@ export default function App() {
 
         if (preference === 'visible') {
           if (data.isPublished) {
-            Alert.alert('Profil sichtbar', 'Dein Profil ist jetzt öffentlich sichtbar.');
+            Alert.alert(t('alertProfileVisible'), t('alertProfileVisibleBody'));
           } else if (data.missingFields && data.missingFields.length > 0) {
             const fields = data.missingFields.join(', ');
             Alert.alert(
-              'Profil unvollständig',
-              `Bevor dein Profil sichtbar wird, fülle bitte noch folgende Felder aus: ${fields}`,
-              [{ text: 'Profil bearbeiten', onPress: () => setActiveTab('therapist') }, { text: 'Später', style: 'cancel' }]
+              t('alertProfileIncomplete'),
+              t('alertProfileIncompleteBody').replace('{fields}', fields),
+              [{ text: t('editProfileAction'), onPress: () => setActiveTab('therapist') }, { text: t('laterBtn'), style: 'cancel' }]
             );
           }
         } else {
-          Alert.alert('Profil versteckt', 'Dein Profil ist jetzt nicht öffentlich sichtbar.');
+          Alert.alert(t('alertProfileHidden'), t('alertProfileHiddenBody'));
         }
       } else {
-        Alert.alert('Fehler', data.message ?? 'Einstellung konnte nicht gespeichert werden.');
+        Alert.alert(t('alertError'), data.message ?? t('alertSettingSaveFail'));
       }
     } catch {
       setShowVisibilityModal(false);
-      Alert.alert('Verbindungsfehler', 'Bitte prüfe deine Internetverbindung.');
+      Alert.alert(t('alertConnectionError'), t('alertConnectionErrorBody'));
     } finally {
       setVisibilityLoading(false);
     }
@@ -2997,27 +3195,27 @@ export default function App() {
         {emailVerifyStatus === 'verifying' && (
           <>
             <Text style={{ fontSize: 40, marginBottom: 16 }}>⏳</Text>
-            <Text style={[styles.infoTitle, { color: c.text, textAlign: 'center' }]}>E-Mail wird bestätigt…</Text>
-            <Text style={[styles.infoBody, { color: c.muted, textAlign: 'center', marginTop: 8 }]}>Bitte einen Moment warten.</Text>
+            <Text style={[styles.infoTitle, { color: c.text, textAlign: 'center' }]}>{t('emailBeingVerified')}</Text>
+            <Text style={[styles.infoBody, { color: c.muted, textAlign: 'center', marginTop: 8 }]}>{t('pleaseWait')}</Text>
           </>
         )}
         {emailVerifyStatus === 'success' && (
           <>
             <Text style={{ fontSize: 40, marginBottom: 16 }}>✅</Text>
-            <Text style={[styles.infoTitle, { color: c.text, textAlign: 'center' }]}>E-Mail bestätigt!</Text>
-            <Text style={[styles.infoBody, { color: c.muted, textAlign: 'center', marginTop: 8 }]}>Du wirst automatisch eingeloggt.</Text>
+            <Text style={[styles.infoTitle, { color: c.text, textAlign: 'center' }]}>{t('emailVerified')}</Text>
+            <Text style={[styles.infoBody, { color: c.muted, textAlign: 'center', marginTop: 8 }]}>{t('autoLogin')}</Text>
           </>
         )}
         {emailVerifyStatus === 'error' && (
           <>
             <Text style={{ fontSize: 40, marginBottom: 16 }}>❌</Text>
-            <Text style={[styles.infoTitle, { color: c.text, textAlign: 'center' }]}>Bestätigung fehlgeschlagen</Text>
+            <Text style={[styles.infoTitle, { color: c.text, textAlign: 'center' }]}>{t('confirmFailed')}</Text>
             <Text style={[styles.infoBody, { color: c.muted, textAlign: 'center', marginTop: 8 }]}>{softenErrorMessage(emailVerifyError)}</Text>
             <Pressable
               style={[styles.registerBtn, { backgroundColor: c.primary, marginTop: 24, paddingHorizontal: 32 }]}
               onPress={() => { setShowEmailVerify(false); setEmailVerifyStatus('idle'); }}
             >
-              <Text style={styles.registerBtnText}>Zurück</Text>
+              <Text style={styles.registerBtnText}>{t('backBtn')}</Text>
             </Pressable>
           </>
         )}
@@ -3029,7 +3227,7 @@ export default function App() {
     if (inviteClaimLoading && !inviteClaimData) {
       return (
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: c.background }}>
-          <Text style={{ color: c.muted, fontSize: 15 }}>Einladung wird geprüft…</Text>
+          <Text style={{ color: c.muted, fontSize: 15 }}>{t('inviteChecking')}</Text>
         </View>
       );
     }
@@ -3039,13 +3237,13 @@ export default function App() {
         <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 40 }]}>
           <View style={[styles.infoCard, { backgroundColor: c.card, borderColor: c.border, marginTop: 40 }]}>
             <Ionicons name="alert-circle-outline" size={40} color={c.error} style={{ alignSelf: 'center' }} />
-            <Text style={[styles.infoTitle, { color: c.text, textAlign: 'center' }]}>Einladung konnte nicht geprüft werden</Text>
+            <Text style={[styles.infoTitle, { color: c.text, textAlign: 'center' }]}>{t('inviteCheckFailed')}</Text>
             <Text style={[styles.infoBody, { color: c.muted, textAlign: 'center' }]}>{softenErrorMessage(inviteClaimError)}</Text>
             <Pressable
               style={[styles.registerBtn, { backgroundColor: c.primary, marginTop: 8 }]}
               onPress={() => { setShowInviteClaim(false); setInviteClaimError(''); }}
             >
-              <Text style={styles.registerBtnText}>Zur App</Text>
+              <Text style={styles.registerBtnText}>{t('toAppBtn')}</Text>
             </Pressable>
           </View>
         </ScrollView>
@@ -3058,11 +3256,11 @@ export default function App() {
 
     const handleClaim = async () => {
       if (!inviteClaimPassword || inviteClaimPassword.length < 6) {
-        setInviteClaimError('Das Passwort muss mindestens 6 Zeichen lang sein.');
+        setInviteClaimError(t('passwordMinLength'));
         return;
       }
       if (inviteClaimPassword !== inviteClaimPasswordConfirm) {
-        setInviteClaimError('Die Passwörter stimmen nicht überein.');
+        setInviteClaimError(t('passwordsMismatch'));
         return;
       }
       setInviteClaimLoading(true);
@@ -3075,7 +3273,7 @@ export default function App() {
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
-          setInviteClaimError(data.message ?? 'Fehler beim Aktivieren des Kontos.');
+          setInviteClaimError(data.message ?? t('accountActivationError'));
           return;
         }
         // Store token and load profile
@@ -3093,7 +3291,7 @@ export default function App() {
         // Show visibility modal
         setShowVisibilityModal(true);
       } catch {
-        setInviteClaimError('Verbindungsfehler. Bitte prüfe deine Internetverbindung.');
+        setInviteClaimError(t('connectionErrorRetry'));
       } finally {
         setInviteClaimLoading(false);
       }
@@ -3103,14 +3301,14 @@ export default function App() {
       <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 40 }]} keyboardShouldPersistTaps="handled">
         <View style={[styles.infoCard, { backgroundColor: c.card, borderColor: c.border, marginTop: 20, alignItems: 'center' }]}>
           <Image source={require('../assets/icon.png')} style={{ width: 56, height: 56, borderRadius: 16 }} />
-          <Text style={[styles.infoTitle, { color: c.text, textAlign: 'center', marginTop: 8 }]}>Du wurdest eingeladen!</Text>
+          <Text style={[styles.infoTitle, { color: c.text, textAlign: 'center', marginTop: 8 }]}>{t('youWereInvited')}</Text>
           <Text style={[styles.infoBody, { color: c.muted, textAlign: 'center' }]}>
-            {invitePractice.name} hat ein Profil für dich erstellt. Setze jetzt ein Passwort, um dein Konto zu aktivieren.
+            {t('inviteSetPasswordInfo').replace('{name}', invitePractice.name)}
           </Text>
         </View>
 
         <View style={[styles.infoCard, { backgroundColor: c.card, borderColor: c.border }]}>
-          <Text style={[styles.filterSectionTitle, { color: c.muted }]}>DEIN PROFIL</Text>
+          <Text style={[styles.filterSectionTitle, { color: c.muted }]}>{t('yourProfile')}</Text>
           <Text style={[styles.detailInfoValue, { color: c.text, fontWeight: '700', fontSize: 17 }]}>{inviteTherapist.fullName}</Text>
           <Text style={[styles.detailInfoValue, { color: c.muted }]}>{inviteTherapist.professionalTitle}</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
@@ -3120,13 +3318,13 @@ export default function App() {
         </View>
 
         <View style={[styles.infoCard, { backgroundColor: c.card, borderColor: c.border }]}>
-          <Text style={[styles.filterSectionTitle, { color: c.muted }]}>PASSWORT SETZEN</Text>
+          <Text style={[styles.filterSectionTitle, { color: c.muted }]}>{t('setPassword')}</Text>
           <View style={{ position: 'relative', marginTop: 6 }}>
             <TextInput
               style={[styles.regInput, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg, marginTop: 0, paddingRight: 44 }]}
               value={inviteClaimPassword}
               onChangeText={setInviteClaimPassword}
-              placeholder="Passwort (mind. 6 Zeichen)"
+              placeholder={t('passwordPlaceholder')}
               placeholderTextColor={c.muted}
               secureTextEntry={!showInvitePassword}
               autoCapitalize="none"
@@ -3140,7 +3338,7 @@ export default function App() {
               style={[styles.regInput, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg, marginTop: 0, paddingRight: 44 }]}
               value={inviteClaimPasswordConfirm}
               onChangeText={setInviteClaimPasswordConfirm}
-              placeholder="Passwort wiederholen"
+              placeholder={t('passwordConfirmPlaceholder')}
               placeholderTextColor={c.muted}
               secureTextEntry={!showInvitePasswordConfirm}
               autoCapitalize="none"
@@ -3228,7 +3426,7 @@ export default function App() {
       setMgrIsTherapist(false); setMgrFullName(''); setMgrProfTitle('');
       setMgrRegStep(1);
     } catch {
-      setMgrRegError('Verbindungsfehler. Bitte prüfe deine Internetverbindung.');
+      setMgrRegError(t('connectionErrorRetry'));
     } finally {
       setMgrRegLoading(false);
     }
@@ -3250,23 +3448,23 @@ export default function App() {
       if (mgrRegStep === 1) {
         return (
           <>
-            <Text style={[styles.regStepTitle, { color: c.text }]}>Zugangsdaten</Text>
-            <Text style={[styles.regStepSub, { color: c.muted }]}>Erstelle deinen Praxis-Account</Text>
-            <TextInput value={mgrEmail} onChangeText={setMgrEmail} placeholder="E-Mail-Adresse" placeholderTextColor={c.muted} keyboardType="email-address" autoCapitalize="none" style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text }]} />
+            <Text style={[styles.regStepTitle, { color: c.text }]}>{t('credentialsTitle')}</Text>
+            <Text style={[styles.regStepSub, { color: c.muted }]}>{t('createPracticeAccount')}</Text>
+            <TextInput value={mgrEmail} onChangeText={setMgrEmail} placeholder={t('emailAddressPlaceholder')} placeholderTextColor={c.muted} keyboardType="email-address" autoCapitalize="none" style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text }]} />
             <View style={{ position: 'relative' }}>
-              <TextInput value={mgrPassword} onChangeText={setMgrPassword} placeholder="Passwort (mind. 6 Zeichen)" placeholderTextColor={c.muted} secureTextEntry={!showMgrPassword} textContentType="newPassword" autoComplete="new-password" style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text, paddingRight: 44 }]} />
+              <TextInput value={mgrPassword} onChangeText={setMgrPassword} placeholder={t('passwordPlaceholder')} placeholderTextColor={c.muted} secureTextEntry={!showMgrPassword} textContentType="newPassword" autoComplete="new-password" style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text, paddingRight: 44 }]} />
               <Pressable onPress={() => setShowMgrPassword(v => !v)} hitSlop={ICON_HIT_SLOP} style={{ position: 'absolute', right: 12, top: 0, bottom: 0, justifyContent: 'center' }}>
                 <Ionicons name={showMgrPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color={c.muted} />
               </Pressable>
             </View>
             <View style={{ position: 'relative' }}>
-              <TextInput value={mgrPasswordConfirm} onChangeText={setMgrPasswordConfirm} placeholder="Passwort wiederholen" placeholderTextColor={c.muted} secureTextEntry={!showMgrPasswordConfirm} textContentType="newPassword" autoComplete="new-password" style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text, paddingRight: 44 }]} />
+              <TextInput value={mgrPasswordConfirm} onChangeText={setMgrPasswordConfirm} placeholder={t('passwordConfirmPlaceholder')} placeholderTextColor={c.muted} secureTextEntry={!showMgrPasswordConfirm} textContentType="newPassword" autoComplete="new-password" style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text, paddingRight: 44 }]} />
               <Pressable onPress={() => setShowMgrPasswordConfirm(v => !v)} hitSlop={ICON_HIT_SLOP} style={{ position: 'absolute', right: 12, top: 0, bottom: 0, justifyContent: 'center' }}>
                 <Ionicons name={showMgrPasswordConfirm ? 'eye-off-outline' : 'eye-outline'} size={20} color={c.muted} />
               </Pressable>
             </View>
             {mgrPasswordConfirm.length > 0 && mgrPassword !== mgrPasswordConfirm && (
-              <Text style={{ color: c.saved, fontSize: 13, marginTop: -6 }}>Passwörter stimmen nicht überein</Text>
+              <Text style={{ color: c.saved, fontSize: 13, marginTop: -6 }}>{t('passwordsMismatch')}</Text>
             )}
           </>
         );
@@ -3274,28 +3472,28 @@ export default function App() {
       if (mgrRegStep === 2) {
         return (
           <>
-            <Text style={[styles.regStepTitle, { color: c.text }]}>Praxis-Daten</Text>
-            <Text style={[styles.regStepSub, { color: c.muted }]}>Informationen zu deiner Praxis</Text>
-            <TextInput value={mgrPracticeName} onChangeText={setMgrPracticeName} placeholder="Praxisname *" placeholderTextColor={c.muted} style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text }]} />
-            <TextInput value={mgrPracticeCity} onChangeText={setMgrPracticeCity} placeholder="Stadt * (z. B. Köln)" placeholderTextColor={c.muted} style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text }]} />
-            <TextInput value={mgrPracticeAddress} onChangeText={setMgrPracticeAddress} placeholder="Adresse (optional)" placeholderTextColor={c.muted} style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text }]} />
-            <TextInput value={mgrPracticePhone} onChangeText={setMgrPracticePhone} placeholder="Telefon (optional)" placeholderTextColor={c.muted} keyboardType="phone-pad" style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text }]} />
+            <Text style={[styles.regStepTitle, { color: c.text }]}>{t('practiceDataTitle')}</Text>
+            <Text style={[styles.regStepSub, { color: c.muted }]}>{t('practiceDataSub')}</Text>
+            <TextInput value={mgrPracticeName} onChangeText={setMgrPracticeName} placeholder={t('practiceNamePlaceholder')} placeholderTextColor={c.muted} style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text }]} />
+            <TextInput value={mgrPracticeCity} onChangeText={setMgrPracticeCity} placeholder={t('cityPlaceholderExample')} placeholderTextColor={c.muted} style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text }]} />
+            <TextInput value={mgrPracticeAddress} onChangeText={setMgrPracticeAddress} placeholder={t('addressOptionalPlaceholder')} placeholderTextColor={c.muted} style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text }]} />
+            <TextInput value={mgrPracticePhone} onChangeText={setMgrPracticePhone} placeholder={t('phoneOptionalPlaceholder')} placeholderTextColor={c.muted} keyboardType="phone-pad" style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text }]} />
           </>
         );
       }
       if (mgrRegStep === 3) {
         return (
           <>
-            <Text style={[styles.regStepTitle, { color: c.text }]}>Deine Rolle</Text>
-            <Text style={[styles.regStepSub, { color: c.muted }]}>Bist du selbst auch Therapeut/in?</Text>
+            <Text style={[styles.regStepTitle, { color: c.text }]}>{t('yourRoleTitle')}</Text>
+            <Text style={[styles.regStepSub, { color: c.muted }]}>{t('yourRoleSub')}</Text>
             <Pressable
               onPress={() => setMgrIsTherapist(false)}
               style={{ backgroundColor: !mgrIsTherapist ? c.primary : c.card, borderWidth: 2, borderColor: !mgrIsTherapist ? c.primary : c.border, borderRadius: 14, paddingVertical: 18, paddingHorizontal: 16, marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 12 }}
             >
               <Ionicons name={!mgrIsTherapist ? 'checkmark-circle' : 'ellipse-outline'} size={22} color={!mgrIsTherapist ? '#fff' : c.muted} />
               <View style={{ flex: 1 }}>
-                <Text style={{ color: !mgrIsTherapist ? '#fff' : c.text, fontWeight: '700', fontSize: 15 }}>Nein, nur Praxismanager</Text>
-                <Text style={{ color: !mgrIsTherapist ? 'rgba(255,255,255,0.8)' : c.muted, fontSize: 13, marginTop: 2 }}>Registriere die Praxis ohne eigenes Therapeutenprofil.</Text>
+                <Text style={{ color: !mgrIsTherapist ? '#fff' : c.text, fontWeight: '700', fontSize: 15 }}>{t('managerOnlyTitle')}</Text>
+                <Text style={{ color: !mgrIsTherapist ? 'rgba(255,255,255,0.8)' : c.muted, fontSize: 13, marginTop: 2 }}>{t('managerOnlySub')}</Text>
               </View>
             </Pressable>
             <Pressable
@@ -3304,8 +3502,8 @@ export default function App() {
             >
               <Ionicons name={mgrIsTherapist ? 'checkmark-circle' : 'ellipse-outline'} size={22} color={mgrIsTherapist ? '#fff' : c.muted} />
               <View style={{ flex: 1 }}>
-                <Text style={{ color: mgrIsTherapist ? '#fff' : c.text, fontWeight: '700', fontSize: 15 }}>Ja, ich bin auch Therapeut/in</Text>
-                <Text style={{ color: mgrIsTherapist ? 'rgba(255,255,255,0.8)' : c.muted, fontSize: 13, marginTop: 2 }}>Registriere die Praxis und mein Therapeutenprofil.</Text>
+                <Text style={{ color: mgrIsTherapist ? '#fff' : c.text, fontWeight: '700', fontSize: 15 }}>{t('alsoTherapistTitle')}</Text>
+                <Text style={{ color: mgrIsTherapist ? 'rgba(255,255,255,0.8)' : c.muted, fontSize: 13, marginTop: 2 }}>{t('alsoTherapistSub')}</Text>
               </View>
             </Pressable>
           </>
@@ -3314,12 +3512,12 @@ export default function App() {
       if (mgrIsTherapist && mgrRegStep === 4) {
         return (
           <>
-            <Text style={[styles.regStepTitle, { color: c.text }]}>Therapeuten-Profil</Text>
-            <Text style={[styles.regStepSub, { color: c.muted }]}>Deine Angaben als Therapeut/in</Text>
-            <TextInput value={mgrFullName} onChangeText={setMgrFullName} placeholder="Vollständiger Name *" placeholderTextColor={c.muted} style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text }]} />
-            <TextInput value={mgrProfTitle} onChangeText={setMgrProfTitle} placeholder="Berufsbezeichnung * (z. B. Physiotherapeut/in)" placeholderTextColor={c.muted} style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text }]} />
+            <Text style={[styles.regStepTitle, { color: c.text }]}>{t('therapistProfileTitle')}</Text>
+            <Text style={[styles.regStepSub, { color: c.muted }]}>{t('therapistProfileSub')}</Text>
+            <TextInput value={mgrFullName} onChangeText={setMgrFullName} placeholder={t('fullNameRequired')} placeholderTextColor={c.muted} style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text }]} />
+            <TextInput value={mgrProfTitle} onChangeText={setMgrProfTitle} placeholder={t('profTitleRequired')} placeholderTextColor={c.muted} style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text }]} />
             <View style={{ backgroundColor: c.mutedBg, borderRadius: 10, padding: 12, marginTop: 4 }}>
-              <Text style={{ color: c.muted, fontSize: 13, lineHeight: 18 }}>Dein Profil wird erst veröffentlicht, wenn du es selbst freigibst.</Text>
+              <Text style={{ color: c.muted, fontSize: 13, lineHeight: 18 }}>{t('profilePublishLater')}</Text>
             </View>
           </>
         );
@@ -3327,48 +3525,48 @@ export default function App() {
       // Summary step
       return (
         <>
-          <Text style={[styles.regStepTitle, { color: c.text }]}>Übersicht</Text>
-          <Text style={[styles.regStepSub, { color: c.muted }]}>Bitte überprüfe deine Angaben</Text>
+          <Text style={[styles.regStepTitle, { color: c.text }]}>{t('overviewTitle')}</Text>
+          <Text style={[styles.regStepSub, { color: c.muted }]}>{t('checkYourDetails')}</Text>
           <View style={{ backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.border, padding: 16, gap: 10 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <Text style={{ color: c.muted, fontSize: 13 }}>E-Mail</Text>
+              <Text style={{ color: c.muted, fontSize: 13 }}>{t('emailLabel')}</Text>
               <Text style={{ color: c.text, fontSize: 13, fontWeight: '600' }}>{mgrEmail}</Text>
             </View>
             <View style={{ height: 1, backgroundColor: c.border }} />
             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <Text style={{ color: c.muted, fontSize: 13 }}>Praxisname</Text>
+              <Text style={{ color: c.muted, fontSize: 13 }}>{t('practiceNameLabel')}</Text>
               <Text style={{ color: c.text, fontSize: 13, fontWeight: '600' }}>{mgrPracticeName}</Text>
             </View>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <Text style={{ color: c.muted, fontSize: 13 }}>Stadt</Text>
+              <Text style={{ color: c.muted, fontSize: 13 }}>{t('cityLabel')}</Text>
               <Text style={{ color: c.text, fontSize: 13, fontWeight: '600' }}>{mgrPracticeCity}</Text>
             </View>
             {!!mgrPracticeAddress && (
               <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                <Text style={{ color: c.muted, fontSize: 13 }}>Adresse</Text>
+                <Text style={{ color: c.muted, fontSize: 13 }}>{t('addressLabel')}</Text>
                 <Text style={{ color: c.text, fontSize: 13, fontWeight: '600', flex: 1, textAlign: 'right' }}>{mgrPracticeAddress}</Text>
               </View>
             )}
             {!!mgrPracticePhone && (
               <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                <Text style={{ color: c.muted, fontSize: 13 }}>Telefon</Text>
+                <Text style={{ color: c.muted, fontSize: 13 }}>{t('phoneLabel')}</Text>
                 <Text style={{ color: c.text, fontSize: 13, fontWeight: '600' }}>{mgrPracticePhone}</Text>
               </View>
             )}
             <View style={{ height: 1, backgroundColor: c.border }} />
             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <Text style={{ color: c.muted, fontSize: 13 }}>Rolle</Text>
-              <Text style={{ color: c.text, fontSize: 13, fontWeight: '600' }}>{mgrIsTherapist ? 'Praxismanager + Therapeut/in' : 'Nur Praxismanager'}</Text>
+              <Text style={{ color: c.muted, fontSize: 13 }}>{t('roleLabel')}</Text>
+              <Text style={{ color: c.text, fontSize: 13, fontWeight: '600' }}>{mgrIsTherapist ? t('managerAndTherapist') : t('managerOnly')}</Text>
             </View>
             {mgrIsTherapist && !!mgrFullName && (
               <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                <Text style={{ color: c.muted, fontSize: 13 }}>Name</Text>
+                <Text style={{ color: c.muted, fontSize: 13 }}>{t('nameLabel')}</Text>
                 <Text style={{ color: c.text, fontSize: 13, fontWeight: '600' }}>{mgrFullName}</Text>
               </View>
             )}
             {mgrIsTherapist && !!mgrProfTitle && (
               <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                <Text style={{ color: c.muted, fontSize: 13 }}>Berufsbezeichnung</Text>
+                <Text style={{ color: c.muted, fontSize: 13 }}>{t('profTitleLabel')}</Text>
                 <Text style={{ color: c.text, fontSize: 13, fontWeight: '600', flex: 1, textAlign: 'right' }}>{mgrProfTitle}</Text>
               </View>
             )}
@@ -3412,7 +3610,7 @@ export default function App() {
         <View style={styles.header}>
           <Image source={require('../assets/icon.png')} style={styles.logoMark} />
           <View style={{ flex: 1 }}>
-            <Text style={[styles.headerTitle, { color: c.text }]}>Praxis registrieren</Text>
+            <Text style={[styles.headerTitle, { color: c.text }]}>{t('registerPractice')}</Text>
             <Text style={[styles.headerSub, { color: c.muted }]}>Schritt {mgrRegStep} von {MGR_REG_STEPS}</Text>
           </View>
         </View>
@@ -3434,7 +3632,7 @@ export default function App() {
             onPress={advanceStep}
             disabled={!mgrRegCanProceed()}
           >
-            <Text style={styles.registerBtnText}>Weiter</Text>
+            <Text style={styles.registerBtnText}>{t('nextBtn')}</Text>
           </Pressable>
         )}
       </ScrollView>
@@ -3469,7 +3667,7 @@ export default function App() {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.message ?? 'Hinzufügen fehlgeschlagen');
+        throw new Error(err.message ?? t('addFailedError'));
       }
       const meRes = await fetch(`${getBaseUrl()}/manager/me`, {
         headers: { Authorization: `Bearer ${authToken}` },
@@ -3479,7 +3677,7 @@ export default function App() {
       setAddTherapistQuery('');
       setAddTherapistResults([]);
     } catch (e) {
-      Alert.alert('Fehler', e.message);
+      Alert.alert(t('alertError'), e.message);
     } finally {
       setAddingTherapistId(null);
     }
@@ -3495,7 +3693,7 @@ export default function App() {
         });
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
-          throw new Error(err.message ?? 'Entfernen fehlgeschlagen');
+          throw new Error(err.message ?? t('removeFailed'));
         }
         const data = await res.json();
         const meRes = await fetch(`${getBaseUrl()}/manager/me`, {
@@ -3503,26 +3701,26 @@ export default function App() {
         });
         if (meRes.ok) setLoggedInManager(await meRes.json());
         if (data.visibilityChanged) {
-          Alert.alert('Hinweis', `${therapistName} wurde entfernt. Das Therapeuten-Profil ist jetzt nicht mehr öffentlich sichtbar, da keine aktive Praxis mehr verknüpft ist.`);
+          Alert.alert(t('alertHint'), t('removeTherapistVisibilityNote').replace('{name}', therapistName));
         }
       } catch (e) {
-        Alert.alert('Fehler', e.message);
+        Alert.alert(t('alertError'), e.message);
       } finally {
         setRemovingTherapistId(null);
       }
     };
 
     if (Platform.OS === 'web') {
-      if (showWebConfirm(`${therapistName} aus der Praxis entfernen?\n\nDas Therapeuten-Konto wird nicht gelöscht. Falls dies die letzte aktive Praxis ist, wird das Profil automatisch unsichtbar.`)) {
+      if (showWebConfirm(t('removeTherapistConfirmWeb').replace('{name}', therapistName))) {
         doRemove();
       }
     } else {
       Alert.alert(
-        'Therapeut entfernen',
-        `Möchtest du ${therapistName} aus der Praxis entfernen?\n\nDas Therapeuten-Konto bleibt erhalten. Falls dies die letzte aktive Praxis ist, wird das Profil automatisch nicht mehr öffentlich sichtbar.`,
+        t('removeTherapistTitle'),
+        t('removeTherapistConfirm').replace('{name}', therapistName),
         [
           { text: t('cancelBtn'), style: 'cancel' },
-          { text: 'Entfernen', style: 'destructive', onPress: doRemove },
+          { text: t('removeBtn'), style: 'destructive', onPress: doRemove },
         ]
       );
     }
@@ -3568,10 +3766,10 @@ export default function App() {
         setMgrEditMode(false);
       } else {
         const err = await res.json().catch(() => ({}));
-        Alert.alert('Fehler', err.message ?? 'Speichern fehlgeschlagen.');
+        Alert.alert(t('alertError'), err.message ?? t('alertSaveFail'));
       }
     } catch {
-      Alert.alert('Verbindungsfehler', 'Bitte prüfe deine Internetverbindung.');
+      Alert.alert(t('alertConnectionError'), t('alertConnectionErrorBody'));
     } finally {
       setMgrEditSaving(false);
     }
@@ -3595,14 +3793,14 @@ export default function App() {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        Alert.alert('Fehler', err.message ?? 'Speichern fehlgeschlagen.');
+        Alert.alert(t('alertError'), err.message ?? t('alertSaveFail'));
         return;
       }
       const meRes = await fetch(`${getBaseUrl()}/manager/me`, { headers: { Authorization: `Bearer ${authToken}` } });
       if (meRes.ok) setLoggedInManager(await meRes.json());
       setMgrProfileEditMode(false);
     } catch {
-      Alert.alert('Verbindungsfehler', 'Bitte prüfe deine Internetverbindung.');
+      Alert.alert(t('alertConnectionError'), t('alertConnectionErrorBody'));
     } finally {
       setMgrProfileSaving(false);
     }
@@ -3618,7 +3816,7 @@ export default function App() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        Alert.alert('Fehler', data.message ?? 'Veröffentlichung fehlgeschlagen.');
+        Alert.alert(t('alertError'), data.message ?? t('alertPublishFail'));
         return;
       }
       const meRes = await fetch(`${getBaseUrl()}/manager/me`, {
@@ -3629,22 +3827,22 @@ export default function App() {
       if (visibilityPreference === 'visible' && !data.isPublished) {
         const missing = formatMissingProfileFields(data.missingFields);
         Alert.alert(
-          'Profil noch nicht öffentlich',
+          t('alertProfileNotPublicYet'),
           missing.length > 0
-            ? `Bitte ergänze zuerst: ${missing.join(', ')}.`
-            : 'Bitte vervollständige dein Profil vor der Veröffentlichung.'
+            ? t('alertCompleteFirst').replace('{fields}', missing.join(', '))
+            : t('alertCompleteProfileFirst')
         );
         return;
       }
 
       Alert.alert(
-        visibilityPreference === 'visible' ? 'Profil veröffentlicht' : 'Profil verborgen',
+        visibilityPreference === 'visible' ? t('alertProfilePublished') : t('alertProfileHidden'),
         visibilityPreference === 'visible'
-          ? 'Dein Therapeuten-Profil ist jetzt öffentlich sichtbar.'
-          : 'Dein Therapeuten-Profil ist nicht mehr öffentlich sichtbar.'
+          ? t('alertProfilePublishedBody')
+          : t('alertProfileHiddenMgrBody')
       );
     } catch {
-      Alert.alert('Verbindungsfehler', 'Bitte prüfe deine Internetverbindung.');
+      Alert.alert(t('alertConnectionError'), t('alertConnectionErrorBody'));
     } finally {
       setMgrProfilePublishLoading(false);
     }
@@ -3652,7 +3850,7 @@ export default function App() {
 
   const handleAddNewPractice = async () => {
     if (!mgrNewPracticeName.trim() || !mgrNewPracticeCity.trim()) {
-      Alert.alert('Fehler', 'Praxisname und Stadt sind erforderlich.');
+      Alert.alert(t('alertError'), t('alertPracticeNameCityRequired'));
       return;
     }
     setMgrNewPracticeLoading(true);
@@ -3667,14 +3865,14 @@ export default function App() {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.message ?? 'Erstellen fehlgeschlagen');
+        throw new Error(err.message ?? t('alertCreateFailed'));
       }
       const { practiceId } = await res.json();
       const meRes = await fetch(`${getBaseUrl()}/manager/me`, { headers: { Authorization: `Bearer ${authToken}` } });
       if (meRes.ok) setLoggedInManager(await meRes.json());
       setActivePracticeId(practiceId);
     } catch (e) {
-      Alert.alert('Fehler', e.message);
+      Alert.alert(t('alertError'), e.message);
     } finally {
       setMgrNewPracticeLoading(false);
     }
@@ -3682,7 +3880,7 @@ export default function App() {
 
   const handlePickManagerPracticeLogo = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) { Alert.alert('Kein Zugriff', 'Bitte Fotobibliothek erlauben.'); return; }
+    if (!perm.granted) { Alert.alert(t('alertNoAccess'), t('alertAllowPhotoLib')); return; }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
@@ -3697,7 +3895,7 @@ export default function App() {
 
   const handleAddManagerPracticePhoto = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) { Alert.alert('Kein Zugriff', 'Bitte Fotobibliothek erlauben.'); return; }
+    if (!perm.granted) { Alert.alert(t('alertNoAccess'), t('alertAllowPhotoLib')); return; }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
@@ -3765,6 +3963,7 @@ export default function App() {
         setMgrProfileTitle={setMgrProfileTitle}
         setShowInvitePage={setShowInvitePage}
         styles={styles}
+        t={t}
       />
     );
   };
@@ -3805,39 +4004,39 @@ export default function App() {
       {addPracticeStep === 1 ? (
         /* ── Schritt 1: Formular ── */
         <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
-          <Text style={[styles.filterSectionTitle, { color: c.muted, marginBottom: 12 }]}>PRAXISDATEN</Text>
+          <Text style={[styles.filterSectionTitle, { color: c.muted, marginBottom: 12 }]}>{t('practiceDataSection')}</Text>
 
-          <Text style={{ color: c.muted, fontSize: 13, marginBottom: 4 }}>Praxisname *</Text>
+          <Text style={{ color: c.muted, fontSize: 13, marginBottom: 4 }}>{t('practiceNameRequired')}</Text>
           <TextInput
             style={[styles.input, { color: c.text, borderColor: mgrNewPracticeName.trim() ? c.primary : c.border, backgroundColor: c.mutedBg, marginBottom: 16, outlineWidth: 0 }]}
-            placeholder="z. B. Physiotherapie Mustermann"
+            placeholder={t('examplePracticeName')}
             placeholderTextColor={c.muted}
             value={mgrNewPracticeName}
             onChangeText={setMgrNewPracticeName}
           />
 
-          <Text style={{ color: c.muted, fontSize: 13, marginBottom: 4 }}>Stadt *</Text>
+          <Text style={{ color: c.muted, fontSize: 13, marginBottom: 4 }}>{t('cityRequired')}</Text>
           <TextInput
             style={[styles.input, { color: c.text, borderColor: mgrNewPracticeCity.trim() ? c.primary : c.border, backgroundColor: c.mutedBg, marginBottom: 16, outlineWidth: 0 }]}
-            placeholder="z. B. München"
+            placeholder={t('exampleCity')}
             placeholderTextColor={c.muted}
             value={mgrNewPracticeCity}
             onChangeText={setMgrNewPracticeCity}
           />
 
-          <Text style={{ color: c.muted, fontSize: 13, marginBottom: 4 }}>Adresse <Text style={{ color: c.muted, fontStyle: 'italic' }}>(optional)</Text></Text>
+          <Text style={{ color: c.muted, fontSize: 13, marginBottom: 4 }}>{t('addressLabel')} <Text style={{ color: c.muted, fontStyle: 'italic' }}>{t('optionalHint')}</Text></Text>
           <TextInput
             style={[styles.input, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg, marginBottom: 16, outlineWidth: 0 }]}
-            placeholder="z. B. Musterstraße 12"
+            placeholder={t('exampleAddress')}
             placeholderTextColor={c.muted}
             value={mgrNewPracticeAddress}
             onChangeText={setMgrNewPracticeAddress}
           />
 
-          <Text style={{ color: c.muted, fontSize: 13, marginBottom: 4 }}>Telefon <Text style={{ color: c.muted, fontStyle: 'italic' }}>(optional)</Text></Text>
+          <Text style={{ color: c.muted, fontSize: 13, marginBottom: 4 }}>{t('phoneLabel')} <Text style={{ color: c.muted, fontStyle: 'italic' }}>{t('optionalHint')}</Text></Text>
           <TextInput
             style={[styles.input, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg, marginBottom: 32 }]}
-            placeholder="z. B. 089 123456"
+            placeholder={t('examplePhone')}
             placeholderTextColor={c.muted}
             value={mgrNewPracticePhone}
             onChangeText={setMgrNewPracticePhone}
@@ -3847,26 +4046,26 @@ export default function App() {
           <Pressable
             onPress={() => {
               if (!mgrNewPracticeName.trim() || !mgrNewPracticeCity.trim()) {
-                if (Platform.OS === 'web') { showWebAlert('Bitte Praxisname und Stadt ausfüllen.'); }
-                else { Alert.alert('Pflichtfelder', 'Bitte Praxisname und Stadt ausfüllen.'); }
+                if (Platform.OS === 'web') { showWebAlert(t('alertFillNameCity')); }
+                else { Alert.alert(t('alertRequiredFields'), t('alertFillNameCity')); }
                 return;
               }
               setAddPracticeStep(2);
             }}
             style={{ backgroundColor: c.primary, borderRadius: 14, paddingVertical: 16, alignItems: 'center' }}
           >
-            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 16 }}>Weiter zur Übersicht</Text>
+            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 16 }}>{t('continueToOverview')}</Text>
           </Pressable>
         </ScrollView>
       ) : (
         /* ── Schritt 2: Übersicht & Bestätigung ── */
         <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40 }}>
-          <Text style={[styles.filterSectionTitle, { color: c.muted, marginBottom: 16 }]}>ZUSAMMENFASSUNG</Text>
+          <Text style={[styles.filterSectionTitle, { color: c.muted, marginBottom: 16 }]}>{t('summaryLabel')}</Text>
 
           <View style={{ backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.border, padding: 16, marginBottom: 20, gap: 14 }}>
             {[
-              { label: 'Praxisname', value: mgrNewPracticeName },
-              { label: 'Stadt', value: mgrNewPracticeCity },
+              { label: t('practiceNameLabel'), value: mgrNewPracticeName },
+              { label: t('cityLabel'), value: mgrNewPracticeCity },
               { label: t('addressLabel'), value: mgrNewPracticeAddress || '—' },
               { label: t('phoneLabel'), value: mgrNewPracticePhone || '—' },
             ].map(({ label, value }) => (
@@ -3881,7 +4080,7 @@ export default function App() {
           <View style={{ backgroundColor: c.warningBg, borderRadius: RADIUS.md, padding: 14, marginBottom: 24, flexDirection: 'row', gap: 10, alignItems: 'flex-start' }}>
             <Ionicons name="information-circle-outline" size={20} color={c.warning} style={{ marginTop: 1 }} />
             <Text style={{ color: c.warning, fontSize: 13, flex: 1, lineHeight: 20 }}>
-              Die Praxis wird nach dem Einreichen zur Prüfung weitergeleitet. Erst nach Freigabe durch einen Admin ist sie öffentlich sichtbar.
+              {t('practiceReviewNotice')}
             </Text>
           </View>
 
@@ -3893,11 +4092,11 @@ export default function App() {
             disabled={mgrNewPracticeLoading}
             style={{ backgroundColor: mgrNewPracticeLoading ? c.border : c.primary, borderRadius: 14, paddingVertical: 16, alignItems: 'center', marginBottom: 12 }}
           >
-            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 16 }}>{mgrNewPracticeLoading ? 'Wird erstellt...' : 'Praxis einreichen'}</Text>
+            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 16 }}>{mgrNewPracticeLoading ? t('creatingBtn') : t('submitPractice')}</Text>
           </Pressable>
 
           <Pressable onPress={closeAddPracticeScreen} style={{ alignItems: 'center', paddingVertical: 12 }}>
-            <Text style={{ color: c.muted, fontSize: 14 }}>Abbrechen</Text>
+            <Text style={{ color: c.muted, fontSize: 14 }}>{t('cancelBtn')}</Text>
           </Pressable>
         </ScrollView>
       )}
@@ -3981,8 +4180,8 @@ export default function App() {
         <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' }} onPress={() => setDeletionFlowStep(null)} />
         <View style={{ backgroundColor: c.background, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, paddingBottom: 48 }}>
           <View style={{ width: 36, height: 4, backgroundColor: c.border, borderRadius: 2, alignSelf: 'center', marginBottom: 20 }} />
-          <Text style={{ fontSize: 18, fontWeight: '700', color: c.text, marginBottom: 6 }}>Warum möchtest du die Praxis löschen?</Text>
-          <Text style={{ fontSize: 14, color: c.muted, marginBottom: 20 }}>Dein Feedback hilft uns, Revio zu verbessern.</Text>
+          <Text style={{ fontSize: 18, fontWeight: '700', color: c.text, marginBottom: 6 }}>{t('deletePracticeQuestion')}</Text>
+          <Text style={{ fontSize: 14, color: c.muted, marginBottom: 20 }}>{t('deletePracticeFeedback')}</Text>
           {DELETION_REASONS.map((reason) => (
             <Pressable
               key={reason}
@@ -3993,9 +4192,9 @@ export default function App() {
               <Text style={{ fontSize: 15, color: c.text }}>{reason}</Text>
             </Pressable>
           ))}
-          {deletionReason === 'Sonstiges' && (
+          {deletionReason === t('deletionReasonOther') && (
             <TextInput
-              placeholder="Kurze Beschreibung (optional)"
+              placeholder={t('shortDescOptional')}
               placeholderTextColor={c.muted}
               value={deletionReasonDetail}
               onChangeText={setDeletionReasonDetail}
@@ -4007,10 +4206,10 @@ export default function App() {
             onPress={() => deletionReason ? setDeletionFlowStep('confirm') : null}
             style={{ marginTop: 20, backgroundColor: deletionReason ? c.error : c.border, borderRadius: RADIUS.md, paddingVertical: 14, alignItems: 'center' }}
           >
-            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>Weiter</Text>
+            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>{t('nextBtn')}</Text>
           </Pressable>
           <Pressable onPress={() => setDeletionFlowStep(null)} style={{ marginTop: 12, alignItems: 'center', paddingVertical: 10 }}>
-            <Text style={{ color: c.muted, fontSize: 14 }}>Abbrechen</Text>
+            <Text style={{ color: c.muted, fontSize: 14 }}>{t('cancelBtn')}</Text>
           </Pressable>
         </View>
       </Modal>
@@ -4020,24 +4219,24 @@ export default function App() {
         <View style={{ backgroundColor: c.background, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, paddingBottom: 48 }}>
           <View style={{ width: 36, height: 4, backgroundColor: c.border, borderRadius: 2, alignSelf: 'center', marginBottom: 20 }} />
           <View style={{ backgroundColor: c.errorBg, borderRadius: RADIUS.md, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: c.error }}>
-            <Text style={{ fontSize: 15, fontWeight: '700', color: c.error, marginBottom: 6 }}>Diese Aktion kann nicht rückgängig gemacht werden.</Text>
+            <Text style={{ fontSize: 15, fontWeight: '700', color: c.error, marginBottom: 6 }}>{t('actionIrreversible')}</Text>
             <Text style={{ fontSize: 14, color: c.error }}>
-              {`„${loggedInTherapist?.adminPractice?.name ?? 'Diese Praxis'}" wird dauerhaft gelöscht. Alle verknüpften Therapeuten werden getrennt und verlieren ihre Praxis-Zuordnung.`}
+              {t('deletePracticeWarning').replace('{name}', loggedInTherapist?.adminPractice?.name ?? t('thisPractice'))}
             </Text>
           </View>
           <Text style={{ fontSize: 13, color: c.muted, marginBottom: 20 }}>
-            {`Grund: ${deletionReason}${deletionReason === 'Sonstiges' && deletionReasonDetail ? ` – ${deletionReasonDetail}` : ''}`}
+            {`${t('reasonLabel')}: ${deletionReason}${deletionReason === t('deletionReasonOther') && deletionReasonDetail ? ` – ${deletionReasonDetail}` : ''}`}
           </Text>
           <Pressable
             onPress={deletionLoading ? undefined : deletePracticeConfirmed}
             style={{ backgroundColor: c.error, borderRadius: RADIUS.md, paddingVertical: 14, alignItems: 'center', opacity: deletionLoading ? 0.6 : 1 }}
           >
             <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>
-              {deletionLoading ? 'Wird gelöscht…' : 'Praxis endgültig löschen'}
+              {deletionLoading ? t('deletingBtn') : t('deletePracticeFinal')}
             </Text>
           </Pressable>
           <Pressable onPress={() => setDeletionFlowStep('reason')} style={{ marginTop: 12, alignItems: 'center', paddingVertical: 10 }}>
-            <Text style={{ color: c.muted, fontSize: 14 }}>Zurück</Text>
+            <Text style={{ color: c.muted, fontSize: 14 }}>{t('backBtn')}</Text>
           </Pressable>
         </View>
       </Modal>
@@ -4047,9 +4246,9 @@ export default function App() {
         <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' }} onPress={() => setShowNotifications(false)} />
         <View style={{ backgroundColor: c.background, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, paddingBottom: 40, minHeight: 200 }}>
           <View style={{ width: 36, height: 4, backgroundColor: c.border, borderRadius: 2, alignSelf: 'center', marginBottom: 16 }} />
-          <Text style={{ fontSize: 18, fontWeight: '700', color: c.text, marginBottom: 16 }}>Benachrichtigungen</Text>
+          <Text style={{ fontSize: 18, fontWeight: '700', color: c.text, marginBottom: 16 }}>{t('notificationsTitle')}</Text>
           {notifications.length === 0 ? (
-            <Text style={{ color: c.muted, textAlign: 'center', marginTop: 24 }}>Keine neuen Benachrichtigungen</Text>
+            <Text style={{ color: c.muted, textAlign: 'center', marginTop: 24 }}>{t('noNotifications')}</Text>
           ) : (
             notifications.map((n) => (
               <View key={n.id} style={{ paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: c.border, flexDirection: 'row', gap: 10, alignItems: 'flex-start' }}>
@@ -4066,14 +4265,44 @@ export default function App() {
         </View>
       </Modal>
 
+      <Modal visible={showReviewNotificationModal} transparent animationType="fade" onRequestClose={() => markReviewNotificationSeen()}>
+        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', padding: 24 }} onPress={() => markReviewNotificationSeen()}>
+          <Pressable onPress={(e) => e.stopPropagation()}>
+            <View style={{ backgroundColor: c.card, borderRadius: 20, padding: 24, gap: 16 }}>
+              <View style={{ alignItems: 'center', gap: 10 }}>
+                <View style={{ width: 64, height: 64, borderRadius: 20, backgroundColor: c.primaryBg, alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons
+                    name={reviewNotification?.type === 'PROFILE_APPROVED' ? 'checkmark-circle' : 'notifications'}
+                    size={34}
+                    color={reviewNotification?.type === 'PROFILE_APPROVED' ? c.success : c.primary}
+                  />
+                </View>
+                <Text style={{ fontSize: 22, fontWeight: '800', color: c.text, textAlign: 'center' }}>
+                  {getReviewNotificationTitle(reviewNotification, t)}
+                </Text>
+              </View>
+              <Text style={{ fontSize: 14, color: c.muted, textAlign: 'center', lineHeight: 21 }}>
+                {reviewNotification?.message}
+              </Text>
+              <Pressable
+                style={{ backgroundColor: c.primary, borderRadius: 14, paddingVertical: 14, alignItems: 'center' }}
+                onPress={() => markReviewNotificationSeen()}
+              >
+                <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>{t('doneBtn')}</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
       {/* ── Visibility Modal ───────────────────────────────────────────────── */}
       <Modal visible={showVisibilityModal} transparent animationType="fade" onRequestClose={() => setShowVisibilityModal(false)}>
         <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', padding: 24 }} onPress={() => setShowVisibilityModal(false)}>
           <Pressable onPress={(e) => e.stopPropagation()}>
             <View style={{ backgroundColor: c.card, borderRadius: 20, padding: 24, gap: 16 }}>
-              <Text style={{ fontSize: 20, fontWeight: '800', color: c.text, textAlign: 'center' }}>Profil sichtbar machen?</Text>
+              <Text style={{ fontSize: 20, fontWeight: '800', color: c.text, textAlign: 'center' }}>{t('makeProfileVisible')}</Text>
               <Text style={{ fontSize: 14, color: c.muted, textAlign: 'center', lineHeight: 20 }}>
-                Soll dein Profil öffentlich sichtbar sein? Du kannst das jederzeit ändern.
+                {t('visibilityQuestion')}
               </Text>
               <Pressable
                 style={{ backgroundColor: c.primary, borderRadius: 14, paddingVertical: 14, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, opacity: visibilityLoading ? 0.6 : 1 }}
@@ -4081,7 +4310,7 @@ export default function App() {
                 disabled={visibilityLoading}
               >
                 <Ionicons name="eye-outline" size={20} color="#fff" />
-                <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>Sichtbar</Text>
+                <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>{t('visibleLabel')}</Text>
               </Pressable>
               <Pressable
                 style={{ backgroundColor: c.mutedBg, borderRadius: 14, paddingVertical: 14, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, borderWidth: 1, borderColor: c.border, opacity: visibilityLoading ? 0.6 : 1 }}
@@ -4089,7 +4318,34 @@ export default function App() {
                 disabled={visibilityLoading}
               >
                 <Ionicons name="eye-off-outline" size={20} color={c.text} />
-                <Text style={{ color: c.text, fontSize: 16, fontWeight: '600' }}>Versteckt</Text>
+                <Text style={{ color: c.text, fontSize: 16, fontWeight: '600' }}>{t('hiddenLabel')}</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* ── Profile Saved Modal ─────────────────────────────────────────────── */}
+      <Modal visible={showProfileSavedModal} transparent animationType="fade" onRequestClose={() => setShowProfileSavedModal(false)}>
+        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', padding: 24 }} onPress={() => setShowProfileSavedModal(false)}>
+          <Pressable onPress={(e) => e.stopPropagation()}>
+            <View style={{ backgroundColor: c.card, borderRadius: 20, padding: 24, gap: 16 }}>
+              <View style={{ alignItems: 'center', gap: 10 }}>
+                <View style={{ width: 64, height: 64, borderRadius: 20, backgroundColor: c.primaryBg, alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons name="checkmark-circle" size={34} color={c.primary} />
+                </View>
+                <Text style={{ fontSize: 22, fontWeight: '800', color: c.text, textAlign: 'center' }}>
+                  {t('profileSavedModalTitle')}
+                </Text>
+              </View>
+              <Text style={{ fontSize: 14, color: c.muted, textAlign: 'center', lineHeight: 21 }}>
+                {t('profileSavedModalBody')}
+              </Text>
+              <Pressable
+                style={{ backgroundColor: c.primary, borderRadius: 14, paddingVertical: 14, alignItems: 'center' }}
+                onPress={() => setShowProfileSavedModal(false)}
+              >
+                <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>{t('doneBtn')}</Text>
               </Pressable>
             </View>
           </Pressable>
@@ -4138,7 +4394,7 @@ export default function App() {
               <TextInput
                 value={locationSheetCity}
                 onChangeText={fetchLocationSuggestions}
-                placeholder="z.B. Hauptstraße 5, München"
+                placeholder={t('locationExamplePlaceholder')}
                 placeholderTextColor={c.muted}
                 style={{ flex: 1, backgroundColor: c.card, borderWidth: 1, borderColor: locationSuggestions.length > 0 ? c.primary : c.border, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, color: c.text, fontSize: 15 }}
                 onSubmitEditing={handleLocationSheetManual}
@@ -4193,9 +4449,9 @@ export default function App() {
         <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 24 }} onPress={() => setShowPhotoPrompt(false)}>
           <Pressable style={{ backgroundColor: c.card, borderRadius: 20, padding: 28, width: '100%', alignItems: 'center', gap: 12 }} onPress={() => {}}>
             <Text style={{ fontSize: 52 }}>📷</Text>
-            <Text style={{ fontSize: 20, fontWeight: '700', color: c.text, textAlign: 'center' }}>Profilfoto hinzufügen</Text>
+            <Text style={{ fontSize: 20, fontWeight: '700', color: c.text, textAlign: 'center' }}>{t('addProfilePhoto')}</Text>
             <Text style={{ fontSize: 14, color: c.muted, textAlign: 'center', lineHeight: 20 }}>
-              Ein Foto macht dein Profil vertrauenswürdiger und hilft Patienten, dich zu erkennen.
+              {t('photoTrustNotice')}
             </Text>
             <Pressable
               onPress={async () => {
@@ -4206,7 +4462,7 @@ export default function App() {
               }}
               style={{ backgroundColor: c.primary, borderRadius: 12, paddingVertical: 14, paddingHorizontal: 32, width: '100%', alignItems: 'center', marginTop: 4 }}
             >
-              <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>Foto auswählen</Text>
+              <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>{t('choosePhoto')}</Text>
             </Pressable>
             <Pressable
               onPress={async () => {
@@ -4215,7 +4471,42 @@ export default function App() {
               }}
               style={{ paddingVertical: 10 }}
             >
-              <Text style={{ color: c.muted, fontSize: 14 }}>Später</Text>
+              <Text style={{ color: c.muted, fontSize: 14 }}>{t('laterBtn')}</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* ── Konto löschen Modal ──────────────────────────────────────────────── */}
+      <Modal visible={showDeleteAccountModal} transparent animationType="fade" onRequestClose={() => setShowDeleteAccountModal(false)}>
+        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', padding: 24 }} onPress={() => setShowDeleteAccountModal(false)}>
+          <Pressable style={{ backgroundColor: c.card, borderRadius: 20, padding: 24, gap: 16 }} onPress={() => {}}>
+            <Text style={{ fontSize: 20, fontWeight: '700', color: c.error, textAlign: 'center' }}>{t('deleteAccountConfirmTitle')}</Text>
+            <Text style={{ fontSize: 14, color: c.muted, textAlign: 'center', lineHeight: 20 }}>
+              {t('deleteAccountConfirmMsg')}
+            </Text>
+            <View style={{ backgroundColor: c.errorBg, borderRadius: RADIUS.md, padding: 14, borderWidth: 1, borderColor: c.error }}>
+              <Text style={{ fontSize: 13, color: c.error, marginBottom: 10 }}>
+                {t('enterLastNameConfirm')}
+              </Text>
+              <TextInput
+                value={deleteNameInput}
+                onChangeText={setDeleteNameInput}
+                placeholder={loggedInTherapist?.fullName?.split(' ').slice(-1)[0] ?? t('lastNameFallback')}
+                placeholderTextColor={c.muted}
+                autoCapitalize="words"
+                style={{ backgroundColor: c.background, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: c.error, color: c.text, paddingHorizontal: 14, paddingVertical: 10, fontSize: 15 }}
+              />
+            </View>
+            <Pressable
+              onPress={async () => { setShowDeleteAccountModal(false); await deleteAccountConfirmed(); }}
+              disabled={deleteNameInput.trim().toLowerCase() !== (loggedInTherapist?.fullName?.split(' ').slice(-1)[0] ?? '').toLowerCase()}
+              style={({ pressed }) => ({ backgroundColor: c.error, borderRadius: RADIUS.md, paddingVertical: 14, alignItems: 'center', opacity: deleteNameInput.trim().toLowerCase() === (loggedInTherapist?.fullName?.split(' ').slice(-1)[0] ?? '').toLowerCase() ? (pressed ? 0.7 : 1) : 0.35 })}
+            >
+              <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>{t('deleteAccountFinal')}</Text>
+            </Pressable>
+            <Pressable onPress={() => setShowDeleteAccountModal(false)} style={{ alignItems: 'center', paddingVertical: 8 }}>
+              <Text style={{ color: c.muted, fontSize: 14 }}>{t('cancelBtn')}</Text>
             </Pressable>
           </Pressable>
         </Pressable>
@@ -4265,10 +4556,10 @@ export default function App() {
                     size={22}
                     color={active ? c.primary : c.muted}
                   />
-                  {tab.key === 'therapist' && loggedInTherapist && notifications.filter(n => n.type === 'BOOKING_REQUEST').length > 0 && (
+                  {tab.key === 'therapist' && loggedInTherapist && notifications.length > 0 && (
                     <View style={{ position: 'absolute', top: -3, right: -5, backgroundColor: '#E53E3E', borderRadius: 6, minWidth: 12, height: 12, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 2 }}>
                       <Text style={{ color: '#fff', fontSize: 8, fontWeight: '800', lineHeight: 12 }}>
-                        {notifications.filter(n => n.type === 'BOOKING_REQUEST').length}
+                        {notifications.length}
                       </Text>
                     </View>
                   )}

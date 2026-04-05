@@ -86,7 +86,7 @@ export function TherapistDashboardScreen(props) {
   const th = loggedInTherapist;
   const [photoError, setPhotoError] = useState(false);
   const initials = th.fullName.split(' ').map((name) => name[0]).join('').slice(0, 2).toUpperCase();
-  const reviewStatusLabel = th.reviewStatus === 'APPROVED' ? 'Freigegeben' : th.reviewStatus === 'CHANGES_REQUESTED' ? 'Anpassung nötig' : 'In Prüfung';
+  const reviewStatusLabel = th.reviewStatus === 'APPROVED' ? t('statusApproved') : th.reviewStatus === 'CHANGES_REQUESTED' ? t('statusChangesRequested') : t('statusInReview');
   const reviewStatusColor = th.reviewStatus === 'APPROVED' ? c.success : th.reviewStatus === 'CHANGES_REQUESTED' ? c.warning : c.muted;
   const hasPractice = (th.practices ?? []).length > 0;
   const hasDocuments = (therapistDocuments ?? []).length > 0;
@@ -110,29 +110,29 @@ export function TherapistDashboardScreen(props) {
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: SPACE.sm, marginTop: SPACE.sm, width: '100%' }}>
           <StatusMiniCard
             icon="shield-checkmark-outline"
-            label="Prüfstatus"
+            label={t('reviewStatusLabel')}
             value={reviewStatusLabel}
             color={reviewStatusColor}
             c={c}
           />
           <StatusMiniCard
             icon="eye-outline"
-            label="Sichtbar"
-            value={th.isVisible ? 'Ja' : 'Versteckt'}
+            label={t('visibleLabel')}
+            value={th.isVisible ? t('yesLabel') : t('hiddenLabel')}
             color={th.isVisible ? c.success : c.muted}
             c={c}
           />
           <StatusMiniCard
             icon="business-outline"
-            label="Praxis"
-            value={hasPractice ? 'Verknüpft' : 'Keine'}
+            label={t('practicesLabel')}
+            value={hasPractice ? t('linkedLabel') : t('noneLabel')}
             color={hasPractice ? c.success : c.warning}
             c={c}
           />
           <StatusMiniCard
             icon="document-outline"
-            label="Nachweise"
-            value={hasDocuments ? 'Vorhanden' : 'Fehlen'}
+            label={t('documentsTitle')}
+            value={hasDocuments ? t('existsLabel') : t('missingLabel')}
             color={hasDocuments ? c.success : c.warning}
             c={c}
           />
@@ -141,7 +141,7 @@ export function TherapistDashboardScreen(props) {
 
       {(th.practices ?? []).length === 0 && (
         <View style={[{ marginTop: 12, marginHorizontal: 0, borderRadius: RADIUS.md, borderWidth: 1, padding: 16, backgroundColor: c.mutedBg, borderColor: c.border }]}>
-          <Text style={{ color: c.text, fontWeight: '600', fontSize: 14, marginBottom: 4 }}>Noch keine Praxis verbunden</Text>
+          <Text style={{ color: c.text, fontWeight: '600', fontSize: 14, marginBottom: 4 }}>{t('noPracticeYet')}</Text>
           <Text style={{ color: c.muted, fontSize: 13, marginBottom: 12 }}>
             Du bist noch mit keiner Praxis verknüpft. Erstelle eine eigene Praxis oder verbinde dich mit einer bestehenden.
           </Text>
@@ -164,35 +164,35 @@ export function TherapistDashboardScreen(props) {
 
       {editMode ? (
         <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
-          <Text style={[styles.filterSectionTitle, { color: c.muted }]}>Über mich</Text>
+          <Text style={[styles.filterSectionTitle, { color: c.muted }]}>{t('aboutLabel')}</Text>
           <TextInput
             style={[styles.inputField, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg, minHeight: 80, textAlignVertical: 'top' }]}
             value={editBio}
             onChangeText={setEditBio}
-            placeholder="Kurze Beschreibung…"
+            placeholder={t('bioShortPlaceholder')}
             placeholderTextColor={c.muted}
             multiline
           />
-          <Text style={[styles.filterSectionTitle, { color: c.muted, marginTop: 12 }]}>Spezialisierungen (kommagetrennt)</Text>
+          <Text style={[styles.filterSectionTitle, { color: c.muted, marginTop: 12 }]}>{t('specsCommaSeparated')}</Text>
           <TextInput
             style={[styles.inputField, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg }]}
             value={editSpecializations}
             onChangeText={setEditSpecializations}
-            placeholder="Rücken, Sport, Neurologie…"
+            placeholder={t('specsExamplePlaceholder')}
             placeholderTextColor={c.muted}
           />
-          <Text style={[styles.filterSectionTitle, { color: c.muted, marginTop: 12 }]}>Sprachen</Text>
-          <LangMultiselect editLanguages={editLanguages} setEditLanguages={setEditLanguages} c={c} styles={styles} />
+          <Text style={[styles.filterSectionTitle, { color: c.muted, marginTop: 12 }]}>{t('languagesLabel')}</Text>
+          <LangMultiselect editLanguages={editLanguages} setEditLanguages={setEditLanguages} c={c} styles={styles} t={t} />
           <View style={[styles.detailInfoRow, { marginTop: 12 }]}>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.detailInfoLabel, { color: c.text }]}>Hausbesuche anbieten</Text>
-              <Text style={{ fontSize: 12, color: c.muted, marginTop: 2 }}>Du fährst zu Patienten nach Hause</Text>
+              <Text style={[styles.detailInfoLabel, { color: c.text }]}>{t('homeVisitOffer')}</Text>
+              <Text style={{ fontSize: 12, color: c.muted, marginTop: 2 }}>{t('homeVisitOfferSub')}</Text>
             </View>
             <Switch value={editHomeVisit} onValueChange={setEditHomeVisit} trackColor={{ true: c.success }} />
           </View>
           {editHomeVisit && (
             <View style={{ marginTop: 10 }}>
-              <Text style={[styles.filterSectionTitle, { color: c.muted }]}>Einzugsgebiet (wie weit fährst du?)</Text>
+              <Text style={[styles.filterSectionTitle, { color: c.muted }]}>{t('serviceAreaQuestion')}</Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 6 }}>
                 {[5, 10, 15, 20, 30, 50].map((km) => (
                   <Pressable
@@ -211,13 +211,13 @@ export function TherapistDashboardScreen(props) {
               </View>
             </View>
           )}
-          <Text style={[styles.filterSectionTitle, { color: c.muted, marginTop: 12 }]}>Kassenart</Text>
+          <Text style={[styles.filterSectionTitle, { color: c.muted, marginTop: 12 }]}>{t('kassenartLabel')}</Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 6 }}>
             {[
-              { key: 'gesetzlich', label: 'Gesetzlich' },
-              { key: 'privat', label: 'Privat' },
-              { key: 'selbstzahler', label: 'Selbstzahler' },
-              { key: 'alle', label: 'Alle' },
+              { key: 'gesetzlich', label: t('kasseGesetzlich') },
+              { key: 'privat', label: t('kassePrivat') },
+              { key: 'selbstzahler', label: t('kasseSelbstzahler') },
+              { key: 'alle', label: t('allOption') },
             ].map((option) => (
               <Pressable
                 key={option.key}
@@ -234,23 +234,23 @@ export function TherapistDashboardScreen(props) {
             ))}
           </View>
           <View style={[styles.detailInfoRow, { marginTop: 12 }]}>
-            <Text style={[styles.detailInfoLabel, { color: c.text, flex: 1 }]}>In Suche sichtbar</Text>
+            <Text style={[styles.detailInfoLabel, { color: c.text, flex: 1 }]}>{t('searchVisibleLabel')}</Text>
             <Switch value={editIsVisible} onValueChange={setEditIsVisible} trackColor={{ true: c.primary }} />
           </View>
-          <Text style={[styles.detailInfoLabel, { color: c.muted, marginTop: 14, marginBottom: 4 }]}>Verfügbarkeit</Text>
+          <Text style={[styles.detailInfoLabel, { color: c.muted, marginTop: 14, marginBottom: 4 }]}>{t('availabilityLabel')}</Text>
           <TextInput
             style={[styles.registerInput, { color: c.text, borderColor: c.border, backgroundColor: c.card }]}
             value={editAvailability}
             onChangeText={setEditAvailability}
-            placeholder="z.B. ab sofort, Mo–Fr 8:00–18:00 Uhr"
+            placeholder={t('availabilityPlaceholder')}
             placeholderTextColor={c.muted}
           />
           <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
             <Pressable style={[styles.registerBtn, { flex: 1, backgroundColor: c.border, marginTop: 0 }]} onPress={() => setEditMode(false)}>
-              <Text style={{ ...TYPE.heading, color: c.text }}>Abbrechen</Text>
+              <Text style={{ ...TYPE.heading, color: c.text }}>{t('cancelBtn')}</Text>
             </Pressable>
             <Pressable style={[styles.registerBtn, { flex: 1, backgroundColor: profileSaving ? c.border : c.primary, marginTop: 0 }]} onPress={handleSaveProfile} disabled={profileSaving}>
-              <Text style={styles.registerBtnText}>{profileSaving ? 'Speichern…' : 'Speichern'}</Text>
+              <Text style={styles.registerBtnText}>{profileSaving ? t('savingBtn') : t('saveBtn')}</Text>
             </Pressable>
           </View>
         </View>
@@ -275,7 +275,7 @@ export function TherapistDashboardScreen(props) {
           </View>
 
           <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
-            <Text style={[styles.filterSectionTitle, { color: c.muted }]}>Sprachen</Text>
+            <Text style={[styles.filterSectionTitle, { color: c.muted }]}>{t('languagesLabel')}</Text>
             <View style={styles.tagRow}>
               {(th.languages ?? []).map((language) => (
                 <View key={language} style={[styles.tag, { backgroundColor: c.mutedBg }]}>
@@ -289,7 +289,7 @@ export function TherapistDashboardScreen(props) {
             {(th.practices ?? []).length === 0 && (
               <View style={[styles.detailInfoRow, { marginBottom: 8 }]}>
                 <Text style={[styles.detailInfoLabel, { color: c.muted, flex: 1 }]}>{t('homeVisitLabel')}</Text>
-                <Text style={[styles.detailInfoValue, { color: c.text }]}>{th.homeVisit ? 'Ja' : 'Nein'}</Text>
+                <Text style={[styles.detailInfoValue, { color: c.text }]}>{th.homeVisit ? t('yesLabel') : t('noLabel')}</Text>
               </View>
             )}
             {th.availability ? (
@@ -305,11 +305,11 @@ export function TherapistDashboardScreen(props) {
           </View>
 
           <Pressable style={[styles.registerBtn, { backgroundColor: c.primary }]} onPress={props.onEnterEdit}>
-            <Text style={styles.registerBtnText}>✏️ Profil bearbeiten</Text>
+            <Text style={styles.registerBtnText}>{t('editProfileBtn')}</Text>
           </Pressable>
 
           <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
-            <Text style={[styles.filterSectionTitle, { color: c.muted }]}>Nachweise & Dokumente</Text>
+            <Text style={[styles.filterSectionTitle, { color: c.muted }]}>{t('documentsTitle')}</Text>
             {(therapistDocuments ?? []).length > 0 && (
               <View style={{ marginBottom: 12 }}>
                 {(therapistDocuments ?? []).map((doc) => (
@@ -335,16 +335,16 @@ export function TherapistDashboardScreen(props) {
               }}
             >
               {documentUploading ? (
-                <Text style={{ color: c.muted, fontSize: 13 }}>Wird hochgeladen…</Text>
+                <Text style={{ color: c.muted, fontSize: 13 }}>{t('uploadingDoc')}</Text>
               ) : (
                 <>
                   <Ionicons name="attach-outline" size={18} color={c.primary} />
-                  <Text style={{ color: c.primary, fontWeight: '600', fontSize: 13 }}>Nachweis hochladen</Text>
+                  <Text style={{ color: c.primary, fontWeight: '600', fontSize: 13 }}>{t('uploadDocBtn')}</Text>
                 </>
               )}
             </Pressable>
             <Text style={{ color: c.muted, fontSize: 12, marginTop: 8 }}>
-              PDF, Foto oder Scan — nur für Admins sichtbar
+              {t('documentsHint')}
             </Text>
           </View>
 
@@ -391,20 +391,20 @@ export function TherapistDashboardScreen(props) {
             <View style={[styles.noticeBox, { backgroundColor: c.mutedBg, borderColor: c.border }]}>
               <Text style={styles.noticeIcon}>🏥</Text>
               <View style={{ flex: 1 }}>
-                <Text style={[styles.noticeTitle, { color: c.text }]}>Keine Praxis verknüpft</Text>
-                <Text style={[styles.noticeBody, { color: c.muted }]}>Verbinde dich mit einer Praxis oder erstelle deine eigene.</Text>
+                <Text style={[styles.noticeTitle, { color: c.text }]}>{t('noPracticeLinked')}</Text>
+                <Text style={[styles.noticeBody, { color: c.muted }]}>{t('noPracticeLinkedBody')}</Text>
                 <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
                   <Pressable
                     onPress={() => { setPracticeSearchQuery(''); setPracticeSearchResults([]); setShowPracticeSearch(true); }}
                     style={[styles.kassenartBtn, { backgroundColor: c.primary, borderColor: c.primary, flex: 1 }]}
                   >
-                    <Text style={[styles.kassenartText, { color: '#fff' }]}>Praxis suchen</Text>
+                    <Text style={[styles.kassenartText, { color: '#fff' }]}>{t('searchPracticeBtn')}</Text>
                   </Pressable>
                   <Pressable
                     onPress={() => setShowCreatePractice(true)}
                     style={[styles.kassenartBtn, { backgroundColor: c.mutedBg, borderColor: c.border, flex: 1 }]}
                   >
-                    <Text style={[styles.kassenartText, { color: c.text }]}>Neue Praxis</Text>
+                    <Text style={[styles.kassenartText, { color: c.text }]}>{t('newPracticeBtn')}</Text>
                   </Pressable>
                 </View>
               </View>
@@ -464,7 +464,7 @@ export function PracticeAdminScreen(props) {
   if (!p) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-        <Text style={[styles.infoBody, { color: c.muted }]}>Wird geladen…</Text>
+        <Text style={[styles.infoBody, { color: c.muted }]}>{t('loadingLabel')}</Text>
       </View>
     );
   }
@@ -510,7 +510,7 @@ export function PracticeAdminScreen(props) {
 
       {pending.length > 0 && (
         <>
-          <Text style={[styles.sectionLabel, { color: c.text }]}>Anfragen ({pending.length})</Text>
+          <Text style={[styles.sectionLabel, { color: c.text }]}>{t('requestsTitle')} ({pending.length})</Text>
           {pending.map((link) => (
             <View key={link.id} style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border, gap: 10 }]}>
               <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }} onPress={() => openTherapistById(link.therapist.id)}>
@@ -523,10 +523,10 @@ export function PracticeAdminScreen(props) {
               </Pressable>
               <View style={{ flexDirection: 'row', gap: 8 }}>
                 <Pressable onPress={() => handleLinkAction(link.id, 'accept')} style={[styles.kassenartBtn, { backgroundColor: c.success, borderColor: c.success, flex: 1 }]}>
-                  <Text style={[styles.kassenartText, { color: '#fff' }]}>✓ Annehmen</Text>
+                  <Text style={[styles.kassenartText, { color: '#fff' }]}>{t('acceptBtn')}</Text>
                 </Pressable>
                 <Pressable onPress={() => handleLinkAction(link.id, 'reject')} style={[styles.kassenartBtn, { backgroundColor: 'transparent', borderColor: c.error, flex: 1 }]}>
-                  <Text style={[styles.kassenartText, { color: c.error }]}>✕ Ablehnen</Text>
+                  <Text style={[styles.kassenartText, { color: c.error }]}>{t('rejectBtn')}</Text>
                 </Pressable>
               </View>
             </View>
@@ -534,14 +534,14 @@ export function PracticeAdminScreen(props) {
         </>
       )}
 
-      <Text style={[styles.sectionLabel, { color: c.text }]}>Therapeuten ({confirmed.length})</Text>
+      <Text style={[styles.sectionLabel, { color: c.text }]}>{t('therapistsLabel')} ({confirmed.length})</Text>
       {confirmed.map((link) => {
         const therapist = link.therapist;
         const isInvited = therapist.invitedByPracticeId === p.id;
         const statusLabel = isInvited
-          ? therapist.onboardingStatus === 'invited' ? 'Einladung ausstehend'
-            : therapist.onboardingStatus === 'claimed' ? 'Profil wird ausgefüllt'
-            : therapist.isPublished ? 'Veröffentlicht' : 'Profil vollständig'
+          ? therapist.onboardingStatus === 'invited' ? t('invitePending')
+            : therapist.onboardingStatus === 'claimed' ? t('profileFilling')
+            : therapist.isPublished ? t('publishedLabel') : t('profileComplete')
           : null;
         const statusColor = therapist.onboardingStatus === 'invited'
           ? c.warning
@@ -568,7 +568,7 @@ export function PracticeAdminScreen(props) {
             </Pressable>
             {isInvited && therapist.onboardingStatus === 'invited' && (
               <Pressable onPress={() => handleResendInvite(therapist.id)} style={{ marginTop: 10, paddingVertical: 10, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderTopWidth: 1, borderTopColor: c.border }}>
-                <Text style={{ fontSize: 13, color: c.primary, fontWeight: '600' }}>Einladung erneut senden</Text>
+                <Text style={{ fontSize: 13, color: c.primary, fontWeight: '600' }}>{t('resendInviteBtn')}</Text>
               </Pressable>
             )}
           </View>
@@ -578,19 +578,19 @@ export function PracticeAdminScreen(props) {
       {confirmed.length === 0 && pending.length === 0 && (
         <View style={[styles.emptyState, { backgroundColor: c.card, borderColor: c.border }]}>
           <Text style={styles.emptyIcon}>👥</Text>
-          <Text style={[styles.emptyTitle, { color: c.text }]}>Noch keine Therapeuten</Text>
-          <Text style={[styles.emptyBody, { color: c.muted }]}>Lade Therapeuten per E-Mail ein.</Text>
+          <Text style={[styles.emptyTitle, { color: c.text }]}>{t('noTherapistsYet')}</Text>
+          <Text style={[styles.emptyBody, { color: c.muted }]}>{t('noTherapistsYetBody')}</Text>
         </View>
       )}
 
-      <Text style={[styles.sectionLabel, { color: c.text }]}>Praxisdaten bearbeiten</Text>
+      <Text style={[styles.sectionLabel, { color: c.text }]}>{t('editPracticeData')}</Text>
       <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border, gap: 10 }]}>
         {[
-          { label: 'Name *', value: editPracticeName, setter: setEditPracticeName, placeholder: 'Praxisname' },
-          { label: 'Stadt *', value: editPracticeCity, setter: setEditPracticeCity, placeholder: 'Stadt' },
-          { label: 'Adresse', value: editPracticeAddress, setter: setEditPracticeAddress, placeholder: 'Straße Nr, PLZ Stadt' },
-          { label: 'Telefon', value: editPracticePhone, setter: setEditPracticePhone, placeholder: '+49 …', keyboard: 'phone-pad' },
-          { label: 'Öffnungszeiten', value: editPracticeHours, setter: setEditPracticeHours, placeholder: 'Mo–Fr 8:00–18:00' },
+          { label: t('nameLabel') + ' *', value: editPracticeName, setter: setEditPracticeName, placeholder: t('practiceNamePlaceholder') },
+          { label: t('cityPlaceholder') + ' *', value: editPracticeCity, setter: setEditPracticeCity, placeholder: t('cityPlaceholder') },
+          { label: t('addressLabel'), value: editPracticeAddress, setter: setEditPracticeAddress, placeholder: t('addressPlaceholder') },
+          { label: t('phoneLabel'), value: editPracticePhone, setter: setEditPracticePhone, placeholder: t('phonePlaceholder'), keyboard: 'phone-pad' },
+          { label: t('hoursLabel'), value: editPracticeHours, setter: setEditPracticeHours, placeholder: t('hoursPlaceholder') },
         ].map(({ label, value, setter, placeholder, keyboard = 'default' }) => (
           <View key={label}>
             <Text style={[styles.filterSectionTitle, { color: c.muted }]}>{label}</Text>
@@ -606,23 +606,23 @@ export function PracticeAdminScreen(props) {
         ))}
 
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, borderTopWidth: 1, borderTopColor: c.border, marginTop: 4 }}>
-          <Text style={[styles.filterSectionTitle, { color: c.text }]}>Hausbesuche</Text>
+          <Text style={[styles.filterSectionTitle, { color: c.text }]}>{t('homeVisitsSwitch')}</Text>
           <Switch value={editPracticeHomeVisit} onValueChange={setEditPracticeHomeVisit} trackColor={{ true: c.primary }} />
         </View>
 
         <View>
-          <Text style={[styles.filterSectionTitle, { color: c.muted }]}>Beschreibung</Text>
+          <Text style={[styles.filterSectionTitle, { color: c.muted }]}>{t('descriptionLabel')}</Text>
           <TextInput
             style={[styles.inputField, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg, minHeight: 90, textAlignVertical: 'top' }]}
             value={editPracticeDescription}
             onChangeText={setEditPracticeDescription}
-            placeholder="Stellen Sie Ihre Praxis vor …"
+            placeholder={t('practiceIntroPlaceholder')}
             placeholderTextColor={c.muted}
             multiline
           />
         </View>
 
-        <Text style={[styles.filterSectionTitle, { color: c.muted }]}>Logo</Text>
+        <Text style={[styles.filterSectionTitle, { color: c.muted }]}>{t('logoLabel')}</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
           {editPracticeLogo ? (
             <Image source={{ uri: editPracticeLogo }} style={{ width: 64, height: 64, borderRadius: RADIUS.sm }} />
@@ -633,16 +633,16 @@ export function PracticeAdminScreen(props) {
             </View>
           )}
           <Pressable onPress={handlePickPracticeLogo} style={[styles.kassenartBtn, { backgroundColor: c.mutedBg, borderColor: c.border }]}>
-            <Text style={[styles.kassenartText, { color: c.text }]}>📷 Logo ändern</Text>
+            <Text style={[styles.kassenartText, { color: c.text }]}>{t('changeLogoBtn')}</Text>
           </Pressable>
           {editPracticeLogo && (
             <Pressable onPress={() => setEditPracticeLogo(null)} style={[styles.kassenartBtn, { backgroundColor: 'transparent', borderColor: c.error }]}>
-              <Text style={[styles.kassenartText, { color: c.error }]}>Entfernen</Text>
+              <Text style={[styles.kassenartText, { color: c.error }]}>{t('removeBtn')}</Text>
             </Pressable>
           )}
         </View>
 
-        <Text style={[styles.filterSectionTitle, { color: c.muted, marginTop: 4 }]}>Praxisfotos</Text>
+        <Text style={[styles.filterSectionTitle, { color: c.muted, marginTop: 4 }]}>{t('practicePhotosLabel')}</Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           {editPracticePhotos.map((photo, index) => (
             <View key={index} style={{ position: 'relative' }}>
@@ -663,7 +663,7 @@ export function PracticeAdminScreen(props) {
 
         <Pressable onPress={handleSavePractice} style={[styles.kassenartBtn, { backgroundColor: c.primary, borderColor: c.primary, marginTop: 4 }]}>
           <Text style={[styles.kassenartText, { color: '#fff' }]}>
-            {practiceEditSaving ? 'Wird gespeichert…' : 'Speichern'}
+            {practiceEditSaving ? t('savingBtn') : t('saveBtn')}
           </Text>
         </Pressable>
       </View>
@@ -673,17 +673,17 @@ export function PracticeAdminScreen(props) {
         onPress={() => { setInvitePageTab('new'); if (!inviteToken) handleLoadInviteToken(); setShowInvitePage(true); }}
         style={[styles.kassenartBtn, { backgroundColor: 'transparent', borderColor: c.border, alignSelf: 'flex-start', marginBottom: 8 }]}
       >
-        <Text style={[styles.kassenartText, { color: c.muted }]}>+ Therapeut einladen</Text>
+        <Text style={[styles.kassenartText, { color: c.muted }]}>{t('inviteTherapistBtn')}</Text>
       </Pressable>
 
       <Pressable onPress={handleDeletePractice} style={{ marginTop: 8, marginBottom: 8, alignItems: 'center', paddingVertical: 14 }}>
-        <Text style={{ color: c.muted, fontSize: 14 }}>Praxis löschen</Text>
+        <Text style={{ color: c.muted, fontSize: 14 }}>{t('deletePracticeBtn')}</Text>
       </Pressable>
     </ScrollView>
   );
 }
 
-function LangMultiselect({ editLanguages, setEditLanguages, c, styles }) {
+function LangMultiselect({ editLanguages, setEditLanguages, c, styles, t }) {
   const [search, setSearch] = useState('');
   const q = search.trim().toLowerCase();
   const suggestions = languageOptions.filter((code) => {
@@ -711,7 +711,7 @@ function LangMultiselect({ editLanguages, setEditLanguages, c, styles }) {
       <TextInput
         value={search}
         onChangeText={setSearch}
-        placeholder="Sprache suchen…"
+        placeholder={t('searchLanguagePlaceholder')}
         placeholderTextColor={c.muted}
         style={[styles.inputField, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg }]}
       />
