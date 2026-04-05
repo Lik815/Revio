@@ -7,13 +7,9 @@ const visibilityReasonLabel: Record<string, string> = {
   profile_incomplete: 'Profil unvollständig',
   manually_hidden: 'Manuell versteckt',
   publication_missing: 'Freigabe fehlt',
-  no_confirmed_link: 'Keine bestätigte Praxis',
-  pending_link_only: 'Praxis-Verknüpfung offen',
-  practice_not_approved: 'Praxis nicht freigegeben',
   no_home_visit: 'Hausbesuch fehlt',
   no_service_radius: 'Einzugsgebiet fehlt',
   no_kassenart: 'Kassenart fehlt',
-  no_confirmed_practice_link: 'Keine bestätigte Praxis',
 };
 
 function formatVisibilityReason(reason: string) {
@@ -30,14 +26,15 @@ export default async function HomePage() {
 
   const cards = [
     { kicker: 'Therapeut:innen', label: 'Offene Reviews', value: stats.therapists.pending_review, href: '/therapists?status=PENDING_REVIEW' },
-    { kicker: 'Praxen', label: 'Offene Freigaben', value: stats.practices.pending_review, href: '/practices?status=PENDING_REVIEW' },
     { kicker: 'Sichtbarkeit', label: 'Profile mit Blockern', value: visibilityIssues.count, href: '/therapists?status=APPROVED' },
+    { kicker: 'Review', label: 'Änderungen oder Ablehnung', value: stats.therapists.changes_requested + stats.therapists.rejected, href: '/therapists' },
   ];
 
   return (
     <PageShell
       title="Übersicht"
       eyebrow="Dashboard"
+      description="Die wichtigsten offenen Entscheidungen auf einen Blick."
       actions={<div className="hero-pill">{totalTherapists} Profile</div>}
     >
       <div className="review-summary-grid">
@@ -53,11 +50,11 @@ export default async function HomePage() {
       </div>
 
       {visibilityIssues.count > 0 && (
-        <article className="panel">
+        <article className="panel panel--compact">
           <div className="panel-header">
             <div>
               <div className="kicker">Öffentliche Sichtbarkeit</div>
-              <h3>Profile mit aktuellen Blockern</h3>
+              <h3>Aktuelle Blocker</h3>
             </div>
             <div className="hero-pill">{visibilityIssues.count}</div>
           </div>
@@ -75,7 +72,7 @@ export default async function HomePage() {
             ))}
             {visibilityIssues.count > 5 && (
               <div className="table-note" style={{ padding: '8px 2px 0' }}>
-                + {visibilityIssues.count - 5} weitere — alle unter <Link href="/therapists?status=APPROVED">Therapeut:innen → Freigegeben</Link> prüfen
+                + {visibilityIssues.count - 5} weitere unter <Link href="/therapists?status=APPROVED">Therapeut:innen → Freigegeben</Link>
               </div>
             )}
           </div>

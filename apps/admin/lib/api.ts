@@ -1,8 +1,6 @@
 import type {
   AdminStats,
   TherapistWithLinks,
-  PracticeWithLinks,
-  LinkWithEntities,
 } from '@revio/shared';
 import { cookies } from 'next/headers';
 import { getApiBaseCandidates } from './api-base';
@@ -88,20 +86,6 @@ export type VisibilityIssues = {
   issues: VisibilityIssue[];
 };
 
-export type PracticeManager = {
-  id: string;
-  email: string;
-  createdAt: string;
-  practiceId: string;
-  therapistId: string | null;
-  practice: { id: string; name: string; city: string; reviewStatus: string } | null;
-  therapist: { id: string; fullName: string; email: string; reviewStatus: string } | null;
-};
-
-export type ManagersResponse = {
-  managers: PracticeManager[];
-};
-
 export type TherapistDocument = {
   id: string;
   filename: string;
@@ -126,10 +110,7 @@ export const api = {
   getStats: () => adminFetch<AdminStats>('/admin/stats'),
   getTherapists: () => adminFetch<TherapistWithLinks[]>('/admin/therapists'),
   getTherapist: (id: string) => adminFetch<TherapistWithLinks>(`/admin/therapists/${id}`),
-  getPractices: () => adminFetch<PracticeWithLinks[]>('/admin/practices'),
-  getLinks: () => adminFetch<LinkWithEntities[]>('/admin/links'),
   getVisibilityIssues: () => adminFetch<VisibilityIssues>('/admin/visibility-issues'),
-  getManagers: () => adminFetch<ManagersResponse>('/admin/managers'),
   getSiteSettings: () => adminFetch<SiteSettings>('/admin/site-settings'),
   getTherapistDocuments: (id: string) => adminFetch<TherapistDocument[]>(`/admin/therapists/${id}/documents`),
   getCertificationOptions: () => adminFetch<{ certifications: CertificationOption[] }>('/admin/certifications'),

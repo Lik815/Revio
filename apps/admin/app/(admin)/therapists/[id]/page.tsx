@@ -22,15 +22,11 @@ const statusLabel: Record<string, string> = {
 
 const blockingReasonLabel: Record<string, string> = {
   profile_incomplete: 'Profil unvollständig',
-  manually_hidden: 'Manuell versteckt (isVisible = false)',
-  publication_missing: 'Explizite Freigabe fehlt (isPublished = false)',
-  no_confirmed_link: 'Keine bestätigte Praxis-Verknüpfung',
-  pending_link_only: 'Nur ausstehende/strittige Praxis-Links',
-  practice_not_approved: 'Alle verknüpften Praxen nicht freigegeben',
-  no_home_visit: 'Kein Hausbesuch aktiviert (Mobile-Pfad erfordert homeVisit = true)',
-  no_service_radius: 'Kein Einzugsgebiet angegeben (serviceRadiusKm fehlt)',
+  manually_hidden: 'Manuell versteckt',
+  publication_missing: 'Explizite Freigabe fehlt',
+  no_home_visit: 'Kein Hausbesuch aktiviert',
+  no_service_radius: 'Kein Einzugsgebiet angegeben',
   no_kassenart: 'Keine Kassenart angegeben',
-  no_confirmed_practice_link: 'Keine bestätigte Praxis-Verknüpfung (Praxis-Pfad)',
 };
 
 function mimeIcon(mimetype: string) {
@@ -222,35 +218,6 @@ export default async function TherapistDetailPage({ params }: Props) {
           <div className="card" style={{ padding: '20px 24px' }}>
             <div className="kicker" style={{ marginBottom: 8 }}>Bio</div>
             <p style={{ margin: 0, lineHeight: 1.6 }}>{therapist.bio}</p>
-          </div>
-        </section>
-      )}
-
-      {/* Linked practices */}
-      {therapist.links && therapist.links.length > 0 && (
-        <section style={{ marginBottom: 32 }}>
-          <div className="card" style={{ padding: '20px 24px' }}>
-            <div className="kicker" style={{ marginBottom: 12 }}>Verknüpfte Praxen</div>
-            <table className="table" style={{ margin: 0 }}>
-              <thead>
-                <tr>
-                  <th>Praxis</th>
-                  <th>Stadt</th>
-                  <th>Link-Status</th>
-                  <th>Praxis-Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {therapist.links.map((l) => (
-                  <tr key={l.id}>
-                    <td><Link href={`/practices/${l.practice.id}`}>{l.practice.name}</Link></td>
-                    <td>{l.practice.city}</td>
-                    <td><span className={`badge badge--${l.status}`}>{l.status}</span></td>
-                    <td><span className={`badge badge--${l.practice.reviewStatus}`}>{statusLabel[l.practice.reviewStatus] ?? l.practice.reviewStatus}</span></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
           </div>
         </section>
       )}

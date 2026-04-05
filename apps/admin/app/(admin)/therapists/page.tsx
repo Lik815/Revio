@@ -32,13 +32,13 @@ function getVisibilityMeta(t: {
   visibility: { visibilityState: string; blockingReasons: string[] };
 }) {
   if (t.reviewStatus !== 'APPROVED') {
-    return 'Wird nach Freigabe öffentlich sichtbar.';
+    return 'Wird nach Freigabe sichtbar.';
   }
   if (!t.isVisible) {
-    return 'Manuell versteckt.';
+    return 'Manuell ausgeblendet.';
   }
   if (t.visibility.visibilityState === 'visible') {
-    return 'In der öffentlichen Suche sichtbar.';
+    return 'Sichtbar in der Suche.';
   }
   const reasons = t.visibility.blockingReasons.map(humanizeReason);
   return summarizeReasons(reasons) ?? 'Noch nicht sichtbar.';
@@ -57,13 +57,9 @@ const blockingReasonLabel: Record<string, string> = {
   profile_incomplete: 'Profil unvollständig',
   manually_hidden: 'Manuell versteckt',
   publication_missing: 'Freigabe fehlt',
-  no_confirmed_link: 'Keine Praxis',
-  pending_link_only: 'Praxis ausstehend',
-  practice_not_approved: 'Praxis nicht freigegeben',
   no_home_visit: 'Kein Hausbesuch',
   no_service_radius: 'Kein Einzugsgebiet',
   no_kassenart: 'Keine Kassenart',
-  no_confirmed_practice_link: 'Keine Praxis bestätigt',
 };
 
 const statusPriority: Record<string, number> = {
@@ -134,8 +130,8 @@ export default async function TherapistsPage({ searchParams }: { searchParams: S
 
   return (
     <PageShell
-      title="Therapeut:innen-Warteschlange"
-      description="Klare Review-Liste für Profile, Sichtbarkeit und Kontaktqualität."
+      title="Therapeut:innen"
+      description="Review, Öffentlichkeit und die nächste sinnvolle Entscheidung."
       eyebrow="Reviews"
       actions={<div className="hero-pill">{filtered.length} Ergebnisse</div>}
     >
@@ -143,22 +139,22 @@ export default async function TherapistsPage({ searchParams }: { searchParams: S
         <article className="review-summary-card">
           <div className="kicker">Offen</div>
           <strong>{pendingCount}</strong>
-          <span>Profile warten aktuell auf Review</span>
+          <span>Warten auf Review</span>
         </article>
         <article className="review-summary-card review-summary-card--warning">
           <div className="kicker">Überfällig</div>
           <strong>{overdueCount}</strong>
-          <span>Seit mehr als 48 Stunden offen</span>
+          <span>Länger als 48 Stunden offen</span>
         </article>
         <article className="review-summary-card">
           <div className="kicker">Mit Lücken</div>
           <strong>{incompleteCount}</strong>
-          <span>Profile brauchen Rückfragen oder Änderungen</span>
+          <span>Brauchen Rückfragen</span>
         </article>
       </div>
 
       <form className="toolbar" action="/therapists">
-        <input name="q" defaultValue={params.q ?? ''} className="toolbar-input" placeholder="Nach Name, Stadt oder Spezialisierung suchen" />
+        <input name="q" defaultValue={params.q ?? ''} className="toolbar-input" placeholder="Name, Stadt oder Spezialisierung" />
         <input name="city" defaultValue={params.city ?? ''} className="toolbar-input toolbar-input--sm" placeholder="Stadt" />
         <select name="status" defaultValue={statusFilter} className="toolbar-select">
           <option value="ALL">Alle Status</option>
@@ -179,12 +175,12 @@ export default async function TherapistsPage({ searchParams }: { searchParams: S
         </div>
       ) : (
       <>
-      <p className="table-note">Die Liste zeigt nur die wichtigsten Prüfentscheidungen direkt. Fachdetails liegen auf der Detailseite.</p>
+      <p className="table-note">Die Liste zeigt nur die Kernsignale. Fachdetails liegen auf der Detailseite.</p>
       <table className="table table--elevated focus-table">
         <thead>
           <tr>
             <th>Name</th>
-            <th>Überblick</th>
+            <th>Profil</th>
             <th>Review</th>
             <th>Öffentlich</th>
             <th>Aktionen</th>
@@ -196,10 +192,10 @@ export default async function TherapistsPage({ searchParams }: { searchParams: S
               const priority = getReviewPriority(t);
               const publicVisibilityBadge =
                 t.reviewStatus === 'APPROVED' && t.isVisible
-                  ? { label: 'Öffentlich sichtbar', className: 'badge badge--APPROVED' }
+                  ? { label: 'Öffentlich', className: 'badge badge--APPROVED' }
                   : t.reviewStatus === 'APPROVED' && !t.isVisible
-                    ? { label: 'Freigegeben, aber versteckt', className: 'badge badge--PENDING_REVIEW' }
-                    : { label: 'Nicht öffentlich', className: 'badge badge--DRAFT' };
+                    ? { label: 'Versteckt', className: 'badge badge--PENDING_REVIEW' }
+                    : { label: 'Noch nicht', className: 'badge badge--DRAFT' };
               const isApprovedButNotVisible = t.reviewStatus === 'APPROVED' && t.visibility.visibilityState !== 'visible';
               const blockerReasons = (
                 t.visibility.blockingReasons.length > 0
@@ -220,10 +216,10 @@ export default async function TherapistsPage({ searchParams }: { searchParams: S
                   </div>
                 </td>
                 <td data-label="Überblick">
-                  <div className="priority-stack">
-                    <strong style={{ fontSize: 14 }}>{t.city}</strong>
-                    <span className="entity-meta">{t.professionalTitle}</span>
-                    <div className="tag-list">
+                    <div className="priority-stack">
+                      <strong style={{ fontSize: 14 }}>{t.city}</strong>
+                      <span className="entity-meta">{t.professionalTitle}</span>
+                      <div className="tag-list">
                       {t.specializations.slice(0, 2).map((spec) => <span key={spec} className="tag">{spec}</span>)}
                       {t.specializations.length > 2 && <span className="tag">+{t.specializations.length - 2}</span>}
                     </div>

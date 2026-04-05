@@ -9,11 +9,11 @@ export default async function SettingsPage() {
   return (
     <PageShell
       title="Einstellungen"
-      description="Globale Optionen für Website und App."
+      description="Ruhige Steuerung für die öffentliche Website und zentrale App-Optionen."
       eyebrow="Konfiguration"
       actions={<div className="hero-pill">{websiteStateLabel}</div>}
     >
-      <article className="panel">
+      <article className="panel panel--compact">
         <div className="panel-header">
           <div>
             <div className="kicker">Website</div>
@@ -30,8 +30,8 @@ export default async function SettingsPage() {
 
         <div className="settings-feature-grid">
           <div className="settings-feature-card">
-            <div className="settings-feature-card__label">Website</div>
-            <h4>Präsentationsseite</h4>
+            <div className="settings-feature-card__label">Web settings</div>
+            <h4>Under Construction steuern</h4>
             <p>
               Mit diesem Schalter kannst du die öffentliche Website vorübergehend auf einen ruhigen „Under Construction"-Zustand setzen, ohne sie offline zu nehmen.
             </p>

@@ -9,7 +9,7 @@ export default function LoginPage() {
         </div>
         <h1 className="login-title">Willkommen zurück</h1>
         <p className="login-copy">
-          Melde dich an, um Therapeut:innen, Praxen und Verknüpfungen in einer zentralen Moderationsoberfläche zu verwalten.
+          Melde dich an, um freiberufliche Therapeut:innen in einer ruhigen Moderationsoberfläche zu prüfen und freizugeben.
         </p>
 
         <LoginForm />
