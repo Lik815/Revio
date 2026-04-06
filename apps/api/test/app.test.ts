@@ -650,9 +650,8 @@ describe('POST /register/therapist', () => {
     expect(body.therapistId).toBeTruthy();
 
     const therapist = await prisma.therapist.findUnique({ where: { id: body.therapistId } });
-    // In dev/test mode register auto-approves; in production it stays PENDING_REVIEW
-    const expectedStatus = process.env.NODE_ENV !== 'production' ? 'APPROVED' : 'PENDING_REVIEW';
-    expect(therapist?.reviewStatus).toBe(expectedStatus);
+    // Always PENDING_REVIEW — admin must approve
+    expect(therapist?.reviewStatus).toBe('PENDING_REVIEW');
     expect(therapist?.email).toBe(validPayload.email);
   });
 
@@ -676,9 +675,8 @@ describe('POST /register/therapist', () => {
     const link = await prisma.therapistPracticeLink.findFirst({
       where: { therapistId: body.therapistId },
     });
-    // In dev/test mode auto-approve confirms the link immediately
-    const expectedLinkStatus = process.env.NODE_ENV !== 'production' ? 'CONFIRMED' : 'PROPOSED';
-    expect(link?.status).toBe(expectedLinkStatus);
+    // Always PROPOSED — admin must confirm the link
+    expect(link?.status).toBe('PROPOSED');
   });
 });
 
@@ -958,40 +956,34 @@ describe('End-to-End: Register → Admin Approve → Visible in Search', () => {
     expect(regRes.statusCode).toBe(201);
     const { therapistId } = regRes.json();
 
-    const isDev = process.env.NODE_ENV !== 'production';
+    // 2. Vor Freigabe: nicht in Suche sichtbar
+    const searchBefore = await app.inject({
+      method: 'POST',
+      url: '/search',
+      payload: { query: 'back pain', city: 'Köln' },
+    });
+    expect(searchBefore.json().therapists).toHaveLength(0);
 
-    if (!isDev) {
-      // 2. Vor Freigabe: nicht in Suche sichtbar (nur in Production)
-      const searchBefore = await app.inject({
-        method: 'POST',
-        url: '/search',
-        payload: { query: 'back pain', city: 'Köln' },
-      });
-      expect(searchBefore.json().therapists).toHaveLength(0);
+    // 3. Admin: Therapeut-Status abrufen
+    const adminList = await app.inject({ method: 'GET', url: '/admin/therapists', headers: AUTH });
+    const pending = adminList.json().find((t: { id: string }) => t.id === therapistId);
+    expect(pending.reviewStatus).toBe('PENDING_REVIEW');
 
-      // 3. Admin: Therapeut-Status abrufen
-      const adminList = await app.inject({ method: 'GET', url: '/admin/therapists', headers: AUTH });
-      const pending = adminList.json().find((t: { id: string }) => t.id === therapistId);
-      expect(pending.reviewStatus).toBe('PENDING_REVIEW');
+    // 4. Admin: Therapeut freigeben
+    const approveRes = await app.inject({
+      method: 'POST',
+      url: `/admin/therapists/${therapistId}/approve`,
+      headers: AUTH,
+    });
+    expect(approveRes.statusCode).toBe(200);
 
-      // 4. Admin: Therapeut freigeben
-      const approveRes = await app.inject({
-        method: 'POST',
-        url: `/admin/therapists/${therapistId}/approve`,
-        headers: AUTH,
-      });
-      expect(approveRes.statusCode).toBe(200);
+    // 5. Admin: Praxis freigeben + Link bestätigen
+    const links = await app.inject({ method: 'GET', url: '/admin/links', headers: AUTH });
+    const link = links.json().find((l: { therapistId: string }) => l.therapistId === therapistId);
+    const practiceId = link.practiceId;
+    await app.inject({ method: 'POST', url: `/admin/practices/${practiceId}/approve`, headers: AUTH });
+    await app.inject({ method: 'POST', url: `/admin/links/${link.id}/confirm`, headers: AUTH });
 
-      // 5. Admin: Praxis freigeben + Link bestätigen
-      const links = await app.inject({ method: 'GET', url: '/admin/links', headers: AUTH });
-      const link = links.json().find((l: { therapistId: string }) => l.therapistId === therapistId);
-      const practiceId = link.practiceId;
-      await app.inject({ method: 'POST', url: `/admin/practices/${practiceId}/approve`, headers: AUTH });
-      await app.inject({ method: 'POST', url: `/admin/links/${link.id}/confirm`, headers: AUTH });
-    }
-
-    // In dev mode the therapist is auto-approved and visible immediately.
-    // In production the above admin steps are required first.
     const searchAfter = await app.inject({
       method: 'POST',
       url: '/search',
@@ -1005,9 +997,10 @@ describe('End-to-End: Register → Admin Approve → Visible in Search', () => {
   });
 });
 
-// ─── Invite Flow ──────────────────────────────────────────────────────────────
+// ─── Invite Flow, Manager Auth, Manager Visibility ────────────────────────────
+// These features have been removed (freelancer-only MVP). Tests kept as skipped.
 
-describe('Invite Flow: practice manager creates therapist profile', () => {
+describe.skip('Invite Flow: practice manager creates therapist profile', () => {
   let practiceId: string;
   let practiceAdminToken: string; // adminSessionToken for practice-auth routes
 
@@ -1304,7 +1297,7 @@ describe('Invite Flow: practice manager creates therapist profile', () => {
 
 // ─── Manager Auth ─────────────────────────────────────────────────────────────
 
-describe('POST /manager/register', () => {
+describe.skip('POST /manager/register', () => {
   it('creates manager-only account (isTherapist=false)', async () => {
     const res = await app.inject({
       method: 'POST',
@@ -1393,7 +1386,7 @@ describe('POST /manager/register', () => {
   });
 });
 
-describe('POST /manager/login + GET /manager/me', () => {
+describe.skip('POST /manager/login + GET /manager/me', () => {
   it('logs in and returns practice data', async () => {
     // Register first
     const regRes = await app.inject({
@@ -1447,7 +1440,7 @@ describe('POST /manager/login + GET /manager/me', () => {
   });
 });
 
-describe('Manager visibility in search', () => {
+describe.skip('Manager visibility in search', () => {
   it('manager-only account does not appear in therapist search', async () => {
     await app.inject({
       method: 'POST',

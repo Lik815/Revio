@@ -12,7 +12,6 @@ import {
 } from 'react-native';
 import {
   formatDist,
-  getPracticeInitials,
   getSearchMatchLabel,
   kassenartOptions,
   quickChips,
@@ -58,10 +57,9 @@ export function DiscoverScreen(props) {
     homeVisit,
     isFavorite,
     locationLabel,
-    mapPractices,
+    mapTherapists,
     mapScrollEnabled,
     notifications,
-    openPractice,
     openTherapistById,
     query,
     results,
@@ -362,15 +360,7 @@ export function DiscoverScreen(props) {
                 <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: c.primary, borderWidth: 3, borderColor: '#fff', shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 3, shadowOffset: { width: 0, height: 1 }, elevation: 5 }} />
               </Marker>
             )}
-            {mapPractices.map((practice) => (
-              <Marker key={practice.id} coordinate={{ latitude: practice.lat, longitude: practice.lng }} onPress={() => openPractice(practice)} tracksViewChanges={false}>
-                <View style={{ backgroundColor: c.primary, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5, flexDirection: 'row', alignItems: 'center', gap: 5, shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 4 }}>
-                  <Text style={{ color: '#fff', fontSize: 11, fontWeight: '800' }}>{getPracticeInitials(practice.name)}</Text>
-                  <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700', maxWidth: 100 }} numberOfLines={1}>{practice.name}</Text>
-                </View>
-              </Marker>
-            ))}
-            {results.filter(th => th.homeVisit && th.homeLat && th.homeLng && th.serviceRadiusKm).map((th) => (
+            {mapTherapists.map((th) => (
               <React.Fragment key={`radius-${th.id}`}>
                 <Circle
                   center={{ latitude: th.homeLat, longitude: th.homeLng }}
@@ -407,7 +397,7 @@ export function DiscoverScreen(props) {
             </View>
           )}
 
-          {!searchLoading && mapPractices.length === 0 && searched && (
+          {!searchLoading && mapTherapists.length === 0 && searched && (
             <View style={{ position: 'absolute', top: 20, left: 20, right: 20, padding: 20, borderRadius: 18, backgroundColor: 'rgba(17,24,39,0.82)', alignItems: 'center', justifyContent: 'center' }}>
               <Ionicons name="location-outline" size={36} color="#fff" />
               {userCoords ? (
@@ -514,17 +504,15 @@ export function DiscoverScreen(props) {
             </View>
           </View>
 
-          {showAutocomplete && acSuggestions.length > 0 && (
+          {showAutocomplete && acSuggestions.filter((group) => group.type !== 'PRACTICE_NAME').length > 0 && (
             <View style={[styles.autocompleteBox, { backgroundColor: c.card, borderColor: c.primary }]}>
-              {acSuggestions.map((group) => {
+              {acSuggestions.filter((group) => group.type !== 'PRACTICE_NAME').map((group) => {
                 const typeLabel = group.type === 'SPECIALTY' ? 'Spezialisierung'
                   : group.type === 'THERAPIST_NAME' ? 'Therapeut'
-                  : group.type === 'PRACTICE_NAME' ? 'Praxis'
                   : group.type === 'CITY' ? 'Ort'
                   : group.type;
                 const typeIcon = group.type === 'SPECIALTY' ? 'medical-outline'
                   : group.type === 'THERAPIST_NAME' ? 'person-outline'
-                  : group.type === 'PRACTICE_NAME' ? 'business-outline'
                   : group.type === 'CITY' ? 'location-outline'
                   : 'search-outline';
                 return (
@@ -629,11 +617,6 @@ export function DiscoverScreen(props) {
                   <View style={[styles.metaPill, { backgroundColor: c.mutedBg }]}>
                     <Text style={[styles.metaPillText, { color: c.text }]}>{getSearchMatchLabel(therapist, query)}</Text>
                   </View>
-                  {therapist.practices?.length > 1 && (
-                    <View style={[styles.metaPill, { backgroundColor: c.successBg }]}>
-                      <Text style={[styles.metaPillText, { color: c.success }]}>{`${therapist.practices.length} Praxen`}</Text>
-                    </View>
-                  )}
                 </View>
               </View>
               <Text style={[styles.practiceArrow, { color: c.muted }]}>›</Text>
@@ -674,28 +657,7 @@ export function DiscoverScreen(props) {
             </View>
           )}
 
-          {therapist.practices?.length > 0 ? (
-            <Pressable onPress={() => openPractice(therapist.practices[0])} style={[styles.practiceBtn, { borderColor: c.border, backgroundColor: c.mutedBg }]}>
-              <View style={[styles.practiceInitial, { backgroundColor: c.primary }]}>
-                <Text style={[styles.practiceInitialText, { color: '#FFFFFF' }]}>
-                  {getPracticeInitials(therapist.practices[0].name)}
-                </Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.practiceName, { color: c.text }]}>{therapist.practices[0].name}</Text>
-                <Text style={[styles.practiceCity, { color: c.muted }]}>{therapist.practices[0].city}</Text>
-                {!!therapist.practices[0].address && (
-                  <Text style={[styles.practiceCity, { color: c.muted }]} numberOfLines={1}>{therapist.practices[0].address}</Text>
-                )}
-              </View>
-              {therapist.distKm != null && (
-                <View style={[styles.distBadge, { backgroundColor: c.successBg }]}>
-                  <Text style={[styles.distBadgeText, { color: c.success }]}>{formatDist(therapist.distKm)}</Text>
-                </View>
-              )}
-              <Text style={[styles.practiceArrow, { color: c.muted }]}>›</Text>
-            </Pressable>
-          ) : therapist.homeVisit && therapist.city ? (
+          {therapist.homeVisit && therapist.city ? (
             <View style={[styles.practiceBtn, { borderColor: c.border, backgroundColor: c.mutedBg }]}>
               <View style={[styles.practiceInitial, { backgroundColor: c.successBg }]}>
                 <Ionicons name="home-outline" size={16} color={c.success} />
@@ -712,15 +674,30 @@ export function DiscoverScreen(props) {
                 </View>
               )}
             </View>
+          ) : therapist.city ? (
+            <View style={[styles.practiceBtn, { borderColor: c.border, backgroundColor: c.mutedBg }]}>
+              <View style={[styles.practiceInitial, { backgroundColor: c.border }]}>
+                <Ionicons name="location-outline" size={16} color={mutedText} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.practiceName, { color: c.text }]}>{therapist.city}</Text>
+                {therapist.availability ? (
+                  <Text style={[styles.practiceCity, { color: c.muted }]} numberOfLines={1}>{therapist.availability}</Text>
+                ) : null}
+              </View>
+              {therapist.distKm != null ? (
+                <View style={[styles.distBadge, { backgroundColor: c.successBg }]}>
+                  <Text style={[styles.distBadgeText, { color: c.success }]}>{formatDist(therapist.distKm)}</Text>
+                </View>
+              ) : null}
+            </View>
           ) : null}
 
           <Pressable
             style={[styles.ctaBtn, { backgroundColor: c.primary, marginTop: 2 }]}
-            onPress={() => therapist.practices?.[0]?.phone ? callPhone(therapist.practices[0].phone) : openTherapistById(therapist.id)}
+            onPress={() => openTherapistById(therapist.id)}
           >
-            <Text style={styles.ctaBtnText}>
-              {therapist.practices?.[0]?.phone ? t('callBtn') : t('viewProfileBtn')}
-            </Text>
+            <Text style={styles.ctaBtnText}>{t('viewProfileBtn')}</Text>
           </Pressable>
         </View>
       ))}

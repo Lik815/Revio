@@ -15,7 +15,6 @@ import {
   formatDist,
   getLangLabel,
   getPracticeInitials,
-  getPrimaryPractice,
   RADIUS,
   resolveMediaUrl,
   TYPE,
@@ -186,7 +185,6 @@ export function TherapistProfileScreen(props) {
     c,
     callPhone,
     isFavorite,
-    openPractice,
     setSelectedTherapist,
     styles,
     t,
@@ -194,7 +192,6 @@ export function TherapistProfileScreen(props) {
     toggleFavorite,
   } = props;
 
-  const primaryPractice = getPrimaryPractice(th);
   const iconHitSlop = { top: 10, bottom: 10, left: 10, right: 10 };
   const openEmailComposer = () => {
     if (!th.email) return;
@@ -258,19 +255,14 @@ export function TherapistProfileScreen(props) {
           </View>
         )}
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8, marginTop: 8 }}>
-          {(primaryPractice?.city || th.city) ? (
+          {th.city ? (
             <View style={[styles.metaPill, { backgroundColor: c.mutedBg }]}>
-              <Text style={[styles.metaPillText, { color: c.text }]}>{primaryPractice?.city || th.city}</Text>
+              <Text style={[styles.metaPillText, { color: c.text }]}>{th.city}</Text>
             </View>
           ) : null}
           {th.distKm != null ? (
             <View style={[styles.metaPill, { backgroundColor: c.successBg }]}>
               <Text style={[styles.metaPillText, { color: c.success }]}>{t('distanceAway').replace('{dist}', formatDist(th.distKm))}</Text>
-            </View>
-          ) : null}
-          {th.practices?.length > 1 ? (
-            <View style={[styles.metaPill, { backgroundColor: c.mutedBg }]}>
-              <Text style={[styles.metaPillText, { color: c.text }]}>{t('nPractices').replace('{n}', th.practices.length)}</Text>
             </View>
           ) : null}
         </View>
@@ -388,26 +380,7 @@ export function TherapistProfileScreen(props) {
         </View>
       )}
 
-      {primaryPractice ? (
-        <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
-          <Text style={[styles.filterSectionTitle, { color: c.muted }]}>{t('quickContact')}</Text>
-          <Text style={{ color: c.text, fontSize: 16, fontWeight: '700' }}>{primaryPractice.name}</Text>
-          <Text style={{ color: c.muted, fontSize: 13, marginTop: 4 }}>
-            {primaryPractice.address || primaryPractice.city}
-          </Text>
-          <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
-            <Pressable style={[styles.ctaBtn, { backgroundColor: c.accent, flex: 1 }]} onPress={() => callPhone(primaryPractice.phone)}>
-              <Text style={styles.ctaBtnText}>{t('callPractice')}</Text>
-            </Pressable>
-            <Pressable
-              style={[styles.ctaBtnSecondary, { borderColor: c.border, backgroundColor: c.mutedBg, flex: 1 }]}
-              onPress={() => { setSelectedTherapist(null); openPractice(primaryPractice); }}
-            >
-              <Text style={[styles.ctaBtnSecondaryText, { color: c.text }]}>{t('viewPracticeAction')}</Text>
-            </Pressable>
-          </View>
-        </View>
-      ) : th.email ? (
+      {th.email ? (
         <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
           <Text style={[styles.filterSectionTitle, { color: c.muted }]}>{t('contactTitle')}</Text>
           <Text style={{ color: c.muted, fontSize: 13, marginTop: 4 }}>
@@ -420,29 +393,6 @@ export function TherapistProfileScreen(props) {
           </View>
         </View>
       ) : null}
-
-      {th.practices?.length > 0 && (
-        <>
-          <Text style={[styles.sectionLabel, { color: c.text }]}>{t('practicesLabel')}</Text>
-          {th.practices.map((practice) => (
-            <Pressable
-              key={practice.id}
-              onPress={() => { setSelectedTherapist(null); openPractice(practice); }}
-              style={[styles.practiceBtn, { borderColor: c.border, backgroundColor: c.mutedBg }]}
-            >
-              <View style={[styles.practiceInitial, { backgroundColor: c.border }]}>
-                <Text style={[styles.practiceInitialText, { color: c.muted }]}>{getPracticeInitials(practice.name)}</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.practiceName, { color: c.text }]}>{practice.name}</Text>
-                <Text style={[styles.practiceCity, { color: c.muted }]}>{practice.city}</Text>
-                {!!practice.address && <Text style={[styles.practiceCity, { color: c.muted }]} numberOfLines={1}>{practice.address}</Text>}
-              </View>
-              <Text style={[styles.practiceArrow, { color: c.muted }]}>›</Text>
-            </Pressable>
-          ))}
-        </>
-      )}
     </ScrollView>
   );
 }

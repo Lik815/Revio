@@ -9,7 +9,6 @@ type ContactFormProps = {
 const roleOptions = [
   { value: 'Patient:in', label: 'Patient:in' },
   { value: 'Therapeut:in', label: 'Therapeut:in' },
-  { value: 'Praxis', label: 'Praxis' },
 ];
 
 export function ContactForm({ contactEmail }: ContactFormProps) {

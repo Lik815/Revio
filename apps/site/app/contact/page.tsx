@@ -9,7 +9,7 @@ export default function ContactPage() {
       <Hero
         eyebrow="Kontakt"
         title="Interesse an Revio"
-        body="Ob als Patient:in, Therapeut:in oder Praxis: Wir freuen uns über Interesse und Austausch."
+        body="Ob als Patient:in oder Therapeut:in: Wir freuen uns über Interesse und Austausch."
         primaryHref={`mailto:${siteConfig.contactEmail}`}
         primaryLabel="Direkt per E-Mail"
         secondaryHref="/about"

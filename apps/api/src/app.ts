@@ -12,11 +12,7 @@ import { searchRoutes } from './routes/search.js';
 import { registerRoutes } from './routes/register.js';
 import { adminRoutes } from './routes/admin.js';
 import { authRoutes } from './routes/auth.js';
-import { practiceAuthRoutes } from './routes/practice-auth.js';
-import { practiceRoutes } from './routes/practice.js';
 import { uploadRoutes } from './routes/upload.js';
-import { inviteRoutes } from './routes/invite.js';
-import { managerAuthRoutes } from './routes/manager-auth.js';
 import { configRoutes } from './routes/config.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -41,11 +37,7 @@ export async function buildApp() {
   await app.register(registerRoutes);
   await app.register(adminRoutes, { prefix: '/admin' });
   await app.register(authRoutes);
-  await app.register(practiceAuthRoutes);
-  await app.register(practiceRoutes);
   await app.register(uploadRoutes);
-  await app.register(inviteRoutes);
-  await app.register(managerAuthRoutes);
 
   return app;
 }
