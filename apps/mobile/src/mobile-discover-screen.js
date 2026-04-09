@@ -3,6 +3,8 @@ import { Ionicons } from '@expo/vector-icons';
 import {
   ActivityIndicator,
   Image,
+  KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -166,7 +168,25 @@ export function DiscoverScreen(props) {
     </View>
   );
   const filtersPanel = (
-    <View style={[styles.filterPanel, styles.filterCompactPanel, { backgroundColor: c.card, borderColor: c.border }]}>
+    <Modal
+      visible={showFilters}
+      transparent
+      animationType="slide"
+      onRequestClose={() => setShowFilters(false)}
+    >
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <Pressable style={{ flex: 1 }} onPress={() => setShowFilters(false)} />
+        <ScrollView
+          style={{ backgroundColor: c.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, borderTopWidth: 1, borderColor: c.border }}
+          contentContainerStyle={{ padding: 20, paddingBottom: 40, gap: 16 }}
+          keyboardShouldPersistTaps="handled"
+          bounces={false}
+          showsVerticalScrollIndicator={false}
+        >
+    <View style={[styles.filterPanel, styles.filterCompactPanel, { backgroundColor: c.card, borderColor: 'transparent', shadowOpacity: 0, elevation: 0, marginBottom: 0 }]}>
       <View style={styles.filterCompactHeader}>
         <View style={{ flex: 1 }}>
           <Text style={[styles.filterCompactTitle, { color: c.text }]}>Filter</Text>
@@ -293,6 +313,9 @@ export function DiscoverScreen(props) {
         ) : null}
       </View>
     </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </Modal>
   );
 
   if (viewMode === 'map') {
@@ -377,7 +400,7 @@ export function DiscoverScreen(props) {
             </View>
           </View>
           {showHeaderToggle && <View style={{ alignItems: 'flex-end' }}>{headerToggle}</View>}
-          {showFilters ? filtersPanel : null}
+          {filtersPanel}
           {(searched || safeResults.length > 0) && (
             <Text style={{ ...TYPE.meta, color: mutedText }}>
               {searched ? `${safeResults.length} ${safeResults.length !== 1 ? t('resultsLabelPlural') : t('resultsLabel')}` : t('suggestions')}
@@ -386,7 +409,7 @@ export function DiscoverScreen(props) {
         </View>
 
         {/* Fullscreen map */}
-        <View style={{ flex: 1, position: 'relative' }} onTouchStart={() => { if (showFilters) setShowFilters(false); }}>
+        <View style={{ flex: 1, position: 'relative' }}>
           <MapView
             style={{ flex: 1 }}
             region={getMapRegion()}
@@ -618,7 +641,7 @@ export function DiscoverScreen(props) {
           </View>
         )}
 
-        {showFilters ? filtersPanel : null}
+        {filtersPanel}
       </View>
 
       {/* Scrollbare Ergebnisse */}
@@ -628,7 +651,6 @@ export function DiscoverScreen(props) {
         contentContainerStyle={[styles.scrollContent, { paddingBottom: 20 }]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
-        onTouchStart={() => { if (showFilters) setShowFilters(false); }}
       >
       {(searched || safeResults.length > 0) ? (
         <View style={styles.sectionRow}>
