@@ -451,7 +451,9 @@ export default function App() {
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [loginError, setLoginError] = useState('');
+  const [loginNotice, setLoginNotice] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
+  const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [editBio, setEditBio] = useState('');
   const [editSpecializations, setEditSpecializations] = useState('');
@@ -717,6 +719,7 @@ export default function App() {
 
   const handleLogin = async () => {
     setLoginError('');
+    setLoginNotice('');
     setLoginLoading(true);
     try {
       const res = await fetch(`${getBaseUrl()}/auth/login`, {
@@ -755,6 +758,42 @@ export default function App() {
       setLoginError(t('alertConnectionError') + '. ' + t('alertConnectionErrorBody'));
     } finally {
       setLoginLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    const email = loginEmail.trim();
+    setLoginError('');
+    setLoginNotice('');
+
+    if (!email) {
+      setLoginError(t('forgotPasswordEmailMissing'));
+      return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setLoginError(t('forgotPasswordEmailInvalid'));
+      return;
+    }
+
+    setForgotPasswordLoading(true);
+    try {
+      const res = await fetch(`${getBaseUrl()}/auth/forgot-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...TUNNEL_HEADERS },
+        body: JSON.stringify({ email }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setLoginError(err.message ?? t('alertConnectionError'));
+        return;
+      }
+
+      setLoginNotice(t('forgotPasswordSent'));
+    } catch {
+      setLoginError(t('alertConnectionError') + '. ' + t('alertConnectionErrorBody'));
+    } finally {
+      setForgotPasswordLoading(false);
     }
   };
 
@@ -1614,10 +1653,13 @@ export default function App() {
   const renderLogin = () => (
     <LoginScreen
       c={c}
+      forgotPasswordLoading={forgotPasswordLoading}
       handleLogin={handleLogin}
+      handleForgotPassword={handleForgotPassword}
       loginEmail={loginEmail}
       loginError={loginError}
       loginLoading={loginLoading}
+      loginNotice={loginNotice}
       loginPassword={loginPassword}
       setLoginEmail={setLoginEmail}
       setLoginPassword={setLoginPassword}

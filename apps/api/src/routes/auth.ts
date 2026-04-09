@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { randomBytes } from 'crypto';
 import type { LocationPrecision } from '@revio/shared';
 import { hashPassword, verifyPassword, getToken } from './auth-utils.js';
+import { sendPasswordResetEmail } from '../utils/mailer.js';
 import {
   getProfileStatus,
   getTherapistProfileCompletion,
@@ -27,7 +28,17 @@ const loginSchema = z.object({
   password: z.string().min(1),
 });
 
+const forgotPasswordSchema = z.object({
+  email: z.string().trim().email(),
+});
+
+const resetPasswordSchema = z.object({
+  token: z.string().trim().min(1),
+  password: z.string().min(6),
+});
+
 const locationPrecisionSchema = z.enum(['exact', 'approximate'] satisfies [LocationPrecision, ...LocationPrecision[]]);
+const PASSWORD_RESET_WINDOW_MS = 2 * 60 * 60 * 1000;
 
 const updateMeSchema = z.object({
   fullName: z.string().min(2).optional(),
@@ -70,6 +81,261 @@ const serializeCompliance = (therapist: Record<string, any>) => {
     healthAuthorityStatus: compliance.healthAuthorityStatus ?? null,
     updatedAt: compliance.updatedAt ? compliance.updatedAt.toISOString() : null,
   };
+};
+
+const getForgotPasswordResponse = () => ({
+  success: true,
+  message: 'Wenn ein Konto mit dieser E-Mail-Adresse existiert, haben wir dir einen Link zum Zurücksetzen geschickt.',
+});
+
+const getPublicBaseUrl = (request: Record<string, any>) => {
+  const forwardedProto = typeof request.headers?.['x-forwarded-proto'] === 'string'
+    ? request.headers['x-forwarded-proto'].split(',')[0]?.trim()
+    : '';
+  const forwardedHost = typeof request.headers?.['x-forwarded-host'] === 'string'
+    ? request.headers['x-forwarded-host'].split(',')[0]?.trim()
+    : '';
+  const host = forwardedHost || request.headers?.host || 'api.my-revio.de';
+  const protocol = forwardedProto || (host.includes('localhost') || host.includes('127.0.0.1') ? 'http' : 'https');
+  return `${protocol}://${host}`;
+};
+
+const getPasswordResetName = (account: {
+  user: Record<string, any>;
+  therapist: Record<string, any> | null;
+  manager: Record<string, any> | null;
+}) => account.therapist?.fullName || account.manager?.email || account.user.email;
+
+const renderPasswordResetHtml = (opts: {
+  token?: string;
+  error?: string;
+}) => {
+  if (opts.error) {
+    return `
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width,initial-scale=1">
+          <title>Revio Passwort zurücksetzen</title>
+        </head>
+        <body style="margin:0;background:#f5f7f8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#1c2b33">
+          <div style="max-width:420px;margin:48px auto;padding:0 18px">
+            <div style="background:#fff;border-radius:20px;padding:32px 24px;box-shadow:0 10px 30px rgba(28,43,51,0.08)">
+              <div style="font-size:40px;margin-bottom:12px">🔒</div>
+              <h1 style="font-size:26px;line-height:1.2;margin:0 0 12px">Link nicht mehr gültig</h1>
+              <p style="color:#6b838e;line-height:1.6;margin:0 0 24px">${opts.error}</p>
+              <a href="revo://login" style="display:inline-block;background:#3e6271;color:#fff;padding:14px 20px;border-radius:12px;text-decoration:none;font-weight:600">
+                Revio-App öffnen
+              </a>
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+  }
+
+  const token = JSON.stringify(opts.token ?? '');
+  return `
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width,initial-scale=1">
+        <title>Revio Passwort zurücksetzen</title>
+      </head>
+      <body style="margin:0;background:#f5f7f8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#1c2b33">
+        <div style="max-width:420px;margin:48px auto;padding:0 18px">
+          <div id="card" style="background:#fff;border-radius:20px;padding:32px 24px;box-shadow:0 10px 30px rgba(28,43,51,0.08)">
+            <div style="font-size:40px;margin-bottom:12px">🔐</div>
+            <h1 style="font-size:26px;line-height:1.2;margin:0 0 12px">Neues Passwort festlegen</h1>
+            <p style="color:#6b838e;line-height:1.6;margin:0 0 24px">Lege ein neues Passwort für dein Revio-Konto fest. Danach kannst du dich wieder in der App anmelden.</p>
+            <form id="reset-form" style="display:flex;flex-direction:column;gap:14px">
+              <input id="password" type="password" autocomplete="new-password" minlength="6" required placeholder="Neues Passwort" style="border:1px solid #d4dee3;border-radius:12px;padding:14px 16px;font-size:16px">
+              <input id="confirmPassword" type="password" autocomplete="new-password" minlength="6" required placeholder="Passwort wiederholen" style="border:1px solid #d4dee3;border-radius:12px;padding:14px 16px;font-size:16px">
+              <button id="submitBtn" type="submit" style="border:none;background:#3e6271;color:#fff;padding:14px 18px;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer">
+                Passwort zurücksetzen
+              </button>
+            </form>
+            <p id="status" style="min-height:20px;color:#b94040;font-size:14px;margin:14px 0 0"></p>
+          </div>
+        </div>
+        <script>
+          const token = ${token};
+          const form = document.getElementById('reset-form');
+          const passwordInput = document.getElementById('password');
+          const confirmInput = document.getElementById('confirmPassword');
+          const submitBtn = document.getElementById('submitBtn');
+          const status = document.getElementById('status');
+          const card = document.getElementById('card');
+
+          form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            status.textContent = '';
+
+            if (passwordInput.value.length < 6) {
+              status.textContent = 'Das Passwort muss mindestens 6 Zeichen lang sein.';
+              return;
+            }
+
+            if (passwordInput.value !== confirmInput.value) {
+              status.textContent = 'Die Passwörter stimmen nicht überein.';
+              return;
+            }
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Speichern…';
+
+            try {
+              const response = await fetch('/auth/reset-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token, password: passwordInput.value }),
+              });
+              const data = await response.json().catch(() => ({}));
+
+              if (!response.ok) {
+                status.textContent = data.message || 'Der Link ist ungültig oder abgelaufen.';
+                return;
+              }
+
+              card.innerHTML = \`
+                <div style="font-size:40px;margin-bottom:12px">✅</div>
+                <h1 style="font-size:26px;line-height:1.2;margin:0 0 12px">Passwort aktualisiert</h1>
+                <p style="color:#6b838e;line-height:1.6;margin:0 0 24px">Dein Passwort wurde erfolgreich geändert. Du kannst dich jetzt wieder in der Revio-App anmelden.</p>
+                <a href="revo://login" style="display:inline-block;background:#3e6271;color:#fff;padding:14px 20px;border-radius:12px;text-decoration:none;font-weight:600">
+                  Revio-App öffnen
+                </a>
+              \`;
+            } catch (error) {
+              status.textContent = 'Verbindungsfehler. Bitte versuche es erneut.';
+            } finally {
+              submitBtn.disabled = false;
+              submitBtn.textContent = 'Passwort zurücksetzen';
+            }
+          });
+        </script>
+      </body>
+    </html>
+  `;
+};
+
+const ensurePasswordResetAccount = async (fastify: Record<string, any>, email: string) => {
+  const prisma = fastify.prisma;
+  const user = await prisma.user.findUnique({
+    where: { email },
+    include: { therapistProfile: true, managerProfile: true },
+  });
+
+  if (user) {
+    let therapist = user.role === 'therapist'
+      ? (user.therapistProfile ?? await prisma.therapist.findFirst({ where: { OR: [{ userId: user.id }, { email }] } }))
+      : null;
+    let manager = user.role === 'manager'
+      ? (user.managerProfile ?? await prisma.practiceManager.findFirst({ where: { OR: [{ userId: user.id }, { email }] } }))
+      : null;
+
+    if (therapist && therapist.userId !== user.id) {
+      therapist = await prisma.therapist.update({
+        where: { id: therapist.id },
+        data: { userId: user.id },
+      });
+    }
+    if (manager && manager.userId !== user.id) {
+      manager = await prisma.practiceManager.update({
+        where: { id: manager.id },
+        data: { userId: user.id },
+      });
+    }
+
+    if (!(user.passwordHash || therapist?.passwordHash || manager?.passwordHash)) {
+      return null;
+    }
+
+    return { user, therapist, manager };
+  }
+
+  const legacyTherapist = await prisma.therapist.findUnique({ where: { email } });
+  if (legacyTherapist?.passwordHash) {
+    const ensuredUser = await prisma.user.create({
+      data: {
+        email,
+        passwordHash: legacyTherapist.passwordHash,
+        role: 'therapist',
+      },
+    });
+
+    const therapist = await prisma.therapist.update({
+      where: { id: legacyTherapist.id },
+      data: { userId: ensuredUser.id },
+    });
+
+    return { user: ensuredUser, therapist, manager: null };
+  }
+
+  const legacyManager = await prisma.practiceManager.findUnique({ where: { email } });
+  if (legacyManager?.passwordHash) {
+    const ensuredUser = await prisma.user.create({
+      data: {
+        email,
+        passwordHash: legacyManager.passwordHash,
+        role: 'manager',
+      },
+    });
+
+    const manager = await prisma.practiceManager.update({
+      where: { id: legacyManager.id },
+      data: { userId: ensuredUser.id },
+    });
+
+    return { user: ensuredUser, therapist: null, manager };
+  }
+
+  return null;
+};
+
+const syncPasswordReset = async (
+  fastify: Record<string, any>,
+  user: Record<string, any>,
+  passwordHash: string,
+) => {
+  await fastify.prisma.user.update({
+    where: { id: user.id },
+    data: {
+      passwordHash,
+      passwordResetToken: null,
+      passwordResetExpiresAt: null,
+      sessionToken: null,
+    },
+  });
+
+  if (user.role === 'therapist') {
+    await fastify.prisma.therapist.updateMany({
+      where: {
+        OR: [
+          { userId: user.id },
+          { email: user.email },
+        ],
+      },
+      data: {
+        passwordHash,
+        sessionToken: null,
+      },
+    });
+  }
+
+  if (user.role === 'manager') {
+    await fastify.prisma.practiceManager.updateMany({
+      where: {
+        OR: [
+          { userId: user.id },
+          { email: user.email },
+        ],
+      },
+      data: {
+        passwordHash,
+        sessionToken: null,
+      },
+    });
+  }
 };
 
 export const authRoutes: FastifyPluginAsync = async (fastify) => {
@@ -207,6 +473,89 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     return reply.unauthorized('Ungültige Zugangsdaten');
+  });
+
+  fastify.post('/auth/forgot-password', async (request, reply) => {
+    const parsed = forgotPasswordSchema.safeParse(request.body);
+    if (!parsed.success) return reply.badRequest('Bitte gib eine gültige E-Mail-Adresse ein.');
+
+    const email = parsed.data.email;
+    const account = await ensurePasswordResetAccount(fastify, email);
+    if (!account) {
+      return reply.status(200).send(getForgotPasswordResponse());
+    }
+
+    const token = randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + PASSWORD_RESET_WINDOW_MS);
+
+    await fastify.prisma.user.update({
+      where: { id: account.user.id },
+      data: {
+        passwordResetToken: token,
+        passwordResetExpiresAt: expiresAt,
+      },
+    });
+
+    const resetLink = `${getPublicBaseUrl(request)}/auth/reset-password?token=${encodeURIComponent(token)}`;
+    try {
+      await sendPasswordResetEmail({
+        to: email,
+        name: getPasswordResetName(account),
+        resetLink,
+      });
+    } catch (err) {
+      fastify.log.warn({ err, email }, 'Failed to send password reset email');
+    }
+
+    return reply.status(200).send(getForgotPasswordResponse());
+  });
+
+  fastify.get('/auth/reset-password', async (request, reply) => {
+    const { token } = request.query as { token?: string };
+    if (!token) {
+      reply.header('Content-Type', 'text/html; charset=utf-8');
+      return reply.code(400).send(renderPasswordResetHtml({
+        error: 'Der Link ist unvollständig. Bitte fordere einen neuen Passwort-Link an.',
+      }));
+    }
+
+    const user = await fastify.prisma.user.findFirst({
+      where: {
+        passwordResetToken: token,
+        passwordResetExpiresAt: { gt: new Date() },
+      },
+    });
+
+    reply.header('Content-Type', 'text/html; charset=utf-8');
+    if (!user) {
+      return reply.code(400).send(renderPasswordResetHtml({
+        error: 'Der Link ist ungültig oder bereits abgelaufen. Bitte fordere in der App einen neuen an.',
+      }));
+    }
+
+    return reply.send(renderPasswordResetHtml({ token }));
+  });
+
+  fastify.post('/auth/reset-password', async (request, reply) => {
+    const parsed = resetPasswordSchema.safeParse(request.body);
+    if (!parsed.success) return reply.badRequest('Bitte gib ein neues Passwort mit mindestens 6 Zeichen ein.');
+
+    const { token, password } = parsed.data;
+    const user = await fastify.prisma.user.findFirst({
+      where: {
+        passwordResetToken: token,
+        passwordResetExpiresAt: { gt: new Date() },
+      },
+    });
+    if (!user) return reply.badRequest('Der Link ist ungültig oder abgelaufen.');
+
+    const passwordHash = await hashPassword(password);
+    await syncPasswordReset(fastify, user, passwordHash);
+
+    return reply.status(200).send({
+      success: true,
+      message: 'Dein Passwort wurde aktualisiert.',
+    });
   });
 
   fastify.get('/auth/verify-email', async (request, reply) => {

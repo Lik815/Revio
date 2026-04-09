@@ -88,6 +88,11 @@ export const translations = {
     phoneLabel: 'Telefon',
     emailLabel: 'E-Mail',
     passwordLabel: 'Passwort',
+    forgotPasswordLink: 'Passwort vergessen?',
+    forgotPasswordLoading: 'Link wird gesendet…',
+    forgotPasswordEmailMissing: 'Bitte gib zuerst deine E-Mail-Adresse ein.',
+    forgotPasswordEmailInvalid: 'Bitte gib eine gültige E-Mail-Adresse ein.',
+    forgotPasswordSent: 'Wenn ein Konto existiert, haben wir dir eine E-Mail zum Zurücksetzen geschickt.',
     nameLabel: 'Name',
     notificationsOption: 'Benachrichtigungen',
 
@@ -509,6 +514,11 @@ export const translations = {
     phoneLabel: 'Phone',
     emailLabel: 'Email',
     passwordLabel: 'Password',
+    forgotPasswordLink: 'Forgot password?',
+    forgotPasswordLoading: 'Sending link…',
+    forgotPasswordEmailMissing: 'Please enter your email address first.',
+    forgotPasswordEmailInvalid: 'Please enter a valid email address.',
+    forgotPasswordSent: 'If an account exists, we sent you an email to reset your password.',
     nameLabel: 'Name',
     notificationsOption: 'Notifications',
 

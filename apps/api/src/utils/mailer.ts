@@ -93,6 +93,40 @@ export async function sendVerificationEmail(opts: {
   });
 }
 
+export async function sendPasswordResetEmail(opts: {
+  to: string;
+  name: string;
+  resetLink: string;
+}) {
+  const { to, name, resetLink } = opts;
+
+  await getResend().emails.send({
+    from: FROM,
+    to,
+    subject: 'Revio – Passwort zurücksetzen',
+    html: `
+      <div style="font-family:sans-serif;max-width:540px;margin:0 auto;color:#1a1a1a">
+        <h2 style="color:#2563eb">Passwort zurücksetzen</h2>
+        <p>Hallo ${name},</p>
+        <p>du hast angefragt, dein Passwort für Revio zurückzusetzen.</p>
+        <p style="margin:32px 0">
+          <a href="${resetLink}"
+             style="background:#2563eb;color:#fff;padding:14px 28px;border-radius:8px;
+                    text-decoration:none;font-weight:600;font-size:16px">
+            Neues Passwort festlegen
+          </a>
+        </p>
+        <p style="color:#6b7280;font-size:13px;margin-top:16px">
+          Dieser Link ist 2 Stunden gültig. Wenn du die Anfrage nicht gestellt hast, kannst du diese E-Mail ignorieren.
+        </p>
+        <hr style="border:none;border-top:1px solid #e5e7eb;margin:32px 0"/>
+        <p style="color:#9ca3af;font-size:12px">Revio · noreply@my-revio.de</p>
+      </div>
+    `,
+    text: `Hallo ${name},\n\nDu hast angefragt, dein Passwort für Revio zurückzusetzen.\n\nLege hier ein neues Passwort fest:\n${resetLink}\n\nDieser Link ist 2 Stunden gültig.`,
+  });
+}
+
 export async function sendProfileApprovedEmail(opts: {
   to: string;
   name: string;

@@ -57,6 +57,8 @@ model User {
   emailVerificationToken      String?
   emailVerifiedAt             DateTime?
   requiresEmailVerification   Boolean   @default(false)
+  passwordResetToken          String?
+  passwordResetExpiresAt      DateTime?
   createdAt              DateTime                @default(now())
   updatedAt              DateTime                @updatedAt
   therapistProfile       Therapist?              @relation("TherapistUser")

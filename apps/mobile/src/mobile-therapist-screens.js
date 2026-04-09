@@ -20,10 +20,13 @@ import {
 export function LoginScreen(props) {
   const {
     c,
+    forgotPasswordLoading,
     handleLogin,
+    handleForgotPassword,
     loginEmail,
     loginError,
     loginLoading,
+    loginNotice,
     loginPassword,
     setLoginEmail,
     setLoginPassword,
@@ -93,7 +96,22 @@ export function LoginScreen(props) {
             </Pressable>
           </View>
         </View>
+        <Pressable
+          onPress={handleForgotPassword}
+          disabled={forgotPasswordLoading}
+          style={{ alignSelf: 'flex-end', paddingVertical: 4 }}
+        >
+          <Text style={{ fontSize: 13, fontWeight: '600', color: forgotPasswordLoading ? c.muted : c.primary }}>
+            {forgotPasswordLoading ? t('forgotPasswordLoading') : t('forgotPasswordLink')}
+          </Text>
+        </Pressable>
       </View>
+
+      {loginNotice ? (
+        <View style={[styles.noticeBox, { backgroundColor: c.successBg, borderColor: c.success, marginTop: 12 }]}>
+          <Text style={{ color: c.success, flex: 1 }}>{loginNotice}</Text>
+        </View>
+      ) : null}
 
       {loginError ? (
         <View style={[styles.noticeBox, { backgroundColor: c.errorBg, borderColor: c.error, marginTop: 12 }]}>
@@ -181,4 +199,3 @@ export function TherapistLandingScreen(props) {
     </View>
   );
 }
-

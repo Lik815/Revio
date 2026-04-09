@@ -1,6 +1,7 @@
 import { beforeAll, afterAll, beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { buildApp } from '../src/app.js';
 import { prisma } from '../src/plugins/prisma.js';
+import { hashPassword } from '../src/routes/auth-utils.js';
 import { getProfileStatus } from '../src/utils/profile-completeness.js';
 
 process.env.DATABASE_URL ??= 'file:./prisma/test.db';
@@ -770,6 +771,183 @@ describe('POST /register/therapist', () => {
     expect(therapist?.taxRegistrationStatus).toBe('yes');
     expect(therapist?.healthAuthorityStatus).toBe('in_progress');
     expect(therapist?.complianceUpdatedAt).toBeTruthy();
+  });
+});
+
+describe('Password reset', () => {
+  const registrationPayload = {
+    email: 'reset-user@test.de',
+    password: 'secret123',
+    fullName: 'Reset User',
+    city: 'Köln',
+    postalCode: '50667',
+    street: 'Komoedienstrasse',
+    houseNumber: '12',
+    specializations: ['back pain'],
+    languages: ['de'],
+  };
+
+  it('stores a reset token and lets therapists log in with the new password', async () => {
+    const registerRes = await app.inject({
+      method: 'POST',
+      url: '/register/therapist',
+      payload: registrationPayload,
+    });
+    expect(registerRes.statusCode).toBe(201);
+
+    const forgotRes = await app.inject({
+      method: 'POST',
+      url: '/auth/forgot-password',
+      payload: { email: registrationPayload.email },
+    });
+    expect(forgotRes.statusCode).toBe(200);
+    expect(forgotRes.json().success).toBe(true);
+
+    const userBeforeReset = await prisma.user.findUnique({
+      where: { email: registrationPayload.email },
+    });
+    expect(userBeforeReset?.passwordResetToken).toBeTruthy();
+    expect(userBeforeReset?.passwordResetExpiresAt).toBeTruthy();
+
+    const resetRes = await app.inject({
+      method: 'POST',
+      url: '/auth/reset-password',
+      payload: {
+        token: userBeforeReset?.passwordResetToken,
+        password: 'new-secret-456',
+      },
+    });
+    expect(resetRes.statusCode).toBe(200);
+
+    const userAfterReset = await prisma.user.findUnique({
+      where: { email: registrationPayload.email },
+    });
+    const therapistAfterReset = await prisma.therapist.findUnique({
+      where: { email: registrationPayload.email },
+    });
+    expect(userAfterReset?.passwordResetToken).toBeNull();
+    expect(userAfterReset?.passwordResetExpiresAt).toBeNull();
+    expect(therapistAfterReset?.passwordHash).toBeTruthy();
+    expect(therapistAfterReset?.passwordHash).toBe(userAfterReset?.passwordHash);
+
+    const oldLoginRes = await app.inject({
+      method: 'POST',
+      url: '/auth/login',
+      payload: { email: registrationPayload.email, password: registrationPayload.password },
+    });
+    expect(oldLoginRes.statusCode).toBe(401);
+
+    const newLoginRes = await app.inject({
+      method: 'POST',
+      url: '/auth/login',
+      payload: { email: registrationPayload.email, password: 'new-secret-456' },
+    });
+    expect(newLoginRes.statusCode).toBe(200);
+    expect(newLoginRes.json().token).toBeTruthy();
+  });
+
+  it('returns a generic success response for unknown emails', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/auth/forgot-password',
+      payload: { email: 'missing@test.de' },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      success: true,
+      message: 'Wenn ein Konto mit dieser E-Mail-Adresse existiert, haben wir dir einen Link zum Zurücksetzen geschickt.',
+    });
+  });
+
+  it('supports legacy therapist accounts without a User row', async () => {
+    const legacyPasswordHash = await hashPassword('legacy-pass-123');
+    await prisma.therapist.create({
+      data: {
+        email: 'legacy-reset@test.de',
+        fullName: 'Legacy Reset',
+        professionalTitle: 'Physiotherapeut',
+        city: 'Berlin',
+        specializations: 'Rücken',
+        languages: 'de',
+        certifications: '',
+        passwordHash: legacyPasswordHash,
+        reviewStatus: 'APPROVED',
+      },
+    });
+
+    const forgotRes = await app.inject({
+      method: 'POST',
+      url: '/auth/forgot-password',
+      payload: { email: 'legacy-reset@test.de' },
+    });
+    expect(forgotRes.statusCode).toBe(200);
+
+    const user = await prisma.user.findUnique({ where: { email: 'legacy-reset@test.de' } });
+    const therapist = await prisma.therapist.findUnique({ where: { email: 'legacy-reset@test.de' } });
+    expect(user?.id).toBeTruthy();
+    expect(user?.passwordResetToken).toBeTruthy();
+    expect(therapist?.userId).toBe(user?.id);
+
+    const resetRes = await app.inject({
+      method: 'POST',
+      url: '/auth/reset-password',
+      payload: {
+        token: user?.passwordResetToken,
+        password: 'legacy-pass-456',
+      },
+    });
+    expect(resetRes.statusCode).toBe(200);
+
+    const loginRes = await app.inject({
+      method: 'POST',
+      url: '/auth/login',
+      payload: { email: 'legacy-reset@test.de', password: 'legacy-pass-456' },
+    });
+    expect(loginRes.statusCode).toBe(200);
+  });
+
+  it('rejects expired reset tokens', async () => {
+    const passwordHash = await hashPassword('expired-pass-123');
+    const user = await prisma.user.create({
+      data: {
+        email: 'expired-reset@test.de',
+        passwordHash,
+        role: 'therapist',
+        passwordResetToken: 'expired-token',
+        passwordResetExpiresAt: new Date(Date.now() - 60_000),
+      },
+    });
+    await prisma.therapist.create({
+      data: {
+        email: user.email,
+        userId: user.id,
+        fullName: 'Expired Reset',
+        professionalTitle: 'Physiotherapeut',
+        city: 'Hamburg',
+        specializations: 'Rücken',
+        languages: 'de',
+        certifications: '',
+        passwordHash,
+      },
+    });
+
+    const resetRes = await app.inject({
+      method: 'POST',
+      url: '/auth/reset-password',
+      payload: {
+        token: 'expired-token',
+        password: 'new-password-123',
+      },
+    });
+    expect(resetRes.statusCode).toBe(400);
+
+    const pageRes = await app.inject({
+      method: 'GET',
+      url: '/auth/reset-password?token=expired-token',
+    });
+    expect(pageRes.statusCode).toBe(400);
+    expect(pageRes.body).toContain('Link nicht mehr gültig');
   });
 });
 
