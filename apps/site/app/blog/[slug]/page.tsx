@@ -118,13 +118,43 @@ function renderContent(content: string): ReactNode[] {
   });
 }
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://my-revio.de';
+
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
   const post = await getPublishedBlogPost(slug);
-  if (!post) return { title: 'Beitrag nicht gefunden | Revio' };
+
+  if (!post) {
+    return {
+      title: 'Beitrag nicht gefunden',
+      robots: { index: false, follow: false },
+    };
+  }
+
+  const url = `${SITE_URL}/blog/${slug}`;
+  const publishedTime = post.publishedAt ?? post.createdAt;
+
   return {
-    title: `${post.title} | Revio Blog`,
+    title: post.title,
     description: post.excerpt,
+    alternates: {
+      canonical: `/blog/${slug}`,
+    },
+    openGraph: {
+      type: 'article',
+      url,
+      title: post.title,
+      description: post.excerpt,
+      publishedTime,
+      modifiedTime: post.updatedAt,
+      authors: [post.authorName],
+      locale: 'de_DE',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: post.title,
+      description: post.excerpt,
+    },
   };
 }
 
@@ -133,15 +163,84 @@ export async function generateStaticParams() {
   return posts.map((post) => ({ slug: post.slug }));
 }
 
+function buildJsonLd(post: Awaited<ReturnType<typeof getPublishedBlogPost>>) {
+  if (!post) return null;
+
+  const url = `${SITE_URL}/blog/${post.slug}`;
+  const publishedTime = post.publishedAt ?? post.createdAt;
+
+  // Extract FAQ entries: lines starting with "?? " become questions,
+  // the next paragraph becomes the answer.
+  const faqEntries: { question: string; answer: string }[] = [];
+  const blocks = post.content.split(/\n\s*\n/).map((b) => b.trim()).filter(Boolean);
+  for (let i = 0; i < blocks.length - 1; i++) {
+    if (blocks[i].startsWith('?? ')) {
+      faqEntries.push({
+        question: blocks[i].replace(/^\?\?\s+/, ''),
+        answer: blocks[i + 1].replace(/^[-*>]\s*/gm, '').replace(/\*\*/g, ''),
+      });
+    }
+  }
+
+  const blogPosting = {
+    '@context': 'https://schema.org',
+    '@type': 'BlogPosting',
+    headline: post.title,
+    description: post.excerpt,
+    url,
+    datePublished: publishedTime,
+    dateModified: post.updatedAt,
+    author: {
+      '@type': 'Person',
+      name: post.authorName,
+    },
+    publisher: {
+      '@type': 'Organization',
+      name: 'Revio',
+      url: SITE_URL,
+    },
+    mainEntityOfPage: {
+      '@type': 'WebPage',
+      '@id': url,
+    },
+    inLanguage: 'de-DE',
+  };
+
+  if (faqEntries.length === 0) return [blogPosting];
+
+  const faqPage = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: faqEntries.map(({ question, answer }) => ({
+      '@type': 'Question',
+      name: question,
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: answer,
+      },
+    })),
+  };
+
+  return [blogPosting, faqPage];
+}
+
 export default async function BlogPostPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const post = await getPublishedBlogPost(slug);
   if (!post) notFound();
 
   const toc = extractToc(post.content);
+  const jsonLd = buildJsonLd(post);
 
   return (
     <>
+      {jsonLd?.map((schema, i) => (
+        <script
+          key={i}
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+        />
+      ))}
       <ReadingProgress />
       <section className="blog-article">
         <div className="shell blog-article__shell">
