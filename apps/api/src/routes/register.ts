@@ -2,7 +2,17 @@ import { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { randomBytes } from 'crypto';
 import { hashPassword } from './auth.js';
+import {
+  buildComplianceUpdateData,
+  COMPLIANCE_STATUS_VALUES,
+  HEALTH_AUTHORITY_STATUS_VALUES,
+} from '../utils/compliance.js';
 import { geocodeAddress } from '../utils/geocode.js';
+
+const complianceSchema = z.object({
+  taxRegistrationStatus: z.enum(COMPLIANCE_STATUS_VALUES).optional(),
+  healthAuthorityStatus: z.enum(HEALTH_AUTHORITY_STATUS_VALUES).optional(),
+});
 
 const registerSchema = z.object({
   email: z.string().email(),
@@ -22,6 +32,7 @@ const registerSchema = z.object({
     address: z.string().optional(),
     phone: z.string().optional(),
   }).optional(),
+  compliance: complianceSchema.optional(),
 });
 
 export const registerRoutes: FastifyPluginAsync = async (fastify) => {
@@ -77,6 +88,7 @@ export const registerRoutes: FastifyPluginAsync = async (fastify) => {
         serviceRadiusKm: data.serviceRadiusKm ?? null,
         kassenart: data.kassenart ?? '',
         availability: data.availability ?? '',
+        ...buildComplianceUpdateData(data.compliance ?? {}),
         passwordHash,
         reviewStatus: 'PENDING_REVIEW',
       } as any,

@@ -1,3 +1,5 @@
+import type { TherapistProfileStatus } from '@revio/shared';
+
 type TherapistLike = {
   fullName?: string | null;
   professionalTitle?: string | null;
@@ -12,6 +14,8 @@ type TherapistLike = {
   homeVisit?: boolean | null;
   serviceRadiusKm?: number | null;
   kassenart?: string | null;
+  taxRegistrationStatus?: string | null;
+  healthAuthorityStatus?: string | null;
 };
 
 type TherapistPracticeLinkLike = {
@@ -80,4 +84,18 @@ export function getTherapistPublicationState(
     missingFields: practiceCompletion.missingFields,
     explicitlyPublished: therapist.isPublished === true,
   };
+}
+
+export function getProfileStatus(therapist: TherapistLike): TherapistProfileStatus {
+  const completion = getTherapistProfileCompletion(therapist);
+
+  if (!completion.complete) return 'draft';
+  if (
+    therapist.taxRegistrationStatus === 'yes' &&
+    therapist.healthAuthorityStatus === 'yes'
+  ) {
+    return 'ready_for_review';
+  }
+
+  return 'incomplete';
 }

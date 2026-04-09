@@ -18,6 +18,10 @@ import {
   SPACE,
   TYPE,
 } from './mobile-utils';
+import {
+  ComplianceStatusStep,
+  getComplianceStatusLabel,
+} from './mobile-compliance-step';
 
 function StatusMiniCard({ icon, label, value, color, c }) {
   return (
@@ -50,13 +54,16 @@ export function TherapistDashboardScreen(props) {
     editIsVisible,
     editKassenart,
     editLanguages,
+    editHealthAuthorityStatus,
     editMode,
     editServiceRadius,
     editSpecializations,
+    editTaxRegistrationStatus,
     handlePickDocument,
     handlePickPhoto,
     handleSaveProfile,
     loggedInTherapist,
+    onEnterEdit,
     profileSaving,
     setEditAvailability,
     setEditBio,
@@ -64,17 +71,21 @@ export function TherapistDashboardScreen(props) {
     setEditIsVisible,
     setEditKassenart,
     setEditLanguages,
+    setEditHealthAuthorityStatus,
     setEditMode,
     setEditServiceRadius,
     setEditSpecializations,
+    setEditTaxRegistrationStatus,
     styles,
     t,
     therapistDocuments,
   } = props;
 
-  const th = loggedInTherapist;
   const [photoError, setPhotoError] = useState(false);
-  const initials = th.fullName.split(' ').map((name) => name[0]).join('').slice(0, 2).toUpperCase();
+  const th = loggedInTherapist;
+  if (!th) return null;
+  const fullName = typeof th.fullName === 'string' && th.fullName.trim() ? th.fullName.trim() : 'Profil';
+  const initials = fullName.split(/\s+/).map((name) => name[0]).join('').slice(0, 2).toUpperCase();
   const reviewStatusLabel = th.reviewStatus === 'APPROVED' ? t('statusApproved') : th.reviewStatus === 'CHANGES_REQUESTED' ? t('statusChangesRequested') : t('statusInReview');
   const reviewStatusColor = th.reviewStatus === 'APPROVED' ? c.success : th.reviewStatus === 'CHANGES_REQUESTED' ? c.warning : c.muted;
   const hasDocuments = (therapistDocuments ?? []).length > 0;
@@ -93,8 +104,8 @@ export function TherapistDashboardScreen(props) {
             <Text style={{ color: '#fff', fontSize: 12 }}>📷</Text>
           </View>
         </Pressable>
-        <Text style={[styles.practiceHeaderName, { color: c.text, marginTop: 10 }]}>{th.fullName}</Text>
-        <Text style={[styles.practiceHeaderCity, { color: c.textMuted ?? c.muted }]}>{th.professionalTitle}</Text>
+        <Text style={[styles.practiceHeaderName, { color: c.text, marginTop: 10 }]}>{fullName}</Text>
+        <Text style={[styles.practiceHeaderCity, { color: c.textMuted ?? c.muted }]}>{th.professionalTitle ?? ''}</Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: SPACE.sm, marginTop: SPACE.sm, width: '100%' }}>
           <StatusMiniCard
             icon="shield-checkmark-outline"
@@ -208,6 +219,16 @@ export function TherapistDashboardScreen(props) {
             placeholder={t('availabilityPlaceholder')}
             placeholderTextColor={c.muted}
           />
+          <View style={{ marginTop: 14 }}>
+            <ComplianceStatusStep
+              c={c}
+              healthAuthorityStatus={editHealthAuthorityStatus}
+              onChangeHealthAuthorityStatus={setEditHealthAuthorityStatus}
+              onChangeTaxRegistrationStatus={setEditTaxRegistrationStatus}
+              t={t}
+              taxRegistrationStatus={editTaxRegistrationStatus}
+            />
+          </View>
           <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
             <Pressable style={[styles.registerBtn, { flex: 1, backgroundColor: c.border, marginTop: 0 }]} onPress={() => setEditMode(false)}>
               <Text style={{ ...TYPE.heading, color: c.text }}>{t('cancelBtn')}</Text>
@@ -271,7 +292,29 @@ export function TherapistDashboardScreen(props) {
             </View>
           </View>
 
-          <Pressable style={[styles.registerBtn, { backgroundColor: c.primary }]} onPress={props.onEnterEdit}>
+          <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
+            <Text style={[styles.filterSectionTitle, { color: c.muted }]}>{t('complianceSectionTitle')}</Text>
+            <Text style={{ color: c.muted, fontSize: 13, lineHeight: 19, marginBottom: 12 }}>
+              {t('complianceSectionBody')}
+            </Text>
+            <View style={[styles.detailInfoRow, { marginBottom: 8 }]}>
+              <Text style={[styles.detailInfoLabel, { color: c.muted, flex: 1 }]}>{t('taxRegistrationLabel')}</Text>
+              <Text style={[styles.detailInfoValue, { color: c.text }]}>
+                {getComplianceStatusLabel(th.compliance?.taxRegistrationStatus, t)}
+              </Text>
+            </View>
+            <View style={[styles.detailInfoRow, { marginTop: 8 }]}>
+              <Text style={[styles.detailInfoLabel, { color: c.muted, flex: 1 }]}>{t('healthAuthorityLabel')}</Text>
+              <Text style={[styles.detailInfoValue, { color: c.text }]}>
+                {getComplianceStatusLabel(th.compliance?.healthAuthorityStatus, t)}
+              </Text>
+            </View>
+            <Text style={{ color: c.muted, fontSize: 12, lineHeight: 18, marginTop: 12 }}>
+              {t('complianceDisclaimer')}
+            </Text>
+          </View>
+
+          <Pressable style={[styles.registerBtn, { backgroundColor: c.primary }]} onPress={onEnterEdit}>
             <Text style={styles.registerBtnText}>{t('editProfileBtn')}</Text>
           </Pressable>
 
@@ -326,17 +369,18 @@ export function TherapistDashboardScreen(props) {
 function LangMultiselect({ editLanguages, setEditLanguages, c, styles, t }) {
   const [search, setSearch] = useState('');
   const q = search.trim().toLowerCase();
+  const selectedLanguages = Array.isArray(editLanguages) ? editLanguages : [];
   const suggestions = languageOptions.filter((code) => {
-    if (editLanguages.includes(code)) return false;
+    if (selectedLanguages.includes(code)) return false;
     if (!q) return true;
     return code.toLowerCase().includes(q) || getLangLabel(code).toLowerCase().includes(q);
   }).slice(0, 8);
 
   return (
     <View>
-      {editLanguages.length > 0 && (
+      {selectedLanguages.length > 0 && (
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
-          {editLanguages.map((code) => (
+          {selectedLanguages.map((code) => (
             <Pressable
               key={code}
               onPress={() => setEditLanguages((prev) => prev.filter((l) => l !== code))}

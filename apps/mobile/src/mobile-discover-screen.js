@@ -33,13 +33,27 @@ import {
 //   1. This Platform.OS ternary — dead-code signal to the bundler.
 //   2. Metro resolver stub — ensures react-native-maps never enters web bundle.
 // ────────────────────────────────────────────────────────────────────────────
-const mapModule = Platform.OS === 'web'
-  ? require('./MapStub')
-  : require('react-native-maps');
+function loadMapComponents() {
+  try {
+    const mapModule = Platform.OS === 'web'
+      ? require('./MapStub')
+      : require('react-native-maps');
 
-const MapView = mapModule.default;
-const Marker = mapModule.Marker;
-const Circle = mapModule.Circle ?? (() => null);
+    return {
+      error: null,
+      MapView: mapModule.default,
+      Marker: mapModule.Marker,
+      Circle: mapModule.Circle ?? (() => null),
+    };
+  } catch (error) {
+    return {
+      error,
+      MapView: null,
+      Marker: null,
+      Circle: () => null,
+    };
+  }
+}
 
 export function DiscoverScreen(props) {
   const {
@@ -96,20 +110,32 @@ export function DiscoverScreen(props) {
     setSearchRadius,
   } = props;
 
+  const safeResults = Array.isArray(results) ? results : [];
+  const safeMapTherapists = Array.isArray(mapTherapists) ? mapTherapists : [];
+  const safeFortbildungen = Array.isArray(fortbildungen) ? fortbildungen : [];
+  const safeCertificationOptions = Array.isArray(certificationOptions)
+    ? certificationOptions.filter(
+        (option) => option && typeof option.key === 'string' && typeof option.label === 'string'
+      )
+    : [];
+  const safeAcSuggestions = Array.isArray(acSuggestions)
+    ? acSuggestions.filter((group) => group && typeof group.type === 'string' && Array.isArray(group.items))
+    : [];
+  const visibleSuggestions = safeAcSuggestions.filter((group) => group.type !== 'PRACTICE_NAME');
   const mutedText = c.textMuted ?? c.muted;
   const iconHitSlop = { top: 10, bottom: 10, left: 10, right: 10 };
-  const showHeaderToggle = viewMode === 'map' || searched || results.length > 0;
+  const showHeaderToggle = viewMode === 'map' || searched || safeResults.length > 0;
   const [fortbildungQuery, setFortbildungQuery] = React.useState('');
-  const selectedCertificationOptions = fortbildungen.map((key) =>
-    certificationOptions.find((option) => option.key === key) ?? { key, label: key }
+  const selectedCertificationOptions = safeFortbildungen.map((key) =>
+    safeCertificationOptions.find((option) => option.key === key) ?? { key, label: key }
   );
   const normalizedFortbildungQuery = fortbildungQuery.trim().toLowerCase();
-  const filteredCertificationOptions = certificationOptions.filter((option) =>
+  const filteredCertificationOptions = safeCertificationOptions.filter((option) =>
     option.label.toLowerCase().includes(normalizedFortbildungQuery) ||
     option.key.toLowerCase().includes(normalizedFortbildungQuery)
   );
   const certificationSuggestions = filteredCertificationOptions
-    .filter((option) => !fortbildungen.includes(option.key))
+    .filter((option) => !safeFortbildungen.includes(option.key))
     .slice(0, 6);
   const resetFilters = () => {
     setHomeVisit(false);
@@ -270,6 +296,28 @@ export function DiscoverScreen(props) {
   );
 
   if (viewMode === 'map') {
+    const { error: mapError, MapView, Marker, Circle } = loadMapComponents();
+
+    if (!MapView || !Marker) {
+      return (
+        <View style={{ flex: 1, backgroundColor: c.background, padding: 16, justifyContent: 'center' }}>
+          <View style={[styles.emptyState, { backgroundColor: c.card, borderColor: c.border }]}>
+            <Text style={styles.emptyIcon}>🗺️</Text>
+            <Text style={[styles.emptyTitle, { color: c.text }]}>Karte konnte nicht geladen werden</Text>
+            <Text style={[styles.emptyBody, { color: c.muted }]}>
+              {mapError?.message || 'Der Listenmodus funktioniert weiter.'}
+            </Text>
+            <Pressable
+              onPress={() => setViewMode('list')}
+              style={[styles.emptyActionBtn, { backgroundColor: c.primary, marginTop: 12 }]}
+            >
+              <Text style={[styles.emptyActionText, { color: '#fff' }]}>Zur Liste</Text>
+            </Pressable>
+          </View>
+        </View>
+      );
+    }
+
     return (
       <View style={{ flex: 1, backgroundColor: c.background }}>
         {/* Fixed header + search bar */}
@@ -330,9 +378,9 @@ export function DiscoverScreen(props) {
           </View>
           {showHeaderToggle && <View style={{ alignItems: 'flex-end' }}>{headerToggle}</View>}
           {showFilters ? filtersPanel : null}
-          {(searched || results.length > 0) && (
+          {(searched || safeResults.length > 0) && (
             <Text style={{ ...TYPE.meta, color: mutedText }}>
-              {searched ? `${results.length} ${results.length !== 1 ? t('resultsLabelPlural') : t('resultsLabel')}` : t('suggestions')}
+              {searched ? `${safeResults.length} ${safeResults.length !== 1 ? t('resultsLabelPlural') : t('resultsLabel')}` : t('suggestions')}
             </Text>
           )}
         </View>
@@ -360,7 +408,7 @@ export function DiscoverScreen(props) {
                 <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: c.primary, borderWidth: 3, borderColor: '#fff', shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 3, shadowOffset: { width: 0, height: 1 }, elevation: 5 }} />
               </Marker>
             )}
-            {mapTherapists.map((th) => (
+            {safeMapTherapists.map((th) => (
               <React.Fragment key={`radius-${th.id}`}>
                 <Circle
                   center={{ latitude: th.homeLat, longitude: th.homeLng }}
@@ -371,7 +419,7 @@ export function DiscoverScreen(props) {
                 />
                 <Marker coordinate={{ latitude: th.homeLat, longitude: th.homeLng }} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false} onPress={() => openTherapistById(th.id)}>
                   <View style={{ backgroundColor: c.success, borderRadius: 16, paddingHorizontal: 9, paddingVertical: 4, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 3, shadowOffset: { width: 0, height: 1 }, elevation: 3 }}>
-                    <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>🏠 {th.fullName.split(' ')[0]}</Text>
+                    <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>🏠 {(typeof th?.fullName === 'string' && th.fullName.trim() ? th.fullName.trim().split(/\s+/)[0] : 'Profil')}</Text>
                   </View>
                 </Marker>
               </React.Fragment>
@@ -397,7 +445,7 @@ export function DiscoverScreen(props) {
             </View>
           )}
 
-          {!searchLoading && mapTherapists.length === 0 && searched && (
+          {!searchLoading && safeMapTherapists.length === 0 && searched && (
             <View style={{ position: 'absolute', top: 20, left: 20, right: 20, padding: 20, borderRadius: 18, backgroundColor: 'rgba(17,24,39,0.82)', alignItems: 'center', justifyContent: 'center' }}>
               <Ionicons name="location-outline" size={36} color="#fff" />
               {userCoords ? (
@@ -461,7 +509,7 @@ export function DiscoverScreen(props) {
           <View
             style={[
               styles.searchBox,
-              { backgroundColor: c.card, borderColor: showAutocomplete && acSuggestions.length > 0 ? c.primary : c.border },
+              { backgroundColor: c.card, borderColor: showAutocomplete && visibleSuggestions.length > 0 ? c.primary : c.border },
             ]}
           >
             <Ionicons name="search-outline" size={18} color={c.muted} />
@@ -504,9 +552,9 @@ export function DiscoverScreen(props) {
             </View>
           </View>
 
-          {showAutocomplete && acSuggestions.filter((group) => group.type !== 'PRACTICE_NAME').length > 0 && (
+          {showAutocomplete && visibleSuggestions.length > 0 && (
             <View style={[styles.autocompleteBox, { backgroundColor: c.card, borderColor: c.primary }]}>
-              {acSuggestions.filter((group) => group.type !== 'PRACTICE_NAME').map((group) => {
+              {visibleSuggestions.map((group) => {
                 const typeLabel = group.type === 'SPECIALTY' ? 'Spezialisierung'
                   : group.type === 'THERAPIST_NAME' ? 'Therapeut'
                   : group.type === 'CITY' ? 'Ort'
@@ -582,11 +630,11 @@ export function DiscoverScreen(props) {
         keyboardShouldPersistTaps="handled"
         onTouchStart={() => { if (showFilters) setShowFilters(false); }}
       >
-      {(searched || results.length > 0) ? (
+      {(searched || safeResults.length > 0) ? (
         <View style={styles.sectionRow}>
           <View style={{ flex: 1, gap: 4 }}>
             <Text style={{ ...TYPE.meta, color: mutedText }}>
-              {searched ? `${results.length} ${results.length !== 1 ? t('resultsLabelPlural') : t('resultsLabel')}` : t('suggestions')}
+              {searched ? `${safeResults.length} ${safeResults.length !== 1 ? t('resultsLabelPlural') : t('resultsLabel')}` : t('suggestions')}
             </Text>
             <Text style={{ ...TYPE.meta, color: mutedText }}>
               {city ? `In ${city}` : t('locationPlaceholder')}
@@ -605,7 +653,7 @@ export function DiscoverScreen(props) {
         <SkeletonCard key={item} C={c} />
       ))}
 
-      {viewMode === 'list' && !searchLoading && results.map((therapist) => (
+      {viewMode === 'list' && !searchLoading && safeResults.map((therapist) => (
         <View key={therapist.id} style={[styles.resultCard, { backgroundColor: c.card, borderColor: c.border }]}>
           <View style={styles.cardTop}>
             <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }} onPress={() => openTherapistById(therapist.id)}>
@@ -649,7 +697,7 @@ export function DiscoverScreen(props) {
 
           {therapist.fortbildungen?.length > 0 && (
             <View style={styles.tagRow}>
-              {therapist.fortbildungen.slice(0, 2).map((qualification) => (
+              {(Array.isArray(therapist.fortbildungen) ? therapist.fortbildungen : []).slice(0, 2).map((qualification) => (
                 <View key={qualification} style={[styles.tag, { backgroundColor: c.successBg, borderWidth: 1, borderColor: c.success }]}>
                   <Text style={[styles.tagText, { color: c.success }]}>{qualification}</Text>
                 </View>
@@ -702,7 +750,7 @@ export function DiscoverScreen(props) {
         </View>
       ))}
 
-      {viewMode === 'list' && !searchLoading && results.length === 0 && searched && (
+      {viewMode === 'list' && !searchLoading && safeResults.length === 0 && searched && (
         <View style={[styles.emptyState, { backgroundColor: c.card, borderColor: c.border }]}>
           <Text style={styles.emptyIcon}>🔍</Text>
           <Text style={[styles.emptyTitle, { color: c.text }]}>{t('noResults')}</Text>

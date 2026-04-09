@@ -3,9 +3,16 @@ import { z } from 'zod';
 import { randomBytes } from 'crypto';
 import { hashPassword, verifyPassword, getToken } from './auth-utils.js';
 import {
+  getProfileStatus,
   getTherapistProfileCompletion,
   getTherapistPublicationState,
 } from '../utils/profile-completeness.js';
+import {
+  buildComplianceUpdateData,
+  COMPLIANCE_STATUS_VALUES,
+  getTherapistCompliance,
+  HEALTH_AUTHORITY_STATUS_VALUES,
+} from '../utils/compliance.js';
 import { geocodeAddress } from '../utils/geocode.js';
 
 export { hashPassword, verifyPassword, getToken };
@@ -31,8 +38,28 @@ const updateMeSchema = z.object({
   photo: z.string().optional(),
 });
 
+const updateComplianceSchema = z.object({
+  taxRegistrationStatus: z.enum(COMPLIANCE_STATUS_VALUES).nullable().optional(),
+  healthAuthorityStatus: z.enum(HEALTH_AUTHORITY_STATUS_VALUES).nullable().optional(),
+}).refine(
+  (value) =>
+    Object.prototype.hasOwnProperty.call(value, 'taxRegistrationStatus') ||
+    Object.prototype.hasOwnProperty.call(value, 'healthAuthorityStatus'),
+  { message: 'Mindestens ein Compliance-Feld ist erforderlich.' },
+);
+
 const splitList = (value: string) =>
   value.split(',').map((s) => s.trim()).filter(Boolean);
+
+const serializeCompliance = (therapist: Record<string, any>) => {
+  const compliance = getTherapistCompliance(therapist);
+
+  return {
+    taxRegistrationStatus: compliance.taxRegistrationStatus ?? null,
+    healthAuthorityStatus: compliance.healthAuthorityStatus ?? null,
+    updatedAt: compliance.updatedAt ? compliance.updatedAt.toISOString() : null,
+  };
+};
 
 export const authRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.post('/auth/login', async (request, reply) => {
@@ -308,6 +335,8 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       visibilityPreference: therapist.visibilityPreference,
       isPublished: therapist.isPublished,
       onboardingStatus: therapist.onboardingStatus,
+      compliance: serializeCompliance(therapist),
+      profileStatus: getProfileStatus(therapist),
       ...publication,
       adminPractice: adminPractice ?? null,
       practices: therapist.links.map((l: any) => ({
@@ -421,7 +450,52 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       fullName: updated.fullName,
       isFreelancer: updated.isFreelancer,
       isPublished: updated.isPublished,
+      compliance: serializeCompliance(updated),
+      profileStatus: getProfileStatus(updated),
       ...publication,
+    };
+  });
+
+  fastify.patch('/auth/me/compliance', async (request, reply) => {
+    const token = getToken(request);
+    if (!token) return reply.unauthorized('Kein Token');
+
+    let therapist = null as any;
+    const user = await fastify.prisma.user.findUnique({
+      where: { sessionToken: token },
+      include: { therapistProfile: true },
+    });
+    if (user?.therapistProfile) therapist = user.therapistProfile;
+    if (!therapist) {
+      therapist = await fastify.prisma.therapist.findUnique({
+        where: { sessionToken: token },
+      });
+    }
+    if (!therapist) {
+      const manager = await fastify.prisma.practiceManager.findUnique({ where: { sessionToken: token } });
+      if (manager?.therapistId) {
+        therapist = await fastify.prisma.therapist.findUnique({ where: { id: manager.therapistId } });
+      }
+    }
+    if (!therapist) return reply.unauthorized('Ungültiger Token');
+
+    const parsed = updateComplianceSchema.safeParse(request.body);
+    if (!parsed.success) return reply.badRequest(parsed.error.flatten().toString());
+
+    await fastify.prisma.therapist.update({
+      where: { id: therapist.id },
+      data: buildComplianceUpdateData(parsed.data),
+    });
+
+    const updated = await fastify.prisma.therapist.findUnique({
+      where: { id: therapist.id },
+    });
+    if (!updated) return reply.notFound('Therapeuten-Profil nicht gefunden');
+
+    return {
+      success: true,
+      compliance: serializeCompliance(updated),
+      profileStatus: getProfileStatus(updated),
     };
   });
 

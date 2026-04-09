@@ -185,8 +185,10 @@ const radiusOptions = [1, 3, 5, 10, 25];
 const GENERIC_SEARCH_LABELS = ['physiotherapie', 'physio', 'therapeut', 'physiotherapeut', 'krankengymnastik'];
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://api.my-revio.de';
-const REG_STEPS = 6;
+const REG_STEPS = 7;
 const languageOptions = Object.keys(LANGUAGE_MAP);
+const COMPLIANCE_STATUS_VALUES = ['yes', 'no', 'in_progress'];
+const HEALTH_AUTHORITY_STATUS_VALUES = ['yes', 'no', 'in_progress', 'unknown'];
 
 const getBaseUrl = () => BASE_URL;
 
@@ -269,6 +271,17 @@ const normalizeTherapistProfile = (therapist) => {
   return {
     ...therapist,
     languages: normalizeLanguageCodes(therapist.languages),
+    compliance: {
+      taxRegistrationStatus: COMPLIANCE_STATUS_VALUES.includes(therapist?.compliance?.taxRegistrationStatus)
+        ? therapist.compliance.taxRegistrationStatus
+        : null,
+      healthAuthorityStatus: HEALTH_AUTHORITY_STATUS_VALUES.includes(therapist?.compliance?.healthAuthorityStatus)
+        ? therapist.compliance.healthAuthorityStatus
+        : null,
+      updatedAt: typeof therapist?.compliance?.updatedAt === 'string'
+        ? therapist.compliance.updatedAt
+        : null,
+    },
     photo: resolveMediaUrl(therapist.photo),
     practices: Array.isArray(therapist.practices)
       ? therapist.practices.map((practice) => ({

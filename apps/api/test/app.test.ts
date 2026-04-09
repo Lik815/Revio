@@ -1,6 +1,7 @@
 import { beforeAll, afterAll, beforeEach, afterEach, describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.js';
 import { prisma } from '../src/plugins/prisma.js';
+import { getProfileStatus } from '../src/utils/profile-completeness.js';
 
 process.env.DATABASE_URL ??= 'file:./prisma/test.db';
 process.env.REVIO_ADMIN_TOKEN ??= 'test-token';
@@ -677,6 +678,154 @@ describe('POST /register/therapist', () => {
     });
     // Always PROPOSED — admin must confirm the link
     expect(link?.status).toBe('PROPOSED');
+  });
+
+  it('stores optional self-reported compliance fields', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/register/therapist',
+      payload: {
+        ...validPayload,
+        email: 'compliance-register@test.com',
+        compliance: {
+          taxRegistrationStatus: 'yes',
+          healthAuthorityStatus: 'in_progress',
+        },
+      },
+    });
+
+    expect(res.statusCode).toBe(201);
+    const { therapistId } = res.json();
+    const therapist = await prisma.therapist.findUnique({ where: { id: therapistId } }) as any;
+
+    expect(therapist?.taxRegistrationStatus).toBe('yes');
+    expect(therapist?.healthAuthorityStatus).toBe('in_progress');
+    expect(therapist?.complianceUpdatedAt).toBeTruthy();
+  });
+});
+
+describe('Profile status logic', () => {
+  it('returns draft when required profile fields are missing', () => {
+    expect(
+      getProfileStatus({
+        fullName: 'Test',
+        professionalTitle: 'PT',
+        city: 'Köln',
+        specializations: '',
+        languages: 'de',
+      }),
+    ).toBe('draft');
+  });
+
+  it('returns incomplete when profile is complete but compliance is missing', () => {
+    expect(
+      getProfileStatus({
+        fullName: 'Test',
+        professionalTitle: 'PT',
+        city: 'Köln',
+        specializations: 'Rücken',
+        languages: 'de',
+      }),
+    ).toBe('incomplete');
+  });
+
+  it('returns ready_for_review when both compliance fields are yes', () => {
+    expect(
+      getProfileStatus({
+        fullName: 'Test',
+        professionalTitle: 'PT',
+        city: 'Köln',
+        specializations: 'Rücken',
+        languages: 'de',
+        taxRegistrationStatus: 'yes',
+        healthAuthorityStatus: 'yes',
+      }),
+    ).toBe('ready_for_review');
+  });
+});
+
+describe('PATCH /auth/me/compliance', () => {
+  it('allows partial updates and returns nested compliance data', async () => {
+    const sessionToken = 'compliance-session-token';
+    await prisma.user.create({
+      data: {
+        email: 'compliance-auth@test.de',
+        passwordHash: 'hash',
+        role: 'therapist',
+        sessionToken,
+      },
+    });
+    const therapist = await prisma.therapist.create({
+      data: {
+        email: 'compliance-auth@test.de',
+        fullName: 'Compliance Test',
+        professionalTitle: 'Physiotherapeut',
+        city: 'Berlin',
+        specializations: 'Rücken',
+        languages: 'de',
+        certifications: '',
+        sessionToken,
+        taxRegistrationStatus: 'no',
+      } as any,
+    });
+
+    const patchRes = await app.inject({
+      method: 'PATCH',
+      url: '/auth/me/compliance',
+      headers: { authorization: `Bearer ${sessionToken}` },
+      payload: { healthAuthorityStatus: 'unknown' },
+    });
+
+    expect(patchRes.statusCode).toBe(200);
+    expect(patchRes.json().compliance).toMatchObject({
+      taxRegistrationStatus: 'no',
+      healthAuthorityStatus: 'unknown',
+    });
+    expect(patchRes.json().profileStatus).toBe('incomplete');
+
+    const updated = await prisma.therapist.findUnique({ where: { id: therapist.id } }) as any;
+    expect(updated?.taxRegistrationStatus).toBe('no');
+    expect(updated?.healthAuthorityStatus).toBe('unknown');
+    expect(updated?.complianceUpdatedAt).toBeTruthy();
+  });
+
+  it('returns ready_for_review from /auth/me when both statuses are yes', async () => {
+    const sessionToken = 'compliance-ready-session-token';
+    await prisma.user.create({
+      data: {
+        email: 'compliance-ready@test.de',
+        passwordHash: 'hash',
+        role: 'therapist',
+        sessionToken,
+      },
+    });
+    await prisma.therapist.create({
+      data: {
+        email: 'compliance-ready@test.de',
+        fullName: 'Ready Test',
+        professionalTitle: 'Physiotherapeut',
+        city: 'Hamburg',
+        specializations: 'Rücken',
+        languages: 'de',
+        certifications: '',
+        sessionToken,
+        taxRegistrationStatus: 'yes',
+        healthAuthorityStatus: 'yes',
+      } as any,
+    });
+
+    const meRes = await app.inject({
+      method: 'GET',
+      url: '/auth/me',
+      headers: { authorization: `Bearer ${sessionToken}` },
+    });
+
+    expect(meRes.statusCode).toBe(200);
+    expect(meRes.json().compliance).toMatchObject({
+      taxRegistrationStatus: 'yes',
+      healthAuthorityStatus: 'yes',
+    });
+    expect(meRes.json().profileStatus).toBe('ready_for_review');
   });
 });
 

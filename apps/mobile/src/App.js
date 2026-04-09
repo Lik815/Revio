@@ -61,6 +61,10 @@ import {
 import {
   TherapistDashboardScreen,
 } from './mobile-therapist-dashboard';
+import {
+  ComplianceStatusStep,
+  getComplianceStatusLabel,
+} from './mobile-compliance-step';
 import { translations } from './mobile-translations';
 
 const formatProfileOverviewName = (fullName = '') => {
@@ -90,6 +94,34 @@ const REVIEW_NOTIFICATION_TYPES = new Set([
   'PROFILE_REJECTED',
   'PROFILE_SUSPENDED',
 ]);
+const REGISTRATION_COMPLIANCE_DRAFT_KEY = 'revio_registration_compliance_draft';
+const COMPLIANCE_STATUS_VALUES = ['yes', 'no', 'in_progress'];
+const HEALTH_AUTHORITY_STATUS_VALUES = ['yes', 'no', 'in_progress', 'unknown'];
+
+function normalizeComplianceValue(value, allowedValues) {
+  return allowedValues.includes(value) ? value : null;
+}
+
+function normalizeComplianceDraft(value) {
+  return {
+    taxRegistrationStatus: normalizeComplianceValue(value?.taxRegistrationStatus, COMPLIANCE_STATUS_VALUES),
+    healthAuthorityStatus: normalizeComplianceValue(value?.healthAuthorityStatus, HEALTH_AUTHORITY_STATUS_VALUES),
+  };
+}
+
+function parseComplianceDraft(rawValue) {
+  if (!rawValue) return normalizeComplianceDraft(null);
+
+  try {
+    return normalizeComplianceDraft(JSON.parse(rawValue));
+  } catch {
+    return normalizeComplianceDraft(null);
+  }
+}
+
+function getTherapistComplianceDraftKey(therapistId) {
+  return `revio_therapist_compliance_draft_${therapistId}`;
+}
 
 function formatDocumentSize(bytes) {
   if (!Number.isFinite(bytes) || bytes <= 0) return null;
@@ -127,6 +159,65 @@ function getReviewNotificationTitle(notification, t) {
     default:
       return t('notificationsOption');
   }
+}
+
+function normalizeCertificationOption(option) {
+  if (typeof option === 'string') {
+    const value = option.trim();
+    return value ? { key: value, label: value } : null;
+  }
+
+  if (!option || typeof option !== 'object') return null;
+
+  const key = typeof option.key === 'string' && option.key.trim()
+    ? option.key.trim()
+    : typeof option.label === 'string' && option.label.trim()
+      ? option.label.trim()
+      : '';
+  const label = typeof option.label === 'string' && option.label.trim()
+    ? option.label.trim()
+    : key;
+
+  if (!key || !label) return null;
+  return { key, label };
+}
+
+function normalizeCertificationOptions(options, fallback = fortbildungOptions) {
+  const source = Array.isArray(options) ? options : fallback;
+  const seen = new Set();
+
+  return source
+    .map(normalizeCertificationOption)
+    .filter((option) => {
+      if (!option || seen.has(option.key)) return false;
+      seen.add(option.key);
+      return true;
+    });
+}
+
+function normalizeAutocompleteSuggestions(groups) {
+  if (!Array.isArray(groups)) return [];
+
+  return groups
+    .map((group) => {
+      const type = typeof group?.type === 'string' && group.type.trim() ? group.type.trim() : 'OTHER';
+      const items = Array.isArray(group?.items)
+        ? group.items
+            .map((item) => {
+              const text = typeof item?.text === 'string' ? item.text.trim() : '';
+              if (!text) return null;
+              return {
+                text,
+                entityId: typeof item?.entityId === 'string' ? item.entityId : null,
+              };
+            })
+            .filter(Boolean)
+        : [];
+
+      if (items.length === 0) return null;
+      return { type, items };
+    })
+    .filter(Boolean);
 }
 
 // ─── App ──────────────────────────────────────────────────────────────────────
@@ -247,7 +338,11 @@ export default function App() {
   const [favorites, setFavorites] = useState([]);
   useEffect(() => {
     AsyncStorage.getItem('revio_favorites').then(val => {
-      if (val) setFavorites(JSON.parse(val));
+      if (!val) return;
+      try {
+        const parsed = JSON.parse(val);
+        if (Array.isArray(parsed)) setFavorites(parsed);
+      } catch {}
     });
   }, []);
   // ── Toast notification ────────────────────────────────────────────────────
@@ -279,7 +374,11 @@ export default function App() {
   const [favoritePractices, setFavoritePractices] = useState([]);
   useEffect(() => {
     AsyncStorage.getItem('revio_fav_practices').then(val => {
-      if (val) setFavoritePractices(JSON.parse(val));
+      if (!val) return;
+      try {
+        const parsed = JSON.parse(val);
+        if (Array.isArray(parsed)) setFavoritePractices(parsed);
+      } catch {}
     });
   }, []);
   const toggleFavoritePractice = (practice) => {
@@ -318,6 +417,9 @@ export default function App() {
   const [regSpecSearch, setRegSpecSearch] = useState('');
   const [regLangSearch, setRegLangSearch] = useState('');
   const [regDocument, setRegDocument] = useState(null);
+  const [regTaxRegistrationStatus, setRegTaxRegistrationStatus] = useState(null);
+  const [regHealthAuthorityStatus, setRegHealthAuthorityStatus] = useState(null);
+  const [regComplianceDraftReady, setRegComplianceDraftReady] = useState(false);
   const [showRegFortbildungen, setShowRegFortbildungen] = useState(false);
   const [showRegPassword, setShowRegPassword] = useState(false);
   const [showRegPasswordConfirm, setShowRegPasswordConfirm] = useState(false);
@@ -345,6 +447,8 @@ export default function App() {
   const [editKassenart, setEditKassenart] = useState('');
   const [editIsVisible, setEditIsVisible] = useState(true);
   const [editAvailability, setEditAvailability] = useState('');
+  const [editTaxRegistrationStatus, setEditTaxRegistrationStatus] = useState(null);
+  const [editHealthAuthorityStatus, setEditHealthAuthorityStatus] = useState(null);
   const [profileSaving, setProfileSaving] = useState(false);
   const [therapistDocuments, setTherapistDocuments] = useState([]);
   const [documentUploading, setDocumentUploading] = useState(false);
@@ -369,6 +473,42 @@ export default function App() {
   const [showVisibilityModal, setShowVisibilityModal] = useState(false);
   const [showProfileSavedModal, setShowProfileSavedModal] = useState(false);
   const [visibilityLoading, setVisibilityLoading] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+
+    AsyncStorage.getItem(REGISTRATION_COMPLIANCE_DRAFT_KEY)
+      .then((rawValue) => {
+        if (!active) return;
+        const draft = parseComplianceDraft(rawValue);
+        setRegTaxRegistrationStatus(draft.taxRegistrationStatus);
+        setRegHealthAuthorityStatus(draft.healthAuthorityStatus);
+      })
+      .finally(() => {
+        if (active) setRegComplianceDraftReady(true);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!regComplianceDraftReady) return;
+
+    if (!regTaxRegistrationStatus && !regHealthAuthorityStatus) {
+      AsyncStorage.removeItem(REGISTRATION_COMPLIANCE_DRAFT_KEY).catch(() => {});
+      return;
+    }
+
+    AsyncStorage.setItem(
+      REGISTRATION_COMPLIANCE_DRAFT_KEY,
+      JSON.stringify({
+        taxRegistrationStatus: regTaxRegistrationStatus ?? null,
+        healthAuthorityStatus: regHealthAuthorityStatus ?? null,
+      }),
+    ).catch(() => {});
+  }, [regComplianceDraftReady, regTaxRegistrationStatus, regHealthAuthorityStatus]);
 
   useEffect(() => {
     Promise.all([
@@ -657,10 +797,19 @@ export default function App() {
   };
 
   const handleSaveProfile = async () => {
-    if (!authToken) return;
+    if (!authToken || !loggedInTherapist?.id) return;
     setProfileSaving(true);
+
+    const complianceDraftKey = getTherapistComplianceDraftKey(loggedInTherapist.id);
+    const compliancePayload = {
+      taxRegistrationStatus: editTaxRegistrationStatus ?? null,
+      healthAuthorityStatus: editHealthAuthorityStatus ?? null,
+    };
+
     try {
-      const res = await fetch(`${getBaseUrl()}/auth/me`, {
+      await AsyncStorage.setItem(complianceDraftKey, JSON.stringify(compliancePayload));
+
+      const profileRes = await fetch(`${getBaseUrl()}/auth/me`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
         body: JSON.stringify({
@@ -674,16 +823,39 @@ export default function App() {
           availability: editAvailability,
         }),
       });
-      if (res.ok) {
+
+      const profileData = await profileRes.json().catch(() => ({}));
+
+      const complianceRes = await fetch(`${getBaseUrl()}/auth/me/compliance`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify(compliancePayload),
+      });
+      const complianceData = await complianceRes.json().catch(() => ({}));
+
+      if (complianceRes.ok) {
+        await AsyncStorage.removeItem(complianceDraftKey);
+      }
+
+      if (profileRes.ok || complianceRes.ok) {
         const profileRes = await fetch(`${getBaseUrl()}/auth/me`, {
           headers: { Authorization: `Bearer ${authToken}` },
         });
         if (profileRes.ok) setLoggedInTherapist(normalizeTherapistProfile(await profileRes.json()));
+      }
+
+      if (profileRes.ok && complianceRes.ok) {
         setEditMode(false);
         setShowProfileSavedModal(true);
+      } else if (profileRes.ok) {
+        Alert.alert(t('alertHint'), t('profileSavedCompliancePendingBody'));
+      } else if (complianceRes.ok) {
+        Alert.alert(t('alertHint'), profileData.message ?? t('complianceOnlySavedBody'));
       } else {
-        const err = await res.json().catch(() => ({}));
-        Alert.alert(t('alertError'), err.message ?? t('alertProfileSaveFail'));
+        Alert.alert(
+          t('alertError'),
+          profileData.message ?? complianceData.message ?? t('alertProfileSaveFail'),
+        );
       }
     } catch {
       Alert.alert(t('alertConnectionError'), t('alertConnectionErrorBody'));
@@ -820,7 +992,7 @@ export default function App() {
   const [homeVisit, setHomeVisit] = useState(false);
   const [kassenart, setKassenart] = useState(null);
   const [fortbildungen, setFortbildungen] = useState([]);
-  const [certificationOptions, setCertificationOptions] = useState(fortbildungOptions);
+  const [certificationOptions, setCertificationOptions] = useState(() => normalizeCertificationOptions(fortbildungOptions));
   const [searchRadius, setSearchRadius] = useState(5);
   const [showFilters, setShowFilters] = useState(false);
   const [results, setResults] = useState([]);
@@ -867,7 +1039,7 @@ export default function App() {
         );
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
-        setAcSuggestions(data.suggestions ?? []);
+        setAcSuggestions(normalizeAutocompleteSuggestions(data?.suggestions));
       } catch (err) {
         if (err.name !== 'AbortError') setAcSuggestions([]);
       }
@@ -897,8 +1069,9 @@ export default function App() {
         });
         if (!res.ok) return;
         const data = await res.json();
-        if (!cancelled && Array.isArray(data.certifications) && data.certifications.length > 0) {
-          setCertificationOptions(data.certifications);
+        const nextOptions = normalizeCertificationOptions(data?.certifications, fortbildungOptions);
+        if (!cancelled && nextOptions.length > 0) {
+          setCertificationOptions(nextOptions);
         }
       } catch {}
     };
@@ -929,11 +1102,16 @@ export default function App() {
 
   const applyFilters = (list, coords) => {
     const origin = coords === undefined ? userCoords : coords;
-    return list.filter(t => {
+    const safeList = Array.isArray(list) ? list : [];
+    return safeList.filter(t => {
       if (homeVisit && !t.homeVisit) return false;
       if (kassenart && t.kassenart && t.kassenart !== kassenart) return false;
       if (fortbildungen.length > 0) {
-        const certs = t.fortbildungen ?? t.certifications ?? [];
+        const certs = Array.isArray(t?.fortbildungen)
+          ? t.fortbildungen
+          : Array.isArray(t?.certifications)
+            ? t.certifications
+            : [];
         if (!fortbildungen.some(f => certs.includes(f))) return false;
       }
       if (origin) {
@@ -945,8 +1123,9 @@ export default function App() {
   };
 
   const withDistances = (list, coords) => {
-    if (!coords) return list;
-    return list
+    const safeList = Array.isArray(list) ? list : [];
+    if (!coords) return safeList;
+    return safeList
       .map(t => {
         if (typeof t.distKm === 'number') return t;
         const p = (t.practices ?? []).find(practice => typeof practice.distKm === 'number') ?? t.practices?.[0];
@@ -977,11 +1156,11 @@ export default function App() {
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const payload = await response.json();
-    return (payload.therapists ?? []).map(mapApiTherapist);
+    return (Array.isArray(payload?.therapists) ? payload.therapists : []).map(mapApiTherapist);
   };
 
   const runSearchWith = async (q, coords, cityOverride, originOverride) => {
-    const effectiveCity = cityOverride ?? city;
+    const effectiveCity = typeof (cityOverride ?? city) === 'string' ? (cityOverride ?? city) : '';
     const effectiveOrigin = originOverride !== undefined ? originOverride : (coords ?? userCoords);
     if (!effectiveCity.trim()) {
       setPendingQuery(q);
@@ -1035,7 +1214,8 @@ export default function App() {
   };
 
   const selectSuggestion = (suggestion) => {
-    const text = typeof suggestion === 'string' ? suggestion : suggestion.text;
+    const text = typeof suggestion === 'string' ? suggestion : suggestion?.text;
+    if (!text) return;
     setQuery(text);
     setAcSuggestions([]);
     setShowAutocomplete(false);
@@ -1055,17 +1235,24 @@ export default function App() {
         const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(text)}&format=json&addressdetails=1&limit=6&countrycodes=de,at,ch&accept-language=de`;
         const res = await fetch(url, { headers: { 'User-Agent': 'RevioApp/1.0' } });
         const data = await res.json();
-        setLocationSuggestions(data.map(item => ({
-          label: item.display_name.split(',').slice(0, 3).join(',').trim(),
-          city: item.address?.city || item.address?.town || item.address?.village || item.address?.municipality || '',
-          lat: parseFloat(item.lat),
-          lng: parseFloat(item.lon),
-        })).filter(s => s.city));
+        const nextSuggestions = (Array.isArray(data) ? data : [])
+          .map((item) => {
+            const displayName = typeof item?.display_name === 'string' ? item.display_name : '';
+            return {
+              label: displayName.split(',').slice(0, 3).join(',').trim(),
+              city: item?.address?.city || item?.address?.town || item?.address?.village || item?.address?.municipality || '',
+              lat: Number.parseFloat(item?.lat),
+              lng: Number.parseFloat(item?.lon),
+            };
+          })
+          .filter((suggestion) => suggestion.city && Number.isFinite(suggestion.lat) && Number.isFinite(suggestion.lng));
+        setLocationSuggestions(nextSuggestions);
       } catch {}
     }, 350);
   };
 
   const selectLocationSuggestion = (suggestion) => {
+    if (!suggestion?.city || !Number.isFinite(suggestion.lat) || !Number.isFinite(suggestion.lng)) return;
     setLocationSuggestions([]);
     setLocationSheetCity(suggestion.label);
     confirmLocationAndSearch(suggestion.city, { lat: suggestion.lat, lng: suggestion.lng }, suggestion.label);
@@ -1263,6 +1450,13 @@ export default function App() {
     }
   };
 
+  const openTherapistById = (id) => {
+    const th = results.find(x => x.id === id)
+      || favorites.find(x => x.id === id)
+      || selectedPracticeTherapists.find(x => x.id === id);
+    if (th) setSelectedTherapist(th);
+  };
+
   // ── Discover tab ──────────────────────────────────────────────────────────
 
   const mapTherapists = React.useMemo(
@@ -1415,7 +1609,14 @@ export default function App() {
   const renderTherapistDashboard = () => {
     const th = loggedInTherapist;
 
-    const enterEdit = () => {
+    const enterEdit = async () => {
+      const draft = th?.id
+        ? parseComplianceDraft(await AsyncStorage.getItem(getTherapistComplianceDraftKey(th.id)))
+        : normalizeComplianceDraft(null);
+      const nextCompliance = draft.taxRegistrationStatus || draft.healthAuthorityStatus
+        ? draft
+        : normalizeComplianceDraft(th?.compliance);
+
       setEditBio(th.bio ?? '');
       setEditSpecializations((th.specializations ?? []).join(', '));
       setEditLanguages(normalizeLanguageCodes(th.languages));
@@ -1424,6 +1625,8 @@ export default function App() {
       setEditKassenart(th.kassenart ?? '');
       setEditIsVisible(th.isVisible ?? true);
       setEditAvailability(th.availability ?? '');
+      setEditTaxRegistrationStatus(nextCompliance.taxRegistrationStatus);
+      setEditHealthAuthorityStatus(nextCompliance.healthAuthorityStatus);
       setEditMode(true);
     };
 
@@ -1433,6 +1636,7 @@ export default function App() {
         c={c}
         editAvailability={editAvailability}
         editBio={editBio}
+        editHealthAuthorityStatus={editHealthAuthorityStatus}
         editHomeVisit={editHomeVisit}
         editIsVisible={editIsVisible}
         editKassenart={editKassenart}
@@ -1440,6 +1644,7 @@ export default function App() {
         editMode={editMode}
         editServiceRadius={editServiceRadius}
         editSpecializations={editSpecializations}
+        editTaxRegistrationStatus={editTaxRegistrationStatus}
         documentUploading={documentUploading}
         handlePickDocument={handlePickDocument}
         handlePickPhoto={handlePickPhoto}
@@ -1453,10 +1658,12 @@ export default function App() {
         setEditHomeVisit={setEditHomeVisit}
         setEditIsVisible={setEditIsVisible}
         setEditKassenart={setEditKassenart}
+        setEditHealthAuthorityStatus={setEditHealthAuthorityStatus}
         setEditLanguages={setEditLanguages}
         setEditMode={setEditMode}
         setEditServiceRadius={setEditServiceRadius}
         setEditSpecializations={setEditSpecializations}
+        setEditTaxRegistrationStatus={setEditTaxRegistrationStatus}
         styles={styles}
         t={t}
       />
@@ -1773,7 +1980,7 @@ export default function App() {
           return regFirstName.trim().length > 0 && regLastName.trim().length > 0 && regCity.trim().length > 0;
         case 3:
           return regIsFreelance === true;
-        case 5:
+        case 6:
           return Boolean(regDocument);
         default:
           return true;
@@ -2033,7 +2240,7 @@ export default function App() {
           return (
             <>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
-                <Text style={[styles.regStepTitle, { color: c.text, marginBottom: 0 }]}>{t('registrationDocumentTitle')}</Text>
+                <Text style={[styles.regStepTitle, { color: c.text, marginBottom: 0 }]}>{t('complianceSectionTitle')}</Text>
                 <Pressable onPress={() => setShowRegStepInfo(v => !v)} hitSlop={ICON_HIT_SLOP} style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
                   <Text style={{ fontSize: 12, color: c.muted }}>{t('infoLabel')}</Text>
                   <Ionicons name={showRegStepInfo ? 'chevron-up' : 'chevron-down'} size={13} color={c.muted} />
@@ -2042,6 +2249,31 @@ export default function App() {
               {showRegStepInfo && (
                 <View style={{ backgroundColor: c.mutedBg, borderRadius: 10, padding: 12, borderWidth: 1, borderColor: c.border, marginBottom: SPACE.sm }}>
                   <Text style={{ fontSize: 13, color: c.muted, lineHeight: 19 }}>{REG_STEP_INFO[5]}</Text>
+                </View>
+              )}
+              <ComplianceStatusStep
+                c={c}
+                healthAuthorityStatus={regHealthAuthorityStatus}
+                onChangeHealthAuthorityStatus={setRegHealthAuthorityStatus}
+                onChangeTaxRegistrationStatus={setRegTaxRegistrationStatus}
+                t={t}
+                taxRegistrationStatus={regTaxRegistrationStatus}
+              />
+            </>
+          );
+        case 6:
+          return (
+            <>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
+                <Text style={[styles.regStepTitle, { color: c.text, marginBottom: 0 }]}>{t('registrationDocumentTitle')}</Text>
+                <Pressable onPress={() => setShowRegStepInfo(v => !v)} hitSlop={ICON_HIT_SLOP} style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                  <Text style={{ fontSize: 12, color: c.muted }}>{t('infoLabel')}</Text>
+                  <Ionicons name={showRegStepInfo ? 'chevron-up' : 'chevron-down'} size={13} color={c.muted} />
+                </Pressable>
+              </View>
+              {showRegStepInfo && (
+                <View style={{ backgroundColor: c.mutedBg, borderRadius: 10, padding: 12, borderWidth: 1, borderColor: c.border, marginBottom: SPACE.sm }}>
+                  <Text style={{ fontSize: 13, color: c.muted, lineHeight: 19 }}>{REG_STEP_INFO[6]}</Text>
                 </View>
               )}
 
@@ -2082,7 +2314,7 @@ export default function App() {
               )}
             </>
           );
-        case 6:
+        case 7:
           return (
             <>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
@@ -2094,7 +2326,7 @@ export default function App() {
               </View>
               {showRegStepInfo && (
                 <View style={{ backgroundColor: c.mutedBg, borderRadius: 10, padding: 12, borderWidth: 1, borderColor: c.border }}>
-                  <Text style={{ fontSize: 13, color: c.muted, lineHeight: 19 }}>{REG_STEP_INFO[6]}</Text>
+                  <Text style={{ fontSize: 13, color: c.muted, lineHeight: 19 }}>{REG_STEP_INFO[7]}</Text>
                 </View>
               )}
               {[
@@ -2105,6 +2337,8 @@ export default function App() {
                 { label: t('specsLabel'), value: regSpecializations.join(', ') || '—' },
                 { label: t('languagesLabel'), value: regLanguages.map(getLangLabel).join(', ') || '—' },
                 { label: t('certificationsShort'), value: regFortbildungen.map(getCertificationLabel).join(', ') || '—' },
+                { label: t('taxRegistrationLabel'), value: getComplianceStatusLabel(regTaxRegistrationStatus, t) },
+                { label: t('healthAuthorityLabel'), value: getComplianceStatusLabel(regHealthAuthorityStatus, t) },
                 { label: t('documentLabel'), value: regDocument?.name || '—' },
               ].map(row => (
                 <View key={row.label} style={[styles.previewRow, { borderBottomColor: c.border }]}>
@@ -2131,6 +2365,7 @@ export default function App() {
       4: t('regStepInfoText4'),
       5: t('regStepInfoText5'),
       6: t('regStepInfoText6'),
+      7: t('regStepInfoText7'),
     };
 
     return (
@@ -2189,6 +2424,10 @@ export default function App() {
                     homeVisit: regHomeVisit === true,
                     serviceRadiusKm: regHomeVisit === true ? (regServiceRadius ?? null) : null,
                     kassenart: regKassenart.length ? regKassenart.join(',') : undefined,
+                    compliance: {
+                      taxRegistrationStatus: regTaxRegistrationStatus ?? undefined,
+                      healthAuthorityStatus: regHealthAuthorityStatus ?? undefined,
+                    },
                   }),
                 });
                 const resData = await res.json().catch(() => ({}));
@@ -2236,12 +2475,15 @@ export default function App() {
                     headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${resData.token}` },
                   });
                   if (profileRes.ok) setLoggedInTherapist(normalizeTherapistProfile(await profileRes.json()));
+                  await AsyncStorage.removeItem(REGISTRATION_COMPLIANCE_DRAFT_KEY);
                   setShowRegister(false);
                   setRegStep(1);
                   setRegSpecSearch('');
                   setRegLangSearch('');
                   setShowRegFortbildungen(false);
                   setRegDocument(null);
+                  setRegTaxRegistrationStatus(null);
+                  setRegHealthAuthorityStatus(null);
                   return;
                 }
               } catch {
@@ -2489,9 +2731,9 @@ export default function App() {
       if (loggedInTherapist) return renderTherapistDashboard();
       return (
         <View style={{ flex: 1 }}>
-          <View style={styles.authBrandSlot}>
-            <View style={styles.authBrandRow}>
-              <Image source={require('../assets/icon.png')} style={[styles.logoMark, styles.authBrandMark]} />
+          <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 10, backgroundColor: c.background }}>
+            <View style={[styles.header, { marginBottom: 0 }]}>
+              <Image source={require('../assets/icon.png')} style={styles.logoMark} />
               <Text style={[styles.authBrandWordmark, { color: c.text }]}>evio</Text>
             </View>
           </View>
@@ -2883,23 +3125,6 @@ const styles = StyleSheet.create({
   heroTitle: { ...TYPE.xl },
   heroSub: { ...TYPE.body },
 
-  authBrandSlot: {
-    width: '100%',
-    minHeight: 64,
-    paddingHorizontal: 20,
-    paddingTop: 14,
-    paddingBottom: 10,
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  authBrandRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    width: '100%',
-    minHeight: 40,
-  },
-  authBrandMark: { borderRadius: 13 },
-  authBrandLogoText: { fontSize: 18, lineHeight: 18, letterSpacing: -1 },
   authBrandWordmark: { ...TYPE.lg, marginLeft: 4, letterSpacing: 0.4 },
   header: {
     flexDirection: 'row',

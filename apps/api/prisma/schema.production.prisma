@@ -89,6 +89,9 @@ model Therapist {
   sessionToken          String?      @unique
   photo                 String?
   expoPushToken         String?
+  taxRegistrationStatus String?
+  healthAuthorityStatus String?
+  complianceUpdatedAt   DateTime?
   invitedByPracticeId   String?
   onboardingStatus      String       @default("none")
   visibilityPreference  String       @default("hidden")

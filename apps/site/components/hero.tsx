@@ -40,18 +40,17 @@ export function Hero({
         </div>
 
         <div className="hero-card">
-          <div className="hero-phones">
-            {['/screenshot-1.png', '/screenshot-2.png', '/screenshot-3.png'].map((src, i) => (
-              <div key={src} className={`hero-phone hero-phone--${i}`}>
-                <Image
-                  src={src}
-                  alt="Revio App"
-                  width={390}
-                  height={844}
-                  className="hero-phone__img"
-                />
-              </div>
-            ))}
+          <div className="hero-phones hero-phones--single">
+            <div className="hero-phone hero-phone--single">
+              <Image
+                src="/IMG_2453.jpeg"
+                alt="Revio App"
+                width={1179}
+                height={1076}
+                className="hero-phone__img"
+                priority
+              />
+            </div>
           </div>
           <div className="hero-card__label">Revio App</div>
           <div className="hero-card__text">

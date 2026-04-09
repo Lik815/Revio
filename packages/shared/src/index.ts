@@ -9,6 +9,15 @@ export type ReviewStatus =
   | 'SUSPENDED';
 
 export type LinkStatus = 'PROPOSED' | 'CONFIRMED' | 'DISPUTED' | 'REJECTED';
+export type ComplianceStatus = 'yes' | 'no' | 'in_progress';
+export type HealthAuthorityStatus = ComplianceStatus | 'unknown';
+export type TherapistProfileStatus = 'draft' | 'incomplete' | 'ready_for_review';
+
+export interface TherapistCompliance<TDate = string> {
+  taxRegistrationStatus?: ComplianceStatus | null;
+  healthAuthorityStatus?: HealthAuthorityStatus | null;
+  updatedAt?: TDate | null;
+}
 
 // ─── Core Entities ────────────────────────────────────────────────────────────
 
@@ -30,6 +39,8 @@ export interface Therapist {
   isVisible: boolean;
   isPublished: boolean;
   onboardingStatus: string | null;
+  compliance?: TherapistCompliance | null;
+  profileStatus?: TherapistProfileStatus;
   createdAt: string;
 }
 

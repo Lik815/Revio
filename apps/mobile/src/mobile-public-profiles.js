@@ -17,6 +17,7 @@ import {
   getPracticeInitials,
   RADIUS,
   resolveMediaUrl,
+  softenErrorMessage,
   TYPE,
 } from './mobile-utils';
 
@@ -54,7 +55,10 @@ export function PracticeProfileScreen(props) {
     toggleFavoritePractice,
   } = props;
 
-  const therapists = selectedPracticeTherapists;
+  const practiceName = typeof practice?.name === 'string' && practice.name.trim() ? practice.name.trim() : 'Praxis';
+  const practiceCity = typeof practice?.city === 'string' ? practice.city : '';
+  const therapists = Array.isArray(selectedPracticeTherapists) ? selectedPracticeTherapists : [];
+  const practicePhotos = Array.isArray(practice?.photos) ? practice.photos.filter(Boolean) : [];
   const iconHitSlop = { top: 10, bottom: 10, left: 10, right: 10 };
   const [practiceLogoError, setPracticeLogoError] = React.useState(false);
 
@@ -66,13 +70,13 @@ export function PracticeProfileScreen(props) {
         </Pressable>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           <Pressable onPress={() => toggleFavoritePractice(practice)} hitSlop={iconHitSlop} style={{ paddingHorizontal: 10, paddingVertical: 10 }}>
-            <Ionicons name={isPracticeFavorite(practice.id) ? 'heart' : 'heart-outline'} size={22} color={isPracticeFavorite(practice.id) ? c.saved : c.muted} />
+            <Ionicons name={isPracticeFavorite(practice?.id) ? 'heart' : 'heart-outline'} size={22} color={isPracticeFavorite(practice?.id) ? c.saved : c.muted} />
           </Pressable>
           <Pressable
             onPress={() => sharePublicLink({
-              title: practice.name,
-              url: `https://revio.app/p/${practice.id}`,
-              message: `${practice.name} – ${practice.city}\nhttps://revio.app/p/${practice.id}`,
+              title: practiceName,
+              url: `https://revio.app/p/${practice?.id}`,
+              message: `${practiceName} – ${practiceCity}\nhttps://revio.app/p/${practice?.id}`,
             })}
             hitSlop={iconHitSlop}
             style={{ paddingHorizontal: 12, paddingVertical: 10 }}
@@ -83,7 +87,7 @@ export function PracticeProfileScreen(props) {
       </View>
 
       <View style={[styles.practiceHeader, { backgroundColor: c.card, borderColor: c.border }]}>
-        {practice.logo && !practiceLogoError ? (
+        {practice?.logo && !practiceLogoError ? (
           <Image
             source={{ uri: resolveMediaUrl(practice.logo) }}
             style={[styles.practiceLogoLarge, { borderRadius: RADIUS.md }]}
@@ -96,18 +100,18 @@ export function PracticeProfileScreen(props) {
               <View style={[styles.plusBarV, { backgroundColor: 'rgba(255,255,255,0.45)' }]} />
             </View>
             <Text style={styles.practiceLogoText}>
-              {practice.name.split(' ').filter((word) => word.length > 2).map((word) => word[0]).join('').toUpperCase().slice(0, 2) || practice.name.charAt(0).toUpperCase()}
+              {getPracticeInitials(practiceName)}
             </Text>
           </View>
         )}
-        <Text style={[styles.practiceHeaderName, { color: c.text }]}>{practice.name}</Text>
-        <Text style={[styles.practiceHeaderCity, { color: c.muted }]}>{practice.city}</Text>
+        <Text style={[styles.practiceHeaderName, { color: c.text }]}>{practiceName}</Text>
+        <Text style={[styles.practiceHeaderCity, { color: c.muted }]}>{practiceCity}</Text>
       </View>
 
       {[
-        practice.address && { icon: '📍', label: practice.address, onPress: () => Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(practice.address)}`) },
-        practice.phone && { icon: '📞', label: practice.phone, onPress: () => Linking.openURL(`tel:${practice.phone}`) },
-        practice.hours && { icon: '🕐', label: practice.hours, onPress: null },
+        practice?.address && { icon: '📍', label: practice.address, onPress: () => Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(practice.address)}`) },
+        practice?.phone && { icon: '📞', label: practice.phone, onPress: () => Linking.openURL(`tel:${practice.phone}`) },
+        practice?.hours && { icon: '🕐', label: practice.hours, onPress: null },
       ].filter(Boolean).map((row) => (
         <Pressable key={row.label} onPress={row.onPress ?? undefined} style={[styles.detailRow, { backgroundColor: c.card, borderColor: c.border }]}>
           <Text style={styles.detailIcon}>{row.icon}</Text>
@@ -115,15 +119,15 @@ export function PracticeProfileScreen(props) {
         </Pressable>
       ))}
 
-      {practice.photos?.length > 0 && (
+      {practicePhotos.length > 0 && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: 4 }} contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}>
-          {practice.photos.map((uri, index) => (
+          {practicePhotos.map((uri, index) => (
             <Image key={index} source={{ uri }} style={{ width: 220, height: 145, borderRadius: RADIUS.sm }} />
           ))}
         </ScrollView>
       )}
 
-      {!!practice.description && (
+      {!!practice?.description && (
         <View style={{ marginHorizontal: 16, marginTop: 8, marginBottom: 4, padding: 14, backgroundColor: c.card, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: c.border }}>
           <Text style={{ ...TYPE.label, color: c.muted, marginBottom: 6, textTransform: 'none', letterSpacing: 0.5 }}>{t('aboutPractice')}</Text>
           <Text style={{ ...TYPE.body, color: c.text }}>{practice.description}</Text>
@@ -148,31 +152,34 @@ export function PracticeProfileScreen(props) {
           </Text>
         </View>
       ) : (
-        therapists.map((therapist) => (
-          <Pressable key={therapist.id} onPress={() => openTherapistById(therapist.id)} style={[styles.miniCard, { backgroundColor: c.card, borderColor: c.border }]}>
-            <Image source={{ uri: therapist.photo }} style={styles.miniAvatar} />
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.cardName, { color: c.text }]}>{therapist.fullName}</Text>
-              <Text style={[styles.cardTitle, { color: c.muted }]}>{therapist.professionalTitle}</Text>
-              <View style={[styles.tagRow, { marginTop: 6 }]}>
-                {therapist.specializations.slice(0, 2).map((specialization) => (
-                  <View key={specialization} style={[styles.tag, { backgroundColor: c.mutedBg }]}>
-                    <Text style={[styles.tagText, { color: c.text }]}>{specialization}</Text>
-                  </View>
-                ))}
-                {therapist.homeVisit && (
-                  <View style={[styles.tag, { backgroundColor: c.successBg }]}>
-                    <Text style={[styles.tagText, { color: c.success }]}>{t('homeVisitTag')}</Text>
-                  </View>
-                )}
+        therapists.map((therapist) => {
+          const therapistSpecializations = Array.isArray(therapist?.specializations) ? therapist.specializations : [];
+          return (
+            <Pressable key={therapist.id} onPress={() => openTherapistById(therapist.id)} style={[styles.miniCard, { backgroundColor: c.card, borderColor: c.border }]}>
+              <Image source={{ uri: therapist.photo }} style={styles.miniAvatar} />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.cardName, { color: c.text }]}>{therapist.fullName ?? 'Profil'}</Text>
+                <Text style={[styles.cardTitle, { color: c.muted }]}>{therapist.professionalTitle ?? ''}</Text>
+                <View style={[styles.tagRow, { marginTop: 6 }]}>
+                  {therapistSpecializations.slice(0, 2).map((specialization) => (
+                    <View key={specialization} style={[styles.tag, { backgroundColor: c.mutedBg }]}>
+                      <Text style={[styles.tagText, { color: c.text }]}>{specialization}</Text>
+                    </View>
+                  ))}
+                  {therapist.homeVisit && (
+                    <View style={[styles.tag, { backgroundColor: c.successBg }]}>
+                      <Text style={[styles.tagText, { color: c.success }]}>{t('homeVisitTag')}</Text>
+                    </View>
+                  )}
+                </View>
               </View>
-            </View>
-            <Text style={[styles.practiceArrow, { color: c.muted }]}>›</Text>
-          </Pressable>
-        ))
+              <Text style={[styles.practiceArrow, { color: c.muted }]}>›</Text>
+            </Pressable>
+          );
+        })
       )}
 
-      <Pressable style={[styles.ctaBtn, { backgroundColor: c.accent, marginTop: 4 }]} onPress={() => callPhone(practice.phone)}>
+      <Pressable style={[styles.ctaBtn, { backgroundColor: c.accent, marginTop: 4 }]} onPress={() => callPhone(practice?.phone)}>
         <Text style={styles.ctaBtnText}>{t('callPractice')}</Text>
       </Pressable>
     </ScrollView>
@@ -192,10 +199,15 @@ export function TherapistProfileScreen(props) {
     toggleFavorite,
   } = props;
 
+  const therapistName = typeof th?.fullName === 'string' && th.fullName.trim() ? th.fullName.trim() : 'Profil';
+  const therapistLanguages = Array.isArray(th?.languages) ? th.languages : [];
+  const therapistAreas = Array.isArray(th?.behandlungsbereiche) ? th.behandlungsbereiche : [];
+  const therapistSpecializations = Array.isArray(th?.specializations) ? th.specializations : [];
+  const therapistCertifications = Array.isArray(th?.fortbildungen) ? th.fortbildungen : [];
   const iconHitSlop = { top: 10, bottom: 10, left: 10, right: 10 };
   const openEmailComposer = () => {
     if (!th.email) return;
-    const subject = encodeURIComponent(t('contactSubject').replace('{name}', th.fullName));
+    const subject = encodeURIComponent(t('contactSubject').replace('{name}', therapistName));
     Linking.openURL(`mailto:${th.email}?subject=${subject}`);
   };
 
@@ -209,9 +221,9 @@ export function TherapistProfileScreen(props) {
           <HeartButton isSaved={isFavorite(th.id)} onToggle={() => toggleFavorite(th)} unsavedColor={c.muted} hitSlop={iconHitSlop} style={{ paddingHorizontal: 10, paddingVertical: 10 }} />
           <Pressable
             onPress={() => sharePublicLink({
-              title: th.fullName,
+              title: therapistName,
               url: `https://revio.app/t/${th.id}`,
-              message: `${th.fullName} – ${th.professionalTitle}\nhttps://revio.app/t/${th.id}`,
+              message: `${therapistName} – ${th.professionalTitle ?? ''}\nhttps://revio.app/t/${th.id}`,
             })}
             hitSlop={iconHitSlop}
             style={{ paddingHorizontal: 12, paddingVertical: 10 }}
@@ -227,17 +239,17 @@ export function TherapistProfileScreen(props) {
         ) : (
           <View style={[styles.therapistAvatarLarge, { backgroundColor: c.primary, alignItems: 'center', justifyContent: 'center' }]}>
             <Text style={{ color: '#fff', fontSize: 28, fontWeight: '700' }}>
-              {th.fullName.split(' ').map((name) => name[0]).join('').slice(0, 2).toUpperCase()}
+              {getPracticeInitials(therapistName)}
             </Text>
           </View>
         )}
         <View style={styles.profileNameRow}>
-          <Text style={[styles.practiceHeaderName, { color: c.text }]}>{th.fullName}</Text>
+          <Text style={[styles.practiceHeaderName, { color: c.text }]}>{therapistName}</Text>
         </View>
-        <Text style={[styles.practiceHeaderCity, { color: c.muted }]}>{th.professionalTitle}</Text>
-        {((th.languages ?? []).length > 0 || th.homeVisit) && (
+        <Text style={[styles.practiceHeaderCity, { color: c.muted }]}>{th.professionalTitle ?? ''}</Text>
+        {(therapistLanguages.length > 0 || th.homeVisit) && (
           <View style={[styles.tagRow, { justifyContent: 'center', marginTop: 8 }]}>
-            {(th.languages ?? []).map((language) => (
+            {therapistLanguages.map((language) => (
               <View key={language} style={[styles.tag, { backgroundColor: c.mutedBg }]}>
                 <Text style={[styles.tagText, { color: c.muted }]}>{getLangLabel(language)}</Text>
               </View>
@@ -299,11 +311,11 @@ export function TherapistProfileScreen(props) {
         </View>
       ) : null}
 
-      {th.behandlungsbereiche?.length > 0 && (
+      {therapistAreas.length > 0 && (
         <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
           <Text style={[styles.filterSectionTitle, { color: c.muted }]}>{t('behandlungLabel')}</Text>
           <View style={styles.tagRow}>
-            {th.behandlungsbereiche.map((area) => (
+            {therapistAreas.map((area) => (
               <View key={area} style={[styles.tag, { backgroundColor: c.mutedBg }]}>
                 <Text style={[styles.tagText, { color: c.text }]}>{area}</Text>
               </View>
@@ -312,11 +324,11 @@ export function TherapistProfileScreen(props) {
         </View>
       )}
 
-      {(th.specializations ?? []).length > 0 && (
+      {therapistSpecializations.length > 0 && (
         <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
           <Text style={[styles.filterSectionTitle, { color: c.muted }]}>{t('specsLabel')}</Text>
           <View style={styles.tagRow}>
-            {th.specializations.map((specialization) => (
+            {therapistSpecializations.map((specialization) => (
               <View key={specialization} style={[styles.tag, { backgroundColor: c.mutedBg }]}>
                 <Text style={[styles.tagText, { color: c.text }]}>{specialization}</Text>
               </View>
@@ -325,11 +337,11 @@ export function TherapistProfileScreen(props) {
         </View>
       )}
 
-      {th.fortbildungen?.length > 0 && (
+      {therapistCertifications.length > 0 && (
         <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
           <Text style={[styles.filterSectionTitle, { color: c.muted }]}>{t('certsLabel')}</Text>
           <View style={styles.tagRow}>
-            {th.fortbildungen.map((qualification) => (
+            {therapistCertifications.map((qualification) => (
               <View key={qualification} style={[styles.tag, { backgroundColor: c.successBg, borderWidth: 1, borderColor: c.success }]}>
                 <Text style={[styles.tagText, { color: c.success }]}>{qualification}</Text>
               </View>
