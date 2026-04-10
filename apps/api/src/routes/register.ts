@@ -9,6 +9,8 @@ import {
   HEALTH_AUTHORITY_STATUS_VALUES,
 } from '../utils/compliance.js';
 import { geocodeAddress, geocodeTherapistLocation, normalizeLocationPrecision } from '../utils/geocode.js';
+import { sendVerificationEmail } from '../utils/mailer.js';
+import { getEnv } from '../env.js';
 
 const complianceSchema = z.object({
   taxRegistrationStatus: z.enum(COMPLIANCE_STATUS_VALUES).optional(),
@@ -77,13 +79,16 @@ export const registerRoutes: FastifyPluginAsync = async (fastify) => {
       locationPrecision: data.locationPrecision,
     });
 
+    const emailVerificationToken = randomBytes(32).toString('hex');
+
     const user = await fastify.prisma.user.create({
       data: {
         email: data.email,
         passwordHash,
         role: 'therapist',
-        emailVerifiedAt: new Date(),
-        requiresEmailVerification: false,
+        emailVerifiedAt: null,
+        requiresEmailVerification: true,
+        emailVerificationToken,
       },
     });
 
@@ -139,17 +144,26 @@ export const registerRoutes: FastifyPluginAsync = async (fastify) => {
       });
     }
 
-    // Generate session token so the app can auto-login after registration
-    const sessionToken = randomBytes(32).toString('hex');
-    await fastify.prisma.user.update({
-      where: { id: user.id },
-      data: { sessionToken },
-    });
+    // Send verification email — if RESEND_API_KEY is missing, log the link for dev use
+    const env = getEnv();
+    const deepLink = `revo://verify?token=${emailVerificationToken}`;
+    const browserLink = `${env.APP_URL}/auth/verify-email?token=${emailVerificationToken}`;
+
+    if (env.RESEND_API_KEY) {
+      await sendVerificationEmail({
+        to: data.email,
+        name: data.fullName,
+        verifyLink: deepLink,
+        browserFallbackLink: browserLink,
+      });
+    } else {
+      fastify.log.warn(`[dev] Email verification link for ${data.email}: ${browserLink}`);
+    }
 
     return reply.status(201).send({
       therapistId: therapist.id,
-      message: 'Registration submitted. Your profile will be reviewed by an admin before it appears in search.',
-      token: sessionToken,
+      message: 'Registration submitted. Please verify your email address.',
+      requiresEmailVerification: true,
     });
   });
 };
