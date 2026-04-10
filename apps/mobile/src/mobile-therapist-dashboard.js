@@ -370,9 +370,8 @@ function LangMultiselect({ editLanguages, setEditLanguages, c, styles, t }) {
   const [search, setSearch] = useState('');
   const q = search.trim().toLowerCase();
   const selectedLanguages = Array.isArray(editLanguages) ? editLanguages : [];
-  const suggestions = languageOptions.filter((code) => {
+  const suggestions = q.length === 0 ? [] : languageOptions.filter((code) => {
     if (selectedLanguages.includes(code)) return false;
-    if (!q) return true;
     return code.toLowerCase().includes(q) || getLangLabel(code).toLowerCase().includes(q);
   }).slice(0, 8);
 
