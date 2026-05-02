@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import {
+  Alert,
   Image,
   Modal,
   Pressable,
@@ -187,7 +188,18 @@ export function TherapistLandingScreen(props) {
         ))}
       </View>
 
-      <Pressable style={[styles.registerBtn, { backgroundColor: c.primary }]} onPress={() => { setRegStep(1); setRegSubmitted(false); setShowRegister(true); }}>
+      <Pressable
+        style={[styles.registerBtn, { backgroundColor: c.primary }]}
+        onPress={() => Alert.alert(
+          t('registerRoleTitle'),
+          t('registerRoleBody'),
+          [
+            { text: t('registerRoleTherapist'), onPress: () => { setRegStep(1); setRegSubmitted(false); setShowRegister(true); } },
+            { text: t('registerRolePatient'), onPress: () => setShowPatientRegister(true) },
+            { text: t('cancelBtn'), style: 'cancel' },
+          ],
+        )}
+      >
         <Text style={styles.registerBtnText}>{t('registerBtn')}</Text>
       </Pressable>
 
@@ -196,13 +208,6 @@ export function TherapistLandingScreen(props) {
         onPress={() => setShowLogin(true)}
       >
         <Text style={{ fontSize: 15, fontWeight: '600', color: c.text }}>{t('loginAction')}</Text>
-      </Pressable>
-
-      <Pressable
-        style={{ marginTop: 16, alignItems: 'center', paddingVertical: 8 }}
-        onPress={() => setShowPatientRegister(true)}
-      >
-        <Text style={{ fontSize: 13, color: c.muted }}>{t('registerAsPatient')}</Text>
       </Pressable>
     </View>
   );
