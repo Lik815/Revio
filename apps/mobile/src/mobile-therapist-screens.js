@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import {
-  Alert,
   Image,
   Modal,
   Pressable,
@@ -139,7 +138,7 @@ export function TherapistLandingScreen(props) {
     setRegSubmitted,
     setShowLogin,
     setShowRegister,
-    setShowPatientRegister,
+    setShowRoleSelect,
     styles,
     t,
   } = props;
@@ -190,15 +189,7 @@ export function TherapistLandingScreen(props) {
 
       <Pressable
         style={[styles.registerBtn, { backgroundColor: c.primary }]}
-        onPress={() => Alert.alert(
-          t('registerRoleTitle'),
-          t('registerRoleBody'),
-          [
-            { text: t('registerRoleTherapist'), onPress: () => { setRegStep(1); setRegSubmitted(false); setShowRegister(true); } },
-            { text: t('registerRolePatient'), onPress: () => setShowPatientRegister(true) },
-            { text: t('cancelBtn'), style: 'cancel' },
-          ],
-        )}
+        onPress={() => setShowRoleSelect(true)}
       >
         <Text style={styles.registerBtnText}>{t('registerBtn')}</Text>
       </Pressable>

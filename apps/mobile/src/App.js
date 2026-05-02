@@ -454,6 +454,7 @@ export default function App() {
   const [loggedInTherapist, setLoggedInTherapist] = useState(null);
   const [loggedInPatient, setLoggedInPatient] = useState(null);
   const [accountType, setAccountType] = useState(null); // 'therapist' | 'patient' | null
+  const [showRoleSelect, setShowRoleSelect] = useState(false);
   const [showPatientRegister, setShowPatientRegister] = useState(false);
   const [patientRegEmail, setPatientRegEmail] = useState('');
   const [patientRegPassword, setPatientRegPassword] = useState('');
@@ -1804,6 +1805,74 @@ export default function App() {
 
   // ── Patient registration ──────────────────────────────────────────────────
 
+  const renderRoleSelect = () => (
+    <View style={{ flex: 1, paddingHorizontal: 20 }}>
+      <View style={{ paddingTop: 24, paddingBottom: 20 }}>
+        <Text style={{ fontSize: 22, fontWeight: '800', color: c.text }}>{t('registerRoleTitle')}</Text>
+        <Text style={{ fontSize: 14, color: c.muted, marginTop: 4 }}>{t('registerRoleBody')}</Text>
+      </View>
+
+      <View style={{ gap: 12 }}>
+        {/* Therapeut */}
+        <Pressable
+          onPress={() => { setShowRoleSelect(false); setRegStep(1); setRegSubmitted(false); setShowRegister(true); }}
+          style={({ pressed }) => [{
+            backgroundColor: c.card,
+            borderRadius: 16,
+            borderWidth: 1,
+            borderColor: c.border,
+            padding: 20,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 16,
+            opacity: pressed ? 0.7 : 1,
+          }]}
+        >
+          <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: c.primaryBg, alignItems: 'center', justifyContent: 'center' }}>
+            <Ionicons name="person-outline" size={24} color={c.primary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: c.text }}>{t('registerRoleTherapist')}</Text>
+            <Text style={{ fontSize: 13, color: c.muted, marginTop: 2 }}>{t('registerRoleTherapistSub')}</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={c.muted} />
+        </Pressable>
+
+        {/* Patient */}
+        <Pressable
+          onPress={() => { setShowRoleSelect(false); setShowPatientRegister(true); }}
+          style={({ pressed }) => [{
+            backgroundColor: c.card,
+            borderRadius: 16,
+            borderWidth: 1,
+            borderColor: c.border,
+            padding: 20,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 16,
+            opacity: pressed ? 0.7 : 1,
+          }]}
+        >
+          <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: c.primaryBg, alignItems: 'center', justifyContent: 'center' }}>
+            <Ionicons name="heart-outline" size={24} color={c.primary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: c.text }}>{t('registerRolePatient')}</Text>
+            <Text style={{ fontSize: 13, color: c.muted, marginTop: 2 }}>{t('registerRolePatientSub')}</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={c.muted} />
+        </Pressable>
+      </View>
+
+      <Pressable
+        style={{ marginTop: 24, alignItems: 'center', paddingVertical: 10 }}
+        onPress={() => setShowRoleSelect(false)}
+      >
+        <Text style={{ fontSize: 14, color: c.muted }}>{t('backBtn')}</Text>
+      </Pressable>
+    </View>
+  );
+
   const handlePatientRegister = async () => {
     setPatientRegError('');
     if (!patientRegFirstName.trim() || !patientRegLastName.trim()) {
@@ -1961,7 +2030,7 @@ export default function App() {
       setRegSubmitted={setRegSubmitted}
       setShowLogin={setShowLogin}
       setShowRegister={setShowRegister}
-      setShowPatientRegister={setShowPatientRegister}
+      setShowRoleSelect={setShowRoleSelect}
       styles={styles}
       t={t}
     />
@@ -3234,7 +3303,7 @@ export default function App() {
             </View>
           </View>
           <View style={{ flex: 1 }}>
-            {showLogin ? renderLogin() : showRegister ? renderRegister() : showPatientRegister ? renderPatientRegister() : renderTherapist()}
+            {showLogin ? renderLogin() : showRegister ? renderRegister() : showRoleSelect ? renderRoleSelect() : showPatientRegister ? renderPatientRegister() : renderTherapist()}
           </View>
         </View>
       );
