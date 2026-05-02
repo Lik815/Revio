@@ -75,7 +75,7 @@ export default async function HomePage() {
           <div className="surface-card">
             <ul className="check-list">
               {patientBenefits.map((item) => (
-                <li key={item}>{item}</li>
+                <li key={item.title}>{item.title}</li>
               ))}
             </ul>
           </div>
@@ -101,7 +101,7 @@ export default async function HomePage() {
           <div className="surface-card surface-card--tall">
             <ul className="check-list">
               {therapistBenefits.map((item) => (
-                <li key={item}>{item}</li>
+                <li key={item.title}>{item.title}</li>
               ))}
             </ul>
           </div>
@@ -118,7 +118,7 @@ export default async function HomePage() {
 
       <Section
         eyebrow="Vertrauen"
-        title="Ruhig, hochwertig und medizinisch glaubwürdig"
+        title="Klar, fokussiert und medizinisch glaubwürdig"
         body="Revio ist bewusst reduziert gedacht: klare Profile, verständliche Informationen und ein Produkt, das Vertrauen schafft statt zu überfordern."
       >
         <div className="cta-banner">

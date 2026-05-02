@@ -9,7 +9,7 @@ export function SiteFooter() {
         <div>
           <Brand variant="footer" />
           <p className="site-footer__copy">
-            Revio ist ein ruhiger, hochwertiger Zugang zu moderner Physiotherapie.
+            Revio macht moderne Physiotherapie klarer zugänglich.
           </p>
         </div>
 

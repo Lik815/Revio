@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { Hero } from '../../components/hero';
 import { Section } from '../../components/section';
 import { principles } from '../../lib/content';
@@ -8,11 +9,12 @@ export default function AboutPage() {
       <Hero
         eyebrow="Über Revio"
         title="Warum es Revio gibt"
-        body="Die Suche nach passender Physiotherapie ist oft unnötig unübersichtlich. Revio entsteht aus dem Anspruch, diesen Zugang klarer, vertrauenswürdiger und hochwertiger zu gestalten."
+        body="Die Suche nach passender Physiotherapie ist oft unnötig unübersichtlich. Revio entsteht aus dem Anspruch, diesen Zugang klarer, vertrauenswürdiger und zugänglicher zu gestalten."
         primaryHref="/contact"
         primaryLabel="Kontakt"
         secondaryHref="/patients"
         secondaryLabel="Für Patient:innen"
+        hideImage
       />
 
       <Section
@@ -27,6 +29,24 @@ export default function AboutPage() {
               <p>Diese Richtung bestimmt sowohl das Produkt als auch die visuelle Sprache der Website.</p>
             </article>
           ))}
+        </div>
+      </Section>
+
+      <Section
+        eyebrow="Entstehung"
+        title="Wer hinter Revio steht"
+        body="Revio entsteht als Einzelprojekt mit dem Anspruch, Physiotherapie in Deutschland klarer und zugänglicher zu machen. Der Ausgangspunkt: Die Suche nach einem passenden Therapeuten ist heute unnötig aufwändig — obwohl die Expertise vorhanden ist. Revio soll diese Lücke schließen, ohne dabei eine aufgeblähte Plattform zu werden."
+      >
+        <div className="cta-banner">
+          <div>
+            <h3>Interesse oder Fragen?</h3>
+            <p>Wir freuen uns über Austausch — ob als Patient:in, Therapeut:in oder einfach Neugierige:r.</p>
+          </div>
+          <div className="cta-banner__actions">
+            <Link href="/contact" className="button button--primary">
+              Kontakt aufnehmen
+            </Link>
+          </div>
         </div>
       </Section>
 
@@ -51,6 +71,27 @@ export default function AboutPage() {
               <li>klare Profile</li>
               <li>Vertrauen und medizinische Glaubwürdigkeit</li>
             </ul>
+          </div>
+        </div>
+      </Section>
+
+      <Section
+        eyebrow="Kontakt"
+        title="Interesse an Revio?"
+        body="Ob als Patient:in, Therapeut:in oder mit allgemeiner Frage — wir freuen uns über Nachrichten."
+      >
+        <div className="cta-banner">
+          <div>
+            <h3>Direkt Kontakt aufnehmen</h3>
+            <p>Wir sind offen für Feedback, Interesse und echte Geschichten aus der Versorgungspraxis.</p>
+          </div>
+          <div className="cta-banner__actions">
+            <Link href="/contact" className="button button--primary">
+              Nachricht senden
+            </Link>
+            <Link href="/patients" className="button button--ghost">
+              Für Patient:innen
+            </Link>
           </div>
         </div>
       </Section>

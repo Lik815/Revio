@@ -1,44 +1,81 @@
 'use client';
 
+import emailjs from '@emailjs/browser';
 import { FormEvent, useState } from 'react';
-
-type ContactFormProps = {
-  contactEmail: string;
-};
 
 const roleOptions = [
   { value: 'Patient:in', label: 'Patient:in' },
   { value: 'Therapeut:in', label: 'Therapeut:in' },
 ];
 
-export function ContactForm({ contactEmail }: ContactFormProps) {
+type Status = 'idle' | 'sending' | 'success' | 'error';
+
+export function ContactForm() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [role, setRole] = useState(roleOptions[0].value);
   const [message, setMessage] = useState('');
+  const [status, setStatus] = useState<Status>('idle');
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const subject = encodeURIComponent(`Revio Kontaktanfrage · ${role}`);
-    const body = encodeURIComponent(
-      [
-        `Name: ${name || '-'}`,
-        `E-Mail: ${email || '-'}`,
-        `Rolle: ${role}`,
-        '',
-        message || '-',
-      ].join('\n'),
-    );
+    setStatus('sending');
 
-    window.location.href = `mailto:${contactEmail}?subject=${subject}&body=${body}`;
+    const serviceId = process.env.NEXT_PUBLIC_EMAILJS_SERVICE_ID ?? '';
+    const templateId = process.env.NEXT_PUBLIC_EMAILJS_TEMPLATE_ID ?? '';
+    const publicKey = process.env.NEXT_PUBLIC_EMAILJS_PUBLIC_KEY ?? '';
+
+    try {
+      await emailjs.send(
+        serviceId,
+        templateId,
+        {
+          from_name: name || 'Anonym',
+          from_email: email,
+          role,
+          message: message || '—',
+        },
+        { publicKey },
+      );
+      setStatus('success');
+      setName('');
+      setEmail('');
+      setRole(roleOptions[0].value);
+      setMessage('');
+    } catch {
+      setStatus('error');
+    }
   };
+
+  if (status === 'success') {
+    return (
+      <div className="contact-form contact-form--feedback">
+        <div className="contact-form__success">
+          <div className="contact-form__success-icon">✓</div>
+          <h3>Nachricht gesendet</h3>
+          <p>Wir melden uns bald bei dir.</p>
+          <button
+            type="button"
+            className="button button--ghost"
+            onClick={() => setStatus('idle')}
+          >
+            Neue Nachricht schreiben
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <form className="contact-form" onSubmit={handleSubmit}>
       <div className="form-grid">
         <label className="field">
           <span>Name</span>
-          <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Dein Name" />
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Dein Name"
+          />
         </label>
 
         <label className="field">
@@ -46,15 +83,16 @@ export function ContactForm({ contactEmail }: ContactFormProps) {
           <input
             type="email"
             value={email}
-            onChange={(event) => setEmail(event.target.value)}
+            onChange={(e) => setEmail(e.target.value)}
             placeholder="dein.name@beispiel.de"
+            required
           />
         </label>
       </div>
 
       <label className="field">
         <span>Ich bin</span>
-        <select value={role} onChange={(event) => setRole(event.target.value)}>
+        <select value={role} onChange={(e) => setRole(e.target.value)}>
           {roleOptions.map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}
@@ -67,18 +105,26 @@ export function ContactForm({ contactEmail }: ContactFormProps) {
         <span>Nachricht</span>
         <textarea
           value={message}
-          onChange={(event) => setMessage(event.target.value)}
+          onChange={(e) => setMessage(e.target.value)}
           placeholder="Wobei können wir helfen?"
           rows={6}
+          required
         />
       </label>
 
-      <div className="contact-form__footer">
-        <p className="form-note">
-          Der Versand läuft in dieser MVP-Version bewusst einfach über dein Standard-Mailprogramm.
+      {status === 'error' && (
+        <p className="form-error">
+          Beim Senden ist ein Fehler aufgetreten. Bitte versuche es erneut oder schreib uns direkt per E-Mail.
         </p>
-        <button type="submit" className="button button--primary">
-          E-Mail vorbereiten
+      )}
+
+      <div className="contact-form__footer">
+        <button
+          type="submit"
+          className="button button--primary"
+          disabled={status === 'sending'}
+        >
+          {status === 'sending' ? 'Wird gesendet…' : 'Nachricht senden'}
         </button>
       </div>
     </form>

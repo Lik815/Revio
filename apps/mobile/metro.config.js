@@ -3,6 +3,11 @@ const path = require('path');
 
 const projectRoot = __dirname;
 const workspaceRoot = path.resolve(projectRoot, '../..');
+const assetsRegistryPath = path.dirname(
+  require.resolve('@react-native/assets-registry/package.json', {
+    paths: [projectRoot, workspaceRoot],
+  }),
+);
 
 const config = getDefaultConfig(projectRoot);
 
@@ -17,10 +22,7 @@ config.resolver.nodeModulesPaths = [
 
 // Explicit mappings for packages not symlinked by pnpm into project node_modules
 config.resolver.extraNodeModules = {
-  '@react-native/assets-registry': path.resolve(
-    workspaceRoot,
-    'node_modules/.pnpm/@react-native+assets-registry@0.74.87/node_modules/@react-native/assets-registry',
-  ),
+  '@react-native/assets-registry': assetsRegistryPath,
 };
 
 // Force React 18 for mobile — prevents duplicate React (admin uses React 19)

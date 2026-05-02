@@ -14,6 +14,7 @@ export default function TherapistsPage() {
         primaryLabel="Interesse anmelden"
         secondaryHref="/about"
         secondaryLabel="Über Revio"
+        hideImage
       />
 
       <Section
@@ -23,9 +24,9 @@ export default function TherapistsPage() {
       >
         <div className="card-grid">
           {therapistBenefits.map((item) => (
-            <article key={item} className="feature-card">
-              <h3>{item}</h3>
-              <p>Revio soll Therapeut:innen professionell darstellen und die richtige fachliche Verbindung wahrscheinlicher machen.</p>
+            <article key={item.title} className="feature-card">
+              <h3>{item.title}</h3>
+              <p>{item.body}</p>
             </article>
           ))}
         </div>

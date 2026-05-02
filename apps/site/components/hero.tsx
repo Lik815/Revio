@@ -9,6 +9,7 @@ type HeroProps = {
   primaryLabel: string;
   secondaryHref?: string;
   secondaryLabel?: string;
+  hideImage?: boolean;
 };
 
 export function Hero({
@@ -19,10 +20,11 @@ export function Hero({
   primaryLabel,
   secondaryHref,
   secondaryLabel,
+  hideImage = false,
 }: HeroProps) {
   return (
-    <section className="hero">
-      <div className="shell hero__grid">
+    <section className={`hero${hideImage ? ' hero--no-image' : ''}`}>
+      <div className={`shell${hideImage ? '' : ' hero__grid'}`}>
         <div className="hero__copy">
           <div className="eyebrow">{eyebrow}</div>
           <h1>{title}</h1>
@@ -39,27 +41,29 @@ export function Hero({
           </div>
         </div>
 
-        <div className="hero-card">
-          <div className="hero-phones hero-phones--single">
-            <div className="hero-phone hero-phone--single">
-              <Image
-                src="/IMG_2453.jpeg"
-                alt="Revio App"
-                width={1179}
-                height={1076}
-                className="hero-phone__img"
-                priority
-              />
+        {!hideImage && (
+          <div className="hero-card">
+            <div className="hero-phones hero-phones--single">
+              <div className="hero-phone hero-phone--single">
+                <Image
+                  src="/IMG_2453.jpeg"
+                  alt="Revio App"
+                  width={1179}
+                  height={1076}
+                  className="hero-phone__img"
+                  priority
+                />
+              </div>
+            </div>
+            <div className="hero-card__label">Revio App</div>
+            <div className="hero-card__text">
+              Physiotherapie suchen, einordnen und Kontakt aufnehmen — klar und vertrauenswürdig.
+            </div>
+            <div className="hero-card__meta">
+              Finden · Einordnen · Kontakt aufnehmen
             </div>
           </div>
-          <div className="hero-card__label">Revio App</div>
-          <div className="hero-card__text">
-            Physiotherapie suchen, einordnen und Kontakt aufnehmen — ruhig und vertrauenswürdig.
-          </div>
-          <div className="hero-card__meta">
-            Finden · Einordnen · Kontakt aufnehmen
-          </div>
-        </div>
+        )}
       </div>
     </section>
   );

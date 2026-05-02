@@ -14,23 +14,24 @@ export default function ContactPage() {
         primaryLabel="Direkt per E-Mail"
         secondaryHref="/about"
         secondaryLabel="Mehr erfahren"
+        hideImage
       />
 
       <Section
         eyebrow="Kontakt"
         title="Einfach und direkt"
-        body="Für diese erste Website-Version bleibt der Kontakt bewusst leichtgewichtig. Das Formular bereitet eine E-Mail in deinem Standard-Mailprogramm vor."
+        body="Stell uns eine Frage, meld dein Interesse an oder teile uns deine Erfahrung mit."
       >
         <div className="contact-layout">
           <div className="surface-card">
             <div className="eyebrow">Direkter Kontakt</div>
             <h3>{siteConfig.contactEmail}</h3>
             <p>
-              Diese Adresse ist zentral im Projekt hinterlegt und kann später leicht auf die endgültige Revio-Kontaktadresse umgestellt werden.
+              Du erreichst uns auch direkt per E-Mail — wir antworten so schnell wie möglich.
             </p>
           </div>
 
-          <ContactForm contactEmail={siteConfig.contactEmail} />
+          <ContactForm />
         </div>
       </Section>
     </>

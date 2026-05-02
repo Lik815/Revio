@@ -24,7 +24,7 @@ type TherapistRow = {
   isFreelancer: boolean;
   languages: string; certifications: string; reviewStatus: string;
   serviceRadiusKm: number | null; kassenart: string;
-  gender: string | null; isVisible: boolean; isPublished: boolean; onboardingStatus: string | null;
+  gender?: string | null; isVisible: boolean; isPublished: boolean; onboardingStatus: string | null;
   createdAt: Date; updatedAt: Date;
   links?: Array<{ id: string; status: string; practice: { id: string; name: string; city: string; address: string | null; phone: string | null; hours: string | null; lat: number; lng: number; reviewStatus: string; createdAt: Date; updatedAt: Date } }>;
 };

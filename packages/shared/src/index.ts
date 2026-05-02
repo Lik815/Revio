@@ -86,6 +86,7 @@ export interface SearchInput {
   homeVisit?: boolean;
   specialization?: string;
   kassenart?: string;
+  gender?: 'female' | 'male';
 }
 
 export interface SearchPractice {

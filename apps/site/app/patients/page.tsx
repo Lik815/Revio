@@ -14,6 +14,7 @@ export default function PatientsPage() {
         primaryLabel="Kontakt aufnehmen"
         secondaryHref="/therapists"
         secondaryLabel="Therapeut:innen entdecken"
+        hideImage
       />
 
       <Section
@@ -23,11 +24,9 @@ export default function PatientsPage() {
       >
         <div className="card-grid">
           {patientBenefits.map((item) => (
-            <article key={item} className="feature-card">
-              <h3>{item}</h3>
-              <p>
-                Revio reduziert Suchfrust und hilft dabei, Profile schneller fachlich und praktisch einzuordnen.
-              </p>
+            <article key={item.title} className="feature-card">
+              <h3>{item.title}</h3>
+              <p>{item.body}</p>
             </article>
           ))}
         </div>
