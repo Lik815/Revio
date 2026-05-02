@@ -23,6 +23,7 @@ RUN cd apps/api && npx tsc -p tsconfig.json
 
 # Create uploads directory (required by @fastify/static, not in .dockerignore)
 RUN mkdir -p /app/apps/api/uploads
+# cache-bust: 2026-05-02
 
 EXPOSE 4000
 
