@@ -452,7 +452,16 @@ export default function App() {
   // Auth state
   const [authToken, setAuthToken] = useState(null);
   const [loggedInTherapist, setLoggedInTherapist] = useState(null);
-  const [accountType, setAccountType] = useState(null); // 'therapist' | null
+  const [loggedInPatient, setLoggedInPatient] = useState(null);
+  const [accountType, setAccountType] = useState(null); // 'therapist' | 'patient' | null
+  const [showPatientRegister, setShowPatientRegister] = useState(false);
+  const [patientRegEmail, setPatientRegEmail] = useState('');
+  const [patientRegPassword, setPatientRegPassword] = useState('');
+  const [patientRegFirstName, setPatientRegFirstName] = useState('');
+  const [patientRegLastName, setPatientRegLastName] = useState('');
+  const [patientRegLoading, setPatientRegLoading] = useState(false);
+  const [patientRegError, setPatientRegError] = useState('');
+  const [patientRegDone, setPatientRegDone] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
@@ -544,9 +553,15 @@ export default function App() {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (res.ok) {
+          const profile = await res.json();
           setAuthToken(token);
-          setAccountType('therapist');
-          setLoggedInTherapist(normalizeTherapistProfile(await res.json()));
+          if (profile.role === 'patient') {
+            setAccountType('patient');
+            setLoggedInPatient(profile);
+          } else {
+            setAccountType('therapist');
+            setLoggedInTherapist(normalizeTherapistProfile(profile));
+          }
         } else {
           AsyncStorage.removeItem('revio_auth_token');
           AsyncStorage.removeItem('revio_account_type');
@@ -576,16 +591,32 @@ export default function App() {
         return;
       }
       const data = await res.json();
-      await AsyncStorage.setItem('revio_auth_token', data.token);
-      await AsyncStorage.setItem('revio_account_type', 'therapist');
-      setAuthToken(data.token);
-      setAccountType('therapist');
+      // Auth V2 verify-email returns no token (patient must log in after verification)
+      if (!data.token && !data.accessToken) {
+        setEmailVerifyStatus('success');
+        setTimeout(() => { setShowEmailVerify(false); setShowLogin(true); }, 2500);
+        return;
+      }
+      const verifyToken = data.accessToken || data.token;
+      await AsyncStorage.setItem('revio_auth_token', verifyToken);
+      setAuthToken(verifyToken);
       const profileRes = await fetch(`${getBaseUrl()}/auth/me`, {
-        headers: { Authorization: `Bearer ${data.token}`, ...TUNNEL_HEADERS },
+        headers: { Authorization: `Bearer ${verifyToken}`, ...TUNNEL_HEADERS },
       });
       if (profileRes.ok) {
-        const profile = normalizeTherapistProfile(await profileRes.json());
-        setLoggedInTherapist(profile);
+        const profile = await profileRes.json();
+        if (profile.role === 'patient') {
+          await AsyncStorage.setItem('revio_account_type', 'patient');
+          setAccountType('patient');
+          setLoggedInPatient(profile);
+          setEmailVerifyStatus('success');
+          setTimeout(() => setShowEmailVerify(false), 2500);
+          return;
+        }
+        await AsyncStorage.setItem('revio_account_type', 'therapist');
+        setAccountType('therapist');
+        const therapistProfile = normalizeTherapistProfile(profile);
+        setLoggedInTherapist(therapistProfile);
         if (!profile.photo) setTimeout(() => setShowPhotoPrompt(true), 2800);
       }
       setEmailVerifyStatus('success');
@@ -740,20 +771,32 @@ export default function App() {
         return;
       }
       const data = await res.json();
-      const nextType = 'therapist';
-      await AsyncStorage.setItem('revio_auth_token', data.token);
-      await AsyncStorage.setItem('revio_account_type', nextType);
-      setAuthToken(data.token);
-      setAccountType(nextType);
+      // Auth V2 returns accessToken, legacy returns token
+      const token = data.accessToken || data.token;
+      await AsyncStorage.setItem('revio_auth_token', token);
+      setAuthToken(token);
 
       const profileRes = await fetch(`${getBaseUrl()}/auth/me`, {
-        headers: { Authorization: `Bearer ${data.token}` },
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (profileRes.ok) {
-        const profile = normalizeTherapistProfile(await profileRes.json());
-        setLoggedInTherapist(profile);
-        registerPushToken(data.token);
-        if (!profile.photo) {
+        const profile = await profileRes.json();
+        if (profile.role === 'patient') {
+          await AsyncStorage.setItem('revio_account_type', 'patient');
+          setAccountType('patient');
+          setLoggedInPatient(profile);
+          setShowLogin(false);
+          setLoginEmail('');
+          setLoginPassword('');
+          return;
+        }
+        // Therapist account
+        await AsyncStorage.setItem('revio_account_type', 'therapist');
+        setAccountType('therapist');
+        const therapistProfile = normalizeTherapistProfile(profile);
+        setLoggedInTherapist(therapistProfile);
+        registerPushToken(token);
+        if (!therapistProfile.photo) {
           const dismissed = await AsyncStorage.getItem('revio_photo_prompt_dismissed');
           if (!dismissed) setShowPhotoPrompt(true);
         }
@@ -815,6 +858,7 @@ export default function App() {
     }
     setAuthToken(null);
     setLoggedInTherapist(null);
+    setLoggedInPatient(null);
     setAccountType(null);
   };
 
@@ -1758,6 +1802,155 @@ export default function App() {
     );
   };
 
+  // ── Patient registration ──────────────────────────────────────────────────
+
+  const handlePatientRegister = async () => {
+    setPatientRegError('');
+    if (!patientRegFirstName.trim() || !patientRegLastName.trim()) {
+      setPatientRegError(t('patientRegNameRequired'));
+      return;
+    }
+    if (!patientRegEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(patientRegEmail.trim())) {
+      setPatientRegError(t('patientRegEmailInvalid'));
+      return;
+    }
+    if (patientRegPassword.length < 8) {
+      setPatientRegError(t('patientRegPasswordTooShort'));
+      return;
+    }
+    setPatientRegLoading(true);
+    try {
+      const res = await fetch(`${getBaseUrl()}/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: patientRegEmail.trim().toLowerCase(),
+          password: patientRegPassword,
+          role: 'patient',
+          firstName: patientRegFirstName.trim(),
+          lastName: patientRegLastName.trim(),
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setPatientRegError(err.message ?? t('alertConnectionError'));
+        return;
+      }
+      setPatientRegDone(true);
+    } catch {
+      setPatientRegError(t('alertConnectionError') + '. ' + t('alertConnectionErrorBody'));
+    } finally {
+      setPatientRegLoading(false);
+    }
+  };
+
+  const renderPatientRegister = () => (
+    <ScrollView contentContainerStyle={[styles.scrollContent, { paddingHorizontal: 20, paddingBottom: 40, paddingTop: 8 }]} keyboardShouldPersistTaps="handled">
+      {patientRegDone ? (
+        <View style={{ alignItems: 'center', paddingTop: 40, gap: 16 }}>
+          <Ionicons name="mail-outline" size={48} color={c.primary} />
+          <Text style={{ fontSize: 20, fontWeight: '700', color: c.text, textAlign: 'center' }}>{t('patientRegDoneTitle')}</Text>
+          <Text style={{ fontSize: 14, color: c.muted, textAlign: 'center', lineHeight: 20 }}>{t('patientRegDoneBody')}</Text>
+          <Pressable
+            style={[styles.registerBtn, { backgroundColor: c.card, borderWidth: 1, borderColor: c.border, marginTop: 8 }]}
+            onPress={() => { setShowPatientRegister(false); setShowLogin(true); setPatientRegDone(false); setPatientRegEmail(''); setPatientRegPassword(''); setPatientRegFirstName(''); setPatientRegLastName(''); setPatientRegError(''); }}
+          >
+            <Text style={{ fontSize: 15, fontWeight: '600', color: c.text }}>{t('loginAction')}</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <>
+          <Text style={{ fontSize: 20, fontWeight: '700', color: c.text, marginBottom: 4, marginTop: 8 }}>{t('patientRegTitle')}</Text>
+          <Text style={{ fontSize: 13, color: c.muted, marginBottom: 20 }}>{t('patientRegSubtitle')}</Text>
+
+          <View style={{ gap: 10, marginBottom: 16 }}>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <TextInput
+                style={[styles.input, { flex: 1, color: c.text, backgroundColor: c.card, borderColor: c.border }]}
+                placeholder={t('firstName')}
+                placeholderTextColor={c.muted}
+                value={patientRegFirstName}
+                onChangeText={setPatientRegFirstName}
+                autoCapitalize="words"
+              />
+              <TextInput
+                style={[styles.input, { flex: 1, color: c.text, backgroundColor: c.card, borderColor: c.border }]}
+                placeholder={t('lastName')}
+                placeholderTextColor={c.muted}
+                value={patientRegLastName}
+                onChangeText={setPatientRegLastName}
+                autoCapitalize="words"
+              />
+            </View>
+            <TextInput
+              style={[styles.input, { color: c.text, backgroundColor: c.card, borderColor: c.border }]}
+              placeholder="E-Mail"
+              placeholderTextColor={c.muted}
+              value={patientRegEmail}
+              onChangeText={setPatientRegEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoComplete="email"
+            />
+            <TextInput
+              style={[styles.input, { color: c.text, backgroundColor: c.card, borderColor: c.border }]}
+              placeholder={t('password')}
+              placeholderTextColor={c.muted}
+              value={patientRegPassword}
+              onChangeText={setPatientRegPassword}
+              secureTextEntry
+            />
+          </View>
+
+          {!!patientRegError && (
+            <Text style={{ color: c.error, fontSize: 13, marginBottom: 12 }}>{patientRegError}</Text>
+          )}
+
+          <Pressable
+            style={[styles.registerBtn, { backgroundColor: patientRegLoading ? c.border : c.primary }]}
+            onPress={handlePatientRegister}
+            disabled={patientRegLoading}
+          >
+            <Text style={styles.registerBtnText}>{patientRegLoading ? '…' : t('patientRegSubmit')}</Text>
+          </Pressable>
+
+          <Pressable
+            style={{ marginTop: 12, alignItems: 'center', paddingVertical: 10 }}
+            onPress={() => { setShowPatientRegister(false); setPatientRegError(''); }}
+          >
+            <Text style={{ fontSize: 14, color: c.muted }}>{t('backBtn')}</Text>
+          </Pressable>
+        </>
+      )}
+    </ScrollView>
+  );
+
+  const renderPatientDashboard = () => (
+    <ScrollView contentContainerStyle={[styles.scrollContent, { paddingHorizontal: 20, paddingBottom: 40 }]} showsVerticalScrollIndicator={false}>
+      <View style={{ alignItems: 'center', paddingTop: 32, paddingBottom: 24 }}>
+        <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: c.primaryBg, alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+          <Text style={{ fontSize: 28, fontWeight: '700', color: c.primary }}>{((loggedInPatient?.firstName ?? '?')[0]).toUpperCase()}</Text>
+        </View>
+        <Text style={{ fontSize: 20, fontWeight: '700', color: c.text }}>{loggedInPatient?.firstName} {loggedInPatient?.lastName}</Text>
+        <Text style={{ fontSize: 13, color: c.muted, marginTop: 2 }}>{loggedInPatient?.email}</Text>
+      </View>
+
+      <View style={{ borderRadius: 14, overflow: 'hidden', borderWidth: 1, borderColor: c.border, marginBottom: 16 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: c.card, paddingHorizontal: 16, paddingVertical: 12 }}>
+          <Ionicons name="person-circle-outline" size={18} color={c.muted} />
+          <Text style={{ fontSize: 14, color: c.text }}>{t('patientRoleLabel')}</Text>
+        </View>
+      </View>
+
+      <Pressable
+        style={[styles.registerBtn, { backgroundColor: c.card, borderWidth: 1, borderColor: c.border }]}
+        onPress={handleLogout}
+      >
+        <Text style={{ fontSize: 15, fontWeight: '600', color: c.error }}>{t('logoutBtn')}</Text>
+      </Pressable>
+    </ScrollView>
+  );
+
   // ── Therapist tab ─────────────────────────────────────────────────────────
 
   const renderTherapist = () => (
@@ -1768,6 +1961,7 @@ export default function App() {
       setRegSubmitted={setRegSubmitted}
       setShowLogin={setShowLogin}
       setShowRegister={setShowRegister}
+      setShowPatientRegister={setShowPatientRegister}
       styles={styles}
       t={t}
     />
@@ -1834,7 +2028,27 @@ export default function App() {
             </>
           )}
 
-          {!loggedInTherapist && (
+          {loggedInPatient && (
+            <>
+              <SectionHeader title="Mein Profil" />
+              <OptionGroup>
+                <Pressable onPress={() => setActiveTab('therapist')} style={[styles.optionRow, { backgroundColor: c.card, borderColor: 'transparent' }]}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+                    <View style={{ width: 44, height: 44, borderRadius: 999, backgroundColor: c.primaryBg, alignItems: 'center', justifyContent: 'center' }}>
+                      <Text style={{ fontSize: 18, fontWeight: '700', color: c.primary }}>{((loggedInPatient.firstName ?? '?')[0]).toUpperCase()}</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 15, fontWeight: '600', color: c.text }}>{loggedInPatient.firstName} {loggedInPatient.lastName}</Text>
+                      <Text style={{ fontSize: 12, color: c.muted }}>{t('patientRoleLabel')}</Text>
+                    </View>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color={c.muted} />
+                </Pressable>
+              </OptionGroup>
+            </>
+          )}
+
+          {!loggedInTherapist && !loggedInPatient && (
             <>
               <SectionHeader title="Mein Profil" />
               <OptionGroup>
@@ -3009,6 +3223,7 @@ export default function App() {
     if (activeTab === 'favorites') return renderFavorites();
     if (activeTab === 'therapist') {
       if (showEmailVerify) return renderEmailVerifyScreen();
+      if (loggedInPatient) return renderPatientDashboard();
       if (loggedInTherapist) return renderTherapistDashboard();
       return (
         <View style={{ flex: 1 }}>
@@ -3019,7 +3234,7 @@ export default function App() {
             </View>
           </View>
           <View style={{ flex: 1 }}>
-            {showLogin ? renderLogin() : showRegister ? renderRegister() : renderTherapist()}
+            {showLogin ? renderLogin() : showRegister ? renderRegister() : showPatientRegister ? renderPatientRegister() : renderTherapist()}
           </View>
         </View>
       );

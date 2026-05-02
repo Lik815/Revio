@@ -138,6 +138,7 @@ export function TherapistLandingScreen(props) {
     setRegSubmitted,
     setShowLogin,
     setShowRegister,
+    setShowPatientRegister,
     styles,
     t,
   } = props;
@@ -195,6 +196,13 @@ export function TherapistLandingScreen(props) {
         onPress={() => setShowLogin(true)}
       >
         <Text style={{ fontSize: 15, fontWeight: '600', color: c.text }}>{t('loginAction')}</Text>
+      </Pressable>
+
+      <Pressable
+        style={{ marginTop: 16, alignItems: 'center', paddingVertical: 8 }}
+        onPress={() => setShowPatientRegister(true)}
+      >
+        <Text style={{ fontSize: 13, color: c.muted }}>{t('registerAsPatient')}</Text>
       </Pressable>
     </View>
   );

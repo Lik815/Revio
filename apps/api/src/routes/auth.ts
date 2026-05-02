@@ -4,6 +4,7 @@ import { randomBytes } from 'crypto';
 import type { LocationPrecision } from '@revio/shared';
 import { hashPassword, verifyPassword, getToken } from './auth-utils.js';
 import { sendPasswordResetEmail } from '../utils/mailer.js';
+import type { JwtPayload } from '../plugins/jwt.js';
 import {
   getProfileStatus,
   getTherapistProfileCompletion,
@@ -431,30 +432,39 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     `);
   });
 
-  // App-friendly verification: verifies token and returns a session token for auto-login
   fastify.get('/auth/me', async (request, reply) => {
     const token = getToken(request);
     if (!token) return reply.unauthorized('Kein Token');
 
     let therapist = null as any;
-    const user = await fastify.prisma.user.findUnique({
-      where: { sessionToken: token },
-      include: {
-        therapistProfile: {
-          include: {
-            links: {
-              where: { status: 'CONFIRMED' },
-              include: { practice: true },
-            },
-          },
-        },
-      },
-    });
-    if (user?.therapistProfile) therapist = user.therapistProfile;
 
-    if (!therapist) {
+    // Detect JWT (starts with 'eyJ') vs legacy session token
+    if (token.startsWith('eyJ')) {
+      let payload: JwtPayload;
+      try {
+        payload = fastify.jwtVerify(token);
+      } catch {
+        return reply.unauthorized('Ungültiger Token');
+      }
+      // JWT belongs to a UserV2 — load therapist by userId
+      const v2User = await (fastify.prisma as any).userV2.findUnique({ where: { id: payload.sub } });
+      if (!v2User) return reply.unauthorized('Ungültiger Token');
+
+      if (v2User.role === 'patient') {
+        const profile = await (fastify.prisma as any).patientProfile.findUnique({ where: { userId: v2User.id } });
+        return reply.send({
+          id: v2User.id,
+          email: v2User.email,
+          role: 'patient',
+          firstName: profile?.firstName ?? '',
+          lastName: profile?.lastName ?? '',
+          fullName: `${profile?.firstName ?? ''} ${profile?.lastName ?? ''}`.trim(),
+        });
+      }
+
+      // Therapist V2: load matching legacy Therapist row by email
       therapist = await fastify.prisma.therapist.findUnique({
-        where: { sessionToken: token },
+        where: { email: v2User.email },
         include: {
           links: {
             where: { status: 'CONFIRMED' },
@@ -462,7 +472,37 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
           },
         },
       });
+      if (!therapist) return reply.unauthorized('Therapeuten-Profil nicht gefunden');
+    } else {
+      // Legacy session token path
+      const user = await fastify.prisma.user.findUnique({
+        where: { sessionToken: token },
+        include: {
+          therapistProfile: {
+            include: {
+              links: {
+                where: { status: 'CONFIRMED' },
+                include: { practice: true },
+              },
+            },
+          },
+        },
+      });
+      if (user?.therapistProfile) therapist = user.therapistProfile;
+
+      if (!therapist) {
+        therapist = await fastify.prisma.therapist.findUnique({
+          where: { sessionToken: token },
+          include: {
+            links: {
+              where: { status: 'CONFIRMED' },
+              include: { practice: true },
+            },
+          },
+        });
+      }
     }
+
     if (!therapist) return reply.unauthorized('Ungültiger Token');
 
     const managerAccount = await fastify.prisma.practiceManager.findUnique({

@@ -346,8 +346,12 @@ export function TherapistDashboardScreen(props) {
             </Text>
           </View>
 
-          <Pressable style={[styles.registerBtn, { backgroundColor: c.primary }]} onPress={onEnterEdit}>
-            <Text style={styles.registerBtnText}>{t('editProfileBtn')}</Text>
+          <Pressable
+            style={[styles.registerBtn, { backgroundColor: 'transparent', borderWidth: 1, borderColor: c.border, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }]}
+            onPress={onEnterEdit}
+          >
+            <Ionicons name="pencil" size={15} color={c.text} />
+            <Text style={[styles.registerBtnText, { color: c.text }]}>{t('editProfileBtn')}</Text>
           </Pressable>
 
           <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
