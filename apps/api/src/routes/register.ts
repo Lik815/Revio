@@ -79,7 +79,11 @@ export const registerRoutes: FastifyPluginAsync = async (fastify) => {
     const existingUser = await fastify.prisma.user.findUnique({
       where: { email: data.email },
     });
-    if (existingUser) {
+    // Allow if the user was created by OTP flow (verified, no therapist yet)
+    if (existingUser && existingUser.role === 'therapist' && !existingUser.emailVerifiedAt) {
+      return reply.conflict('A user with this email already exists.');
+    }
+    if (existingUser && existingUser.role !== 'therapist') {
       return reply.conflict('A user with this email already exists.');
     }
 
@@ -92,15 +96,24 @@ export const registerRoutes: FastifyPluginAsync = async (fastify) => {
       locationPrecision: data.locationPrecision,
     });
 
-    const user = await fastify.prisma.user.create({
-      data: {
-        email: data.email,
-        passwordHash,
-        role: 'therapist',
-        emailVerifiedAt: new Date(),
-        requiresEmailVerification: false,
-      },
-    });
+    let user;
+    if (existingUser?.emailVerifiedAt) {
+      // Reuse the OTP-verified user record, just set the password
+      user = await (fastify.prisma as any).user.update({
+        where: { email: data.email },
+        data: { passwordHash, requiresEmailVerification: false },
+      });
+    } else {
+      user = await fastify.prisma.user.create({
+        data: {
+          email: data.email,
+          passwordHash,
+          role: 'therapist',
+          emailVerifiedAt: new Date(),
+          requiresEmailVerification: false,
+        },
+      });
+    }
 
     const therapist = await fastify.prisma.therapist.create({
       data: {

@@ -2404,41 +2404,6 @@ export default function App() {
                 </View>
               )}
 
-              <View style={styles.sectionBadgeRow}>
-                <Text style={[styles.filterSectionTitle, { color: c.muted, marginBottom: 0 }]}>{t('languagesLabel')}</Text>
-                <View style={[styles.inlineMetaPill, { backgroundColor: c.primaryBg }]}>
-                  <Text style={[styles.inlineMetaPillText, { color: c.primary }]}>{t('requiredBadge')}</Text>
-                </View>
-              </View>
-              <Text style={[styles.metaNote, { color: c.textMuted, marginBottom: 8 }]}>{t('germanPreselected')}</Text>
-              {regLanguages.length > 0 && (
-                <View style={[styles.tagRow, { marginBottom: 8 }]}>
-                  {regLanguages.map(l => (
-                    <Pressable key={l} onPress={() => toggleRegLang(l)} style={[styles.chip, { backgroundColor: c.primary, borderColor: c.primary }]}>
-                      <Text style={[styles.chipText, { color: '#FFFFFF' }]}>{getLangLabel(l)} ×</Text>
-                    </Pressable>
-                  ))}
-                </View>
-              )}
-              {langSuggestions4.length > 0 && (
-                <View style={{ borderRadius: RADIUS.sm, borderWidth: 1, borderColor: c.border, marginBottom: 4, overflow: 'hidden', backgroundColor: c.card }}>
-                  {langSuggestions4.map((l, i) => (
-                    <Pressable key={l} onPress={() => { toggleRegLang(l); setRegLangSearch(''); }}
-                      style={{ padding: SPACE.md, borderTopWidth: i > 0 ? 1 : 0, borderColor: c.border }}>
-                      <Text style={{ ...TYPE.body, color: c.text }}>{getLangLabel(l)}</Text>
-                    </Pressable>
-                  ))}
-                </View>
-              )}
-              <TextInput
-                value={regLangSearch}
-                onChangeText={setRegLangSearch}
-                onFocus={scrollRegistrationToBottom}
-                placeholder={t('addLangPlaceholder')}
-                placeholderTextColor={c.muted}
-                style={[styles.regInput, { backgroundColor: c.card, borderColor: regLanguages.length > 0 ? c.primary : c.border, color: c.text }]}
-              />
-
               <Text style={[styles.filterSectionTitle, { color: c.muted }]}>
                 {t('specializationsOptional')} <Text style={styles.optionalInlineLabel}>{t('optionalHint')}</Text>
               </Text>
@@ -2494,6 +2459,41 @@ export default function App() {
                   </Pressable>
                 );
               })}
+
+              <View style={styles.sectionBadgeRow}>
+                <Text style={[styles.filterSectionTitle, { color: c.muted, marginBottom: 0 }]}>{t('languagesLabel')}</Text>
+                <View style={[styles.inlineMetaPill, { backgroundColor: c.primaryBg }]}>
+                  <Text style={[styles.inlineMetaPillText, { color: c.primary }]}>{t('requiredBadge')}</Text>
+                </View>
+              </View>
+              <Text style={[styles.metaNote, { color: c.textMuted, marginBottom: 8 }]}>{t('germanPreselected')}</Text>
+              {regLanguages.length > 0 && (
+                <View style={[styles.tagRow, { marginBottom: 8 }]}>
+                  {regLanguages.map(l => (
+                    <Pressable key={l} onPress={() => toggleRegLang(l)} style={[styles.chip, { backgroundColor: c.primary, borderColor: c.primary }]}>
+                      <Text style={[styles.chipText, { color: '#FFFFFF' }]}>{getLangLabel(l)} ×</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              )}
+              {langSuggestions4.length > 0 && (
+                <View style={{ borderRadius: RADIUS.sm, borderWidth: 1, borderColor: c.border, marginBottom: 4, overflow: 'hidden', backgroundColor: c.card }}>
+                  {langSuggestions4.map((l, i) => (
+                    <Pressable key={l} onPress={() => { toggleRegLang(l); setRegLangSearch(''); }}
+                      style={{ padding: SPACE.md, borderTopWidth: i > 0 ? 1 : 0, borderColor: c.border }}>
+                      <Text style={{ ...TYPE.body, color: c.text }}>{getLangLabel(l)}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              )}
+              <TextInput
+                value={regLangSearch}
+                onChangeText={setRegLangSearch}
+                onFocus={scrollRegistrationToBottom}
+                placeholder={t('addLangPlaceholder')}
+                placeholderTextColor={c.muted}
+                style={[styles.regInput, { backgroundColor: c.card, borderColor: regLanguages.length > 0 ? c.primary : c.border, color: c.text }]}
+              />
             </>
           );
         }
