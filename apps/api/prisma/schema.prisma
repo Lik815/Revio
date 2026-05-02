@@ -57,8 +57,7 @@ model User {
   emailVerificationToken      String?
   emailVerifiedAt             DateTime?
   requiresEmailVerification   Boolean   @default(false)
-  emailOtpCode                String?
-  emailOtpExpiresAt           DateTime?
+  // Password reset (added via migration 20260409183000)
   passwordResetToken          String?
   passwordResetExpiresAt      DateTime?
   createdAt              DateTime                @default(now())
@@ -75,10 +74,6 @@ model Therapist {
   fullName              String
   professionalTitle     String
   city                  String
-  postalCode            String?
-  street                String?
-  houseNumber           String?
-  locationPrecision     String       @default("approximate")
   bio                   String?
   homeVisit             Boolean      @default(false)
   isFreelancer          Boolean      @default(true)
@@ -88,26 +83,33 @@ model Therapist {
   kassenart             String       @default("")
   availability          String       @default("")
   serviceRadiusKm       Float?
-  latitude              Float?
-  longitude             Float?
   homeLat               Float        @default(0)
   homeLng               Float        @default(0)
-  gender                String?
-  isVisible             Boolean      @default(false)
+  isVisible             Boolean      @default(true)
   reviewStatus          ReviewStatus @default(PENDING_REVIEW)
   passwordHash          String?
   sessionToken          String?      @unique
   photo                 String?
   expoPushToken         String?
-  taxRegistrationStatus String?
-  healthAuthorityStatus String?
-  complianceUpdatedAt   DateTime?
   invitedByPracticeId   String?
   onboardingStatus      String       @default("none")
   visibilityPreference  String       @default("hidden")
   isPublished           Boolean      @default(false)
   bookingMode           BookingMode  @default(DIRECTORY_ONLY)
   nextFreeSlotAt        DateTime?
+  // Location (added via migration 20260409150000)
+  postalCode            String?
+  street                String?
+  houseNumber           String?
+  locationPrecision     String       @default("approximate")
+  latitude              Float?
+  longitude             Float?
+  // Compliance (added via migration 20260409113000)
+  taxRegistrationStatus  String?
+  healthAuthorityStatus  String?
+  complianceUpdatedAt    DateTime?
+  // Demographics (added via migration 20260426080704)
+  gender                String?
   createdAt             DateTime     @default(now())
   updatedAt             DateTime     @updatedAt
   links                 TherapistPracticeLink[]
@@ -283,101 +285,13 @@ model ManagerPracticeAssignment {
   @@unique([managerId, practiceId])
 }
 
-// ─── Auth V2 ──────────────────────────────────────────────────────────────────
+model EmailOtp {
+  id         String    @id @default(cuid())
+  email      String
+  codeHash   String
+  expiresAt  DateTime
+  verifiedAt DateTime?
+  createdAt  DateTime  @default(now())
 
-enum UserV2Role {
-  patient
-  therapist
-  practice_manager
-  admin
-
-  @@map("user_v2_role")
-}
-
-model UserV2 {
-  id           String     @id @default(uuid())
-  email        String     @unique
-  passwordHash String     @map("password_hash")
-  role         UserV2Role
-  isVerified   Boolean    @default(false) @map("is_verified")
-  createdAt    DateTime   @default(now()) @map("created_at")
-  updatedAt    DateTime   @updatedAt @map("updated_at")
-
-  patientProfile          PatientProfile?
-  therapistProfileV2      TherapistProfileV2?
-  emailVerificationTokens EmailVerificationToken[]
-  refreshTokens           RefreshToken[]
-  passwordResetTokens     PasswordResetToken[]
-
-  @@map("user_v2")
-}
-
-model PatientProfile {
-  id        String   @id @default(uuid())
-  userId    String   @unique @map("user_id")
-  user      UserV2   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  firstName String   @map("first_name")
-  lastName  String   @map("last_name")
-  phone     String?
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  @@map("patient_profile")
-}
-
-model TherapistProfileV2 {
-  id            String   @id @default(uuid())
-  userId        String   @unique @map("user_id")
-  user          UserV2   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  firstName     String   @map("first_name")
-  lastName      String   @map("last_name")
-  licenseNumber String?  @map("license_number")
-  isApproved    Boolean  @default(false) @map("is_approved")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
-
-  @@map("therapist_profile_v2")
-}
-
-model EmailVerificationToken {
-  id        String    @id @default(uuid())
-  userId    String    @map("user_id")
-  user      UserV2    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tokenHash String    @unique @map("token_hash")
-  expiresAt DateTime  @map("expires_at")
-  usedAt    DateTime? @map("used_at")
-  createdAt DateTime  @default(now()) @map("created_at")
-
-  @@index([userId])
-  @@index([expiresAt])
-  @@map("email_verification_token")
-}
-
-model RefreshToken {
-  id        String    @id @default(uuid())
-  userId    String    @map("user_id")
-  user      UserV2    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tokenHash String    @unique @map("token_hash")
-  expiresAt DateTime  @map("expires_at")
-  revokedAt DateTime? @map("revoked_at")
-  createdAt DateTime  @default(now()) @map("created_at")
-
-  @@index([userId])
-  @@index([expiresAt])
-  @@index([revokedAt])
-  @@map("refresh_token")
-}
-
-model PasswordResetToken {
-  id        String    @id @default(uuid())
-  userId    String    @map("user_id")
-  user      UserV2    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tokenHash String    @unique @map("token_hash")
-  expiresAt DateTime  @map("expires_at")
-  usedAt    DateTime? @map("used_at")
-  createdAt DateTime  @default(now()) @map("created_at")
-
-  @@index([userId])
-  @@index([expiresAt])
-  @@map("password_reset_token")
+  @@index([email, createdAt])
 }

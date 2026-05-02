@@ -24,7 +24,7 @@ type TherapistRow = {
   isFreelancer: boolean;
   languages: string; certifications: string; reviewStatus: string;
   serviceRadiusKm: number | null; kassenart: string;
-  gender?: string | null; isVisible: boolean; isPublished: boolean; onboardingStatus: string | null;
+  isVisible: boolean; isPublished: boolean; onboardingStatus: string | null;
   createdAt: Date; updatedAt: Date;
   links?: Array<{ id: string; status: string; practice: { id: string; name: string; city: string; address: string | null; phone: string | null; hours: string | null; lat: number; lng: number; reviewStatus: string; createdAt: Date; updatedAt: Date } }>;
 };
@@ -71,7 +71,6 @@ function mapTherapist(t: TherapistRow) {
     languages: splitList(t.languages),
     certifications: splitList(t.certifications),
     reviewStatus: t.reviewStatus,
-    gender: (t as any).gender ?? null,
     isVisible: t.isVisible,
     isPublished: t.isPublished,
     onboardingStatus: t.onboardingStatus,
@@ -487,7 +486,7 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
     const { id } = request.params as { id: string };
     const t = await fastify.prisma.therapist.update({
       where: { id },
-      data: { reviewStatus: 'APPROVED', isVisible: true },
+      data: { reviewStatus: 'APPROVED' },
       include: { links: { include: { practice: true } } },
     }).catch(() => null);
     if (!t) return reply.notFound('Therapist not found');
@@ -604,8 +603,8 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
     const links = await fastify.prisma.therapistPracticeLink.findMany({
       where: status ? { status: status as never } : undefined,
       include: {
-        therapist: { select: { id: true, fullName: true, professionalTitle: true, reviewStatus: true } },
-        practice: { select: { id: true, name: true, city: true, reviewStatus: true } },
+        therapist: { select: { id: true, fullName: true, professionalTitle: true } },
+        practice: { select: { id: true, name: true, city: true } },
       },
       orderBy: { createdAt: 'desc' },
     });

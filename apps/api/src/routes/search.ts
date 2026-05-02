@@ -180,7 +180,6 @@ const searchBodySchema = z.object({
   homeVisit: z.boolean().optional(),
   specialization: z.string().optional(),
   kassenart: z.string().optional(),
-  gender: z.enum(['female', 'male']).optional(),
 }).refine((data) => Boolean(data.city) || Boolean(data.origin), {
   message: 'city oder origin ist erforderlich',
 });
@@ -233,7 +232,6 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
       if (typeof input.homeVisit === 'boolean' && t.homeVisit !== input.homeVisit) return false;
       if (input.specialization && !specializations.includes(input.specialization.toLowerCase())) return false;
       if (input.kassenart && (t as any).kassenart && (t as any).kassenart !== input.kassenart) return false;
-      if (input.gender && (t as any).gender !== input.gender) return false;
 
       return true;
     };
@@ -258,25 +256,9 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
 
       // Distanz für mobile Therapeuten ohne Praxis (homeLat/homeLng)
       const tAny = t as any;
-      const hasExactTherapistCoords =
-        Number.isFinite(tAny.latitude) &&
-        Number.isFinite(tAny.longitude);
-      const hasStructuredLocation =
-        Boolean(tAny.postalCode) ||
-        Boolean(tAny.street) ||
-        Boolean(tAny.houseNumber) ||
-        Boolean(tAny.locationPrecision);
-      const hasLegacyHomeCoords =
-        !hasStructuredLocation &&
-        Number.isFinite(tAny.homeLat) &&
-        Number.isFinite(tAny.homeLng) &&
-        tAny.homeLat !== 0 &&
-        tAny.homeLng !== 0;
-      const therapistSearchLat = hasExactTherapistCoords ? tAny.latitude : hasLegacyHomeCoords ? tAny.homeLat : null;
-      const therapistSearchLng = hasExactTherapistCoords ? tAny.longitude : hasLegacyHomeCoords ? tAny.homeLng : null;
       const therapistDistKm =
-        input.origin && therapistSearchLat != null && therapistSearchLng != null
-          ? haversine(input.origin.lat, input.origin.lng, therapistSearchLat, therapistSearchLng)
+        input.origin && tAny.homeLat && tAny.homeLat !== 0
+          ? haversine(input.origin.lat, input.origin.lng, tAny.homeLat, tAny.homeLng)
           : undefined;
 
       const practices: SearchPractice[] = t.links
@@ -349,7 +331,7 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
         practices,
         // Neue Felder für mobile Therapeuten
         ...(tAny.serviceRadiusKm != null ? { serviceRadiusKm: tAny.serviceRadiusKm } : {}),
-        ...(practices.length === 0 && t.homeVisit && tAny.homeLat && tAny.homeLat !== 0 && tAny.homeLng && tAny.homeLng !== 0
+        ...(practices.length === 0 && t.homeVisit && tAny.homeLat && tAny.homeLat !== 0
           ? { homeLat: tAny.homeLat, homeLng: tAny.homeLng }
           : {}),
       } as SearchTherapist & { serviceRadiusKm?: number; homeLat?: number; homeLng?: number });

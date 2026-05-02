@@ -3,7 +3,6 @@ import { Ionicons } from '@expo/vector-icons';
 import {
   Image,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   Switch,
@@ -305,33 +304,6 @@ export function SignupScreen(props) {
       >
         <Text style={styles.registerBtnText}>{t('registerBtn')}</Text>
       </Pressable>
-
-      {/* Divider */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 20 }}>
-        <View style={{ flex: 1, height: 1, backgroundColor: c.border }} />
-        <Text style={{ fontSize: 12, color: c.muted }}>{t('signupOrWith')}</Text>
-        <View style={{ flex: 1, height: 1, backgroundColor: c.border }} />
-      </View>
-
-      {/* Google */}
-      <Pressable
-        style={[styles.registerBtn, { backgroundColor: c.card, borderWidth: 1, borderColor: c.border, flexDirection: 'row', gap: 10, marginTop: 0 }]}
-        onPress={() => {}}
-      >
-        <Text style={{ fontWeight: '700', fontSize: 17, color: '#4285F4' }}>G</Text>
-        <Text style={{ fontSize: 15, fontWeight: '600', color: c.text }}>{t('signupWithGoogle')}</Text>
-      </Pressable>
-
-      {/* Apple — iOS only */}
-      {Platform.OS === 'ios' && (
-        <Pressable
-          style={[styles.registerBtn, { backgroundColor: c.card, borderWidth: 1, borderColor: c.border, flexDirection: 'row', gap: 10, marginTop: 10 }]}
-          onPress={() => {}}
-        >
-          <Ionicons name="logo-apple" size={20} color={c.text} />
-          <Text style={{ fontSize: 15, fontWeight: '600', color: c.text }}>{t('signupWithApple')}</Text>
-        </Pressable>
-      )}
 
       {/* Login link */}
       <Pressable

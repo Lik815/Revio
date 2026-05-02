@@ -3,6 +3,7 @@ import { buildApp } from '../src/app.js';
 import { prisma } from '../src/plugins/prisma.js';
 import { hashPassword } from '../src/routes/auth-utils.js';
 import { getProfileStatus } from '../src/utils/profile-completeness.js';
+import { sha256 } from '../src/utils/hash.js';
 
 process.env.DATABASE_URL ??= 'file:./prisma/test.db';
 process.env.REVIO_ADMIN_TOKEN ??= 'test-token';
@@ -73,7 +74,20 @@ afterEach(async () => {
   await prisma.therapistPracticeLink.deleteMany();
   await prisma.therapist.deleteMany();
   await prisma.practice.deleteMany();
+  await prisma.emailOtp.deleteMany();
 });
+
+// Seed a confirmed (verified) EmailOtp so /register/therapist accepts the email
+async function seedConfirmedOtp(email: string) {
+  await prisma.emailOtp.create({
+    data: {
+      email: email.trim().toLowerCase(),
+      codeHash: sha256('123456'),
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+      verifiedAt: new Date(),
+    },
+  });
+}
 
 // ─── Health ───────────────────────────────────────────────────────────────────
 
@@ -654,6 +668,151 @@ describe('GET /practice-detail/:id', () => {
 
 // ─── Registration ─────────────────────────────────────────────────────────────
 
+// ─── OTP Endpoints ────────────────────────────────────────────────────────────
+
+describe('POST /register/send-otp', () => {
+  it('returns 200 ok for a new email', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/register/send-otp',
+      payload: { email: 'otp-new@test.com' },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().ok).toBe(true);
+
+    const otp = await prisma.emailOtp.findFirst({ where: { email: 'otp-new@test.com' } });
+    expect(otp).not.toBeNull();
+    expect(otp?.verifiedAt).toBeNull();
+  });
+
+  it('returns 409 when email is already a registered therapist', async () => {
+    await prisma.therapist.create({
+      data: {
+        email: 'otp-existing@test.com',
+        fullName: 'Existing',
+        professionalTitle: 'PT',
+        city: 'Köln',
+        specializations: '',
+        languages: 'de',
+        certifications: '',
+      },
+    });
+    const res = await app.inject({
+      method: 'POST',
+      url: '/register/send-otp',
+      payload: { email: 'otp-existing@test.com' },
+    });
+    expect(res.statusCode).toBe(409);
+  });
+
+  it('returns 400 for invalid email format', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/register/send-otp',
+      payload: { email: 'not-an-email' },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('enforces 3 sends per hour DB-level rate limit', async () => {
+    const email = 'otp-ratelimit@test.com';
+    const oneHourAgo = new Date(Date.now() - 30 * 60 * 1000);
+    // Seed 3 existing OTP rows within the last hour
+    for (let i = 0; i < 3; i++) {
+      await prisma.emailOtp.create({
+        data: { email, codeHash: sha256(`code${i}`), expiresAt: new Date(Date.now() + 60000), createdAt: new Date(oneHourAgo.getTime() + i * 1000) },
+      });
+    }
+    const res = await app.inject({
+      method: 'POST',
+      url: '/register/send-otp',
+      payload: { email },
+    });
+    expect(res.statusCode).toBe(429);
+  });
+
+  it('deletes old unconfirmed OTP when a new one is sent', async () => {
+    const email = 'otp-replace@test.com';
+    await prisma.emailOtp.create({
+      data: { email, codeHash: sha256('oldcode'), expiresAt: new Date(Date.now() + 60000) },
+    });
+
+    await app.inject({ method: 'POST', url: '/register/send-otp', payload: { email } });
+
+    const otps = await prisma.emailOtp.findMany({ where: { email } });
+    expect(otps).toHaveLength(1); // old one deleted, only the new one remains
+  });
+});
+
+describe('POST /register/confirm-otp', () => {
+  it('returns 200 ok for the correct code', async () => {
+    const email = 'confirm-ok@test.com';
+    await prisma.emailOtp.create({
+      data: { email, codeHash: sha256('654321'), expiresAt: new Date(Date.now() + 10 * 60 * 1000) },
+    });
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/register/confirm-otp',
+      payload: { email, code: '654321' },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().ok).toBe(true);
+
+    const otp = await prisma.emailOtp.findFirst({ where: { email } });
+    expect(otp?.verifiedAt).not.toBeNull();
+  });
+
+  it('returns 400 for a wrong code', async () => {
+    const email = 'confirm-wrong@test.com';
+    await prisma.emailOtp.create({
+      data: { email, codeHash: sha256('111111'), expiresAt: new Date(Date.now() + 10 * 60 * 1000) },
+    });
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/register/confirm-otp',
+      payload: { email, code: '999999' },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('returns 400 for an expired OTP', async () => {
+    const email = 'confirm-expired@test.com';
+    await prisma.emailOtp.create({
+      data: { email, codeHash: sha256('222222'), expiresAt: new Date(Date.now() - 1000) },
+    });
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/register/confirm-otp',
+      payload: { email, code: '222222' },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('returns 400 when an already-verified OTP is re-submitted', async () => {
+    const email = 'confirm-reuse@test.com';
+    await prisma.emailOtp.create({
+      data: {
+        email,
+        codeHash: sha256('333333'),
+        expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+        verifiedAt: new Date(),
+      },
+    });
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/register/confirm-otp',
+      payload: { email, code: '333333' },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+});
+
+// ─── Registration ─────────────────────────────────────────────────────────────
+
 describe('POST /register/therapist', () => {
   const validPayload = {
     email: 'new@test.com',
@@ -689,7 +848,18 @@ describe('POST /register/therapist', () => {
     expect(res.statusCode).toBe(400);
   });
 
+  it('returns 400 without a confirmed OTP', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/register/therapist',
+      payload: validPayload,
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().message).toContain('nicht bestätigt');
+  });
+
   it('creates therapist and practice with PENDING_REVIEW status', async () => {
+    await seedConfirmedOtp(validPayload.email);
     const res = await app.inject({
       method: 'POST',
       url: '/register/therapist',
@@ -705,8 +875,41 @@ describe('POST /register/therapist', () => {
     expect(therapist?.email).toBe(validPayload.email);
   });
 
+  it('returns session token that works for GET /auth/me', async () => {
+    await seedConfirmedOtp(validPayload.email);
+    const regRes = await app.inject({
+      method: 'POST',
+      url: '/register/therapist',
+      payload: validPayload,
+    });
+    expect(regRes.statusCode).toBe(201);
+    const { token } = regRes.json();
+    expect(token).toBeTruthy();
+
+    const meRes = await app.inject({
+      method: 'GET',
+      url: '/auth/me',
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(meRes.statusCode).toBe(200);
+    expect(meRes.json().email).toBe(validPayload.email);
+  });
+
+  it('deletes the confirmed OTP after successful registration', async () => {
+    await seedConfirmedOtp(validPayload.email);
+    await app.inject({
+      method: 'POST',
+      url: '/register/therapist',
+      payload: validPayload,
+    });
+    const remaining = await prisma.emailOtp.findMany({ where: { email: validPayload.email } });
+    expect(remaining).toHaveLength(0);
+  });
+
   it('returns 409 on duplicate email', async () => {
+    await seedConfirmedOtp(validPayload.email);
     await app.inject({ method: 'POST', url: '/register/therapist', payload: validPayload });
+    // Second attempt — no OTP (email already in use)
     const res = await app.inject({
       method: 'POST',
       url: '/register/therapist',
@@ -716,6 +919,7 @@ describe('POST /register/therapist', () => {
   });
 
   it('creates a practice and PROPOSED link', async () => {
+    await seedConfirmedOtp(validPayload.email);
     const res = await app.inject({
       method: 'POST',
       url: '/register/therapist',
@@ -729,11 +933,13 @@ describe('POST /register/therapist', () => {
     expect(link?.status).toBe('PROPOSED');
   });
 
-  it('stores structured location fields and keeps public coords approximate', async () => {
+  it('stores structured location fields and geocodes latitude/longitude', async () => {
+    const email = 'location-register@test.com';
+    await seedConfirmedOtp(email);
     const res = await app.inject({
       method: 'POST',
       url: '/register/therapist',
-      payload: { ...validPayload, email: 'location-register@test.com', homeVisit: true },
+      payload: { ...validPayload, email, homeVisit: true },
     });
 
     expect(res.statusCode).toBe(201);
@@ -746,17 +952,48 @@ describe('POST /register/therapist', () => {
     expect(therapist?.locationPrecision).toBe('approximate');
     expect(therapist?.latitude).toBeCloseTo(50.9418, 3);
     expect(therapist?.longitude).toBeCloseTo(6.9582, 3);
-    expect(therapist?.homeLat).toBeCloseTo(50.9375, 3);
-    expect(therapist?.homeLng).toBeCloseTo(6.9603, 3);
+  });
+
+  it('/auth/me returns new location and compliance fields', async () => {
+    const email = 'me-fields@test.com';
+    await seedConfirmedOtp(email);
+    const regRes = await app.inject({
+      method: 'POST',
+      url: '/register/therapist',
+      payload: {
+        ...validPayload,
+        email,
+        compliance: { taxRegistrationStatus: 'yes', healthAuthorityStatus: 'in_progress' },
+        gender: 'female',
+      },
+    });
+    expect(regRes.statusCode).toBe(201);
+    const { token } = regRes.json();
+
+    const meRes = await app.inject({
+      method: 'GET',
+      url: '/auth/me',
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(meRes.statusCode).toBe(200);
+    const body = meRes.json();
+    expect(body.postalCode).toBe('50667');
+    expect(body.street).toBe('Komoedienstrasse');
+    expect(body.gender).toBe('female');
+    expect(body.taxRegistrationStatus).toBe('yes');
+    expect(body.healthAuthorityStatus).toBe('in_progress');
+    expect(body.complianceUpdatedAt).toBeTruthy();
   });
 
   it('stores optional self-reported compliance fields', async () => {
+    const email = 'compliance-register@test.com';
+    await seedConfirmedOtp(email);
     const res = await app.inject({
       method: 'POST',
       url: '/register/therapist',
       payload: {
         ...validPayload,
-        email: 'compliance-register@test.com',
+        email,
         compliance: {
           taxRegistrationStatus: 'yes',
           healthAuthorityStatus: 'in_progress',
@@ -788,6 +1025,7 @@ describe('Password reset', () => {
   };
 
   it('stores a reset token and lets therapists log in with the new password', async () => {
+    await seedConfirmedOtp(registrationPayload.email);
     const registerRes = await app.inject({
       method: 'POST',
       url: '/register/therapist',
@@ -985,49 +1223,63 @@ describe('Password reset', () => {
 });
 
 describe('Email verification', () => {
-  it('verifies a therapist account via the browser confirmation route', async () => {
-    const registrationPayload = {
-      email: 'verify-browser@test.de',
-      password: 'secret123',
-      fullName: 'Verify Browser',
-      city: 'Köln',
-      postalCode: '50667',
-      street: 'Komoedienstrasse',
-      houseNumber: '12',
-      specializations: ['back pain'],
-      languages: ['de'],
-    };
+  it('OTP confirm-otp sets verifiedAt, enabling subsequent registration', async () => {
+    const email = 'verify-otp@test.de';
+    // Send OTP
+    const sendRes = await app.inject({
+      method: 'POST',
+      url: '/register/send-otp',
+      payload: { email },
+    });
+    expect(sendRes.statusCode).toBe(200);
 
-    const registerRes = await app.inject({
+    // Fetch the code directly from the DB (RESEND_API_KEY not set in tests)
+    const otp = await prisma.emailOtp.findFirst({ where: { email } });
+    expect(otp).not.toBeNull();
+
+    // Confirm with wrong code first
+    const badRes = await app.inject({
+      method: 'POST',
+      url: '/register/confirm-otp',
+      payload: { email, code: '000000' },
+    });
+    expect(badRes.statusCode).toBe(400);
+    expect((await prisma.emailOtp.findFirst({ where: { email } }))?.verifiedAt).toBeNull();
+
+    // Confirm with the code hash — retrieve actual code by seeding a known one
+    await prisma.emailOtp.deleteMany({ where: { email } });
+    await prisma.emailOtp.create({
+      data: { email, codeHash: sha256('987654'), expiresAt: new Date(Date.now() + 600_000) },
+    });
+    const confirmRes = await app.inject({
+      method: 'POST',
+      url: '/register/confirm-otp',
+      payload: { email, code: '987654' },
+    });
+    expect(confirmRes.statusCode).toBe(200);
+
+    const verified = await prisma.emailOtp.findFirst({ where: { email } });
+    expect(verified?.verifiedAt).not.toBeNull();
+
+    // Registration now succeeds
+    const regRes = await app.inject({
       method: 'POST',
       url: '/register/therapist',
-      payload: registrationPayload,
-      headers: {
-        host: 'api.my-revio.de',
-        'x-forwarded-proto': 'https',
-        'x-forwarded-host': 'api.my-revio.de',
+      payload: {
+        email,
+        password: 'secret123',
+        fullName: 'OTP Verified',
+        city: 'Köln',
+        specializations: ['back pain'],
+        languages: ['de'],
       },
     });
-    expect(registerRes.statusCode).toBe(201);
+    expect(regRes.statusCode).toBe(201);
 
-    const userBeforeVerification = await prisma.user.findUnique({
-      where: { email: registrationPayload.email },
-    });
-    expect(userBeforeVerification?.emailVerificationToken).toBeTruthy();
-    expect(userBeforeVerification?.emailVerifiedAt).toBeNull();
-
-    const verifyRes = await app.inject({
-      method: 'GET',
-      url: `/auth/verify-email?token=${encodeURIComponent(userBeforeVerification!.emailVerificationToken!)}`,
-    });
-    expect(verifyRes.statusCode).toBe(200);
-    expect(verifyRes.body).toContain('E-Mail bestätigt');
-
-    const userAfterVerification = await prisma.user.findUnique({
-      where: { email: registrationPayload.email },
-    });
-    expect(userAfterVerification?.emailVerificationToken).toBeNull();
-    expect(userAfterVerification?.emailVerifiedAt).toBeTruthy();
+    // User is marked as email-verified
+    const user = await prisma.user.findUnique({ where: { email } });
+    expect(user?.emailVerifiedAt).not.toBeNull();
+    expect(user?.requiresEmailVerification).toBe(false);
   });
 });
 
@@ -1542,6 +1794,7 @@ describe('Admin link routes', () => {
 describe('End-to-End: Register → Admin Approve → Visible in Search', () => {
   it('full flow works correctly', async () => {
     // 1. Therapeut registriert sich
+    await seedConfirmedOtp('e2e@test.com');
     const regRes = await app.inject({
       method: 'POST',
       url: '/register/therapist',

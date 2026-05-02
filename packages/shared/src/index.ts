@@ -9,16 +9,6 @@ export type ReviewStatus =
   | 'SUSPENDED';
 
 export type LinkStatus = 'PROPOSED' | 'CONFIRMED' | 'DISPUTED' | 'REJECTED';
-export type ComplianceStatus = 'yes' | 'no' | 'in_progress';
-export type HealthAuthorityStatus = ComplianceStatus | 'unknown';
-export type TherapistProfileStatus = 'draft' | 'incomplete' | 'ready_for_review';
-export type LocationPrecision = 'exact' | 'approximate';
-
-export interface TherapistCompliance<TDate = string> {
-  taxRegistrationStatus?: ComplianceStatus | null;
-  healthAuthorityStatus?: HealthAuthorityStatus | null;
-  updatedAt?: TDate | null;
-}
 
 // ─── Core Entities ────────────────────────────────────────────────────────────
 
@@ -35,20 +25,11 @@ export interface Therapist {
   serviceRadiusKm?: number | null;
   kassenart: string;
   city: string;
-  postalCode?: string | null;
-  street?: string | null;
-  houseNumber?: string | null;
-  locationPrecision?: LocationPrecision | null;
-  latitude?: number | null;
-  longitude?: number | null;
   bio?: string;
   reviewStatus: ReviewStatus;
-  gender?: 'female' | 'male' | null;
   isVisible: boolean;
   isPublished: boolean;
   onboardingStatus: string | null;
-  compliance?: TherapistCompliance | null;
-  profileStatus?: TherapistProfileStatus;
   createdAt: string;
 }
 
@@ -86,7 +67,6 @@ export interface SearchInput {
   homeVisit?: boolean;
   specialization?: string;
   kassenart?: string;
-  gender?: 'female' | 'male';
 }
 
 export interface SearchPractice {
@@ -140,10 +120,6 @@ export interface TherapistRegistrationInput {
   fullName: string;
   professionalTitle: string;
   city: string;
-  postalCode?: string;
-  street?: string;
-  houseNumber?: string;
-  locationPrecision?: LocationPrecision;
   bio?: string;
   homeVisit: boolean;
   specializations: string[];

@@ -2,32 +2,24 @@ import { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { randomBytes } from 'crypto';
 import { hashPassword } from './auth.js';
+import { geocodeAddress } from '../utils/geocode.js';
 import { sendEmailOtpEmail } from '../utils/mailer.js';
-import { getEnv } from '../env.js';
-import type { LocationPrecision } from '@revio/shared';
-import {
-  buildComplianceUpdateData,
-  COMPLIANCE_STATUS_VALUES,
-  HEALTH_AUTHORITY_STATUS_VALUES,
-} from '../utils/compliance.js';
-import { geocodeAddress, geocodeTherapistLocation, normalizeLocationPrecision } from '../utils/geocode.js';
-
-const complianceSchema = z.object({
-  taxRegistrationStatus: z.enum(COMPLIANCE_STATUS_VALUES).optional(),
-  healthAuthorityStatus: z.enum(HEALTH_AUTHORITY_STATUS_VALUES).optional(),
-});
-
-const locationPrecisionSchema = z.enum(['exact', 'approximate'] satisfies [LocationPrecision, ...LocationPrecision[]]);
+import { sha256 } from '../utils/hash.js';
 
 const registerSchema = z.object({
   email: z.string().email(),
   password: z.string().min(6).optional(),
   fullName: z.string().min(2),
   city: z.string().optional(),
-  postalCode: z.string().trim().regex(/^\d{5}$/).optional(),
-  street: z.string().trim().min(2).optional(),
-  houseNumber: z.string().trim().min(1).optional(),
-  locationPrecision: locationPrecisionSchema.optional(),
+  postalCode: z.string().optional(),
+  street: z.string().optional(),
+  houseNumber: z.string().optional(),
+  locationPrecision: z.string().optional(),
+  gender: z.string().optional(),
+  compliance: z.object({
+    taxRegistrationStatus: z.string().nullable().optional(),
+    healthAuthorityStatus: z.string().nullable().optional(),
+  }).optional(),
   specializations: z.array(z.string()).default([]),
   languages: z.array(z.string()).min(1),
   certifications: z.array(z.string()).default([]),
@@ -35,29 +27,88 @@ const registerSchema = z.object({
   serviceRadiusKm: z.number().min(1).max(200).nullable().optional(),
   kassenart: z.string().optional(),
   availability: z.string().optional(),
-  gender: z.enum(['female', 'male']).nullable().optional(),
   practice: z.object({
     name: z.string().min(1),
     city: z.string().min(1),
     address: z.string().optional(),
     phone: z.string().optional(),
   }).optional(),
-  compliance: complianceSchema.optional(),
 });
 
-const getPublicApiBaseUrl = (request: Record<string, any>) => {
-  const forwardedProto = typeof request.headers?.['x-forwarded-proto'] === 'string'
-    ? request.headers['x-forwarded-proto'].split(',')[0]?.trim()
-    : '';
-  const forwardedHost = typeof request.headers?.['x-forwarded-host'] === 'string'
-    ? request.headers['x-forwarded-host'].split(',')[0]?.trim()
-    : '';
-  const host = forwardedHost || request.headers?.host || 'api.my-revio.de';
-  const protocol = forwardedProto || (host.includes('localhost') || host.includes('127.0.0.1') ? 'http' : 'https');
-  return `${protocol}://${host}`;
-};
-
 export const registerRoutes: FastifyPluginAsync = async (fastify) => {
+  // ── POST /register/send-otp ────────────────────────────────────────────────
+  fastify.post('/register/send-otp', {
+    config: { rateLimit: { max: 6, timeWindow: '1 minute' } },
+  }, async (request, reply) => {
+    const parsed = z.object({ email: z.string().email() }).safeParse(request.body);
+    if (!parsed.success) return reply.badRequest('Ungültige E-Mail-Adresse.');
+
+    const email = parsed.data.email.trim().toLowerCase();
+
+    const existingTherapist = await fastify.prisma.therapist.findUnique({ where: { email } });
+    if (existingTherapist) return reply.conflict('Diese E-Mail-Adresse ist bereits registriert.');
+    const existingUser = await fastify.prisma.user.findUnique({ where: { email } });
+    if (existingUser) return reply.conflict('Diese E-Mail-Adresse ist bereits registriert.');
+
+    // DB-level rate limit: max 3 sends per email per hour
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    const recentCount = await fastify.prisma.emailOtp.count({
+      where: { email, createdAt: { gte: oneHourAgo } },
+    });
+    if (recentCount >= 3) {
+      return reply.tooManyRequests('Zu viele Anfragen. Bitte warte eine Stunde.');
+    }
+
+    // Clear old unconfirmed OTPs for this email
+    await fastify.prisma.emailOtp.deleteMany({ where: { email, verifiedAt: null } });
+
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    const codeHash = sha256(code);
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 min
+    await fastify.prisma.emailOtp.create({ data: { email, codeHash, expiresAt } });
+
+    if (!process.env.RESEND_API_KEY) {
+      console.log(`[DEV] OTP for ${email}: ${code}`);
+    } else {
+      await sendEmailOtpEmail({ to: email, code });
+    }
+
+    return reply.send({ ok: true });
+  });
+
+  // ── POST /register/confirm-otp ─────────────────────────────────────────────
+  fastify.post('/register/confirm-otp', {
+    config: { rateLimit: { max: 10, timeWindow: '10 minutes' } },
+  }, async (request, reply) => {
+    const parsed = z.object({
+      email: z.string().email(),
+      code: z.string().length(6),
+    }).safeParse(request.body);
+    if (!parsed.success) return reply.badRequest('Ungültige Eingabe.');
+
+    const email = parsed.data.email.trim().toLowerCase();
+    const codeHash = sha256(parsed.data.code);
+    const now = new Date();
+
+    const otp = await fastify.prisma.emailOtp.findFirst({
+      where: { email, verifiedAt: null, expiresAt: { gt: now } },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    // Same error for "not found" and "wrong code" — prevents email enumeration
+    if (!otp || otp.codeHash !== codeHash) {
+      return reply.badRequest('Ungültiger oder abgelaufener Code.');
+    }
+
+    await fastify.prisma.emailOtp.update({
+      where: { id: otp.id },
+      data: { verifiedAt: now },
+    });
+
+    return reply.send({ ok: true });
+  });
+
+  // ── POST /register/therapist ───────────────────────────────────────────────
   fastify.post('/register/therapist', async (request, reply) => {
     const parsed = registerSchema.safeParse(request.body);
     if (!parsed.success) {
@@ -68,7 +119,10 @@ export const registerRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.badRequest(fieldMsgs || flat.formErrors.join('; ') || 'Ungültige Eingabe');
     }
 
-    const data = parsed.data;
+    const data = {
+      ...parsed.data,
+      email: parsed.data.email.trim().toLowerCase(),
+    };
 
     const existing = await fastify.prisma.therapist.findUnique({
       where: { email: data.email },
@@ -79,177 +133,112 @@ export const registerRoutes: FastifyPluginAsync = async (fastify) => {
     const existingUser = await fastify.prisma.user.findUnique({
       where: { email: data.email },
     });
-    // Allow if the user was created by OTP flow (verified, no therapist yet)
-    if (existingUser && existingUser.role === 'therapist' && !existingUser.emailVerifiedAt) {
+    if (existingUser) {
       return reply.conflict('A user with this email already exists.');
     }
-    if (existingUser && existingUser.role !== 'therapist') {
-      return reply.conflict('A user with this email already exists.');
+
+    // Require a confirmed OTP — 2-hour window measured from verifiedAt
+    const now = new Date();
+    const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
+    const confirmedOtp = await fastify.prisma.emailOtp.findFirst({
+      where: {
+        email: data.email,
+        verifiedAt: { not: null, gte: twoHoursAgo },
+      },
+      orderBy: { verifiedAt: 'desc' },
+    });
+    if (!confirmedOtp) {
+      return reply.badRequest('E-Mail-Adresse nicht bestätigt. Bitte starte die Registrierung erneut.');
     }
 
     const passwordHash = data.password ? await hashPassword(data.password) : undefined;
-    const therapistLocation = await geocodeTherapistLocation({
-      city: data.city,
-      postalCode: data.postalCode,
-      street: data.street,
-      houseNumber: data.houseNumber,
-      locationPrecision: data.locationPrecision,
-    });
 
-    let user;
-    if (existingUser?.emailVerifiedAt) {
-      // Reuse the OTP-verified user record, just set the password
-      user = await (fastify.prisma as any).user.update({
-        where: { email: data.email },
-        data: { passwordHash, requiresEmailVerification: false },
-      });
-    } else {
-      user = await fastify.prisma.user.create({
+    // Geocode therapist's own address (best-effort, never blocks registration)
+    const streetPart = [data.street, data.houseNumber].filter(Boolean).join(' ');
+    const cityPart = [data.postalCode, data.city].filter(Boolean).join(' ');
+    const coords = (data.street && data.city)
+      ? await geocodeAddress(streetPart, cityPart)
+      : null;
+
+    const sessionToken = randomBytes(32).toString('hex');
+
+    const { therapist } = await (fastify.prisma as any).$transaction(async (tx: any) => {
+      const user = await tx.user.create({
         data: {
           email: data.email,
           passwordHash,
           role: 'therapist',
-          emailVerifiedAt: new Date(),
+          emailVerifiedAt: confirmedOtp.verifiedAt,
           requiresEmailVerification: false,
+          sessionToken,
         },
       });
-    }
 
-    const therapist = await fastify.prisma.therapist.create({
-      data: {
-        email: data.email,
-        userId: user.id,
-        fullName: data.fullName,
-        professionalTitle: 'Physiotherapeut/in',
-        city: data.city ?? '',
-        postalCode: data.postalCode ?? null,
-        street: data.street ?? null,
-        houseNumber: data.houseNumber ?? null,
-        locationPrecision: normalizeLocationPrecision(data.locationPrecision),
-        specializations: data.specializations.join(', '),
-        languages: data.languages.join(', '),
-        certifications: data.certifications.join(', '),
-        homeVisit: data.homeVisit ?? false,
-        isFreelancer: true,
-        serviceRadiusKm: data.serviceRadiusKm ?? null,
-        latitude: therapistLocation.exactCoords?.lat ?? null,
-        longitude: therapistLocation.exactCoords?.lng ?? null,
-        homeLat: therapistLocation.publicCoords?.lat ?? 0,
-        homeLng: therapistLocation.publicCoords?.lng ?? 0,
-        kassenart: data.kassenart ?? '',
-        gender: data.gender ?? null,
-        availability: data.availability ?? '',
-        ...buildComplianceUpdateData(data.compliance ?? {}),
-        passwordHash,
-        reviewStatus: 'PENDING_REVIEW',
-      } as any,
-    });
-
-    // Create practice + link if provided
-    if (data.practice) {
-      const coords = await geocodeAddress(data.practice.address ?? '', data.practice.city);
-      const practice = await fastify.prisma.practice.create({
+      const therapist = await tx.therapist.create({
         data: {
-          name: data.practice.name,
-          city: data.practice.city,
-          address: data.practice.address ?? '',
-          phone: data.practice.phone ?? null,
-          lat: coords?.lat ?? 0,
-          lng: coords?.lng ?? 0,
+          email: data.email,
+          userId: user.id,
+          fullName: data.fullName,
+          professionalTitle: 'Physiotherapeut/in',
+          city: data.city ?? '',
+          postalCode: data.postalCode ?? null,
+          street: data.street ?? null,
+          houseNumber: data.houseNumber ?? null,
+          locationPrecision: data.locationPrecision ?? 'approximate',
+          latitude: coords?.lat ?? null,
+          longitude: coords?.lng ?? null,
+          gender: data.gender ?? null,
+          specializations: data.specializations.join(', '),
+          languages: data.languages.join(', '),
+          certifications: data.certifications.join(', '),
+          homeVisit: data.homeVisit ?? false,
+          isFreelancer: true,
+          serviceRadiusKm: data.serviceRadiusKm ?? null,
+          kassenart: data.kassenart ?? '',
+          availability: data.availability ?? '',
+          passwordHash,
           reviewStatus: 'PENDING_REVIEW',
+          sessionToken,
+          ...(data.compliance?.taxRegistrationStatus !== undefined && {
+            taxRegistrationStatus: data.compliance.taxRegistrationStatus,
+          }),
+          ...(data.compliance?.healthAuthorityStatus !== undefined && {
+            healthAuthorityStatus: data.compliance.healthAuthorityStatus,
+          }),
+          ...(data.compliance && { complianceUpdatedAt: new Date() }),
         },
       });
-      await (fastify.prisma as any).therapistPracticeLink.create({
-        data: {
-          therapistId: therapist.id,
-          practiceId: practice.id,
-          status: 'PROPOSED',
-        },
-      });
-    }
 
-    // Generate session token so the user is automatically logged in
-    const sessionToken = randomBytes(32).toString('hex');
-    await (fastify.prisma as any).user.update({
-      where: { id: user.id },
-      data: { sessionToken },
+      if (data.practice) {
+        const practiceCoords = await geocodeAddress(
+          data.practice.address ?? '',
+          data.practice.city,
+        );
+        const practice = await tx.practice.create({
+          data: {
+            name: data.practice.name,
+            city: data.practice.city,
+            address: data.practice.address ?? '',
+            phone: data.practice.phone ?? null,
+            lat: practiceCoords?.lat ?? 0,
+            lng: practiceCoords?.lng ?? 0,
+            reviewStatus: 'PENDING_REVIEW',
+          },
+        });
+        await tx.therapistPracticeLink.create({
+          data: { therapistId: therapist.id, practiceId: practice.id, status: 'PROPOSED' },
+        });
+      }
+
+      await tx.emailOtp.delete({ where: { id: confirmedOtp.id } });
+
+      return { user, therapist };
     });
 
     return reply.status(201).send({
       therapistId: therapist.id,
+      message: 'Registration submitted. Your profile will be reviewed by an admin before it appears in search.',
       token: sessionToken,
-      message: 'Registration submitted. Awaiting admin review.',
-      requiresEmailVerification: false,
     });
-  });
-
-  // ── POST /register/send-otp ───────────────────────────────────────────────
-  // Sends a 6-digit OTP to verify the email before registration continues.
-  // Creates a temporary User record (no therapist yet) or reuses one if the
-  // email already has a pending OTP user.
-  fastify.post('/register/send-otp', async (request, reply) => {
-    const parsed = z.object({ email: z.string().email() }).safeParse(request.body);
-    if (!parsed.success) return reply.badRequest('Ungültige E-Mail-Adresse.');
-
-    const { email } = parsed.data;
-
-    // Block if email already has a fully registered therapist
-    const existing = await (fastify.prisma as any).user.findUnique({ where: { email } });
-    if (existing && existing.emailVerifiedAt && existing.role === 'therapist') {
-      return reply.status(409).send({ message: 'Diese E-Mail-Adresse ist bereits registriert.' });
-    }
-
-    const code = String(Math.floor(100000 + Math.random() * 900000));
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
-
-    if (existing) {
-      await (fastify.prisma as any).user.update({
-        where: { email },
-        data: { emailOtpCode: code, emailOtpExpiresAt: expiresAt },
-      });
-    } else {
-      await (fastify.prisma as any).user.create({
-        data: {
-          email,
-          role: 'therapist',
-          emailOtpCode: code,
-          emailOtpExpiresAt: expiresAt,
-          requiresEmailVerification: true,
-        },
-      });
-    }
-
-    const env = getEnv();
-    if (env.RESEND_API_KEY) {
-      await sendEmailOtpEmail({ to: email, code });
-    } else {
-      fastify.log.warn(`[dev] Email OTP for ${email}: ${code}`);
-    }
-
-    return reply.send({ message: 'Code gesendet.' });
-  });
-
-  // ── POST /register/confirm-otp ────────────────────────────────────────────
-  // Verifies the OTP. On success marks email as verified so registration can continue.
-  fastify.post('/register/confirm-otp', async (request, reply) => {
-    const parsed = z.object({
-      email: z.string().email(),
-      code: z.string().length(6),
-    }).safeParse(request.body);
-    if (!parsed.success) return reply.badRequest('Ungültige Eingabe.');
-
-    const { email, code } = parsed.data;
-    const user = await (fastify.prisma as any).user.findUnique({ where: { email } });
-
-    if (!user || !user.emailOtpCode) return reply.status(400).send({ message: 'Kein Code angefordert.' });
-    if (new Date() > new Date(user.emailOtpExpiresAt)) return reply.status(400).send({ message: 'Der Code ist abgelaufen. Bitte neuen Code anfordern.' });
-    if (user.emailOtpCode !== code) return reply.status(400).send({ message: 'Falscher Code. Bitte erneut versuchen.' });
-
-    await (fastify.prisma as any).user.update({
-      where: { email },
-      data: { emailOtpCode: null, emailOtpExpiresAt: null, emailVerifiedAt: new Date() },
-    });
-
-    return reply.send({ verified: true });
   });
 };

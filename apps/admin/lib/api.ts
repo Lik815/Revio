@@ -1,7 +1,5 @@
 import type {
   AdminStats,
-  LinkWithEntities,
-  PracticeWithLinks,
   TherapistWithLinks,
 } from '@revio/shared';
 import { cookies } from 'next/headers';
@@ -121,36 +119,10 @@ export type BlogPost = {
   updatedAt: string;
 };
 
-export type AdminLink = LinkWithEntities & {
-  therapist: LinkWithEntities['therapist'] & { reviewStatus?: string };
-  practice: LinkWithEntities['practice'] & { reviewStatus?: string };
-};
-
-export type ManagerAccount = {
-  id: string;
-  email: string;
-  therapistId: string | null;
-  practice: {
-    id: string;
-    name: string;
-    city: string;
-    reviewStatus: string;
-  } | null;
-  therapist: {
-    id: string;
-    fullName: string;
-    email: string;
-    reviewStatus: string;
-  } | null;
-};
-
 export const api = {
   getStats: () => adminFetch<AdminStats>('/admin/stats'),
   getTherapists: () => adminFetch<TherapistWithLinks[]>('/admin/therapists'),
   getTherapist: (id: string) => adminFetch<TherapistWithLinks>(`/admin/therapists/${id}`),
-  getPractices: () => adminFetch<PracticeWithLinks[]>('/admin/practices'),
-  getLinks: () => adminFetch<AdminLink[]>('/admin/links'),
-  getManagers: () => adminFetch<{ managers: ManagerAccount[] }>('/admin/managers'),
   getVisibilityIssues: () => adminFetch<VisibilityIssues>('/admin/visibility-issues'),
   getSiteSettings: () => adminFetch<SiteSettings>('/admin/site-settings'),
   getBlogPosts: () => adminFetch<BlogPost[]>('/admin/blog-posts'),
