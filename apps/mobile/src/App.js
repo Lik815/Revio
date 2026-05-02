@@ -55,6 +55,7 @@ import {
 } from './mobile-public-profiles';
 import {
   LoginScreen,
+  SignupScreen,
   TherapistLandingScreen,
 } from './mobile-therapist-screens';
 import {
@@ -455,6 +456,12 @@ export default function App() {
   const [loggedInPatient, setLoggedInPatient] = useState(null);
   const [accountType, setAccountType] = useState(null); // 'therapist' | 'patient' | null
   const [showRoleSelect, setShowRoleSelect] = useState(false);
+  const [showSignup, setShowSignup] = useState(false);
+  const [signupEmail, setSignupEmail] = useState('');
+  const [signupPassword, setSignupPassword] = useState('');
+  const [signupTerms, setSignupTerms] = useState(false);
+  const [signupError, setSignupError] = useState('');
+  const [showPatientName, setShowPatientName] = useState(false);
   const [showPatientRegister, setShowPatientRegister] = useState(false);
   const [patientRegEmail, setPatientRegEmail] = useState('');
   const [patientRegPassword, setPatientRegPassword] = useState('');
@@ -1813,9 +1820,32 @@ export default function App() {
       </View>
 
       <View style={{ gap: 12 }}>
-        {/* Therapeut */}
+        {/* Patient — filled/primary */}
         <Pressable
-          onPress={() => { setShowRoleSelect(false); setRegStep(1); setRegSubmitted(false); setShowRegister(true); }}
+          onPress={() => { setShowRoleSelect(false); setShowPatientName(true); }}
+          style={({ pressed }) => [{
+            backgroundColor: c.primary,
+            borderRadius: 16,
+            padding: 20,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 16,
+            opacity: pressed ? 0.8 : 1,
+          }]}
+        >
+          <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' }}>
+            <Ionicons name="heart-outline" size={24} color="#FFFFFF" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: '#FFFFFF' }}>{t('registerRolePatient')}</Text>
+            <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.75)', marginTop: 2 }}>{t('registerRolePatientSub')}</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.75)" />
+        </Pressable>
+
+        {/* Therapeut — outlined */}
+        <Pressable
+          onPress={() => { setShowRoleSelect(false); setRegEmail(signupEmail); setRegPassword(signupPassword); setRegPasswordConfirm(signupPassword); setRegStep(2); setRegSubmitted(false); setShowRegister(true); }}
           style={({ pressed }) => [{
             backgroundColor: c.card,
             borderRadius: 16,
@@ -1837,40 +1867,102 @@ export default function App() {
           </View>
           <Ionicons name="chevron-forward" size={20} color={c.muted} />
         </Pressable>
+      </View>
+    </View>
+  );
 
-        {/* Patient */}
-        <Pressable
-          onPress={() => { setShowRoleSelect(false); setShowPatientRegister(true); }}
-          style={({ pressed }) => [{
-            backgroundColor: c.card,
-            borderRadius: 16,
-            borderWidth: 1,
-            borderColor: c.border,
-            padding: 20,
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 16,
-            opacity: pressed ? 0.7 : 1,
-          }]}
-        >
-          <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: c.primaryBg, alignItems: 'center', justifyContent: 'center' }}>
-            <Ionicons name="heart-outline" size={24} color={c.primary} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 16, fontWeight: '700', color: c.text }}>{t('registerRolePatient')}</Text>
-            <Text style={{ fontSize: 13, color: c.muted, marginTop: 2 }}>{t('registerRolePatientSub')}</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color={c.muted} />
-        </Pressable>
+  const handlePatientNameSubmit = async () => {
+    setPatientRegError('');
+    if (!patientRegFirstName.trim() || !patientRegLastName.trim()) {
+      setPatientRegError(t('patientRegNameRequired'));
+      return;
+    }
+    setPatientRegLoading(true);
+    try {
+      const res = await fetch(`${getBaseUrl()}/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: signupEmail.trim().toLowerCase(),
+          password: signupPassword,
+          role: 'patient',
+          firstName: patientRegFirstName.trim(),
+          lastName: patientRegLastName.trim(),
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setPatientRegError(err.message ?? t('alertConnectionError'));
+        return;
+      }
+      // Registration successful — show email verification notice, reset state
+      setShowPatientName(false);
+      setShowRoleSelect(false);
+      setShowSignup(false);
+      setSignupEmail('');
+      setSignupPassword('');
+      setSignupTerms(false);
+      setSignupError('');
+      setPatientRegFirstName('');
+      setPatientRegLastName('');
+      setPatientRegDone(true);
+      setShowPatientRegister(true); // reuse the "done" screen from old flow
+    } catch {
+      setPatientRegError(t('alertConnectionError') + '. ' + t('alertConnectionErrorBody'));
+    } finally {
+      setPatientRegLoading(false);
+    }
+  };
+
+  const renderPatientName = () => (
+    <ScrollView contentContainerStyle={[styles.scrollContent, { paddingHorizontal: 24, paddingBottom: 40 }]} keyboardShouldPersistTaps="handled">
+      <View style={{ paddingTop: 8, paddingBottom: 24 }}>
+        <Text style={{ fontSize: 26, fontWeight: '800', color: c.text }}>{t('patientNameTitle')}</Text>
+        <Text style={{ fontSize: 14, color: c.muted, marginTop: 6, lineHeight: 20 }}>{t('patientNameSubtitle')}</Text>
       </View>
 
+      <View style={{ gap: 12, marginBottom: 24 }}>
+        <TextInput
+          style={[styles.regInput, { color: c.text, borderColor: patientRegFirstName ? c.primary : c.border, backgroundColor: c.mutedBg }]}
+          placeholder={t('firstName')}
+          placeholderTextColor={c.muted}
+          value={patientRegFirstName}
+          onChangeText={setPatientRegFirstName}
+          autoCapitalize="words"
+          autoFocus
+        />
+        <TextInput
+          style={[styles.regInput, { color: c.text, borderColor: patientRegLastName ? c.primary : c.border, backgroundColor: c.mutedBg }]}
+          placeholder={t('lastName')}
+          placeholderTextColor={c.muted}
+          value={patientRegLastName}
+          onChangeText={setPatientRegLastName}
+          autoCapitalize="words"
+        />
+      </View>
+
+      {!!patientRegError && (
+        <View style={[styles.noticeBox, { backgroundColor: c.errorBg, borderColor: c.error, marginBottom: 16 }]}>
+          <Ionicons name="alert-circle-outline" size={18} color={c.error} />
+          <Text style={{ fontSize: 14, color: c.error, flex: 1 }}>{patientRegError}</Text>
+        </View>
+      )}
+
       <Pressable
-        style={{ marginTop: 24, alignItems: 'center', paddingVertical: 10 }}
-        onPress={() => setShowRoleSelect(false)}
+        style={[styles.registerBtn, { backgroundColor: patientRegLoading ? c.border : c.primary }]}
+        onPress={handlePatientNameSubmit}
+        disabled={patientRegLoading}
+      >
+        <Text style={styles.registerBtnText}>{patientRegLoading ? '…' : t('createAccountBtn')}</Text>
+      </Pressable>
+
+      <Pressable
+        style={{ marginTop: 16, alignItems: 'center', paddingVertical: 10 }}
+        onPress={() => { setShowPatientName(false); setShowRoleSelect(true); setPatientRegError(''); }}
       >
         <Text style={{ fontSize: 14, color: c.muted }}>{t('backBtn')}</Text>
       </Pressable>
-    </View>
+    </ScrollView>
   );
 
   const handlePatientRegister = async () => {
@@ -2022,15 +2114,31 @@ export default function App() {
 
   // ── Therapist tab ─────────────────────────────────────────────────────────
 
+  const renderSignup = () => (
+    <SignupScreen
+      c={c}
+      styles={styles}
+      t={t}
+      setShowLogin={setShowLogin}
+      setShowSignup={setShowSignup}
+      setShowRoleSelect={setShowRoleSelect}
+      signupEmail={signupEmail}
+      setSignupEmail={setSignupEmail}
+      signupPassword={signupPassword}
+      setSignupPassword={setSignupPassword}
+      signupTerms={signupTerms}
+      setSignupTerms={setSignupTerms}
+      signupError={signupError}
+      setSignupError={setSignupError}
+    />
+  );
+
   const renderTherapist = () => (
     <TherapistLandingScreen
       __DEV__={__DEV__}
       c={c}
-      setRegStep={setRegStep}
-      setRegSubmitted={setRegSubmitted}
       setShowLogin={setShowLogin}
-      setShowRegister={setShowRegister}
-      setShowRoleSelect={setShowRoleSelect}
+      setShowSignup={setShowSignup}
       styles={styles}
       t={t}
     />
@@ -3303,7 +3411,7 @@ export default function App() {
             </View>
           </View>
           <View style={{ flex: 1 }}>
-            {showLogin ? renderLogin() : showRegister ? renderRegister() : showRoleSelect ? renderRoleSelect() : showPatientRegister ? renderPatientRegister() : renderTherapist()}
+            {showLogin ? renderLogin() : showRegister ? renderRegister() : showRoleSelect ? renderRoleSelect() : showPatientName ? renderPatientName() : showSignup ? renderSignup() : showPatientRegister ? renderPatientRegister() : renderTherapist()}
           </View>
         </View>
       );
