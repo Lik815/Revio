@@ -35,6 +35,7 @@ enum Role {
   therapist
   manager
   admin
+  patient
 }
 
 enum BookingMode {
@@ -55,6 +56,8 @@ model User {
   passwordHash           String?
   sessionToken           String?                 @unique
   role                   Role
+  firstName                   String?
+  lastName                    String?
   emailVerificationToken      String?
   emailVerifiedAt             DateTime?
   requiresEmailVerification   Boolean   @default(false)
@@ -282,6 +285,17 @@ model ManagerPracticeAssignment {
   createdAt  DateTime        @default(now())
 
   @@unique([managerId, practiceId])
+}
+
+model EmailOtp {
+  id         String    @id @default(cuid())
+  email      String
+  codeHash   String
+  expiresAt  DateTime
+  verifiedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([email, createdAt])
 }
 
 // ─── Auth V2 ──────────────────────────────────────────────────────────────────
