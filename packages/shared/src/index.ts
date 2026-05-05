@@ -1,3 +1,16 @@
+// ─── Compliance ───────────────────────────────────────────────────────────────
+
+export type ComplianceStatus = 'yes' | 'no' | 'in_progress';
+export type HealthAuthorityStatus = 'yes' | 'no' | 'in_progress' | 'unknown';
+
+export interface TherapistCompliance<T = Date> {
+  taxRegistrationStatus: ComplianceStatus | null;
+  healthAuthorityStatus: HealthAuthorityStatus | null;
+  updatedAt: T | null;
+}
+
+export type TherapistProfileStatus = 'draft' | 'incomplete' | 'ready_for_review';
+
 // ─── Status Enums ────────────────────────────────────────────────────────────
 
 export type ReviewStatus =
