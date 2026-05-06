@@ -1,7 +1,8 @@
 export const translations = {
   de: {
     signupTitle: 'Registrieren',
-    signupPasswordPlaceholder: 'Passwort eingeben',
+    signupPasswordPlaceholder: 'Passwort (mind. 8 Zeichen)',
+    signupPasswordConfirmPlaceholder: 'Passwort bestätigen',
     signupOrWith: 'Oder fortfahren mit',
     signupWithGoogle: 'Mit Google fortfahren',
     signupWithApple: 'Mit Apple fortfahren',
@@ -345,7 +346,11 @@ export const translations = {
 
     // --- Registration form ---
     createAccountTitle: 'Account erstellen',
+    emailVerificationSubtitle: 'Bestätige zuerst deine E-Mail-Adresse. Danach wählst du, wie du dich registrieren möchtest.',
     infoLabel: 'Info',
+    alreadyHaveAccount: 'Bereits ein Konto?',
+    termsCheckbox: 'Ich akzeptiere die Nutzungsbedingungen und Datenschutzrichtlinie',
+    termsRequired: 'Bitte akzeptiere die Nutzungsbedingungen.',
     passwordsMismatch: 'Passwörter stimmen nicht überein',
     personalDetailsTitle: 'Persönliche Angaben',
     howDoYouWork: 'Wie bist du tätig?',
@@ -467,7 +472,8 @@ export const translations = {
   },
   en: {
     signupTitle: 'Sign up',
-    signupPasswordPlaceholder: 'Enter your password',
+    signupPasswordPlaceholder: 'Password (min. 8 characters)',
+    signupPasswordConfirmPlaceholder: 'Confirm password',
     signupOrWith: 'Or continue with',
     signupWithGoogle: 'Continue with Google',
     signupWithApple: 'Continue with Apple',
@@ -809,7 +815,11 @@ export const translations = {
 
     // --- Registration form ---
     createAccountTitle: 'Create account',
+    emailVerificationSubtitle: 'Confirm your email first. After that, choose how you want to register.',
     infoLabel: 'Info',
+    alreadyHaveAccount: 'Already have an account?',
+    termsCheckbox: 'I accept the terms and privacy policy',
+    termsRequired: 'Please accept the terms and privacy policy.',
     passwordsMismatch: 'Passwords do not match',
     personalDetailsTitle: 'Personal details',
     howDoYouWork: 'How do you work?',

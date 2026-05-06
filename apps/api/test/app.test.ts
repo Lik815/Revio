@@ -813,6 +813,82 @@ describe('POST /register/confirm-otp', () => {
 
 // ─── Registration ─────────────────────────────────────────────────────────────
 
+describe('POST /auth/register (patient)', () => {
+  const validPayload = {
+    email: 'patient-register@test.com',
+    password: 'patient-secret-123',
+    role: 'patient' as const,
+    firstName: 'Anna',
+    lastName: 'Becker',
+  };
+
+  it('returns 400 without a confirmed OTP', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/auth/register',
+      payload: validPayload,
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json().message).toContain('nicht bestätigt');
+  });
+
+  it('returns 400 for passwords shorter than 8 characters', async () => {
+    await seedConfirmedOtp('patient-short@test.com');
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/auth/register',
+      payload: {
+        ...validPayload,
+        email: 'patient-short@test.com',
+        password: 'short',
+      },
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('creates the patient account, returns a session token, and consumes the OTP', async () => {
+    await seedConfirmedOtp(validPayload.email);
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/auth/register',
+      payload: validPayload,
+    });
+
+    expect(res.statusCode).toBe(201);
+    expect(res.json()).toMatchObject({
+      accountType: 'patient',
+      firstName: 'Anna',
+      lastName: 'Becker',
+    });
+    expect(res.json().token).toBeTruthy();
+
+    const meRes = await app.inject({
+      method: 'GET',
+      url: '/auth/me',
+      headers: { authorization: `Bearer ${res.json().token}` },
+    });
+
+    expect(meRes.statusCode).toBe(200);
+    expect(meRes.json()).toMatchObject({
+      email: validPayload.email,
+      role: 'patient',
+      firstName: 'Anna',
+      lastName: 'Becker',
+    });
+
+    const user = await prisma.user.findUnique({ where: { email: validPayload.email } });
+    expect(user?.role).toBe('patient');
+    expect(user?.emailVerifiedAt).toBeTruthy();
+
+    const remainingOtps = await prisma.emailOtp.findMany({ where: { email: validPayload.email } });
+    expect(remainingOtps).toHaveLength(0);
+  });
+});
+
 describe('POST /register/therapist', () => {
   const validPayload = {
     email: 'new@test.com',

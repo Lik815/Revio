@@ -459,6 +459,11 @@ export default function App() {
     setShowSignupPasswordConfirm(false);
     setSignupTerms(false);
     setSignupError('');
+    setShowRoleSelect(false);
+    setShowPatientName(false);
+    setPatientRegFirstName('');
+    setPatientRegLastName('');
+    setPatientRegError('');
   };
 
   const toggleRegSpec = (s) => setRegSpecializations(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]);
@@ -573,6 +578,13 @@ export default function App() {
   const [showVisibilityModal, setShowVisibilityModal] = useState(false);
   const [showProfileSavedModal, setShowProfileSavedModal] = useState(false);
   const [visibilityLoading, setVisibilityLoading] = useState(false);
+
+  const openSignupFlow = () => {
+    resetSignupState();
+    setShowLogin(false);
+    setShowRegister(false);
+    setShowSignup(true);
+  };
 
   useEffect(() => {
     let active = true;
@@ -1958,7 +1970,11 @@ export default function App() {
 
   const handlePatientNameSubmit = async () => {
     setPatientRegError('');
-    if (!patientRegFirstName.trim() || !patientRegLastName.trim()) {
+    const email = signupEmail.trim().toLowerCase();
+    const firstName = patientRegFirstName.trim();
+    const lastName = patientRegLastName.trim();
+
+    if (!firstName || !lastName) {
       setPatientRegError(t('patientRegNameRequired'));
       return;
     }
@@ -1968,11 +1984,11 @@ export default function App() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: signupEmail.trim().toLowerCase(),
+          email,
           password: signupPassword,
           role: 'patient',
-          firstName: patientRegFirstName.trim(),
-          lastName: patientRegLastName.trim(),
+          firstName,
+          lastName,
         }),
       });
       if (!res.ok) {
@@ -1989,21 +2005,14 @@ export default function App() {
         setAccountType('patient');
         setLoggedInPatient({
           id: data.userId,
-          email: signupEmail.trim().toLowerCase(),
+          email,
           role: 'patient',
-          firstName: patientRegFirstName.trim(),
-          lastName: patientRegLastName.trim(),
+          firstName,
+          lastName,
         });
       }
-      setShowPatientName(false);
-      setShowRoleSelect(false);
       setShowSignup(false);
-      setSignupEmail('');
-      setSignupPassword('');
-      setSignupTerms(false);
-      setSignupError('');
-      setPatientRegFirstName('');
-      setPatientRegLastName('');
+      resetSignupState();
     } catch {
       setPatientRegError(t('alertConnectionError') + '. ' + t('alertConnectionErrorBody'));
     } finally {
@@ -2096,9 +2105,12 @@ export default function App() {
       {/* Back / cancel */}
       <Pressable
         onPress={() => {
-          if (signupEmailVerified) {
-            setSignupEmailVerified(false);
+          if (signupOtpSent) {
             setSignupOtpSent(false);
+            setSignupOtpCode('');
+            setSignupOtpError('');
+            setSignupOtpLoading(false);
+            setSignupEmailVerified(false);
           } else {
             setShowSignup(false);
             resetSignupState();
@@ -2106,133 +2118,38 @@ export default function App() {
         }}
         style={{ paddingTop: 16, paddingBottom: 4, alignSelf: 'flex-start' }}
       >
-        <Text style={{ fontSize: 15, color: c.primary }}>‹ {signupEmailVerified ? t('backBtn') : t('cancelBtn')}</Text>
+        <Text style={{ fontSize: 15, color: c.primary }}>‹ {signupOtpSent ? t('backBtn') : t('cancelBtn')}</Text>
       </Pressable>
 
       <View style={{ paddingTop: 8, paddingBottom: 20 }}>
         <Text style={{ fontSize: 26, fontWeight: '800', color: c.text }}>
-          {signupEmailVerified ? t('createPasswordTitle') : t('createAccountTitle')}
+          {signupOtpSent ? 'E-Mail bestätigen' : t('createAccountTitle')}
         </Text>
         <Text style={{ fontSize: 14, color: c.muted, marginTop: 6, lineHeight: 20 }}>
-          {signupEmailVerified
-            ? `${t('passwordForEmail')} ${signupEmail}`
+          {signupOtpSent
+            ? `Wir haben einen 6-stelligen Code an ${signupEmail} gesendet.`
             : t('emailVerificationSubtitle')}
         </Text>
       </View>
 
-      {/* ── Phase A: OTP ─────────────────────────────────────────────── */}
-      {!signupEmailVerified && (
+      {/* ── Phase A: E-Mail + Passwort + AGB ─────────────────────────── */}
+      {!signupOtpSent && (
         <View style={{ gap: 12 }}>
-          {/* Email + Send button */}
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <TextInput
-              value={signupEmail}
-              onChangeText={(v) => { setSignupEmail(v); setSignupOtpSent(false); setSignupOtpCode(''); setSignupOtpError(''); }}
-              placeholder={t('emailLabel')}
-              placeholderTextColor={c.muted}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              editable={!signupOtpSent}
-              style={[styles.regInput, { flex: 1, backgroundColor: c.card, borderColor: c.border, color: c.text }]}
-            />
-            <Pressable
-              onPress={async () => {
-                if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(signupEmail)) { setSignupOtpError('Bitte gib eine gültige E-Mail ein.'); return; }
-                setSignupOtpLoading(true); setSignupOtpError('');
-                try {
-                  const res = await fetch(`${getBaseUrl()}/register/send-otp`, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email: signupEmail.trim().toLowerCase() }),
-                  });
-                  const data = await res.json().catch(() => ({}));
-                  if (!res.ok) { setSignupOtpError(data.message ?? 'Fehler beim Senden.'); return; }
-                  setSignupOtpSent(true);
-                } catch { setSignupOtpError('Verbindungsfehler.'); }
-                finally { setSignupOtpLoading(false); }
-              }}
-              disabled={signupOtpLoading || signupOtpSent || signupEmail.length < 5}
-              style={[styles.regInput, { justifyContent: 'center', alignItems: 'center', paddingHorizontal: 14, backgroundColor: signupOtpSent ? c.border : (signupEmail.length >= 5 ? c.primary : c.border) }]}
-            >
-              <Text style={{ color: '#fff', fontWeight: '600', fontSize: 13 }}>{signupOtpLoading ? '...' : 'Code senden'}</Text>
-            </Pressable>
-          </View>
-
-          {/* OTP input */}
-          {signupOtpSent && (
-            <View style={{ gap: 8 }}>
-              <Text style={{ color: c.muted, fontSize: 13 }}>
-                Wir haben einen 6-stelligen Code an <Text style={{ color: c.text, fontWeight: '600' }}>{signupEmail}</Text> gesendet.
-              </Text>
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                <TextInput
-                  value={signupOtpCode}
-                  onChangeText={(v) => { setSignupOtpCode(v.replace(/\D/g, '').slice(0, 6)); setSignupOtpError(''); }}
-                  placeholder="000000"
-                  placeholderTextColor={c.muted}
-                  keyboardType="number-pad"
-                  maxLength={6}
-                  style={[styles.regInput, { flex: 1, backgroundColor: c.card, borderColor: c.border, color: c.text, letterSpacing: 6, fontSize: 20, textAlign: 'center' }]}
-                />
-                <Pressable
-                  onPress={async () => {
-                    if (signupOtpCode.length !== 6) return;
-                    setSignupOtpLoading(true); setSignupOtpError('');
-                    try {
-                      const res = await fetch(`${getBaseUrl()}/register/confirm-otp`, {
-                        method: 'POST', headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ email: signupEmail.trim().toLowerCase(), code: signupOtpCode }),
-                      });
-                      const data = await res.json().catch(() => ({}));
-                      if (!res.ok) { setSignupOtpError(data.message ?? 'Falscher Code.'); return; }
-                      setSignupEmailVerified(true);
-                    } catch { setSignupOtpError('Verbindungsfehler.'); }
-                    finally { setSignupOtpLoading(false); }
-                  }}
-                  disabled={signupOtpCode.length !== 6 || signupOtpLoading}
-                  style={[styles.regInput, { justifyContent: 'center', alignItems: 'center', paddingHorizontal: 14, backgroundColor: signupOtpCode.length === 6 ? c.primary : c.border }]}
-                >
-                  <Text style={{ color: '#fff', fontWeight: '600', fontSize: 13 }}>{signupOtpLoading ? '...' : 'Bestätigen'}</Text>
-                </Pressable>
-              </View>
-              <View style={{ flexDirection: 'row', gap: 16 }}>
-                <Pressable onPress={async () => {
-                  setSignupOtpLoading(true); setSignupOtpError('');
-                  try {
-                    const res = await fetch(`${getBaseUrl()}/register/send-otp`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: signupEmail.trim().toLowerCase() }) });
-                    if (!res.ok) { const d = await res.json().catch(() => ({})); setSignupOtpError(d.message ?? 'Fehler beim Senden.'); }
-                  } catch { setSignupOtpError('Verbindungsfehler.'); }
-                  finally { setSignupOtpLoading(false); }
-                }}>
-                  <Text style={{ color: c.primary, fontSize: 13 }}>Code erneut senden</Text>
-                </Pressable>
-                <Pressable onPress={() => { setSignupOtpSent(false); setSignupOtpCode(''); setSignupOtpError(''); }}>
-                  <Text style={{ color: c.muted, fontSize: 13 }}>Andere E-Mail</Text>
-                </Pressable>
-              </View>
-            </View>
-          )}
-
-          {!!signupOtpError && <Text style={{ color: c.error, fontSize: 13 }}>{signupOtpError}</Text>}
-
-          <Pressable style={{ marginTop: 8, alignSelf: 'flex-end' }} onPress={() => { setShowSignup(false); setShowLogin(true); resetSignupState(); }}>
-            <Text style={{ color: c.muted, fontSize: 13 }}>{t('alreadyHaveAccount')} {t('loginAction')}</Text>
-          </Pressable>
-        </View>
-      )}
-
-      {/* ── Phase B: Password + Terms ────────────────────────────────── */}
-      {signupEmailVerified && (
-        <View style={{ gap: 12 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Ionicons name="checkmark-circle" size={16} color={c.success} />
-            <Text style={{ color: c.success, fontSize: 13, fontWeight: '600' }}>E-Mail bestätigt</Text>
-          </View>
+          <TextInput
+            value={signupEmail}
+            onChangeText={(v) => { setSignupEmail(v); setSignupOtpError(''); }}
+            placeholder={t('emailLabel')}
+            placeholderTextColor={c.muted}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text }]}
+          />
 
           <View style={{ position: 'relative' }}>
             <TextInput
               value={signupPassword}
               onChangeText={setSignupPassword}
-              placeholder={t('passwordPlaceholder')}
+              placeholder={t('signupPasswordPlaceholder')}
               placeholderTextColor={c.muted}
               secureTextEntry={!showSignupPassword}
               textContentType="newPassword"
@@ -2248,7 +2165,7 @@ export default function App() {
             <TextInput
               value={signupPasswordConfirm}
               onChangeText={setSignupPasswordConfirm}
-              placeholder={t('passwordConfirmPlaceholder')}
+              placeholder={t('signupPasswordConfirmPlaceholder')}
               placeholderTextColor={c.muted}
               secureTextEntry={!showSignupPasswordConfirm}
               textContentType="newPassword"
@@ -2276,21 +2193,98 @@ export default function App() {
             <Text style={{ flex: 1, fontSize: 13, color: c.muted }}>{t('termsCheckbox')}</Text>
           </Pressable>
 
-          {!!signupError && <Text style={{ color: c.error, fontSize: 13 }}>{signupError}</Text>}
+          {!!signupOtpError && <Text style={{ color: c.error, fontSize: 13 }}>{signupOtpError}</Text>}
 
           <Pressable
-            onPress={() => {
-              if (signupPassword.length < 8) { setSignupError('Passwort muss mindestens 8 Zeichen haben.'); return; }
-              if (signupPassword !== signupPasswordConfirm) { setSignupError(t('passwordsMismatch')); return; }
-              if (!signupTerms) { setSignupError(t('termsRequired')); return; }
-              setSignupError('');
-              setShowSignup(false);
-              setShowRoleSelect(true);
+            onPress={async () => {
+              if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(signupEmail)) { setSignupOtpError('Bitte gib eine gültige E-Mail ein.'); return; }
+              if (signupPassword.length < 8) { setSignupOtpError('Passwort muss mindestens 8 Zeichen haben.'); return; }
+              if (signupPassword !== signupPasswordConfirm) { setSignupOtpError(t('passwordsMismatch')); return; }
+              if (!signupTerms) { setSignupOtpError(t('termsRequired')); return; }
+              setSignupOtpLoading(true); setSignupOtpError('');
+              try {
+                const res = await fetch(`${getBaseUrl()}/register/send-otp`, {
+                  method: 'POST', headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ email: signupEmail.trim().toLowerCase() }),
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) { setSignupOtpError(data.message ?? 'Fehler beim Senden.'); return; }
+                setSignupOtpSent(true);
+              } catch { setSignupOtpError('Verbindungsfehler.'); }
+              finally { setSignupOtpLoading(false); }
             }}
-            style={[styles.registerBtn, { backgroundColor: (signupPassword.length >= 8 && signupPassword === signupPasswordConfirm && signupTerms) ? c.primary : c.border, marginTop: 8 }]}
+            disabled={signupOtpLoading}
+            style={[styles.registerBtn, { backgroundColor: c.primary, marginTop: 8, opacity: signupOtpLoading ? 0.6 : 1 }]}
           >
-            <Text style={styles.registerBtnText}>Weiter →</Text>
+            <Text style={styles.registerBtnText}>{signupOtpLoading ? '...' : 'Weiter →'}</Text>
           </Pressable>
+
+          <Pressable style={{ marginTop: 4, alignSelf: 'flex-end' }} onPress={() => { setShowSignup(false); setShowLogin(true); resetSignupState(); }}>
+            <Text style={{ color: c.muted, fontSize: 13 }}>{t('alreadyHaveAccount')} {t('loginAction')}</Text>
+          </Pressable>
+        </View>
+      )}
+
+      {/* ── Phase B: OTP bestätigen ───────────────────────────────────── */}
+      {signupOtpSent && (
+        <View style={{ gap: 12 }}>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <TextInput
+              value={signupOtpCode}
+              onChangeText={(v) => { setSignupOtpCode(v.replace(/\D/g, '').slice(0, 6)); setSignupOtpError(''); }}
+              placeholder="000000"
+              placeholderTextColor={c.muted}
+              keyboardType="number-pad"
+              maxLength={6}
+              style={[styles.regInput, { flex: 1, backgroundColor: c.card, borderColor: c.border, color: c.text, letterSpacing: 6, fontSize: 20, textAlign: 'center' }]}
+            />
+            <Pressable
+              onPress={async () => {
+                if (signupOtpCode.length !== 6) return;
+                setSignupOtpLoading(true); setSignupOtpError('');
+                try {
+                  const res = await fetch(`${getBaseUrl()}/register/confirm-otp`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: signupEmail.trim().toLowerCase(), code: signupOtpCode }),
+                  });
+                  const data = await res.json().catch(() => ({}));
+                  if (!res.ok) { setSignupOtpError(data.message ?? 'Falscher Code.'); return; }
+                  setSignupEmailVerified(true);
+                  setShowSignup(false);
+                  setShowRoleSelect(true);
+                } catch { setSignupOtpError('Verbindungsfehler.'); }
+                finally { setSignupOtpLoading(false); }
+              }}
+              disabled={signupOtpCode.length !== 6 || signupOtpLoading}
+              style={[styles.regInput, { justifyContent: 'center', alignItems: 'center', paddingHorizontal: 14, backgroundColor: signupOtpCode.length === 6 ? c.primary : c.border }]}
+            >
+              <Text style={{ color: '#fff', fontWeight: '600', fontSize: 13 }}>{signupOtpLoading ? '...' : 'Bestätigen'}</Text>
+            </Pressable>
+          </View>
+
+          {!!signupOtpError && <Text style={{ color: c.error, fontSize: 13 }}>{signupOtpError}</Text>}
+
+          <View style={{ flexDirection: 'row', gap: 16 }}>
+            <Pressable onPress={async () => {
+              setSignupOtpLoading(true); setSignupOtpError('');
+              try {
+                const res = await fetch(`${getBaseUrl()}/register/send-otp`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: signupEmail.trim().toLowerCase() }) });
+                if (!res.ok) { const d = await res.json().catch(() => ({})); setSignupOtpError(d.message ?? 'Fehler beim Senden.'); }
+              } catch { setSignupOtpError('Verbindungsfehler.'); }
+              finally { setSignupOtpLoading(false); }
+            }}>
+              <Text style={{ color: c.primary, fontSize: 13 }}>Code erneut senden</Text>
+            </Pressable>
+            <Pressable onPress={() => {
+              setSignupOtpSent(false);
+              setSignupOtpCode('');
+              setSignupOtpError('');
+              setSignupOtpLoading(false);
+              setSignupEmailVerified(false);
+            }}>
+              <Text style={{ color: c.muted, fontSize: 13 }}>Andere E-Mail</Text>
+            </Pressable>
+          </View>
         </View>
       )}
     </ScrollView>
@@ -2301,7 +2295,7 @@ export default function App() {
       __DEV__={__DEV__}
       c={c}
       setShowLogin={setShowLogin}
-      setShowSignup={setShowSignup}
+      setShowSignup={openSignupFlow}
       styles={styles}
       t={t}
     />
