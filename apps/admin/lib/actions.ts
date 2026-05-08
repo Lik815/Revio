@@ -208,12 +208,23 @@ export async function updateAppFeedbackStatus(id: string, formData: FormData) {
   revalidatePath('/feedback');
 }
 
+function slugifyBlogTitle(value: string) {
+  return value
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .replace(/-{2,}/g, '-');
+}
+
 export async function createBlogPost(formData: FormData) {
-  const slug = String(formData.get('slug') ?? '').trim();
   const title = String(formData.get('title') ?? '').trim();
+  const slugInput = String(formData.get('slug') ?? '').trim();
   const excerpt = String(formData.get('excerpt') ?? '').trim();
   const content = String(formData.get('content') ?? '').trim();
   const authorName = String(formData.get('authorName') ?? 'Revio Team').trim() || 'Revio Team';
+  const slug = slugInput || slugifyBlogTitle(title);
 
   if (!slug || !title || !excerpt || !content) return;
 
@@ -225,11 +236,12 @@ export async function createBlogPost(formData: FormData) {
 }
 
 export async function updateBlogPost(id: string, formData: FormData) {
-  const slug = String(formData.get('slug') ?? '').trim();
   const title = String(formData.get('title') ?? '').trim();
+  const slugInput = String(formData.get('slug') ?? '').trim();
   const excerpt = String(formData.get('excerpt') ?? '').trim();
   const content = String(formData.get('content') ?? '').trim();
   const authorName = String(formData.get('authorName') ?? 'Revio Team').trim() || 'Revio Team';
+  const slug = slugInput || slugifyBlogTitle(title);
 
   if (!slug || !title || !excerpt || !content) return;
 
