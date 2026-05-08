@@ -413,6 +413,27 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
     };
   });
 
+  // ── GET /therapists/:id/slots ─────────────────────────────────────────────
+
+  fastify.get('/therapists/:id/slots', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const now = new Date();
+    const slots = await fastify.prisma.therapistSlot.findMany({
+      where: { therapistId: id, status: 'AVAILABLE', startsAt: { gt: now } },
+      orderBy: { startsAt: 'asc' },
+      take: 20,
+    });
+    return {
+      slots: slots.map((s) => ({
+        id: s.id,
+        therapistId: s.therapistId,
+        startsAt: s.startsAt.toISOString(),
+        durationMin: s.durationMin,
+        status: s.status,
+      })),
+    };
+  });
+
   // ── GET /practice-detail/:id ─────────────────────────────────────────────
 
   fastify.get('/practice-detail/:id', async (request, reply) => {

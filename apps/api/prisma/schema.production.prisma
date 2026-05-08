@@ -51,6 +51,12 @@ enum BookingRequestStatus {
   EXPIRED
 }
 
+enum SlotStatus {
+  AVAILABLE
+  BOOKED
+  CANCELLED
+}
+
 model User {
   id                     String                  @id @default(cuid())
   email                  String                  @unique
@@ -123,6 +129,7 @@ model Therapist {
   documents             TherapistDocument[]
   bookingRequests       BookingRequest[]
   favoritedBy           UserFavoriteTherapist[]
+  slots                 TherapistSlot[]
 }
 
 model Practice {
@@ -221,12 +228,27 @@ model BlogPost {
   updatedAt   DateTime @updatedAt
 }
 
+model TherapistSlot {
+  id          String      @id @default(cuid())
+  therapistId String
+  therapist   Therapist   @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+  startsAt    DateTime
+  durationMin Int         @default(20)
+  status      SlotStatus  @default(AVAILABLE)
+  booking     BookingRequest?
+  createdAt   DateTime    @default(now())
+
+  @@index([therapistId, status, startsAt])
+}
+
 model BookingRequest {
   id                   String               @id @default(cuid())
   therapistId          String
   therapist            Therapist            @relation(fields: [therapistId], references: [id], onDelete: Cascade)
   patientUserId        String?
   patientUser          User?                @relation(fields: [patientUserId], references: [id], onDelete: SetNull)
+  slotId               String?              @unique
+  slot                 TherapistSlot?       @relation(fields: [slotId], references: [id], onDelete: SetNull)
   status               BookingRequestStatus @default(PENDING)
   patientName          String
   patientEmail         String?

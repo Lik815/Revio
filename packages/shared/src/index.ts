@@ -25,17 +25,34 @@ export type LinkStatus = 'PROPOSED' | 'CONFIRMED' | 'DISPUTED' | 'REJECTED';
 
 export type BookingMode = 'DIRECTORY_ONLY' | 'FIRST_APPOINTMENT_REQUEST';
 
-export type BookingRequestStatus = 'PENDING' | 'CONFIRMED' | 'DECLINED' | 'EXPIRED';
+export type BookingRequestStatus = 'PENDING' | 'CONFIRMED' | 'DECLINED' | 'CANCELLED' | 'EXPIRED';
+
+export type SlotStatus = 'AVAILABLE' | 'BOOKED' | 'CANCELLED';
+
+export interface TherapistSlot {
+  id: string;
+  therapistId: string;
+  startsAt: string;
+  durationMin: number;
+  status: SlotStatus;
+  bookingId?: string | null;
+  createdAt: string;
+}
 
 export interface BookingRequest {
   id: string;
   therapistId: string;
+  slotId?: string | null;
+  slot?: {
+    id: string;
+    startsAt: string;
+    durationMin: number;
+    status: SlotStatus;
+  } | null;
   status: BookingRequestStatus;
   patientName: string;
   patientEmail?: string | null;
   patientPhone?: string | null;
-  preferredDays: string[];
-  preferredTimeWindows: string[];
   message?: string | null;
   createdAt: string;
   responseDueAt: string;

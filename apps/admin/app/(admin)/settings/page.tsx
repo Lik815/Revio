@@ -15,10 +15,10 @@ export default async function SettingsPage() {
     >
       <article className="panel panel--compact">
         <div className="panel-header">
-          <div>
+          <div className="panel-header__content">
             <div className="kicker">Website</div>
             <h3>Präsentationsseite</h3>
-            <p style={{ margin: '8px 0 0', color: 'var(--muted)', maxWidth: 560 }}>
+            <p className="panel-header__description">
               Mit diesem Schalter kannst du die öffentliche Website vorübergehend auf einen ruhigen
               „Under Construction"-Zustand setzen, ohne sie offline zu nehmen.
             </p>

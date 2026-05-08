@@ -72,6 +72,7 @@ afterEach(async () => {
   await prisma.practiceManager.deleteMany();
   await prisma.user.deleteMany();
   await prisma.bookingRequest.deleteMany();
+  await prisma.therapistSlot.deleteMany();
   await prisma.therapistPracticeLink.deleteMany();
   await prisma.therapist.deleteMany();
   await prisma.practice.deleteMany();
@@ -2731,5 +2732,259 @@ describe('GET /auth/favorites/therapists', () => {
     });
     expect(res.statusCode).toBe(200);
     expect(res.json().therapists).toHaveLength(1);
+  });
+});
+
+// ─── Slot-based Booking ───────────────────────────────────────────────────────
+
+describe('Slot-based Booking', () => {
+  let therapistToken: string;
+  let therapistId: string;
+  let patientToken: string;
+
+  async function setupTherapistAndPatient() {
+    const therapist = await prisma.therapist.create({
+      data: {
+        email: 'slot-therapist@test.de',
+        fullName: 'Slot Therapeutin',
+        professionalTitle: 'Physiotherapeutin',
+        city: 'Berlin',
+        specializations: 'Rückenschmerzen',
+        languages: 'Deutsch',
+        reviewStatus: 'APPROVED',
+        isVisible: true,
+        bookingMode: 'FIRST_APPOINTMENT_REQUEST',
+        sessionToken: 'slot-therapist-token',
+      },
+    });
+    therapistToken = 'slot-therapist-token';
+    therapistId = therapist.id;
+
+    await prisma.user.create({
+      data: {
+        email: 'slot-patient@test.de',
+        passwordHash: await hashPassword('test1234'),
+        role: 'patient',
+        firstName: 'Slot',
+        lastName: 'Patient',
+        sessionToken: 'slot-patient-token',
+        emailVerifiedAt: new Date(),
+      },
+    });
+    patientToken = 'slot-patient-token';
+  }
+
+  async function createFutureSlot(overrides: Record<string, unknown> = {}) {
+    return prisma.therapistSlot.create({
+      data: {
+        therapistId,
+        startsAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        durationMin: 20,
+        status: 'AVAILABLE',
+        ...overrides,
+      },
+    });
+  }
+
+  beforeEach(async () => {
+    await setupTherapistAndPatient();
+  });
+
+  afterEach(async () => {
+    await prisma.bookingRequest.deleteMany();
+    await prisma.therapistSlot.deleteMany();
+  });
+
+  it('POST /therapist/slots — therapist creates a slot', async () => {
+    const startsAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
+    const res = await app.inject({
+      method: 'POST', url: '/therapist/slots',
+      headers: { authorization: `Bearer ${therapistToken}`, 'content-type': 'application/json' },
+      payload: { slots: [{ startsAt, durationMin: 20 }] },
+    });
+    expect(res.statusCode).toBe(201);
+    expect(res.json().created).toHaveLength(1);
+    expect(res.json().created[0].status).toBe('AVAILABLE');
+  });
+
+  it('GET /therapists/:id/slots — returns only future AVAILABLE slots', async () => {
+    await createFutureSlot();
+    await createFutureSlot({ status: 'BOOKED' });
+    await prisma.therapistSlot.create({
+      data: { therapistId, startsAt: new Date(Date.now() - 60000), durationMin: 20, status: 'AVAILABLE' },
+    });
+
+    const res = await app.inject({ method: 'GET', url: `/therapists/${therapistId}/slots` });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().slots).toHaveLength(1);
+    expect(res.json().slots[0].status).toBe('AVAILABLE');
+  });
+
+  it('POST /bookings — books an AVAILABLE slot atomically', async () => {
+    const slot = await createFutureSlot();
+
+    const res = await app.inject({
+      method: 'POST', url: '/bookings',
+      headers: { authorization: `Bearer ${patientToken}`, 'content-type': 'application/json' },
+      payload: { therapistId, slotId: slot.id, consentAccepted: true },
+    });
+    expect(res.statusCode).toBe(201);
+    expect(res.json().slot.id).toBe(slot.id);
+
+    const updatedSlot = await prisma.therapistSlot.findUnique({ where: { id: slot.id } });
+    expect(updatedSlot?.status).toBe('BOOKED');
+  });
+
+  it('POST /bookings — double-booking same slot returns 409', async () => {
+    const slot = await createFutureSlot();
+
+    await app.inject({
+      method: 'POST', url: '/bookings',
+      headers: { authorization: `Bearer ${patientToken}`, 'content-type': 'application/json' },
+      payload: { therapistId, slotId: slot.id, consentAccepted: true },
+    });
+
+    const patient2 = await prisma.user.create({
+      data: { email: 'patient2@test.de', passwordHash: 'x', role: 'patient', sessionToken: 'patient2-token', emailVerifiedAt: new Date() },
+    });
+    const res2 = await app.inject({
+      method: 'POST', url: '/bookings',
+      headers: { authorization: 'Bearer patient2-token', 'content-type': 'application/json' },
+      payload: { therapistId, slotId: slot.id, consentAccepted: true },
+    });
+    expect(res2.statusCode).toBe(409);
+
+    const slotAfter = await prisma.therapistSlot.findUnique({ where: { id: slot.id } });
+    expect(slotAfter?.status).toBe('BOOKED');
+  });
+
+  it('PATCH /bookings/:id/cancel — patient cancel releases slot', async () => {
+    const slot = await createFutureSlot();
+    const bookRes = await app.inject({
+      method: 'POST', url: '/bookings',
+      headers: { authorization: `Bearer ${patientToken}`, 'content-type': 'application/json' },
+      payload: { therapistId, slotId: slot.id, consentAccepted: true },
+    });
+    const bookingId = bookRes.json().id;
+
+    const cancelRes = await app.inject({
+      method: 'PATCH', url: `/bookings/${bookingId}/cancel`,
+      headers: { authorization: `Bearer ${patientToken}` },
+    });
+    expect(cancelRes.statusCode).toBe(200);
+
+    const updatedSlot = await prisma.therapistSlot.findUnique({ where: { id: slot.id } });
+    expect(updatedSlot?.status).toBe('AVAILABLE');
+  });
+
+  it('PATCH /bookings/:id/respond CONFIRM — booking confirmed, slot stays BOOKED', async () => {
+    const slot = await createFutureSlot();
+    const bookRes = await app.inject({
+      method: 'POST', url: '/bookings',
+      headers: { authorization: `Bearer ${patientToken}`, 'content-type': 'application/json' },
+      payload: { therapistId, slotId: slot.id, consentAccepted: true },
+    });
+
+    const confirmRes = await app.inject({
+      method: 'PATCH', url: `/bookings/${bookRes.json().id}/respond`,
+      headers: { authorization: `Bearer ${therapistToken}`, 'content-type': 'application/json' },
+      payload: { action: 'CONFIRM' },
+    });
+    expect(confirmRes.statusCode).toBe(200);
+    expect(confirmRes.json().status).toBe('CONFIRMED');
+    expect(confirmRes.json().confirmedSlotAt).toBeTruthy();
+
+    const updatedSlot = await prisma.therapistSlot.findUnique({ where: { id: slot.id } });
+    expect(updatedSlot?.status).toBe('BOOKED');
+  });
+
+  it('PATCH /bookings/:id/respond DECLINE — booking declined, slot released', async () => {
+    const slot = await createFutureSlot();
+    const bookRes = await app.inject({
+      method: 'POST', url: '/bookings',
+      headers: { authorization: `Bearer ${patientToken}`, 'content-type': 'application/json' },
+      payload: { therapistId, slotId: slot.id, consentAccepted: true },
+    });
+
+    const declineRes = await app.inject({
+      method: 'PATCH', url: `/bookings/${bookRes.json().id}/respond`,
+      headers: { authorization: `Bearer ${therapistToken}`, 'content-type': 'application/json' },
+      payload: { action: 'DECLINE', declinedReason: 'Keine Kapazität' },
+    });
+    expect(declineRes.statusCode).toBe(200);
+    expect(declineRes.json().status).toBe('DECLINED');
+
+    const updatedSlot = await prisma.therapistSlot.findUnique({ where: { id: slot.id } });
+    expect(updatedSlot?.status).toBe('AVAILABLE');
+  });
+
+  it('Expiry — expired PENDING booking releases slot', async () => {
+    const slot = await createFutureSlot();
+    const booking = await prisma.bookingRequest.create({
+      data: {
+        therapistId,
+        slotId: slot.id,
+        status: 'PENDING',
+        patientName: 'Test',
+        patientEmail: 'test@x.de',
+        consentAcceptedAt: new Date(),
+        responseDueAt: new Date(Date.now() - 1000),
+      },
+    });
+    await prisma.therapistSlot.update({ where: { id: slot.id }, data: { status: 'BOOKED' } });
+
+    await app.inject({
+      method: 'GET', url: `/bookings/incoming`,
+      headers: { authorization: `Bearer ${therapistToken}` },
+    });
+
+    const updatedBooking = await prisma.bookingRequest.findUnique({ where: { id: booking.id } });
+    expect(updatedBooking?.status).toBe('EXPIRED');
+
+    const updatedSlot = await prisma.therapistSlot.findUnique({ where: { id: slot.id } });
+    expect(updatedSlot?.status).toBe('AVAILABLE');
+  });
+
+  it('DELETE /therapist/slots/:id — therapist can delete own AVAILABLE slot', async () => {
+    const slot = await createFutureSlot();
+    const res = await app.inject({
+      method: 'DELETE', url: `/therapist/slots/${slot.id}`,
+      headers: { authorization: `Bearer ${therapistToken}` },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().deleted).toBe(true);
+  });
+
+  it('DELETE /therapist/slots/:id — cannot delete BOOKED slot', async () => {
+    const slot = await createFutureSlot({ status: 'BOOKED' });
+    const res = await app.inject({
+      method: 'DELETE', url: `/therapist/slots/${slot.id}`,
+      headers: { authorization: `Bearer ${therapistToken}` },
+    });
+    expect(res.statusCode).toBe(409);
+  });
+
+  it('Legacy booking without slotId remains readable', async () => {
+    const legacy = await prisma.bookingRequest.create({
+      data: {
+        therapistId,
+        status: 'PENDING',
+        patientName: 'Legacy Patient',
+        patientEmail: 'legacy@test.de',
+        preferredDays: 'Montag',
+        preferredTimeWindows: 'Vormittag',
+        consentAcceptedAt: new Date(),
+        responseDueAt: new Date(Date.now() + 86400000),
+      },
+    });
+
+    const res = await app.inject({
+      method: 'GET', url: '/bookings/incoming',
+      headers: { authorization: `Bearer ${therapistToken}` },
+    });
+    expect(res.statusCode).toBe(200);
+    const found = res.json().find((b: { id: string }) => b.id === legacy.id);
+    expect(found).toBeTruthy();
+    expect(found.slot).toBeNull();
   });
 });

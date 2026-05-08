@@ -11,36 +11,29 @@ import {
 } from 'react-native';
 import { getBaseUrl, RADIUS, SHADOW, SPACE, TYPE } from './mobile-utils';
 
-const DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr'];
-const TIME_WINDOWS = ['Morgens', 'Mittags', 'Abends'];
+function formatSlot(startsAt, durationMin) {
+  if (!startsAt) return '—';
+  const d = new Date(startsAt);
+  const date = d.toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'long' });
+  const time = d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+  return `${date} · ${time} Uhr (${durationMin ?? 20} Min)`;
+}
 
 // ─── BookingRequestForm ────────────────────────────────────────────────────────
 
-export function BookingRequestForm({ c, t, therapist, authToken, patientName, onSuccess, onClose }) {
-  const [selectedDays, setSelectedDays] = useState([]);
-  const [selectedTimes, setSelectedTimes] = useState([]);
+export function BookingRequestForm({ c, t, therapist, authToken, availableSlots, onSuccess, onClose }) {
+  const [selectedSlotId, setSelectedSlotId] = useState(null);
   const [message, setMessage] = useState('');
   const [consent, setConsent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
 
-  function toggleDay(day) {
-    setSelectedDays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]);
-  }
-
-  function toggleTime(time) {
-    setSelectedTimes(prev => prev.includes(time) ? prev.filter(t => t !== time) : [...prev, time]);
-  }
+  const slots = Array.isArray(availableSlots) ? availableSlots : [];
 
   async function handleSubmit() {
-    if (selectedDays.length === 0 || selectedTimes.length === 0) {
-      setError('Bitte Wunschtage und Wunschzeit auswählen.');
-      return;
-    }
-    if (!consent) {
-      setError('Bitte stimme der Datenschutzerklärung zu.');
-      return;
-    }
+    if (!selectedSlotId) { setError('Bitte wähle einen Termin aus.'); return; }
+    if (!consent) { setError('Bitte stimme der Datenschutzerklärung zu.'); return; }
     setError('');
     setLoading(true);
     try {
@@ -49,23 +42,40 @@ export function BookingRequestForm({ c, t, therapist, authToken, patientName, on
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
         body: JSON.stringify({
           therapistId: therapist.id,
-          preferredDays: selectedDays.join(', '),
-          preferredTimeWindows: selectedTimes.join(', '),
+          slotId: selectedSlotId,
           message: message.trim() || undefined,
           consentAccepted: true,
         }),
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error ?? t('bookingRequestFail'));
+        setError(data.error ?? 'Buchung fehlgeschlagen. Bitte erneut versuchen.');
       } else {
-        onSuccess(data);
+        setSuccess(true);
       }
     } catch {
-      setError(t('bookingRequestFail'));
+      setError('Verbindungsfehler. Bitte erneut versuchen.');
     } finally {
       setLoading(false);
     }
+  }
+
+  if (success) {
+    return (
+      <View style={{ flex: 1, padding: SPACE.lg, alignItems: 'center', justifyContent: 'center' }}>
+        <Ionicons name="checkmark-circle" size={64} color={c.success ?? '#1A7A40'} />
+        <Text style={{ ...TYPE.h2, color: c.text, marginTop: SPACE.md, textAlign: 'center' }}>Anfrage gesendet</Text>
+        <Text style={{ ...TYPE.body, color: c.muted, marginTop: SPACE.sm, textAlign: 'center' }}>
+          Der Therapeut hat Zeit zum Antworten. Du siehst den Status unter Favoriten.
+        </Text>
+        <Pressable
+          onPress={onSuccess}
+          style={{ backgroundColor: c.primary, borderRadius: RADIUS.md, paddingVertical: 14, paddingHorizontal: 32, marginTop: SPACE.lg }}
+        >
+          <Text style={{ ...TYPE.label, color: '#fff' }}>Zu meinen Terminen</Text>
+        </Pressable>
+      </View>
+    );
   }
 
   return (
@@ -75,82 +85,63 @@ export function BookingRequestForm({ c, t, therapist, authToken, patientName, on
         <Pressable onPress={onClose} style={{ marginRight: 12 }}>
           <Ionicons name="close" size={24} color={c.muted} />
         </Pressable>
-        <Text style={{ ...TYPE.h2, color: c.text, flex: 1 }}>{t('bookingRequestTitle')}</Text>
+        <Text style={{ ...TYPE.h2, color: c.text, flex: 1 }}>Termin buchen</Text>
       </View>
 
-      {/* Therapist name */}
-      <Text style={{ ...TYPE.caption, color: c.muted, marginBottom: SPACE.sm }}>
+      <Text style={{ ...TYPE.caption, color: c.muted, marginBottom: SPACE.md }}>
         {therapist.fullName} · {therapist.professionalTitle}
       </Text>
 
-      {/* Days */}
-      <Text style={{ ...TYPE.label, color: c.text, marginBottom: SPACE.xs }}>{t('bookingPreferredDays')}</Text>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: SPACE.md }}>
-        {DAYS.map(day => {
-          const active = selectedDays.includes(day);
-          return (
-            <Pressable
-              key={day}
-              onPress={() => toggleDay(day)}
-              style={{
-                paddingHorizontal: 14,
-                paddingVertical: 8,
-                borderRadius: RADIUS.sm,
-                backgroundColor: active ? c.primary : c.mutedBg,
-                borderWidth: 1,
-                borderColor: active ? c.primary : c.border,
-              }}
-            >
-              <Text style={{ ...TYPE.label, color: active ? '#fff' : c.text }}>{day}</Text>
-            </Pressable>
-          );
-        })}
-      </View>
+      {/* Slot list */}
+      <Text style={{ ...TYPE.label, color: c.text, marginBottom: SPACE.sm }}>Freie Termine</Text>
 
-      {/* Time windows */}
-      <Text style={{ ...TYPE.label, color: c.text, marginBottom: SPACE.xs }}>{t('bookingPreferredTime')}</Text>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: SPACE.md }}>
-        {TIME_WINDOWS.map(tw => {
-          const active = selectedTimes.includes(tw);
-          return (
-            <Pressable
-              key={tw}
-              onPress={() => toggleTime(tw)}
-              style={{
-                paddingHorizontal: 14,
-                paddingVertical: 8,
-                borderRadius: RADIUS.sm,
-                backgroundColor: active ? c.primary : c.mutedBg,
-                borderWidth: 1,
-                borderColor: active ? c.primary : c.border,
-              }}
-            >
-              <Text style={{ ...TYPE.label, color: active ? '#fff' : c.text }}>{tw}</Text>
-            </Pressable>
-          );
-        })}
-      </View>
+      {slots.length === 0 ? (
+        <View style={{ backgroundColor: c.mutedBg, borderRadius: RADIUS.sm, padding: SPACE.md, marginBottom: SPACE.md }}>
+          <Text style={{ ...TYPE.small, color: c.muted, textAlign: 'center' }}>
+            Aktuell keine freien Termine verfügbar.
+          </Text>
+        </View>
+      ) : (
+        <View style={{ marginBottom: SPACE.md, gap: 8 }}>
+          {slots.map((slot) => {
+            const active = selectedSlotId === slot.id;
+            return (
+              <Pressable
+                key={slot.id}
+                onPress={() => setSelectedSlotId(slot.id)}
+                style={{
+                  flexDirection: 'row', alignItems: 'center',
+                  padding: SPACE.sm,
+                  borderRadius: RADIUS.sm,
+                  borderWidth: 1.5,
+                  borderColor: active ? c.primary : c.border,
+                  backgroundColor: active ? c.primaryBg : c.card,
+                }}
+              >
+                <Ionicons name="calendar-outline" size={18} color={active ? c.primary : c.muted} style={{ marginRight: 10 }} />
+                <Text style={{ ...TYPE.body, color: active ? c.primary : c.text, flex: 1, fontWeight: active ? '600' : '400' }}>
+                  {formatSlot(slot.startsAt, slot.durationMin)}
+                </Text>
+                {active && <Ionicons name="checkmark-circle" size={18} color={c.primary} />}
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
 
       {/* Message */}
-      <Text style={{ ...TYPE.label, color: c.text, marginBottom: SPACE.xs }}>{t('bookingMessage')}</Text>
+      <Text style={{ ...TYPE.label, color: c.text, marginBottom: SPACE.xs }}>Nachricht (optional)</Text>
       <TextInput
         value={message}
         onChangeText={setMessage}
-        placeholder={t('bookingMessage')}
+        placeholder="Was möchtest du dem Therapeuten mitteilen?"
         placeholderTextColor={c.muted}
         multiline
         numberOfLines={3}
         style={{
-          borderWidth: 1,
-          borderColor: c.border,
-          borderRadius: RADIUS.sm,
-          backgroundColor: c.mutedBg,
-          color: c.text,
-          fontSize: 15,
-          padding: 12,
-          minHeight: 80,
-          textAlignVertical: 'top',
-          marginBottom: SPACE.md,
+          borderWidth: 1, borderColor: c.border, borderRadius: RADIUS.sm,
+          backgroundColor: c.mutedBg, color: c.text, fontSize: 15,
+          padding: 12, minHeight: 80, textAlignVertical: 'top', marginBottom: SPACE.md,
         }}
       />
 
@@ -167,7 +158,9 @@ export function BookingRequestForm({ c, t, therapist, authToken, patientName, on
         }}>
           {consent && <Ionicons name="checkmark" size={14} color="#fff" />}
         </View>
-        <Text style={{ ...TYPE.small, color: c.muted, flex: 1, lineHeight: 20 }}>{t('bookingConsent')}</Text>
+        <Text style={{ ...TYPE.small, color: c.muted, flex: 1, lineHeight: 20 }}>
+          Ich stimme zu, dass meine Kontaktdaten zur Terminvermittlung verwendet werden.
+        </Text>
       </Pressable>
 
       {/* Error */}
@@ -179,26 +172,23 @@ export function BookingRequestForm({ c, t, therapist, authToken, patientName, on
       )}
 
       {/* Submit */}
-      <Pressable
-        onPress={handleSubmit}
-        disabled={loading}
-        style={{
-          backgroundColor: loading ? c.border : c.primary,
-          borderRadius: RADIUS.md,
-          paddingVertical: 16,
-          alignItems: 'center',
-        }}
-      >
-        {loading
-          ? <ActivityIndicator color="#fff" />
-          : <Text style={{ ...TYPE.label, color: '#fff', fontSize: 16 }}>{t('bookingRequestBtn')}</Text>
-        }
-      </Pressable>
+      {slots.length > 0 && (
+        <Pressable
+          onPress={handleSubmit}
+          disabled={loading}
+          style={{ backgroundColor: loading ? c.border : c.primary, borderRadius: RADIUS.md, paddingVertical: 16, alignItems: 'center' }}
+        >
+          {loading
+            ? <ActivityIndicator color="#fff" />
+            : <Text style={{ ...TYPE.label, color: '#fff', fontSize: 16 }}>Jetzt buchen</Text>
+          }
+        </Pressable>
+      )}
     </ScrollView>
   );
 }
 
-// ─── PatientAppointmentCard ────────────────────────────────────────────────────
+// ─── Status helpers ────────────────────────────────────────────────────────────
 
 const STATUS_COLORS = {
   PENDING:   { bg: '#FFF9E6', text: '#B78700', label: 'Ausstehend' },
@@ -208,71 +198,50 @@ const STATUS_COLORS = {
   EXPIRED:   { bg: '#F3F4F6', text: '#6B7280', label: 'Abgelaufen' },
 };
 
+// ─── PatientAppointmentCard ────────────────────────────────────────────────────
+
 export function PatientAppointmentCard({ c, t, appointment, onCancel, onViewTherapist }) {
-  const { status, therapist, confirmedSlotAt, preferredDays, preferredTimeWindows } = appointment;
+  const { status, therapist, slot, confirmedSlotAt } = appointment;
   const badge = STATUS_COLORS[status] ?? STATUS_COLORS.EXPIRED;
 
-  return (
-    <View style={{
-      backgroundColor: c.card,
-      borderRadius: RADIUS.md,
-      padding: SPACE.md,
-      marginBottom: SPACE.sm,
-      ...SHADOW.card,
-    }}>
-      <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
-        {/* Avatar */}
-        <View style={{
-          width: 44, height: 44, borderRadius: 22,
-          backgroundColor: c.primaryBg,
-          alignItems: 'center', justifyContent: 'center',
-          marginRight: 12,
-        }}>
-          <Text style={{ fontSize: 18, fontWeight: '700', color: c.primary }}>
-            {(therapist?.fullName ?? '?')[0]}
-          </Text>
-        </View>
+  // Prefer slot.startsAt, fall back to confirmedSlotAt for legacy bookings
+  const slotDate = slot?.startsAt ?? confirmedSlotAt ?? null;
+  const durationMin = slot?.durationMin ?? 20;
 
-        {/* Info */}
+  return (
+    <View style={{ backgroundColor: c.card, borderRadius: RADIUS.md, padding: SPACE.md, marginBottom: SPACE.sm, ...SHADOW.card }}>
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+        <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: c.primaryBg, alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+          <Text style={{ fontSize: 18, fontWeight: '700', color: c.primary }}>{(therapist?.fullName ?? '?')[0]}</Text>
+        </View>
         <View style={{ flex: 1 }}>
           <Text style={{ ...TYPE.label, color: c.text, fontSize: 15 }}>{therapist?.fullName ?? '—'}</Text>
           <Text style={{ ...TYPE.caption, color: c.muted, marginTop: 2 }}>{therapist?.professionalTitle ?? ''}</Text>
         </View>
-
-        {/* Status badge */}
         <View style={{ backgroundColor: badge.bg, borderRadius: RADIUS.sm, paddingHorizontal: 8, paddingVertical: 4 }}>
           <Text style={{ fontSize: 12, fontWeight: '700', color: badge.text }}>{badge.label}</Text>
         </View>
       </View>
 
-      {/* Confirmed slot */}
-      {status === 'CONFIRMED' && confirmedSlotAt && (
+      {slotDate && (
         <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: SPACE.sm, gap: 6 }}>
-          <Ionicons name="calendar-outline" size={14} color={c.primary} />
-          <Text style={{ ...TYPE.small, color: c.primary, fontWeight: '600' }}>
-            {new Date(confirmedSlotAt).toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'long' })}
+          <Ionicons name="calendar-outline" size={14} color={status === 'CONFIRMED' ? c.primary : c.muted} />
+          <Text style={{ ...TYPE.small, color: status === 'CONFIRMED' ? c.primary : c.muted, fontWeight: '600' }}>
+            {formatSlot(slotDate, durationMin)}
           </Text>
         </View>
       )}
 
-      {/* Preferred (when not confirmed) */}
-      {status !== 'CONFIRMED' && (preferredDays || preferredTimeWindows) && (
-        <Text style={{ ...TYPE.small, color: c.muted, marginTop: SPACE.xs }}>
-          {[preferredDays, preferredTimeWindows].filter(Boolean).join(' · ')}
-        </Text>
-      )}
-
-      {/* Actions */}
       <View style={{ flexDirection: 'row', gap: 8, marginTop: SPACE.sm }}>
         {status === 'PENDING' && (
           <Pressable
-            onPress={() => Alert.alert(t('bookingCancelConfirm'), '', [
+            onPress={() => Alert.alert('Termin stornieren', 'Möchtest du diese Anfrage wirklich stornieren?', [
               { text: 'Nein', style: 'cancel' },
-              { text: t('bookingCancel'), style: 'destructive', onPress: onCancel },
+              { text: 'Stornieren', style: 'destructive', onPress: onCancel },
             ])}
             style={{ flex: 1, borderWidth: 1, borderColor: c.error, borderRadius: RADIUS.sm, paddingVertical: 10, alignItems: 'center' }}
           >
-            <Text style={{ ...TYPE.label, color: c.error, fontSize: 14 }}>{t('bookingCancel')}</Text>
+            <Text style={{ ...TYPE.label, color: c.error, fontSize: 14 }}>Stornieren</Text>
           </Pressable>
         )}
         <Pressable
@@ -292,41 +261,20 @@ export function TherapistBookingCard({ c, t, request, onRespond }) {
   const [loading, setLoading] = useState(false);
   const [showDecline, setShowDecline] = useState(false);
   const [declinedReason, setDeclinedReason] = useState('');
-  const [confirmDate, setConfirmDate] = useState('');
-  const [showConfirm, setShowConfirm] = useState(false);
   const [error, setError] = useState('');
+
+  const isPending = request.status === 'PENDING';
+  const slot = request.slot ?? null;
+  // Legacy: fall back to confirmedSlotAt if no slot
+  const slotDate = slot?.startsAt ?? request.confirmedSlotAt ?? null;
 
   async function handleRespond(action) {
     setError('');
-    if (action === 'CONFIRM' && !confirmDate.trim()) {
-      setError('Bitte Datum eingeben (z.B. 15.05.2026 10:00)');
-      return;
-    }
     setLoading(true);
     try {
-      let body;
-      if (action === 'CONFIRM') {
-        const parts = confirmDate.trim().split(/[\s,]+/);
-        const [datePart, timePart] = parts;
-        const dateBits = datePart.split('.');
-        if (dateBits.length !== 3 || !dateBits[2] || dateBits[2].length < 4) {
-          setError('Bitte im Format TT.MM.JJJJ HH:MM eingeben, z.B. 15.05.2026 10:00');
-          setLoading(false);
-          return;
-        }
-        const [d, m, y] = dateBits;
-        const isoDate = timePart
-          ? `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}T${timePart}:00.000Z`
-          : `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}T09:00:00.000Z`;
-        if (isNaN(new Date(isoDate).getTime())) {
-          setError('Ungültiges Datum. Bitte Format prüfen: TT.MM.JJJJ HH:MM');
-          setLoading(false);
-          return;
-        }
-        body = { action: 'CONFIRM', confirmedSlotAt: isoDate };
-      } else {
-        body = { action: 'DECLINE', declinedReason: declinedReason.trim() || undefined };
-      }
+      const body = action === 'CONFIRM'
+        ? { action: 'CONFIRM' }
+        : { action: 'DECLINE', declinedReason: declinedReason.trim() || undefined };
       await onRespond(request.id, body);
     } catch {
       setError('Fehler beim Speichern.');
@@ -335,17 +283,9 @@ export function TherapistBookingCard({ c, t, request, onRespond }) {
     }
   }
 
-  const isPending = request.status === 'PENDING';
-
   return (
-    <View style={{
-      backgroundColor: c.card,
-      borderRadius: RADIUS.md,
-      padding: SPACE.md,
-      marginBottom: SPACE.sm,
-      ...SHADOW.card,
-    }}>
-      {/* Header row */}
+    <View style={{ backgroundColor: c.card, borderRadius: RADIUS.md, padding: SPACE.md, marginBottom: SPACE.sm, ...SHADOW.card }}>
+      {/* Header */}
       <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: SPACE.sm }}>
         <View style={{ flex: 1 }}>
           <Text style={{ ...TYPE.label, color: c.text, fontSize: 15 }}>{request.patientName}</Text>
@@ -358,45 +298,30 @@ export function TherapistBookingCard({ c, t, request, onRespond }) {
             <Text style={{ fontSize: 11, fontWeight: '700', color: '#B78700' }}>ANFRAGE</Text>
           </View>
         )}
+        {!isPending && (
+          <View style={{ backgroundColor: STATUS_COLORS[request.status]?.bg ?? '#F3F4F6', borderRadius: RADIUS.sm, paddingHorizontal: 8, paddingVertical: 4 }}>
+            <Text style={{ fontSize: 11, fontWeight: '700', color: STATUS_COLORS[request.status]?.text ?? '#6B7280' }}>
+              {STATUS_COLORS[request.status]?.label ?? request.status}
+            </Text>
+          </View>
+        )}
       </View>
 
-      {/* Details */}
-      <Text style={{ ...TYPE.small, color: c.muted, marginBottom: 2 }}>
-        Wunschtage: {request.preferredDays || '—'}
-      </Text>
-      <Text style={{ ...TYPE.small, color: c.muted, marginBottom: request.message ? 4 : 0 }}>
-        Wunschzeit: {request.preferredTimeWindows || '—'}
-      </Text>
+      {/* Slot */}
+      {slotDate && (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: SPACE.xs }}>
+          <Ionicons name="calendar-outline" size={14} color={c.primary} />
+          <Text style={{ ...TYPE.small, color: c.primary, fontWeight: '600' }}>
+            {formatSlot(slotDate, slot?.durationMin ?? 20)}
+          </Text>
+        </View>
+      )}
+
+      {/* Message */}
       {!!request.message && (
-        <Text style={{ ...TYPE.small, color: c.text, fontStyle: 'italic', marginBottom: 4 }}>
+        <Text style={{ ...TYPE.small, color: c.text, fontStyle: 'italic', marginBottom: SPACE.xs }}>
           „{request.message}"
         </Text>
-      )}
-
-      {!isPending && (
-        <Text style={{ ...TYPE.small, color: c.muted, marginTop: 4 }}>
-          Status: {STATUS_COLORS[request.status]?.label ?? request.status}
-        </Text>
-      )}
-
-      {/* Error */}
-      {!!error && (
-        <Text style={{ ...TYPE.small, color: c.error, marginTop: 6 }}>{error}</Text>
-      )}
-
-      {/* Confirm date input */}
-      {isPending && showConfirm && (
-        <TextInput
-          value={confirmDate}
-          onChangeText={setConfirmDate}
-          placeholder="z.B. 15.05.2026 10:00"
-          placeholderTextColor={c.muted}
-          style={{
-            borderWidth: 1, borderColor: c.border, borderRadius: RADIUS.sm,
-            backgroundColor: c.mutedBg, color: c.text, fontSize: 14,
-            padding: 10, marginTop: SPACE.sm,
-          }}
-        />
       )}
 
       {/* Decline reason input */}
@@ -406,61 +331,47 @@ export function TherapistBookingCard({ c, t, request, onRespond }) {
           onChangeText={setDeclinedReason}
           placeholder="Grund (optional)"
           placeholderTextColor={c.muted}
-          style={{
-            borderWidth: 1, borderColor: c.border, borderRadius: RADIUS.sm,
-            backgroundColor: c.mutedBg, color: c.text, fontSize: 14,
-            padding: 10, marginTop: SPACE.sm,
-          }}
+          style={{ borderWidth: 1, borderColor: c.border, borderRadius: RADIUS.sm, backgroundColor: c.mutedBg, color: c.text, fontSize: 14, padding: 10, marginTop: SPACE.sm }}
         />
       )}
 
-      {/* Action buttons */}
+      {/* Error */}
+      {!!error && <Text style={{ ...TYPE.small, color: c.error, marginTop: 6 }}>{error}</Text>}
+
+      {/* Actions */}
       {isPending && (
         <View style={{ flexDirection: 'row', gap: 8, marginTop: SPACE.sm }}>
-          {/* Decline flow */}
-          {!showConfirm && (
-            showDecline ? (
-              <Pressable
-                disabled={loading}
-                onPress={() => handleRespond('DECLINE')}
-                style={{ flex: 1, borderWidth: 1, borderColor: c.error, borderRadius: RADIUS.sm, paddingVertical: 10, alignItems: 'center' }}
-              >
-                {loading
-                  ? <ActivityIndicator size="small" color={c.error} />
-                  : <Text style={{ ...TYPE.label, color: c.error, fontSize: 14 }}>Senden</Text>
-                }
-              </Pressable>
-            ) : (
-              <Pressable
-                onPress={() => setShowDecline(true)}
-                style={{ flex: 1, borderWidth: 1, borderColor: c.error, borderRadius: RADIUS.sm, paddingVertical: 10, alignItems: 'center' }}
-              >
-                <Text style={{ ...TYPE.label, color: c.error, fontSize: 14 }}>{t('bookingDeclineAction')}</Text>
-              </Pressable>
-            )
+          {!showDecline ? (
+            <Pressable
+              onPress={() => setShowDecline(true)}
+              style={{ flex: 1, borderWidth: 1, borderColor: c.error, borderRadius: RADIUS.sm, paddingVertical: 10, alignItems: 'center' }}
+            >
+              <Text style={{ ...TYPE.label, color: c.error, fontSize: 14 }}>Ablehnen</Text>
+            </Pressable>
+          ) : (
+            <Pressable
+              disabled={loading}
+              onPress={() => handleRespond('DECLINE')}
+              style={{ flex: 1, borderWidth: 1, borderColor: c.error, borderRadius: RADIUS.sm, paddingVertical: 10, alignItems: 'center' }}
+            >
+              {loading
+                ? <ActivityIndicator size="small" color={c.error} />
+                : <Text style={{ ...TYPE.label, color: c.error, fontSize: 14 }}>Ablehnung senden</Text>
+              }
+            </Pressable>
           )}
 
-          {/* Confirm flow */}
           {!showDecline && (
-            showConfirm ? (
-              <Pressable
-                disabled={loading}
-                onPress={() => handleRespond('CONFIRM')}
-                style={{ flex: 1, backgroundColor: c.primary, borderRadius: RADIUS.sm, paddingVertical: 10, alignItems: 'center' }}
-              >
-                {loading
-                  ? <ActivityIndicator size="small" color="#fff" />
-                  : <Text style={{ ...TYPE.label, color: '#fff', fontSize: 14 }}>Bestätigen</Text>
-                }
-              </Pressable>
-            ) : (
-              <Pressable
-                onPress={() => setShowConfirm(true)}
-                style={{ flex: 1, backgroundColor: c.primary, borderRadius: RADIUS.sm, paddingVertical: 10, alignItems: 'center' }}
-              >
-                <Text style={{ ...TYPE.label, color: '#fff', fontSize: 14 }}>{t('bookingConfirmAction')} →</Text>
-              </Pressable>
-            )
+            <Pressable
+              disabled={loading}
+              onPress={() => handleRespond('CONFIRM')}
+              style={{ flex: 1, backgroundColor: c.primary, borderRadius: RADIUS.sm, paddingVertical: 10, alignItems: 'center' }}
+            >
+              {loading
+                ? <ActivityIndicator size="small" color="#fff" />
+                : <Text style={{ ...TYPE.label, color: '#fff', fontSize: 14 }}>Bestätigen</Text>
+              }
+            </Pressable>
           )}
         </View>
       )}

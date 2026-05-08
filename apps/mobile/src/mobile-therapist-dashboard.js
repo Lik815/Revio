@@ -85,9 +85,17 @@ export function TherapistDashboardScreen(props) {
     onRespondToBooking,
     editBookingMode,
     setEditBookingMode,
+    mySlots,
+    onAddSlot,
+    onCancelSlot,
+    slotsLoading,
   } = props;
 
   const [photoError, setPhotoError] = useState(false);
+  const [newSlotDate, setNewSlotDate] = useState('');
+  const [newSlotTime, setNewSlotTime] = useState('');
+  const [newSlotDuration, setNewSlotDuration] = useState('20');
+  const [slotError, setSlotError] = useState('');
   const th = loggedInTherapist;
   if (!th) return null;
   const fullName = typeof th.fullName === 'string' && th.fullName.trim() ? th.fullName.trim() : 'Profil';
@@ -290,6 +298,101 @@ export function TherapistDashboardScreen(props) {
         </View>
       ) : (
         <>
+          {/* ── Slot-Verwaltung ─────────────────────────────────────────────── */}
+          {editBookingMode === 'FIRST_APPOINTMENT_REQUEST' && (
+            <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
+              <Text style={[styles.filterSectionTitle, { color: c.muted }]}>Verfügbare Termine</Text>
+
+              {/* Neuen Slot anlegen */}
+              <View style={{ marginBottom: 12 }}>
+                <Text style={{ fontSize: 13, color: c.text, fontWeight: '600', marginBottom: 6 }}>Termin hinzufügen</Text>
+                <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
+                  <TextInput
+                    value={newSlotDate}
+                    onChangeText={setNewSlotDate}
+                    placeholder="TT.MM.JJJJ"
+                    placeholderTextColor={c.muted}
+                    style={[styles.registerInput, { flex: 1, color: c.text, borderColor: c.border, backgroundColor: c.mutedBg, marginBottom: 0, paddingVertical: 8 }]}
+                  />
+                  <TextInput
+                    value={newSlotTime}
+                    onChangeText={setNewSlotTime}
+                    placeholder="HH:MM"
+                    placeholderTextColor={c.muted}
+                    style={[styles.registerInput, { flex: 1, color: c.text, borderColor: c.border, backgroundColor: c.mutedBg, marginBottom: 0, paddingVertical: 8 }]}
+                  />
+                  <TextInput
+                    value={newSlotDuration}
+                    onChangeText={setNewSlotDuration}
+                    placeholder="Min"
+                    placeholderTextColor={c.muted}
+                    keyboardType="number-pad"
+                    style={[styles.registerInput, { width: 56, color: c.text, borderColor: c.border, backgroundColor: c.mutedBg, marginBottom: 0, paddingVertical: 8 }]}
+                  />
+                </View>
+                {!!slotError && (
+                  <Text style={{ fontSize: 12, color: c.error, marginBottom: 6 }}>{slotError}</Text>
+                )}
+                <Pressable
+                  onPress={() => {
+                    setSlotError('');
+                    const dateBits = newSlotDate.trim().split('.');
+                    if (dateBits.length !== 3 || !dateBits[2] || dateBits[2].length < 4) {
+                      setSlotError('Datum im Format TT.MM.JJJJ eingeben');
+                      return;
+                    }
+                    const [d, m, y] = dateBits;
+                    const timeStr = newSlotTime.trim() || '09:00';
+                    const iso = `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}T${timeStr}:00.000Z`;
+                    if (isNaN(new Date(iso).getTime())) { setSlotError('Ungültiges Datum'); return; }
+                    if (new Date(iso) <= new Date()) { setSlotError('Datum muss in der Zukunft liegen'); return; }
+                    const dur = parseInt(newSlotDuration, 10);
+                    if (isNaN(dur) || dur < 5 || dur > 120) { setSlotError('Dauer: 5–120 Minuten'); return; }
+                    onAddSlot({ startsAt: iso, durationMin: dur });
+                    setNewSlotDate('');
+                    setNewSlotTime('');
+                    setNewSlotDuration('20');
+                  }}
+                  style={{ backgroundColor: c.primary, borderRadius: 8, paddingVertical: 10, alignItems: 'center' }}
+                >
+                  <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600' }}>+ Slot anlegen</Text>
+                </Pressable>
+              </View>
+
+              {/* Slot-Liste */}
+              {slotsLoading ? (
+                <Text style={{ fontSize: 13, color: c.muted, textAlign: 'center', paddingVertical: 8 }}>Lädt…</Text>
+              ) : !Array.isArray(mySlots) || mySlots.length === 0 ? (
+                <Text style={{ fontSize: 13, color: c.muted, textAlign: 'center', paddingVertical: 8 }}>
+                  Noch keine Termine angelegt.
+                </Text>
+              ) : (
+                mySlots.filter(s => s.status !== 'CANCELLED').map((slot) => {
+                  const d = new Date(slot.startsAt);
+                  const label = d.toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short' })
+                    + ' · ' + d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+                  const isBooked = slot.status === 'BOOKED';
+                  return (
+                    <View key={slot.id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: c.border }}>
+                      <Text style={{ fontSize: 13, color: isBooked ? c.primary : c.text, flex: 1 }}>
+                        {label} ({slot.durationMin} Min)
+                      </Text>
+                      {isBooked ? (
+                        <View style={{ backgroundColor: c.primaryBg, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 }}>
+                          <Text style={{ fontSize: 11, color: c.primary, fontWeight: '600' }}>Gebucht</Text>
+                        </View>
+                      ) : (
+                        <Pressable onPress={() => onCancelSlot(slot.id)}>
+                          <Text style={{ fontSize: 12, color: c.error, paddingHorizontal: 8 }}>Löschen</Text>
+                        </Pressable>
+                      )}
+                    </View>
+                  );
+                })
+              )}
+            </View>
+          )}
+
           {th.bio ? (
             <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
               <Text style={[styles.filterSectionTitle, { color: c.muted }]}>{t('aboutLabel')}</Text>

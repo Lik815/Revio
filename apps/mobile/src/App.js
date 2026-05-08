@@ -387,6 +387,62 @@ export default function App() {
     } catch {}
   };
 
+  const loadMySlots = async (token) => {
+    if (!token) return;
+    setSlotsLoading(true);
+    try {
+      const res = await fetch(`${getBaseUrl()}/therapist/slots`, {
+        headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setMySlots(Array.isArray(data.slots) ? data.slots : []);
+      }
+    } catch {} finally {
+      setSlotsLoading(false);
+    }
+  };
+
+  const handleAddSlot = async ({ startsAt, durationMin }) => {
+    if (!authToken) return;
+    try {
+      const res = await fetch(`${getBaseUrl()}/therapist/slots`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({ slots: [{ startsAt, durationMin }] }),
+      });
+      if (res.ok) loadMySlots(authToken);
+    } catch {}
+  };
+
+  const handleCancelSlot = async (slotId) => {
+    if (!authToken) return;
+    try {
+      const res = await fetch(`${getBaseUrl()}/therapist/slots/${slotId}`, {
+        method: 'DELETE',
+        headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
+      });
+      if (res.ok) loadMySlots(authToken);
+    } catch {}
+  };
+
+  const loadAvailableSlots = async (therapistId) => {
+    try {
+      setAvailableSlotsTherapistId(therapistId);
+      const res = await fetch(`${getBaseUrl()}/therapists/${therapistId}/slots`, {
+        headers: { ...TUNNEL_HEADERS },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAvailableSlots(Array.isArray(data.slots) ? data.slots : []);
+      } else {
+        setAvailableSlots([]);
+      }
+    } catch {
+      setAvailableSlots([]);
+    }
+  };
+
   // ── Toast notification ────────────────────────────────────────────────────
   const [toastMsg, setToastMsg] = useState(null);
   const toastAnim = useRef(new Animated.Value(-80)).current;
@@ -574,6 +630,10 @@ export default function App() {
   const [accountType, setAccountType] = useState(null); // 'therapist' | 'patient' | null
   const [myAppointments, setMyAppointments] = useState([]);
   const [incomingBookings, setIncomingBookings] = useState([]);
+  const [availableSlots, setAvailableSlots] = useState([]);
+  const [availableSlotsTherapistId, setAvailableSlotsTherapistId] = useState(null);
+  const [mySlots, setMySlots] = useState([]);
+  const [slotsLoading, setSlotsLoading] = useState(false);
   const [showBookingForm, setShowBookingForm] = useState(false);
   const [bookingTargetTherapist, setBookingTargetTherapist] = useState(null);
   const [showRoleSelect, setShowRoleSelect] = useState(false);
@@ -714,7 +774,7 @@ export default function App() {
           }
           loadFavorites(token);
           if (profile.role === 'patient') loadMyAppointments(token);
-          else loadIncomingBookings(token);
+          else { loadIncomingBookings(token); loadMySlots(token); }
         } else {
           AsyncStorage.removeItem('revio_auth_token');
           AsyncStorage.removeItem('revio_account_type');
@@ -1829,7 +1889,10 @@ export default function App() {
     const th = results.find(x => x.id === id)
       || favorites.find(x => x.id === id)
       || selectedPracticeTherapists.find(x => x.id === id);
-    if (th) setSelectedTherapist(th);
+    if (th) {
+      setSelectedTherapist(th);
+      if (th.bookingMode === 'FIRST_APPOINTMENT_REQUEST') loadAvailableSlots(id);
+    }
   };
 
   // ── Discover tab ──────────────────────────────────────────────────────────
@@ -1963,12 +2026,13 @@ export default function App() {
         toggleFavorite={toggleFavorite}
         authToken={authToken}
         accountType={accountType}
+        availableSlots={availableSlotsTherapistId === th?.id ? availableSlots : []}
         onBookingRequest={(therapist) => {
+          if (!authToken) { setShowLogin(true); return; }
           if (therapist) {
             setBookingTargetTherapist(therapist);
+            loadAvailableSlots(therapist.id);
             setShowBookingForm(true);
-          } else {
-            setShowLogin(true);
           }
         }}
       />
@@ -2078,6 +2142,10 @@ export default function App() {
             throw new Error(data.error ?? 'Fehler');
           }
         }}
+        mySlots={mySlots}
+        slotsLoading={slotsLoading}
+        onAddSlot={handleAddSlot}
+        onCancelSlot={handleCancelSlot}
       />
     );
   };
@@ -3880,13 +3948,19 @@ export default function App() {
               t={t}
               therapist={bookingTargetTherapist}
               authToken={authToken}
+              availableSlots={availableSlots}
               onSuccess={() => {
                 setShowBookingForm(false);
                 setBookingTargetTherapist(null);
+                setAvailableSlots([]);
                 loadMyAppointments(authToken);
                 setActiveTab('favorites');
               }}
-              onClose={() => { setShowBookingForm(false); setBookingTargetTherapist(null); }}
+              onClose={() => {
+                setShowBookingForm(false);
+                setBookingTargetTherapist(null);
+                setAvailableSlots([]);
+              }}
             />
           )}
         </View>

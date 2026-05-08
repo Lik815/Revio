@@ -3,31 +3,157 @@ import { z } from 'zod';
 import { sendPushNotification } from '../utils/push.js';
 
 async function resolvePatient(fastify: FastifyInstance, token: string) {
-  const user = await fastify.prisma.user.findUnique({
-    where: { sessionToken: token },
-  });
+  const user = await fastify.prisma.user.findUnique({ where: { sessionToken: token } });
   if (!user || user.role !== 'patient') return null;
   return user;
 }
 
 async function resolveTherapist(fastify: FastifyInstance, token: string) {
-  // Try User table first (role=therapist)
   const user = await fastify.prisma.user.findUnique({
     where: { sessionToken: token },
     include: { therapistProfile: true },
   });
-  if (user?.role === 'therapist' && user.therapistProfile) {
-    return user.therapistProfile;
-  }
-  // Legacy: Therapist.sessionToken
-  const therapist = await fastify.prisma.therapist.findUnique({
-    where: { sessionToken: token },
-  });
+  if (user?.role === 'therapist' && user.therapistProfile) return user.therapistProfile;
+  const therapist = await fastify.prisma.therapist.findUnique({ where: { sessionToken: token } });
   return therapist ?? null;
 }
 
+function serializeSlot(slot: { id: string; startsAt: Date; durationMin: number; status: string } | null | undefined) {
+  if (!slot) return null;
+  return { id: slot.id, startsAt: slot.startsAt.toISOString(), durationMin: slot.durationMin, status: slot.status };
+}
+
+// Marks expired PENDING bookings as EXPIRED and releases their slots back to AVAILABLE.
+// Returns the count of expired bookings.
+async function expireStaleBookings(fastify: FastifyInstance, where: Record<string, unknown>) {
+  const stale = await fastify.prisma.bookingRequest.findMany({
+    where: { ...where, status: 'PENDING', responseDueAt: { lt: new Date() } },
+    select: { id: true, slotId: true },
+  });
+  if (stale.length === 0) return;
+  await fastify.prisma.$transaction([
+    fastify.prisma.bookingRequest.updateMany({
+      where: { id: { in: stale.map((b) => b.id) } },
+      data: { status: 'EXPIRED' },
+    }),
+    ...stale
+      .filter((b) => b.slotId)
+      .map((b) =>
+        fastify.prisma.therapistSlot.update({
+          where: { id: b.slotId! },
+          data: { status: 'AVAILABLE' },
+        }),
+      ),
+  ]);
+}
+
 export async function bookingRoutes(fastify: FastifyInstance) {
-  // POST /bookings — Patient creates a booking request
+
+  // ── Therapeut: Slot-Verwaltung ──────────────────────────────────────────
+
+  // GET /therapist/slots — Eigene Slots auflisten
+  fastify.get('/therapist/slots', async (request, reply) => {
+    const token = request.headers.authorization?.replace('Bearer ', '');
+    if (!token) return reply.status(401).send({ error: 'Unauthorized' });
+    const therapist = await resolveTherapist(fastify, token);
+    if (!therapist) return reply.status(403).send({ error: 'Only therapists can manage slots' });
+
+    const { from, to } = request.query as { from?: string; to?: string };
+    const fromDate = from ? new Date(from) : new Date();
+    const toDate = to ? new Date(to) : new Date(Date.now() + 60 * 24 * 60 * 60 * 1000);
+
+    const slots = await fastify.prisma.therapistSlot.findMany({
+      where: { therapistId: therapist.id, startsAt: { gte: fromDate, lte: toDate } },
+      include: { booking: { select: { id: true, patientName: true, status: true } } },
+      orderBy: { startsAt: 'asc' },
+    });
+
+    return { slots: slots.map((s) => ({
+      id: s.id,
+      startsAt: s.startsAt.toISOString(),
+      durationMin: s.durationMin,
+      status: s.status,
+      bookingId: s.booking?.id ?? null,
+      patientName: s.booking?.patientName ?? null,
+      bookingStatus: s.booking?.status ?? null,
+      createdAt: s.createdAt.toISOString(),
+    })) };
+  });
+
+  // POST /therapist/slots — Einen oder mehrere Slots anlegen
+  fastify.post('/therapist/slots', async (request, reply) => {
+    const token = request.headers.authorization?.replace('Bearer ', '');
+    if (!token) return reply.status(401).send({ error: 'Unauthorized' });
+    const therapist = await resolveTherapist(fastify, token);
+    if (!therapist) return reply.status(403).send({ error: 'Only therapists can create slots' });
+
+    const schema = z.object({
+      slots: z.array(z.object({
+        startsAt: z.string().datetime(),
+        durationMin: z.number().int().min(5).max(120).optional(),
+      })).min(1).max(50),
+    });
+
+    const parsed = schema.safeParse(request.body);
+    if (!parsed.success) return reply.status(400).send({ error: 'Invalid request', details: parsed.error.flatten() });
+
+    const now = new Date();
+    const future = parsed.data.slots.filter((s) => new Date(s.startsAt) > now);
+    if (future.length === 0) return reply.status(400).send({ error: 'All slots must be in the future' });
+
+    const created = await fastify.prisma.$transaction(
+      future.map((s) =>
+        fastify.prisma.therapistSlot.create({
+          data: { therapistId: therapist.id, startsAt: new Date(s.startsAt), durationMin: s.durationMin ?? 20 },
+        }),
+      ),
+    );
+
+    return reply.status(201).send({ created: created.map(serializeSlot) });
+  });
+
+  // PATCH /therapist/slots/:id — Slot stornieren (nur AVAILABLE)
+  fastify.patch('/therapist/slots/:id', async (request, reply) => {
+    const token = request.headers.authorization?.replace('Bearer ', '');
+    if (!token) return reply.status(401).send({ error: 'Unauthorized' });
+    const therapist = await resolveTherapist(fastify, token);
+    if (!therapist) return reply.status(403).send({ error: 'Only therapists can manage slots' });
+
+    const { id } = request.params as { id: string };
+    const slot = await fastify.prisma.therapistSlot.findUnique({ where: { id } });
+    if (!slot) return reply.status(404).send({ error: 'Slot not found' });
+    if (slot.therapistId !== therapist.id) return reply.status(403).send({ error: 'Not your slot' });
+    if (slot.status === 'BOOKED') return reply.status(409).send({ error: 'Cannot cancel a booked slot. Decline the booking first.' });
+    if (slot.status === 'CANCELLED') return reply.status(400).send({ error: 'Slot is already cancelled' });
+
+    const updated = await fastify.prisma.therapistSlot.update({
+      where: { id },
+      data: { status: 'CANCELLED' },
+    });
+
+    return { ...serializeSlot(updated) };
+  });
+
+  // DELETE /therapist/slots/:id — Slot löschen (nur AVAILABLE oder CANCELLED)
+  fastify.delete('/therapist/slots/:id', async (request, reply) => {
+    const token = request.headers.authorization?.replace('Bearer ', '');
+    if (!token) return reply.status(401).send({ error: 'Unauthorized' });
+    const therapist = await resolveTherapist(fastify, token);
+    if (!therapist) return reply.status(403).send({ error: 'Only therapists can delete slots' });
+
+    const { id } = request.params as { id: string };
+    const slot = await fastify.prisma.therapistSlot.findUnique({ where: { id } });
+    if (!slot) return reply.status(404).send({ error: 'Slot not found' });
+    if (slot.therapistId !== therapist.id) return reply.status(403).send({ error: 'Not your slot' });
+    if (slot.status === 'BOOKED') return reply.status(409).send({ error: 'Cannot delete a booked slot. Decline the booking first.' });
+
+    await fastify.prisma.therapistSlot.delete({ where: { id } });
+    return { deleted: true };
+  });
+
+  // ── Patient: Buchung ────────────────────────────────────────────────────
+
+  // POST /bookings — Patient bucht einen Slot
   fastify.post('/bookings', async (request, reply) => {
     const token = request.headers.authorization?.replace('Bearer ', '');
     if (!token) return reply.status(401).send({ error: 'Unauthorized' });
@@ -37,213 +163,198 @@ export async function bookingRoutes(fastify: FastifyInstance) {
 
     const schema = z.object({
       therapistId: z.string(),
-      preferredDays: z.string().min(1),
-      preferredTimeWindows: z.string().min(1),
-      message: z.string().optional(),
+      slotId: z.string(),
+      message: z.string().max(1000).optional(),
       consentAccepted: z.literal(true),
+      // Legacy-Felder werden ignoriert, damit bestehende Mobile-Calls nicht brechen
+      preferredDays: z.string().optional(),
+      preferredTimeWindows: z.string().optional(),
+      patientName: z.string().optional(),
+      patientEmail: z.string().optional(),
+      patientPhone: z.string().optional(),
     });
 
     const parsed = schema.safeParse(request.body);
-    if (!parsed.success) {
-      return reply.status(400).send({ error: 'Invalid request', details: parsed.error.flatten() });
-    }
+    if (!parsed.success) return reply.status(400).send({ error: 'Invalid request', details: parsed.error.flatten() });
 
-    const { therapistId, preferredDays, preferredTimeWindows, message, consentAccepted } = parsed.data;
+    const { therapistId, slotId, message } = parsed.data;
 
+    // Therapeut und Modus prüfen
     const therapist = await fastify.prisma.therapist.findUnique({ where: { id: therapistId } });
     if (!therapist) return reply.status(404).send({ error: 'Therapist not found' });
     if (therapist.bookingMode !== 'FIRST_APPOINTMENT_REQUEST') {
       return reply.status(400).send({ error: 'This therapist does not accept booking requests' });
     }
 
-    // Max 1 active request per patient+therapist
-    const existing = await fastify.prisma.bookingRequest.findFirst({
-      where: {
-        patientUserId: patient.id,
-        therapistId,
-        status: { in: ['PENDING', 'CONFIRMED'] },
-      },
-    });
-    if (existing) {
-      return reply.status(409).send({ error: 'You already have an active request with this therapist' });
-    }
+    // Patientenname aus Account ableiten
+    const patientName = `${patient.firstName ?? ''} ${patient.lastName ?? ''}`.trim() || patient.email;
 
     const now = new Date();
-    const expiresAt = new Date(now.getTime() + 5 * 24 * 60 * 60 * 1000);
 
-    const booking = await fastify.prisma.bookingRequest.create({
-      data: {
-        therapistId,
-        patientUserId: patient.id,
-        status: 'PENDING',
-        patientName: `${patient.firstName ?? ''} ${patient.lastName ?? ''}`.trim() || patient.email,
-        patientEmail: patient.email,
-        preferredDays,
-        preferredTimeWindows,
-        message,
-        consentAcceptedAt: now,
-        responseDueAt: expiresAt,
-      },
-    });
+    // Alles atomar in einer Transaktion
+    try {
+      const result = await fastify.prisma.$transaction(async (tx) => {
+        const slot = await tx.therapistSlot.findUnique({ where: { id: slotId } });
+        if (!slot) throw Object.assign(new Error('Slot not found'), { code: 404 });
+        if (slot.therapistId !== therapistId) throw Object.assign(new Error('Slot does not belong to this therapist'), { code: 400 });
+        if (slot.status !== 'AVAILABLE') throw Object.assign(new Error('Slot is no longer available'), { code: 409 });
+        if (slot.startsAt <= now) throw Object.assign(new Error('Slot is in the past'), { code: 400 });
 
-    // Push-Notification an Therapeuten
-    if (therapist.expoPushToken) {
-      const patientLabel = booking.patientName || booking.patientEmail || 'Ein Patient';
-      sendPushNotification(
-        therapist.expoPushToken,
-        'Neue Terminanfrage',
-        `${patientLabel} möchte einen Ersttermin buchen.`,
-        { bookingId: booking.id, screen: 'bookings' },
-      );
+        await tx.therapistSlot.update({ where: { id: slotId }, data: { status: 'BOOKED' } });
+
+        return tx.bookingRequest.create({
+          data: {
+            therapistId,
+            patientUserId: patient.id,
+            slotId,
+            status: 'PENDING',
+            patientName,
+            patientEmail: patient.email,
+            confirmedSlotAt: slot.startsAt,
+            consentAcceptedAt: now,
+            responseDueAt: new Date(now.getTime() + 5 * 24 * 60 * 60 * 1000),
+            message,
+          },
+          include: { slot: true },
+        });
+      });
+
+      if (therapist.expoPushToken) {
+        sendPushNotification(
+          therapist.expoPushToken,
+          'Neue Terminanfrage',
+          `${patientName} hat einen Termin am ${new Date(result.confirmedSlotAt!).toLocaleDateString('de-DE')} gebucht.`,
+          { bookingId: result.id, screen: 'bookings' },
+        );
+      }
+
+      return reply.status(201).send({
+        id: result.id,
+        status: result.status,
+        slot: serializeSlot(result.slot),
+        expiresAt: result.responseDueAt,
+      });
+    } catch (err: any) {
+      const status = err.code ?? 400;
+      return reply.status(status).send({ error: err.message });
     }
-
-    return reply.status(201).send({ id: booking.id, status: booking.status, expiresAt: booking.responseDueAt });
   });
 
-  // GET /bookings/my — Patient sees their own requests
+  // GET /bookings/my — Patient sieht eigene Buchungen
   fastify.get('/bookings/my', async (request, reply) => {
     const token = request.headers.authorization?.replace('Bearer ', '');
     if (!token) return reply.status(401).send({ error: 'Unauthorized' });
-
     const patient = await resolvePatient(fastify, token);
     if (!patient) return reply.status(403).send({ error: 'Only patients can view their bookings' });
 
-    // Mark expired requests
-    await fastify.prisma.bookingRequest.updateMany({
-      where: {
-        patientUserId: patient.id,
-        status: 'PENDING',
-        responseDueAt: { lt: new Date() },
-      },
-      data: { status: 'EXPIRED' },
-    });
+    await expireStaleBookings(fastify, { patientUserId: patient.id });
 
     const bookings = await fastify.prisma.bookingRequest.findMany({
       where: { patientUserId: patient.id },
       include: {
-        therapist: {
-          select: {
-            id: true,
-            fullName: true,
-            professionalTitle: true,
-            city: true,
-            photo: true,
-          },
-        },
+        slot: true,
+        therapist: { select: { id: true, fullName: true, professionalTitle: true, city: true, photo: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
 
-    return reply.send(bookings);
+    return reply.send(bookings.map((b) => ({ ...b, slot: serializeSlot(b.slot) })));
   });
 
-  // GET /bookings/incoming — Therapist sees incoming requests
+  // GET /bookings/incoming — Therapeut sieht eingehende Buchungen
   fastify.get('/bookings/incoming', async (request, reply) => {
     const token = request.headers.authorization?.replace('Bearer ', '');
     if (!token) return reply.status(401).send({ error: 'Unauthorized' });
-
     const therapist = await resolveTherapist(fastify, token);
     if (!therapist) return reply.status(403).send({ error: 'Only therapists can view incoming bookings' });
 
-    // Mark expired requests
-    await fastify.prisma.bookingRequest.updateMany({
-      where: {
-        therapistId: therapist.id,
-        status: 'PENDING',
-        responseDueAt: { lt: new Date() },
-      },
-      data: { status: 'EXPIRED' },
-    });
+    await expireStaleBookings(fastify, { therapistId: therapist.id });
 
     const bookings = await fastify.prisma.bookingRequest.findMany({
       where: { therapistId: therapist.id },
+      include: { slot: true },
       orderBy: { createdAt: 'desc' },
     });
 
-    return reply.send(bookings);
+    return reply.send(bookings.map((b) => ({ ...b, slot: serializeSlot(b.slot) })));
   });
 
-  // PATCH /bookings/:id/respond — Therapist confirms or declines
+  // PATCH /bookings/:id/respond — Therapeut bestätigt oder lehnt ab
   fastify.patch('/bookings/:id/respond', async (request, reply) => {
     const token = request.headers.authorization?.replace('Bearer ', '');
     if (!token) return reply.status(401).send({ error: 'Unauthorized' });
-
     const therapist = await resolveTherapist(fastify, token);
     if (!therapist) return reply.status(403).send({ error: 'Only therapists can respond to bookings' });
 
     const { id } = request.params as { id: string };
-    const booking = await fastify.prisma.bookingRequest.findUnique({ where: { id } });
+    const booking = await fastify.prisma.bookingRequest.findUnique({
+      where: { id },
+      include: { slot: true },
+    });
     if (!booking) return reply.status(404).send({ error: 'Booking not found' });
     if (booking.therapistId !== therapist.id) return reply.status(403).send({ error: 'Not your booking' });
     if (booking.status !== 'PENDING') return reply.status(400).send({ error: 'Booking is no longer pending' });
 
     const schema = z.discriminatedUnion('action', [
-      z.object({ action: z.literal('CONFIRM'), confirmedSlotAt: z.string().datetime() }),
+      z.object({ action: z.literal('CONFIRM') }),
       z.object({ action: z.literal('DECLINE'), declinedReason: z.string().optional() }),
     ]);
 
     const parsed = schema.safeParse(request.body);
-    if (!parsed.success) {
-      return reply.status(400).send({ error: 'Invalid request', details: parsed.error.flatten() });
-    }
+    if (!parsed.success) return reply.status(400).send({ error: 'Invalid request', details: parsed.error.flatten() });
 
     const now = new Date();
+
     if (parsed.data.action === 'CONFIRM') {
+      const confirmedAt = booking.slot?.startsAt ?? booking.confirmedSlotAt ?? now;
       const updated = await fastify.prisma.bookingRequest.update({
         where: { id },
-        data: {
-          status: 'CONFIRMED',
-          confirmedSlotAt: new Date(parsed.data.confirmedSlotAt),
-          respondedAt: now,
-        },
+        data: { status: 'CONFIRMED', confirmedSlotAt: confirmedAt, respondedAt: now },
+        include: { slot: true },
       });
 
-      // Push an Patient
       const patientUser = booking.patientUserId
         ? await fastify.prisma.user.findUnique({ where: { id: booking.patientUserId } })
         : null;
-      if (patientUser?.expoPushToken) {
-        sendPushNotification(
-          patientUser.expoPushToken,
-          'Termin bestätigt 🎉',
-          `${therapist.fullName} hat deinen Termin bestätigt.`,
-          { bookingId: booking.id, screen: 'bookings' },
-        );
+      if ((patientUser as any)?.expoPushToken) {
+        const slotDate = confirmedAt.toLocaleDateString('de-DE');
+        sendPushNotification((patientUser as any).expoPushToken, 'Termin bestätigt 🎉',
+          `${therapist.fullName} hat deinen Termin am ${slotDate} bestätigt.`,
+          { bookingId: booking.id, screen: 'bookings' });
       }
 
-      return reply.send(updated);
+      return reply.send({ ...updated, slot: serializeSlot(updated.slot) });
     } else {
-      const updated = await fastify.prisma.bookingRequest.update({
-        where: { id },
-        data: {
-          status: 'DECLINED',
-          declinedReason: parsed.data.declinedReason,
-          respondedAt: now,
-        },
+      const declineData = parsed.data as { action: 'DECLINE'; declinedReason?: string };
+      const updated = await fastify.prisma.$transaction(async (tx) => {
+        const u = await tx.bookingRequest.update({
+          where: { id },
+          data: { status: 'DECLINED', declinedReason: declineData.declinedReason, respondedAt: now },
+          include: { slot: true },
+        });
+        if (booking.slotId) {
+          await tx.therapistSlot.update({ where: { id: booking.slotId }, data: { status: 'AVAILABLE' } });
+        }
+        return u;
       });
 
-      // Push an Patient
       const patientUser = booking.patientUserId
         ? await fastify.prisma.user.findUnique({ where: { id: booking.patientUserId } })
         : null;
-      if (patientUser?.expoPushToken) {
-        sendPushNotification(
-          patientUser.expoPushToken,
-          'Terminanfrage abgelehnt',
+      if ((patientUser as any)?.expoPushToken) {
+        sendPushNotification((patientUser as any).expoPushToken, 'Terminanfrage abgelehnt',
           `${therapist.fullName} konnte deinen Termin leider nicht bestätigen.`,
-          { bookingId: booking.id, screen: 'bookings' },
-        );
+          { bookingId: booking.id, screen: 'bookings' });
       }
 
-      return reply.send(updated);
+      return reply.send({ ...updated, slot: serializeSlot(updated.slot) });
     }
   });
 
-  // PATCH /bookings/:id/cancel — Patient cancels their own PENDING request
+  // PATCH /bookings/:id/cancel — Patient storniert eigene PENDING-Buchung
   fastify.patch('/bookings/:id/cancel', async (request, reply) => {
     const token = request.headers.authorization?.replace('Bearer ', '');
     if (!token) return reply.status(401).send({ error: 'Unauthorized' });
-
     const patient = await resolvePatient(fastify, token);
     if (!patient) return reply.status(403).send({ error: 'Only patients can cancel booking requests' });
 
@@ -253,9 +364,12 @@ export async function bookingRoutes(fastify: FastifyInstance) {
     if (booking.patientUserId !== patient.id) return reply.status(403).send({ error: 'Not your booking' });
     if (booking.status !== 'PENDING') return reply.status(400).send({ error: 'Only pending requests can be cancelled' });
 
-    const updated = await fastify.prisma.bookingRequest.update({
-      where: { id },
-      data: { status: 'CANCELLED' },
+    const updated = await fastify.prisma.$transaction(async (tx) => {
+      const u = await tx.bookingRequest.update({ where: { id }, data: { status: 'CANCELLED' } });
+      if (booking.slotId) {
+        await tx.therapistSlot.update({ where: { id: booking.slotId }, data: { status: 'AVAILABLE' } });
+      }
+      return u;
     });
 
     return reply.send(updated);
