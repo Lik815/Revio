@@ -116,6 +116,45 @@ export async function suspendTherapist(id: string) {
   revalidatePath('/');
 }
 
+export async function approvePractice(id: string) {
+  await adminRequest(`/admin/practices/${id}/approve`);
+  revalidatePath('/practices');
+  revalidatePath('/');
+}
+
+export async function rejectPractice(id: string) {
+  await adminRequest(`/admin/practices/${id}/reject`);
+  revalidatePath('/practices');
+  revalidatePath('/');
+}
+
+export async function suspendPractice(id: string) {
+  await adminRequest(`/admin/practices/${id}/suspend`);
+  revalidatePath('/practices');
+  revalidatePath('/');
+}
+
+export async function confirmLink(id: string) {
+  await adminRequest(`/admin/links/${id}/confirm`);
+  revalidatePath('/links');
+  revalidatePath('/therapists');
+  revalidatePath('/practices');
+}
+
+export async function rejectLink(id: string) {
+  await adminRequest(`/admin/links/${id}/reject`);
+  revalidatePath('/links');
+  revalidatePath('/therapists');
+  revalidatePath('/practices');
+}
+
+export async function disputeLink(id: string) {
+  await adminRequest(`/admin/links/${id}/dispute`);
+  revalidatePath('/links');
+  revalidatePath('/therapists');
+  revalidatePath('/practices');
+}
+
 // Certification option actions
 export async function createCertificationOption(formData: FormData) {
   const label = String(formData.get('label') ?? '').trim();
@@ -158,6 +197,17 @@ export async function updateSiteUnderConstruction(formData: FormData) {
   revalidatePath('/settings');
 }
 
+export async function updateAppFeedbackStatus(id: string, formData: FormData) {
+  const status = String(formData.get('status') ?? '').trim();
+  if (status !== 'NEW' && status !== 'RESOLVED') return;
+
+  await adminRequest(`/admin/feedback/${id}/status`, {
+    body: { status },
+  });
+
+  revalidatePath('/feedback');
+}
+
 export async function createBlogPost(formData: FormData) {
   const slug = String(formData.get('slug') ?? '').trim();
   const title = String(formData.get('title') ?? '').trim();
@@ -198,4 +248,38 @@ export async function toggleBlogPostPublish(id: string) {
 export async function deleteBlogPost(id: string) {
   await adminRequest(`/admin/blog-posts/${id}/delete`);
   revalidatePath('/blog');
+}
+
+// ── Practice actions ──────────────────────────────────────────────────────────
+
+export async function approvePractice(id: string) {
+  await adminRequest(`/admin/practices/${id}/approve`);
+  revalidatePath('/practices');
+}
+
+export async function rejectPractice(id: string) {
+  await adminRequest(`/admin/practices/${id}/reject`);
+  revalidatePath('/practices');
+}
+
+export async function suspendPractice(id: string) {
+  await adminRequest(`/admin/practices/${id}/suspend`);
+  revalidatePath('/practices');
+}
+
+// ── Link actions ──────────────────────────────────────────────────────────────
+
+export async function confirmLink(id: string) {
+  await adminRequest(`/admin/links/${id}/confirm`);
+  revalidatePath('/links');
+}
+
+export async function rejectLink(id: string) {
+  await adminRequest(`/admin/links/${id}/reject`);
+  revalidatePath('/links');
+}
+
+export async function disputeLink(id: string) {
+  await adminRequest(`/admin/links/${id}/dispute`);
+  revalidatePath('/links');
 }

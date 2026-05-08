@@ -10,6 +10,7 @@
     "test": "node -e \"console.log('No site tests yet')\""
   },
   "dependencies": {
+    "@emailjs/browser": "^4.4.1",
     "next": "15.5.14",
     "react": "19.0.0",
     "react-dom": "19.0.0"
