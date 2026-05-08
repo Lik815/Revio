@@ -32,7 +32,7 @@ function getWordCount(content: string) {
   return content.trim().split(/\s+/).filter(Boolean).length;
 }
 
-function renderContentPreview(content: string) {
+function renderContentPreview(content: string, maxBlocks?: number) {
   const lines = content.split('\n');
   const blocks: Array<
     | { type: 'heading'; text: string }
@@ -74,11 +74,13 @@ function renderContentPreview(content: string) {
 
   flushList();
 
-  if (blocks.length === 0) {
+  const visibleBlocks = typeof maxBlocks === 'number' ? blocks.slice(0, maxBlocks) : blocks;
+
+  if (visibleBlocks.length === 0) {
     return <p className="table-note">Noch kein Inhalt vorhanden.</p>;
   }
 
-  return blocks.map((block, index) => {
+  return visibleBlocks.map((block, index) => {
     if (block.type === 'heading') {
       return <h4 key={`heading-${index}`}>{block.text}</h4>;
     }
@@ -192,24 +194,22 @@ export default async function BlogPage({ searchParams }: { searchParams: SearchP
             </div>
 
             <form className="toolbar toolbar--compact blog-cms-toolbar" action="/blog">
-              <input
-                type="hidden"
-                name="mode"
-                value={mode}
-              />
-              <input
-                name="q"
-                defaultValue={params.q ?? ''}
-                className="toolbar-input"
-                placeholder="Titel, Slug oder Autor:in"
-              />
-              <select name="status" defaultValue={statusFilter} className="toolbar-select toolbar-input--sm">
-                <option value="ALL">Alle</option>
-                <option value="LIVE">Live</option>
-                <option value="DRAFT">Entwürfe</option>
-              </select>
+              <input type="hidden" name="mode" value={mode} />
+              <div className="blog-cms-toolbar__row">
+                <input
+                  name="q"
+                  defaultValue={params.q ?? ''}
+                  className="toolbar-input"
+                  placeholder="Titel, Slug oder Autor:in"
+                />
+                <select name="status" defaultValue={statusFilter} className="toolbar-select">
+                  <option value="ALL">Alle Status</option>
+                  <option value="LIVE">Live</option>
+                  <option value="DRAFT">Entwürfe</option>
+                </select>
+              </div>
               <button className="secondary-btn blog-filter-btn" type="submit">
-                Filtern
+                Ansicht aktualisieren
               </button>
             </form>
 
@@ -237,7 +237,7 @@ export default async function BlogPage({ searchParams }: { searchParams: SearchP
                       </div>
                       <p>{post.excerpt}</p>
                       <div className="blog-post-index__meta">
-                        <span>/{post.slug}</span>
+                        <span className="blog-post-index__slug">/{post.slug}</span>
                         <span>Update {formatDate(post.updatedAt)}</span>
                       </div>
                     </Link>
@@ -412,7 +412,7 @@ export default async function BlogPage({ searchParams }: { searchParams: SearchP
                     <span>{previewPost.isPublished ? formatDate(previewPost.publishedAt) : 'Noch nicht veröffentlicht'}</span>
                   </div>
                   <div className="blog-preview-content">
-                    {renderContentPreview(previewPost.content)}
+                    {renderContentPreview(previewPost.content, 4)}
                   </div>
                 </div>
               ) : (
