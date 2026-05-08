@@ -299,7 +299,7 @@ export function TherapistDashboardScreen(props) {
       ) : (
         <>
           {/* ── Slot-Verwaltung ─────────────────────────────────────────────── */}
-          {editBookingMode === 'FIRST_APPOINTMENT_REQUEST' && (
+          {(th.bookingMode === 'FIRST_APPOINTMENT_REQUEST' || editBookingMode === 'FIRST_APPOINTMENT_REQUEST') && (
             <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
               <Text style={[styles.filterSectionTitle, { color: c.muted }]}>Verfügbare Termine</Text>
 
