@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { sendPushNotification } from '../utils/push.js';
 
 async function resolvePatient(fastify: FastifyInstance, token: string) {
   const user = await fastify.prisma.user.findUnique({
@@ -84,6 +85,17 @@ export async function bookingRoutes(fastify: FastifyInstance) {
         responseDueAt: expiresAt,
       },
     });
+
+    // Push-Notification an Therapeuten
+    if (therapist.expoPushToken) {
+      const patientLabel = booking.patientName || booking.patientEmail || 'Ein Patient';
+      sendPushNotification(
+        therapist.expoPushToken,
+        'Neue Terminanfrage',
+        `${patientLabel} möchte einen Ersttermin buchen.`,
+        { bookingId: booking.id, screen: 'bookings' },
+      );
+    }
 
     return reply.status(201).send({ id: booking.id, status: booking.status, expiresAt: booking.responseDueAt });
   });
@@ -185,6 +197,20 @@ export async function bookingRoutes(fastify: FastifyInstance) {
           respondedAt: now,
         },
       });
+
+      // Push an Patient
+      const patientUser = booking.patientUserId
+        ? await fastify.prisma.user.findUnique({ where: { id: booking.patientUserId } })
+        : null;
+      if (patientUser?.expoPushToken) {
+        sendPushNotification(
+          patientUser.expoPushToken,
+          'Termin bestätigt 🎉',
+          `${therapist.fullName} hat deinen Termin bestätigt.`,
+          { bookingId: booking.id, screen: 'bookings' },
+        );
+      }
+
       return reply.send(updated);
     } else {
       const updated = await fastify.prisma.bookingRequest.update({
@@ -195,6 +221,20 @@ export async function bookingRoutes(fastify: FastifyInstance) {
           respondedAt: now,
         },
       });
+
+      // Push an Patient
+      const patientUser = booking.patientUserId
+        ? await fastify.prisma.user.findUnique({ where: { id: booking.patientUserId } })
+        : null;
+      if (patientUser?.expoPushToken) {
+        sendPushNotification(
+          patientUser.expoPushToken,
+          'Terminanfrage abgelehnt',
+          `${therapist.fullName} konnte deinen Termin leider nicht bestätigen.`,
+          { bookingId: booking.id, screen: 'bookings' },
+        );
+      }
+
       return reply.send(updated);
     }
   });
