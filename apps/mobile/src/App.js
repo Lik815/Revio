@@ -67,7 +67,7 @@ import {
 } from './mobile-compliance-step';
 import { translations } from './mobile-translations';
 import { PatientDashboardScreen } from './mobile-patient-dashboard';
-import { BookingRequestForm, PatientAppointmentCard } from './mobile-booking';
+import { BookingRequestForm, PatientAppointmentCard, TherapistBookingCard } from './mobile-booking';
 
 const formatProfileOverviewName = (fullName = '') => {
   const parts = String(fullName).trim().split(/\s+/).filter(Boolean);
@@ -2704,7 +2704,7 @@ export default function App() {
           <>
             {accountType === 'patient' && myAppointments.length > 0 && (
               <>
-                <Text style={[styles.sectionLabel, { color: c.text }]}>{t('myAppointments')}</Text>
+                <Text style={[styles.sectionLabel, { color: c.text }]}>{t('myAppointments') ?? 'Meine Termine'}</Text>
                 {myAppointments.map(apt => (
                   <PatientAppointmentCard
                     key={apt.id}
@@ -2726,6 +2726,45 @@ export default function App() {
                   />
                 ))}
               </>
+            )}
+
+            {accountType === 'patient' && myAppointments.length === 0 && authToken && (
+              <View style={[styles.emptyState, { backgroundColor: c.card, borderColor: c.border }]}>
+                <Text style={styles.emptyIcon}>📅</Text>
+                <Text style={[styles.emptyTitle, { color: c.text }]}>Keine Terminanfragen</Text>
+                <Text style={[styles.emptyBody, { color: c.muted }]}>Deine Terminanfragen und bestätigten Termine erscheinen hier.</Text>
+              </View>
+            )}
+
+            {(accountType === 'therapist' || accountType === 'manager') && incomingBookings.length > 0 && (
+              <>
+                <Text style={[styles.sectionLabel, { color: c.text }]}>Eingehende Anfragen</Text>
+                {incomingBookings.map(req => (
+                  <TherapistBookingCard
+                    key={req.id}
+                    c={c}
+                    t={t}
+                    request={req}
+                    onRespond={async (id, body) => {
+                      const res = await fetch(`${getBaseUrl()}/bookings/${id}/respond`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json', ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
+                        body: JSON.stringify(body),
+                      });
+                      if (!res.ok) throw new Error('failed');
+                      loadIncomingBookings(authToken);
+                    }}
+                  />
+                ))}
+              </>
+            )}
+
+            {(accountType === 'therapist' || accountType === 'manager') && incomingBookings.length === 0 && authToken && (
+              <View style={[styles.emptyState, { backgroundColor: c.card, borderColor: c.border }]}>
+                <Text style={styles.emptyIcon}>📅</Text>
+                <Text style={[styles.emptyTitle, { color: c.text }]}>Keine offenen Anfragen</Text>
+                <Text style={[styles.emptyBody, { color: c.muted }]}>Eingehende Terminanfragen erscheinen hier.</Text>
+              </View>
             )}
 
             <View style={[styles.noticeBox, { backgroundColor: c.mutedBg, borderColor: c.border, marginBottom: 4 }]}>
