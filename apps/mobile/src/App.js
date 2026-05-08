@@ -2767,15 +2767,6 @@ export default function App() {
               </View>
             )}
 
-            <View style={[styles.noticeBox, { backgroundColor: c.mutedBg, borderColor: c.border, marginBottom: 4 }]}>
-              <View style={styles.lockBadge}>
-                <Ionicons name="bookmark-outline" size={16} color={c.primary} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.noticeBody, { color: c.muted, flex: 0 }]}>{t('favoritesHint')}</Text>
-              </View>
-            </View>
-
             {favorites.length === 0 && (
               <View style={[styles.emptyState, { backgroundColor: c.card, borderColor: c.border }]}>
                 <Text style={styles.emptyIcon}>♡</Text>
