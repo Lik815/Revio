@@ -3115,7 +3115,10 @@ export default function App() {
     );
   };
 
-  const renderTherapyTabManager = () => renderTherapyTabShell(therapyTabTitle, renderTherapyPlaceholder('Manager placeholder'));
+  const renderTherapyTabManager = () => renderTherapyTabShell(
+    therapyTabTitle,
+    renderTherapySectionEmpty('Manager-Ansicht wird in einem nächsten Schritt erweitert.', null)
+  );
 
   const renderFavorites = () => {
     if (!authToken) return renderTherapyTabGuest();
