@@ -22,7 +22,6 @@ import {
   ComplianceStatusStep,
   getComplianceStatusLabel,
 } from './mobile-compliance-step';
-import { TherapistSlotManagerCard } from './mobile-slot-composer';
 
 function StatusMiniCard({ icon, label, value, color, c }) {
   return (
@@ -82,14 +81,9 @@ export function TherapistDashboardScreen(props) {
     styles,
     t,
     therapistDocuments,
-    incomingBookings,
-    onRespondToBooking,
     editBookingMode,
     setEditBookingMode,
-    mySlots,
-    onAddSlot,
-    onCancelSlot,
-    slotsLoading,
+    onOpenTherapyTab,
   } = props;
 
   const [photoError, setPhotoError] = useState(false);
@@ -101,9 +95,6 @@ export function TherapistDashboardScreen(props) {
   const reviewStatusLabel = th.reviewStatus === 'APPROVED' ? t('statusApproved') : th.reviewStatus === 'CHANGES_REQUESTED' ? t('statusChangesRequested') : t('statusInReview');
   const reviewStatusColor = th.reviewStatus === 'APPROVED' ? c.success : th.reviewStatus === 'CHANGES_REQUESTED' ? c.warning : c.muted;
   const hasDocuments = (therapistDocuments ?? []).length > 0;
-  const pendingBookings = (incomingBookings ?? []).filter(b => b.status === 'PENDING');
-  const pendingCount = pendingBookings.length;
-
   return (
     <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 20 }]}>
       <View style={[styles.practiceHeader, { backgroundColor: c.card, borderColor: c.border, alignItems: 'center' }]}>
@@ -296,17 +287,20 @@ export function TherapistDashboardScreen(props) {
         </View>
       ) : (
         <>
-          {/* ── Slot-Verwaltung ─────────────────────────────────────────────── */}
-          {(th.bookingMode === 'FIRST_APPOINTMENT_REQUEST' || editBookingMode === 'FIRST_APPOINTMENT_REQUEST') && (
-            <TherapistSlotManagerCard
-              c={c}
-              mySlots={mySlots}
-              onAddSlot={onAddSlot}
-              onCancelSlot={onCancelSlot}
-              slotsLoading={slotsLoading}
-              styles={styles}
-            />
-          )}
+          <Pressable
+            onPress={onOpenTherapyTab}
+            style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border, gap: 10 }]}
+          >
+            <Text style={[styles.filterSectionTitle, { color: c.muted }]}>Therapie</Text>
+            <Text style={{ ...TYPE.heading, color: c.text }}>Deine Termine und Slots findest du im Therapie-Tab.</Text>
+            <Text style={{ fontSize: 13, color: c.muted, lineHeight: 19 }}>
+              Dort kannst du neue Termine anlegen, gebuchte Slots sehen und offene Anfragen bearbeiten.
+            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}>
+              <Ionicons name="arrow-forward-circle-outline" size={18} color={c.primary} />
+              <Text style={{ color: c.primary, fontSize: 14, fontWeight: '600' }}>Zum Therapie-Tab</Text>
+            </View>
+          </Pressable>
 
           {th.bio ? (
             <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>

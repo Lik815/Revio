@@ -2308,25 +2308,9 @@ export default function App() {
         setEditTaxRegistrationStatus={setEditTaxRegistrationStatus}
         styles={styles}
         t={t}
+        onOpenTherapyTab={() => setActiveTab('favorites')}
         editBookingMode={editBookingMode}
         setEditBookingMode={setEditBookingMode}
-        incomingBookings={incomingBookings}
-        onRespondToBooking={async (bookingId, body) => {
-          const res = await fetch(`${getBaseUrl()}/bookings/${bookingId}/respond`, {
-            method: 'PATCH',
-            headers: { ...TUNNEL_HEADERS, 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
-            body: JSON.stringify(body),
-          });
-          if (res.ok) loadIncomingBookings(authToken);
-          else {
-            const data = await res.json().catch(() => ({}));
-            throw new Error(data.error ?? 'Fehler');
-          }
-        }}
-        mySlots={mySlots}
-        slotsLoading={slotsLoading}
-        onAddSlot={handleAddSlot}
-        onCancelSlot={handleCancelSlot}
       />
     );
   };
