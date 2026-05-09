@@ -2932,7 +2932,20 @@ export default function App() {
     </View>
   );
 
-  const renderTherapyTabGuest = () => renderTherapyTabShell(t('favoritesTitle'), renderTherapyPlaceholder('Guest placeholder'));
+  const renderTherapyTabGuest = () => renderTherapyTabShell(
+    t('favoritesTitle'),
+    <View style={[styles.emptyState, { backgroundColor: c.card, borderColor: c.border }]}>
+      <Text style={styles.emptyIcon}>♡</Text>
+      <Text style={[styles.emptyTitle, { color: c.text }]}>{t('favoritesLoginRequired') ?? 'Einloggen für Favoriten'}</Text>
+      <Text style={[styles.emptyBody, { color: c.muted }]}>{t('favoritesLoginRequiredBody') ?? 'Melde dich an, um Therapeuten als Favoriten zu speichern.'}</Text>
+      <Pressable
+        onPress={() => { setActiveTab('therapist'); setShowLogin(true); }}
+        style={[styles.registerBtn, { backgroundColor: c.primary, marginTop: 16, paddingHorizontal: 32 }]}
+      >
+        <Text style={styles.registerBtnText}>{t('loginAction')}</Text>
+      </Pressable>
+    </View>
+  );
 
   const renderTherapyTabPatient = () => renderTherapyTabShell(t('favoritesTitle'), renderTherapyPlaceholder('Patient placeholder'));
 
