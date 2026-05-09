@@ -5,7 +5,9 @@ import {
   ActivityIndicator,
   Animated,
   Alert,
+  Dimensions,
   Image,
+  Keyboard,
   KeyboardAvoidingView,
   Linking,
   Modal,
@@ -1509,6 +1511,7 @@ export default function App() {
   const [feedbackMessage, setFeedbackMessage] = useState('');
   const [feedbackError, setFeedbackError] = useState('');
   const [feedbackLoading, setFeedbackLoading] = useState(false);
+  const feedbackKeyboardOffset = React.useRef(new Animated.Value(0)).current;
   const notificationPollRef = React.useRef(null);
   const [showReviewNotificationModal, setShowReviewNotificationModal] = useState(false);
   const [reviewNotification, setReviewNotification] = useState(null);
@@ -1931,6 +1934,48 @@ export default function App() {
       setFeedbackEmail(authenticatedFeedbackEmail);
     }
   }, [authenticatedFeedbackEmail, showFeedbackModal]);
+
+  useEffect(() => {
+    if (!showFeedbackModal) {
+      feedbackKeyboardOffset.setValue(0);
+      return;
+    }
+
+    const animateFeedbackSheet = (toValue, duration) => {
+      Animated.timing(feedbackKeyboardOffset, {
+        toValue,
+        duration: typeof duration === 'number' ? duration : 250,
+        useNativeDriver: true,
+      }).start();
+    };
+
+    const handleKeyboardShow = (event) => {
+      const windowHeight = Dimensions.get('window').height;
+      const keyboardHeight = Platform.OS === 'ios'
+        ? Math.max(0, windowHeight - (event.endCoordinates?.screenY ?? windowHeight))
+        : (event.endCoordinates?.height ?? 0);
+
+      animateFeedbackSheet(-keyboardHeight, event.duration);
+    };
+
+    const handleKeyboardHide = (event) => {
+      animateFeedbackSheet(0, event?.duration);
+    };
+
+    const showSubscription = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillChangeFrame' : 'keyboardDidShow',
+      handleKeyboardShow,
+    );
+    const hideSubscription = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      handleKeyboardHide,
+    );
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, [feedbackKeyboardOffset, showFeedbackModal]);
 
 
 
@@ -4046,17 +4091,15 @@ export default function App() {
       </Modal>
 
       <Modal visible={showFeedbackModal} transparent animationType="slide" onRequestClose={closeFeedbackModal}>
-        <KeyboardAvoidingView
-          style={{ flex: 1, justifyContent: 'flex-end' }}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        >
+        <View style={{ flex: 1, justifyContent: 'flex-end' }}>
           <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' }} onPress={closeFeedbackModal} />
-          <View
+          <Animated.View
             style={{
               backgroundColor: c.background,
               borderTopLeftRadius: 20,
               borderTopRightRadius: 20,
               maxHeight: '82%',
+              transform: [{ translateY: feedbackKeyboardOffset }],
             }}
           >
             <ScrollView
@@ -4141,8 +4184,8 @@ export default function App() {
                 )}
               </Pressable>
             </ScrollView>
-          </View>
-        </KeyboardAvoidingView>
+          </Animated.View>
+        </View>
       </Modal>
 
       <Modal visible={showNotifications} transparent animationType="slide" onRequestClose={() => setShowNotifications(false)}>
