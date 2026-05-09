@@ -1938,6 +1938,12 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (activeTab === 'therapist' && authToken && loggedInTherapist) {
+      loadMySlots(authToken);
+    }
+  }, [activeTab, authToken]);
+
+  useEffect(() => {
     if (!showFeedbackModal) return;
     if (authenticatedFeedbackEmail) {
       setFeedbackEmail(authenticatedFeedbackEmail);
