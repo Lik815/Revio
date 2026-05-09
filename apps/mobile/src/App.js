@@ -4046,85 +4046,103 @@ export default function App() {
       </Modal>
 
       <Modal visible={showFeedbackModal} transparent animationType="slide" onRequestClose={closeFeedbackModal}>
-        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' }} onPress={closeFeedbackModal} />
-        <View style={{ backgroundColor: c.background, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, paddingBottom: 40 }}>
-          <View style={{ width: 36, height: 4, backgroundColor: c.border, borderRadius: 2, alignSelf: 'center', marginBottom: 16 }} />
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <Text style={{ fontSize: 18, fontWeight: '700', color: c.text }}>{t('appFeedbackTitle')}</Text>
-            <Pressable onPress={closeFeedbackModal} hitSlop={ICON_HIT_SLOP}>
-              <Ionicons name="close" size={22} color={c.muted} />
-            </Pressable>
-          </View>
-          <Text style={{ color: c.muted, lineHeight: 20, marginBottom: 16 }}>{t('appFeedbackBody')}</Text>
-
-          <Text style={{ ...TYPE.label, color: c.text, marginBottom: 8 }}>{t('feedbackEmailLabel')}</Text>
-          <TextInput
-            value={authenticatedFeedbackEmail || feedbackEmail}
-            onChangeText={setFeedbackEmail}
-            editable={!authenticatedFeedbackEmail}
-            autoCapitalize="none"
-            keyboardType="email-address"
-            placeholder={t('feedbackEmailPlaceholder')}
-            placeholderTextColor={c.muted}
-            style={[
-              styles.regInput,
-              {
-                marginTop: 0,
-                backgroundColor: c.card,
-                borderColor: c.border,
-                color: authenticatedFeedbackEmail ? c.muted : c.text,
-                opacity: authenticatedFeedbackEmail ? 0.8 : 1,
-              },
-            ]}
-          />
-          {authenticatedFeedbackEmail ? (
-            <Text style={{ color: c.muted, fontSize: 12, marginTop: 6 }}>{t('feedbackEmailHintLoggedIn')}</Text>
-          ) : null}
-
-          <Text style={{ ...TYPE.label, color: c.text, marginTop: 18, marginBottom: 8 }}>{t('feedbackMessageLabel')}</Text>
-          <TextInput
-            value={feedbackMessage}
-            onChangeText={setFeedbackMessage}
-            multiline
-            textAlignVertical="top"
-            placeholder={t('feedbackMessagePlaceholder')}
-            placeholderTextColor={c.muted}
-            style={[
-              styles.regInput,
-              {
-                marginTop: 0,
-                minHeight: 120,
-                backgroundColor: c.card,
-                borderColor: c.border,
-                color: c.text,
-                paddingTop: 14,
-              },
-            ]}
-          />
-
-          {!!feedbackError && (
-            <Text style={{ color: c.error, fontSize: 13, marginTop: 12 }}>{feedbackError}</Text>
-          )}
-
-          <Pressable
-            onPress={submitFeedback}
-            disabled={feedbackLoading}
-            style={[
-              styles.registerBtn,
-              {
-                backgroundColor: feedbackLoading ? c.border : c.primary,
-                marginTop: 18,
-                opacity: feedbackLoading ? 0.8 : 1,
-              },
-            ]}
+        <KeyboardAvoidingView
+          style={{ flex: 1, justifyContent: 'flex-end' }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' }} onPress={closeFeedbackModal} />
+          <View
+            style={{
+              backgroundColor: c.background,
+              borderTopLeftRadius: 20,
+              borderTopRightRadius: 20,
+              maxHeight: '82%',
+            }}
           >
-            {feedbackLoading ? (
-              <ActivityIndicator color="#fff" size="small" />
-            ) : (
-              <Text style={styles.registerBtnText}>{t('feedbackSend')}</Text>
-            )}
-          </Pressable>
-        </View>
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{ padding: 24, paddingBottom: 40 }}
+              showsVerticalScrollIndicator={false}
+            >
+              <View style={{ width: 36, height: 4, backgroundColor: c.border, borderRadius: 2, alignSelf: 'center', marginBottom: 16 }} />
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                <Text style={{ fontSize: 18, fontWeight: '700', color: c.text }}>{t('appFeedbackTitle')}</Text>
+                <Pressable onPress={closeFeedbackModal} hitSlop={ICON_HIT_SLOP}>
+                  <Ionicons name="close" size={22} color={c.muted} />
+                </Pressable>
+              </View>
+              <Text style={{ color: c.muted, lineHeight: 20, marginBottom: 16 }}>{t('appFeedbackBody')}</Text>
+
+              <Text style={{ ...TYPE.label, color: c.text, marginBottom: 8 }}>{t('feedbackEmailLabel')}</Text>
+              <TextInput
+                value={authenticatedFeedbackEmail || feedbackEmail}
+                onChangeText={setFeedbackEmail}
+                editable={!authenticatedFeedbackEmail}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                placeholder={t('feedbackEmailPlaceholder')}
+                placeholderTextColor={c.muted}
+                style={[
+                  styles.regInput,
+                  {
+                    marginTop: 0,
+                    backgroundColor: c.card,
+                    borderColor: c.border,
+                    color: authenticatedFeedbackEmail ? c.muted : c.text,
+                    opacity: authenticatedFeedbackEmail ? 0.8 : 1,
+                  },
+                ]}
+              />
+              {authenticatedFeedbackEmail ? (
+                <Text style={{ color: c.muted, fontSize: 12, marginTop: 6 }}>{t('feedbackEmailHintLoggedIn')}</Text>
+              ) : null}
+
+              <Text style={{ ...TYPE.label, color: c.text, marginTop: 18, marginBottom: 8 }}>{t('feedbackMessageLabel')}</Text>
+              <TextInput
+                value={feedbackMessage}
+                onChangeText={setFeedbackMessage}
+                multiline
+                textAlignVertical="top"
+                placeholder={t('feedbackMessagePlaceholder')}
+                placeholderTextColor={c.muted}
+                style={[
+                  styles.regInput,
+                  {
+                    marginTop: 0,
+                    minHeight: 120,
+                    backgroundColor: c.card,
+                    borderColor: c.border,
+                    color: c.text,
+                    paddingTop: 14,
+                  },
+                ]}
+              />
+
+              {!!feedbackError && (
+                <Text style={{ color: c.error, fontSize: 13, marginTop: 12 }}>{feedbackError}</Text>
+              )}
+
+              <Pressable
+                onPress={submitFeedback}
+                disabled={feedbackLoading}
+                style={[
+                  styles.registerBtn,
+                  {
+                    backgroundColor: feedbackLoading ? c.border : c.primary,
+                    marginTop: 18,
+                    opacity: feedbackLoading ? 0.8 : 1,
+                  },
+                ]}
+              >
+                {feedbackLoading ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.registerBtnText}>{t('feedbackSend')}</Text>
+                )}
+              </Pressable>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       <Modal visible={showNotifications} transparent animationType="slide" onRequestClose={() => setShowNotifications(false)}>
