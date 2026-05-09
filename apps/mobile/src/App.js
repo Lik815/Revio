@@ -9,6 +9,7 @@ import {
   Image,
   Keyboard,
   KeyboardAvoidingView,
+  LayoutAnimation,
   Linking,
   Modal,
   Platform,
@@ -440,7 +441,15 @@ export default function App() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setFeedbackError(data.error ?? t('feedbackSubmitError'));
+        const apiMessage = typeof data?.message === 'string' ? data.message : '';
+        const apiError = typeof data?.error === 'string' ? data.error : '';
+        const combined = `${apiError} ${apiMessage}`.trim();
+
+        if (/AppFeedback|P2021|does not exist/i.test(combined)) {
+          setFeedbackError(t('feedbackTemporarilyUnavailable'));
+        } else {
+          setFeedbackError(apiMessage || apiError || t('feedbackSubmitError'));
+        }
         return;
       }
 
@@ -1511,7 +1520,7 @@ export default function App() {
   const [feedbackMessage, setFeedbackMessage] = useState('');
   const [feedbackError, setFeedbackError] = useState('');
   const [feedbackLoading, setFeedbackLoading] = useState(false);
-  const feedbackKeyboardOffset = React.useRef(new Animated.Value(0)).current;
+  const [feedbackKeyboardInset, setFeedbackKeyboardInset] = useState(0);
   const notificationPollRef = React.useRef(null);
   const [showReviewNotificationModal, setShowReviewNotificationModal] = useState(false);
   const [reviewNotification, setReviewNotification] = useState(null);
@@ -1937,29 +1946,30 @@ export default function App() {
 
   useEffect(() => {
     if (!showFeedbackModal) {
-      feedbackKeyboardOffset.setValue(0);
+      setFeedbackKeyboardInset(0);
       return;
     }
-
-    const animateFeedbackSheet = (toValue, duration) => {
-      Animated.timing(feedbackKeyboardOffset, {
-        toValue,
-        duration: typeof duration === 'number' ? duration : 250,
-        useNativeDriver: true,
-      }).start();
-    };
 
     const handleKeyboardShow = (event) => {
       const windowHeight = Dimensions.get('window').height;
       const keyboardHeight = Platform.OS === 'ios'
         ? Math.max(0, windowHeight - (event.endCoordinates?.screenY ?? windowHeight))
         : (event.endCoordinates?.height ?? 0);
-
-      animateFeedbackSheet(-keyboardHeight, event.duration);
+      if (typeof Keyboard.scheduleLayoutAnimation === 'function') {
+        Keyboard.scheduleLayoutAnimation(event);
+      } else if (Platform.OS === 'ios') {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      }
+      setFeedbackKeyboardInset(keyboardHeight);
     };
 
     const handleKeyboardHide = (event) => {
-      animateFeedbackSheet(0, event?.duration);
+      if (typeof Keyboard.scheduleLayoutAnimation === 'function') {
+        Keyboard.scheduleLayoutAnimation(event);
+      } else if (Platform.OS === 'ios') {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      }
+      setFeedbackKeyboardInset(0);
     };
 
     const showSubscription = Keyboard.addListener(
@@ -1975,7 +1985,7 @@ export default function App() {
       showSubscription.remove();
       hideSubscription.remove();
     };
-  }, [feedbackKeyboardOffset, showFeedbackModal]);
+  }, [showFeedbackModal]);
 
 
 
@@ -4093,13 +4103,13 @@ export default function App() {
       <Modal visible={showFeedbackModal} transparent animationType="slide" onRequestClose={closeFeedbackModal}>
         <View style={{ flex: 1, justifyContent: 'flex-end' }}>
           <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' }} onPress={closeFeedbackModal} />
-          <Animated.View
+          <View
             style={{
               backgroundColor: c.background,
               borderTopLeftRadius: 20,
               borderTopRightRadius: 20,
               maxHeight: '82%',
-              transform: [{ translateY: feedbackKeyboardOffset }],
+              marginBottom: feedbackKeyboardInset,
             }}
           >
             <ScrollView
@@ -4184,7 +4194,7 @@ export default function App() {
                 )}
               </Pressable>
             </ScrollView>
-          </Animated.View>
+          </View>
         </View>
       </Modal>
 
