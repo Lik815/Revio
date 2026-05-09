@@ -1611,6 +1611,7 @@ export default function App() {
   const [reviewNotification, setReviewNotification] = useState(null);
   const [locationLabel, setLocationLabel] = useState(''); // display: "Hauptstraße 5, München"
   const [showLocationSheet, setShowLocationSheet] = useState(false);
+  const [showSlotComposerModal, setShowSlotComposerModal] = useState(false);
   const [pendingQuery, setPendingQuery] = useState(null);
   const [locationSheetCity, setLocationSheetCity] = useState('');
   const [locationLoading, setLocationLoading] = useState(false);
@@ -3105,12 +3106,19 @@ export default function App() {
     return renderTherapyTabShell(
       therapyTabTitle,
       <>
-        <Text style={[styles.sectionLabel, { color: c.text }]}>Neuen Termin anlegen</Text>
-        <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
-          {slotBookingEnabled
-            ? <TherapistSlotComposer c={c} onAddSlot={handleAddSlot} />
-            : renderTherapySectionEmpty('Terminanfragen sind noch nicht aktiviert.', 'Aktiviere Terminanfragen in deinem Profil, um Slots anzulegen.')}
-        </View>
+        {slotBookingEnabled ? (
+          <Pressable
+            onPress={() => setShowSlotComposerModal(true)}
+            style={[styles.infoSection, { backgroundColor: c.primaryBg, borderColor: c.primary, flexDirection: 'row', alignItems: 'center', gap: 10 }]}
+          >
+            <Ionicons name="add-circle-outline" size={22} color={c.primary} />
+            <Text style={{ fontSize: 15, fontWeight: '600', color: c.primary }}>Neuen Termin anlegen</Text>
+          </Pressable>
+        ) : (
+          <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
+            {renderTherapySectionEmpty('Terminanfragen sind noch nicht aktiviert.', 'Aktiviere Terminanfragen in deinem Profil, um Slots anzulegen.')}
+          </View>
+        )}
 
         <Text style={[styles.sectionLabel, { color: c.text }]}>Nächste eigene Slots</Text>
         <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
@@ -4475,6 +4483,29 @@ export default function App() {
       </Modal>
 
       {/* ── Location Sheet ─────────────────────────────────────────────────── */}
+      {/* Slot Composer Modal */}
+      <Modal visible={showSlotComposerModal} transparent animationType="slide" onRequestClose={() => setShowSlotComposerModal(false)}>
+        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' }} onPress={() => setShowSlotComposerModal(false)}>
+          <Pressable onPress={() => {}} style={{ backgroundColor: c.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 32 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 20, paddingBottom: 8 }}>
+              <Text style={{ fontSize: 18, fontWeight: '700', color: c.text, flex: 1 }}>Neuen Termin anlegen</Text>
+              <Pressable onPress={() => setShowSlotComposerModal(false)} style={{ padding: 4 }}>
+                <Ionicons name="close" size={22} color={c.muted} />
+              </Pressable>
+            </View>
+            <View style={{ paddingHorizontal: 20 }}>
+              <TherapistSlotComposer
+                c={c}
+                onAddSlot={(slot) => {
+                  handleAddSlot(slot);
+                  setShowSlotComposerModal(false);
+                }}
+              />
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
       <Modal visible={showLocationSheet} transparent animationType="slide" onRequestClose={() => setShowLocationSheet(false)}>
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' }} onPress={() => setShowLocationSheet(false)} />
