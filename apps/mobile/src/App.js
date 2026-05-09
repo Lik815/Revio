@@ -2932,8 +2932,59 @@ export default function App() {
     </View>
   );
 
+  const therapyTabTitle = t('tabTherapy') ?? 'Therapie';
+
+  const renderTherapySectionEmpty = (title, body) => (
+    <View style={[styles.emptyState, { backgroundColor: c.card, borderColor: c.border, paddingVertical: 20 }]}>
+      <Text style={[styles.emptyTitle, { color: c.text }]}>{title}</Text>
+      {body ? <Text style={[styles.emptyBody, { color: c.muted }]}>{body}</Text> : null}
+    </View>
+  );
+
+  const renderTherapySectionLoading = () => (
+    <View style={[styles.emptyState, { backgroundColor: c.card, borderColor: c.border, paddingVertical: 20 }]}>
+      <ActivityIndicator color={c.primary} />
+    </View>
+  );
+
+  const renderFavoriteTherapists = () => (
+    favorites.map((fav) => (
+      <View key={fav.id} style={[styles.resultCard, { backgroundColor: c.card, borderColor: c.border }]}>
+        <View style={styles.cardTop}>
+          <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }} onPress={() => setSelectedTherapist(fav)}>
+            <Image source={{ uri: fav.photo }} style={styles.avatar} />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.cardName, { color: c.text }]}>{fav.fullName}</Text>
+              <Text style={[styles.cardTitle, { color: c.muted }]}>{fav.professionalTitle}</Text>
+            </View>
+            <Text style={[styles.practiceArrow, { color: c.muted }]}>›</Text>
+          </Pressable>
+          <ThemedHeartButton isSaved={true} onToggle={() => toggleFavorite(fav)} hitSlop={ICON_HIT_SLOP} />
+        </View>
+        {(fav.city || fav.availability || fav.homeVisit) ? (
+          <View style={[styles.practiceBtn, { borderColor: c.border, backgroundColor: c.mutedBg }]}>
+            <View style={[styles.practiceInitial, { backgroundColor: fav.homeVisit ? c.successBg : c.border }]}>
+              <Ionicons name={fav.homeVisit ? 'home-outline' : 'location-outline'} size={16} color={fav.homeVisit ? c.success : c.muted} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.practiceName, { color: c.text }]}>{fav.city || t('cityLabel')}</Text>
+              {fav.availability ? <Text style={[styles.practiceCity, { color: c.muted }]} numberOfLines={1}>{fav.availability}</Text> : null}
+            </View>
+          </View>
+        ) : null}
+        <Pressable
+          style={[styles.ctaBtn, { backgroundColor: c.accent }]}
+          onPress={() => openTherapistById(fav.id)}
+        >
+          <Ionicons name="person-outline" size={16} color="#fff" style={{ marginRight: 6 }} />
+          <Text style={styles.ctaBtnText}>{t('viewProfileBtn')}</Text>
+        </Pressable>
+      </View>
+    ))
+  );
+
   const renderTherapyTabGuest = () => renderTherapyTabShell(
-    t('favoritesTitle'),
+    therapyTabTitle,
     <View style={[styles.emptyState, { backgroundColor: c.card, borderColor: c.border }]}>
       <Text style={styles.emptyIcon}>♡</Text>
       <Text style={[styles.emptyTitle, { color: c.text }]}>{t('favoritesLoginRequired') ?? 'Einloggen für Favoriten'}</Text>
@@ -2947,11 +2998,47 @@ export default function App() {
     </View>
   );
 
-  const renderTherapyTabPatient = () => renderTherapyTabShell(t('favoritesTitle'), renderTherapyPlaceholder('Patient placeholder'));
+  const renderTherapyTabPatient = () => renderTherapyTabShell(
+    therapyTabTitle,
+    <>
+      <Text style={[styles.sectionLabel, { color: c.text }]}>{t('myAppointments') ?? 'Meine Termine'}</Text>
+      {myAppointmentsLoading
+        ? renderTherapySectionLoading()
+        : myAppointments.length > 0
+          ? myAppointments.map((apt) => (
+            <PatientAppointmentCard
+              key={apt.id}
+              c={c}
+              t={t}
+              appointment={apt}
+              onCancel={async () => {
+                try {
+                  const res = await fetch(`${getBaseUrl()}/bookings/${apt.id}/cancel`, {
+                    method: 'PATCH',
+                    headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
+                  });
+                  if (res.ok) loadMyAppointments(authToken);
+                } catch {}
+              }}
+              onViewTherapist={() => {
+                if (apt.therapist) setSelectedTherapist(apt.therapist);
+              }}
+            />
+          ))
+          : renderTherapySectionEmpty('Du hast noch keine Termine.', t('noAppointmentsBody'))}
 
-  const renderTherapyTabTherapist = () => renderTherapyTabShell(t('favoritesTitle'), renderTherapyPlaceholder('Therapist placeholder'));
+      <Text style={[styles.sectionLabel, { color: c.text }]}>{t('favoritesTherapists') ?? 'Therapeut:innen'}</Text>
+      {favoritesLoading
+        ? renderTherapySectionLoading()
+        : favorites.length > 0
+          ? renderFavoriteTherapists()
+          : renderTherapySectionEmpty('Du hast noch keine Therapeut:innen gespeichert.', t('favoritesEmptyBody'))}
+    </>
+  );
 
-  const renderTherapyTabManager = () => renderTherapyTabShell(t('favoritesTitle'), renderTherapyPlaceholder('Manager placeholder'));
+  const renderTherapyTabTherapist = () => renderTherapyTabShell(therapyTabTitle, renderTherapyPlaceholder('Therapist placeholder'));
+
+  const renderTherapyTabManager = () => renderTherapyTabShell(therapyTabTitle, renderTherapyPlaceholder('Manager placeholder'));
 
   const renderFavorites = () => {
     if (!authToken) return renderTherapyTabGuest();
