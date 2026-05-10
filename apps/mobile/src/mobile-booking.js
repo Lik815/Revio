@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import {
   Image,
@@ -46,14 +46,44 @@ function formatSlot(startsAt, durationMin) {
 // ─── BookingRequestForm ────────────────────────────────────────────────────────
 
 export function BookingRequestForm({ c, t, therapist, authToken, availableSlots, onSuccess, onClose }) {
-  const [selectedSlotId, setSelectedSlotId] = useState(null);
+  const [selectedSlotId, setSelectedSlotId] = useState(therapist?.selectedSlotId ?? null);
   const [message, setMessage] = useState('');
   const [consent, setConsent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
 
-  const slots = Array.isArray(availableSlots) ? availableSlots : [];
+  const slots = (Array.isArray(availableSlots) ? availableSlots : []).reduce((acc, slot) => {
+    const slotKey = `${slot?.startsAt ?? 'unknown'}-${slot?.durationMin ?? 20}`;
+    const existingIndex = acc.findIndex((candidate) => `${candidate?.startsAt ?? 'unknown'}-${candidate?.durationMin ?? 20}` === slotKey);
+
+    if (existingIndex === -1) {
+      acc.push(slot);
+      return acc;
+    }
+
+    if (slot?.id === therapist?.selectedSlotId) {
+      acc[existingIndex] = slot;
+    }
+
+    return acc;
+  }, []);
+
+  useEffect(() => {
+    if (slots.length === 0) {
+      setSelectedSlotId(null);
+      return;
+    }
+
+    if (therapist?.selectedSlotId && slots.some((slot) => slot.id === therapist.selectedSlotId)) {
+      setSelectedSlotId((current) => (current === therapist.selectedSlotId ? current : therapist.selectedSlotId));
+      return;
+    }
+
+    if (!selectedSlotId || !slots.some((slot) => slot.id === selectedSlotId)) {
+      setSelectedSlotId(slots[0].id);
+    }
+  }, [selectedSlotId, slots, therapist?.selectedSlotId]);
 
   async function handleSubmit() {
     if (!selectedSlotId) { setError('Bitte wähle einen Termin aus.'); return; }
