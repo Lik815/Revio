@@ -493,15 +493,31 @@ export function TherapistProfileScreen(props) {
         </View>
       ) : null}
 
-      <Modal visible={showBookingModal} transparent animationType="fade" onRequestClose={() => setShowBookingModal(false)}>
+      <Modal visible={showBookingModal} transparent animationType="slide" onRequestClose={() => setShowBookingModal(false)}>
         <Pressable
-          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center', padding: 24 }}
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' }}
           onPress={() => setShowBookingModal(false)}
         >
           <Pressable
             onPress={() => {}}
-            style={{ backgroundColor: c.card, borderRadius: 18, padding: 20, width: '100%', maxWidth: 420, borderWidth: 1, borderColor: c.border, maxHeight: '86%' }}
+            style={{
+              backgroundColor: c.card,
+              borderTopLeftRadius: 28,
+              borderTopRightRadius: 28,
+              paddingTop: 12,
+              paddingHorizontal: 20,
+              paddingBottom: 24,
+              width: '100%',
+              borderWidth: 1,
+              borderBottomWidth: 0,
+              borderColor: c.border,
+              maxHeight: '86%',
+            }}
           >
+            <View style={{ alignItems: 'center', marginBottom: 12 }}>
+              <View style={{ width: 44, height: 5, borderRadius: 999, backgroundColor: c.border }} />
+            </View>
+
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
               <Text style={{ color: c.text, fontSize: 18, fontWeight: '700' }}>Freie Termine</Text>
               <Pressable onPress={() => setShowBookingModal(false)} hitSlop={iconHitSlop}>
@@ -510,7 +526,7 @@ export function TherapistProfileScreen(props) {
             </View>
 
             {bookingSlots.length > 0 ? (
-              <>
+              <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingBottom: 4 }}>
                   {slotDates.map((dayKey) => {
                     const active = selectedDate === dayKey;
@@ -591,7 +607,7 @@ export function TherapistProfileScreen(props) {
                 >
                   <Text style={styles.ctaBtnText}>Termin buchen</Text>
                 </Pressable>
-              </>
+              </ScrollView>
             ) : (
               <Text style={{ color: c.muted, fontSize: 13, lineHeight: 18 }}>
                 Aktuell keine freien Termine verfügbar. Kontaktiere den Therapeuten direkt.
