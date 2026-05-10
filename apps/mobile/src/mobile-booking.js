@@ -146,10 +146,34 @@ export function BookingRequestForm({ c, t, therapist, authToken, availableSlots,
         {therapist.fullName} · {therapist.professionalTitle}
       </Text>
 
-      {/* Slot list */}
-      <Text style={{ ...TYPE.label, color: c.text, marginBottom: SPACE.sm }}>Freie Termine</Text>
+      {/* Slot — pre-selected (from bottom sheet) or full picker */}
+      <Text style={{ ...TYPE.label, color: c.text, marginBottom: SPACE.sm }}>Gewählter Termin</Text>
 
-      {slots.length === 0 ? (
+      {therapist?.selectedSlotId ? (
+        (() => {
+          const preSelected = slots.find((s) => s.id === therapist.selectedSlotId);
+          if (!preSelected) return null;
+          return (
+            <View
+              style={{
+                flexDirection: 'row', alignItems: 'center',
+                padding: SPACE.sm,
+                borderRadius: RADIUS.sm,
+                borderWidth: 1.5,
+                borderColor: c.primary,
+                backgroundColor: c.primaryBg,
+                marginBottom: SPACE.md,
+              }}
+            >
+              <Ionicons name="calendar-outline" size={18} color={c.primary} style={{ marginRight: 10 }} />
+              <Text style={{ ...TYPE.body, color: c.primary, flex: 1, fontWeight: '600' }}>
+                {formatSlot(preSelected.startsAt, preSelected.durationMin)}
+              </Text>
+              <Ionicons name="checkmark-circle" size={18} color={c.primary} />
+            </View>
+          );
+        })()
+      ) : slots.length === 0 ? (
         <View style={{ backgroundColor: c.mutedBg, borderRadius: RADIUS.sm, padding: SPACE.md, marginBottom: SPACE.md }}>
           <Text style={{ ...TYPE.small, color: c.muted, textAlign: 'center' }}>
             Aktuell keine freien Termine verfügbar.
@@ -226,7 +250,7 @@ export function BookingRequestForm({ c, t, therapist, authToken, availableSlots,
       )}
 
       {/* Submit */}
-      {slots.length > 0 && (
+      {(therapist?.selectedSlotId || slots.length > 0) && (
         <Pressable
           onPress={handleSubmit}
           disabled={loading}
