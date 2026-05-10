@@ -3066,43 +3066,82 @@ export default function App() {
     </View>
   );
 
-  const renderTherapyTabPatient = () => renderTherapyTabShell(
-    therapyTabTitle,
-    <>
-      <Text style={[styles.sectionLabel, { color: c.text }]}>{t('myAppointments') ?? 'Meine Termine'}</Text>
-      {shouldShowSectionLoading(myAppointmentsLoading, appointmentsLastLoadedAt)
-        ? renderTherapySectionLoading()
-        : myAppointments.length > 0
-          ? myAppointments.map((apt) => (
-            <PatientAppointmentCard
-              key={apt.id}
-              c={c}
-              t={t}
-              appointment={apt}
-              onCancel={async () => {
-                try {
-                  const res = await fetch(`${getBaseUrl()}/bookings/${apt.id}/cancel`, {
-                    method: 'PATCH',
-                    headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
-                  });
-                  if (res.ok) loadMyAppointments(authToken);
-                } catch {}
-              }}
-              onViewTherapist={() => {
-                if (apt.therapist) setSelectedTherapist(apt.therapist);
-              }}
-            />
-          ))
-          : renderTherapySectionEmpty('Du hast noch keine Termine.', t('noAppointmentsBody'))}
+  const renderTherapyTabPatient = () => {
+    // Nächsten aktiven Termin hervorheben
+    const activeStatuses = ['CONFIRMED', 'PENDING'];
+    const sortedApts = [...myAppointments].sort((a, b) => {
+      const da = new Date(a.slot?.startsAt ?? a.confirmedSlotAt ?? 0);
+      const db = new Date(b.slot?.startsAt ?? b.confirmedSlotAt ?? 0);
+      return da - db;
+    });
+    const nextApt = sortedApts.find(a => activeStatuses.includes(a.status) && new Date(a.slot?.startsAt ?? a.confirmedSlotAt ?? 0) > new Date());
+    const otherApts = sortedApts.filter(a => a !== nextApt);
 
-      <Text style={[styles.sectionLabel, { color: c.text }]}>{t('favoritesTherapists') ?? 'Therapeut:innen'}</Text>
-      {shouldShowSectionLoading(favoritesLoading, favoritesLastLoadedAt)
-        ? renderTherapySectionLoading()
-        : favorites.length > 0
-          ? renderFavoriteTherapists()
-          : renderTherapySectionEmpty('Du hast noch keine Therapeut:innen gespeichert.', t('favoritesEmptyBody'))}
-    </>
-  );
+    const makeOnCancel = (apt) => async () => {
+      try {
+        const res = await fetch(`${getBaseUrl()}/bookings/${apt.id}/cancel`, {
+          method: 'PATCH', headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
+        });
+        if (res.ok) loadMyAppointments(authToken);
+      } catch {}
+    };
+
+    return renderTherapyTabShell(
+      therapyTabTitle,
+      <>
+        {/* Meine Termine */}
+        <Text style={[styles.sectionLabel, { color: c.text }]}>{t('myAppointments') ?? 'Meine Termine'}</Text>
+        {shouldShowSectionLoading(myAppointmentsLoading, appointmentsLastLoadedAt)
+          ? renderTherapySectionLoading()
+          : myAppointments.length === 0
+            ? <View style={{ backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.border, paddingVertical: 28, paddingHorizontal: 20, alignItems: 'center', marginBottom: 4 }}>
+                <Ionicons name="calendar-outline" size={32} color={c.muted} style={{ marginBottom: 10 }} />
+                <Text style={{ fontSize: 15, fontWeight: '700', color: c.text, textAlign: 'center' }}>Noch keine Termine</Text>
+                <Text style={{ fontSize: 13, color: c.muted, textAlign: 'center', marginTop: 5, lineHeight: 19 }}>
+                  Suche eine Therapeutin oder einen Therapeuten und buche deinen ersten Termin.
+                </Text>
+              </View>
+            : <>
+                {/* Nächster Termin — Hero */}
+                {nextApt && (
+                  <>
+                    <Text style={{ fontSize: 11, fontWeight: '700', letterSpacing: 0.5, color: c.muted, textTransform: 'uppercase', marginBottom: 6 }}>Nächster Termin</Text>
+                    <PatientAppointmentCard
+                      key={nextApt.id} c={c} t={t} appointment={nextApt} isNext
+                      onCancel={makeOnCancel(nextApt)}
+                      onViewTherapist={() => { if (nextApt.therapist) setSelectedTherapist(nextApt.therapist); }}
+                    />
+                  </>
+                )}
+
+                {/* Weitere Termine — kompakt */}
+                {otherApts.length > 0 && (
+                  <>
+                    <Text style={{ fontSize: 11, fontWeight: '700', letterSpacing: 0.5, color: c.muted, textTransform: 'uppercase', marginTop: nextApt ? 12 : 0, marginBottom: 6 }}>
+                      {nextApt ? 'Weitere Termine' : 'Alle Termine'}
+                    </Text>
+                    {otherApts.map(apt => (
+                      <PatientAppointmentCard
+                        key={apt.id} c={c} t={t} appointment={apt}
+                        onCancel={makeOnCancel(apt)}
+                        onViewTherapist={() => { if (apt.therapist) setSelectedTherapist(apt.therapist); }}
+                      />
+                    ))}
+                  </>
+                )}
+              </>
+        }
+
+        {/* Therapeut:innen — sekundär */}
+        <Text style={[styles.sectionLabel, { color: c.text, marginTop: 8 }]}>{t('favoritesTherapists') ?? 'Therapeut:innen'}</Text>
+        {shouldShowSectionLoading(favoritesLoading, favoritesLastLoadedAt)
+          ? renderTherapySectionLoading()
+          : favorites.length > 0
+            ? renderFavoriteTherapists()
+            : renderTherapySectionEmpty('Du hast noch keine Therapeut:innen gespeichert.', t('favoritesEmptyBody'))}
+      </>
+    );
+  };
 
   const renderTherapyTabTherapist = () => {
     const slotBookingEnabled = loggedInTherapist?.bookingMode === 'FIRST_APPOINTMENT_REQUEST';

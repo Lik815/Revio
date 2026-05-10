@@ -200,58 +200,106 @@ const STATUS_COLORS = {
 
 // ─── PatientAppointmentCard ────────────────────────────────────────────────────
 
-export function PatientAppointmentCard({ c, t, appointment, onCancel, onViewTherapist }) {
+export function PatientAppointmentCard({ c, t, appointment, onCancel, onViewTherapist, isNext = false }) {
   const { status, therapist, slot, confirmedSlotAt } = appointment;
   const badge = STATUS_COLORS[status] ?? STATUS_COLORS.EXPIRED;
-
-  // Prefer slot.startsAt, fall back to confirmedSlotAt for legacy bookings
   const slotDate = slot?.startsAt ?? confirmedSlotAt ?? null;
   const durationMin = slot?.durationMin ?? 20;
+  const isActive = status === 'CONFIRMED' || status === 'PENDING';
 
+  if (isNext && slotDate) {
+    // ── Hero-Karte für den nächsten Termin ─────────────────────────
+    const d = new Date(slotDate);
+    const dayNum = d.toLocaleDateString('de-DE', { day: 'numeric' });
+    const monthStr = d.toLocaleDateString('de-DE', { month: 'long' });
+    const yearStr = d.toLocaleDateString('de-DE', { year: 'numeric' });
+    const weekday = d.toLocaleDateString('de-DE', { weekday: 'long' });
+    const timeStr = d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+
+    return (
+      <Pressable onPress={onViewTherapist} style={{ backgroundColor: c.primary, borderRadius: RADIUS.lg, padding: SPACE.lg, marginBottom: SPACE.sm, ...SHADOW.card }}>
+        {/* Status + Therapeut */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: SPACE.md }}>
+          <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: '#fff' }}>{(therapist?.fullName ?? '?')[0]}</Text>
+            </View>
+            <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)', fontWeight: '500' }}>{therapist?.fullName ?? '—'}</Text>
+          </View>
+          <View style={{ backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 }}>
+            <Text style={{ fontSize: 11, fontWeight: '700', color: '#fff' }}>{badge.label}</Text>
+          </View>
+        </View>
+
+        {/* Datum groß */}
+        <Text style={{ fontSize: 34, fontWeight: '800', color: '#fff', lineHeight: 38 }}>{dayNum}. {monthStr}</Text>
+        <Text style={{ fontSize: 14, color: 'rgba(255,255,255,0.7)', marginTop: 2 }}>{weekday} · {timeStr} Uhr · {durationMin} Min</Text>
+
+        {/* Footer */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: SPACE.md, paddingTop: SPACE.sm, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.15)' }}>
+          {status === 'PENDING' ? (
+            <Pressable onPress={(e) => { e.stopPropagation?.(); Alert.alert('Anfrage stornieren', 'Möchtest du diese Anfrage wirklich stornieren?', [{ text: 'Nein', style: 'cancel' }, { text: 'Stornieren', style: 'destructive', onPress: onCancel }]); }}>
+              <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>Stornieren</Text>
+            </Pressable>
+          ) : <View />}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', fontWeight: '500' }}>Profil ansehen</Text>
+            <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.5)" />
+          </View>
+        </View>
+      </Pressable>
+    );
+  }
+
+  // ── Kompakte Karte für weitere Termine ────────────────────────────
+  const isInactive = !isActive;
   return (
-    <View style={{ backgroundColor: c.card, borderRadius: RADIUS.md, padding: SPACE.md, marginBottom: SPACE.sm, ...SHADOW.card }}>
-      <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
-        <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: c.primaryBg, alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
-          <Text style={{ fontSize: 18, fontWeight: '700', color: c.primary }}>{(therapist?.fullName ?? '?')[0]}</Text>
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={{ ...TYPE.label, color: c.text, fontSize: 15 }}>{therapist?.fullName ?? '—'}</Text>
-          <Text style={{ ...TYPE.caption, color: c.muted, marginTop: 2 }}>{therapist?.professionalTitle ?? ''}</Text>
-        </View>
-        <View style={{ backgroundColor: badge.bg, borderRadius: RADIUS.sm, paddingHorizontal: 8, paddingVertical: 4 }}>
-          <Text style={{ fontSize: 12, fontWeight: '700', color: badge.text }}>{badge.label}</Text>
-        </View>
-      </View>
-
-      {slotDate && (
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: SPACE.sm, gap: 6 }}>
-          <Ionicons name="calendar-outline" size={14} color={status === 'CONFIRMED' ? c.primary : c.muted} />
-          <Text style={{ ...TYPE.small, color: status === 'CONFIRMED' ? c.primary : c.muted, fontWeight: '600' }}>
-            {formatSlot(slotDate, durationMin)}
+    <Pressable
+      onPress={onViewTherapist}
+      style={{ backgroundColor: c.card, borderRadius: RADIUS.md, paddingHorizontal: SPACE.md, paddingVertical: 12, marginBottom: 6, flexDirection: 'row', alignItems: 'center', gap: 12, opacity: isInactive ? 0.7 : 1, ...SHADOW.card }}
+    >
+      {/* Datum-Block */}
+      {slotDate ? (
+        <View style={{ width: 44, alignItems: 'center', gap: 1 }}>
+          <Text style={{ fontSize: 18, fontWeight: '800', color: isInactive ? c.muted : c.text, lineHeight: 20 }}>
+            {new Date(slotDate).toLocaleDateString('de-DE', { day: 'numeric' })}
+          </Text>
+          <Text style={{ fontSize: 10, fontWeight: '600', color: c.muted, textTransform: 'uppercase', letterSpacing: 0.3 }}>
+            {new Date(slotDate).toLocaleDateString('de-DE', { month: 'short' })}
           </Text>
         </View>
+      ) : (
+        <View style={{ width: 44 }} />
       )}
 
-      <View style={{ flexDirection: 'row', gap: 8, marginTop: SPACE.sm }}>
-        {status === 'PENDING' && (
-          <Pressable
-            onPress={() => Alert.alert('Termin stornieren', 'Möchtest du diese Anfrage wirklich stornieren?', [
-              { text: 'Nein', style: 'cancel' },
-              { text: 'Stornieren', style: 'destructive', onPress: onCancel },
-            ])}
-            style={{ flex: 1, borderWidth: 1, borderColor: c.error, borderRadius: RADIUS.sm, paddingVertical: 10, alignItems: 'center' }}
-          >
-            <Text style={{ ...TYPE.label, color: c.error, fontSize: 14 }}>Stornieren</Text>
-          </Pressable>
+      {/* Vertikale Linie */}
+      <View style={{ width: 1, height: 36, backgroundColor: c.border }} />
+
+      {/* Info */}
+      <View style={{ flex: 1 }}>
+        {slotDate && (
+          <Text style={{ fontSize: 14, fontWeight: '600', color: isInactive ? c.muted : c.text }}>
+            {new Date(slotDate).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr · {durationMin} Min
+          </Text>
         )}
-        <Pressable
-          onPress={onViewTherapist}
-          style={{ flex: 1, backgroundColor: c.mutedBg, borderRadius: RADIUS.sm, paddingVertical: 10, alignItems: 'center' }}
-        >
-          <Text style={{ ...TYPE.label, color: c.text, fontSize: 14 }}>Details</Text>
-        </Pressable>
+        <Text style={{ fontSize: 12, color: c.muted, marginTop: 1 }}>{therapist?.fullName ?? '—'}</Text>
       </View>
-    </View>
+
+      {/* Status + Chevron */}
+      <View style={{ alignItems: 'flex-end', gap: 4 }}>
+        <View style={{ backgroundColor: badge.bg, borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2 }}>
+          <Text style={{ fontSize: 10, fontWeight: '700', color: badge.text }}>{badge.label}</Text>
+        </View>
+        {status === 'PENDING' ? (
+          <Pressable onPress={(e) => { Alert.alert('Stornieren?', '', [{ text: 'Nein', style: 'cancel' }, { text: 'Ja', style: 'destructive', onPress: onCancel }]); }}>
+            <Text style={{ fontSize: 11, color: c.muted }}>Stornieren</Text>
+          </Pressable>
+        ) : (
+          <Ionicons name="chevron-forward" size={14} color={c.muted} />
+        )}
+      </View>
+    </Pressable>
+  );
   );
 }
 
