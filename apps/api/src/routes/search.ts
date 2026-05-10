@@ -331,6 +331,7 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
         availability: tAny.availability ?? '',
         homeVisit: t.homeVisit,
         city: t.city,
+        email: t.email || undefined,
         bio: t.bio ?? undefined,
         photo: t.photo ?? undefined,
         relevance,
