@@ -236,6 +236,7 @@ export function TherapistProfileScreen(props) {
   const therapistSpecializations = Array.isArray(th?.specializations) ? th.specializations : [];
   const therapistCertifications = Array.isArray(th?.fortbildungen) ? th.fortbildungen : [];
   const therapistPhone = th?.phone ?? '+4312345678';
+  const displayEmail = th?.email ?? 'demo.physio@revio.app';
   const iconHitSlop = { top: 10, bottom: 10, left: 10, right: 10 };
   const bookingSlots = Array.isArray(thWithSlots?.availableSlots)
     ? [...thWithSlots.availableSlots].sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt))
@@ -250,9 +251,9 @@ export function TherapistProfileScreen(props) {
   const slotDates = Object.keys(slotGroups).sort((a, b) => new Date(a) - new Date(b));
   const slotsForSelectedDate = selectedDate ? (slotGroups[selectedDate] ?? []) : [];
   const openEmailComposer = () => {
-    if (!th.email) return;
+    if (!displayEmail) return;
     const subject = encodeURIComponent(t('contactSubject').replace('{name}', therapistName));
-    Linking.openURL(`mailto:${th.email}?subject=${subject}`);
+    Linking.openURL(`mailto:${displayEmail}?subject=${subject}`);
   };
 
   useEffect(() => {
@@ -297,116 +298,138 @@ export function TherapistProfileScreen(props) {
         </View>
       </View>
 
-      <View style={[styles.practiceHeader, { backgroundColor: c.card, borderColor: c.border }]}>
-        {th.photo ? (
-          <Image source={{ uri: th.photo }} style={styles.therapistAvatarLarge} />
-        ) : (
-          <View style={[styles.therapistAvatarLarge, { backgroundColor: c.primary, alignItems: 'center', justifyContent: 'center' }]}>
-            <Text style={{ color: '#fff', fontSize: 28, fontWeight: '700' }}>
-              {getPracticeInitials(therapistName)}
-            </Text>
-          </View>
-        )}
-        <View style={styles.profileNameRow}>
-          <Text style={[styles.practiceHeaderName, { color: c.text }]}>{therapistName}</Text>
-        </View>
-        <Text style={[styles.practiceHeaderCity, { color: c.muted }]}>{th.professionalTitle ?? ''}</Text>
-        <View style={[styles.tagRow, { justifyContent: 'center', marginTop: 8 }]}>
-          <View style={[styles.tag, { backgroundColor: th.homeVisit ? c.successBg : c.mutedBg, borderWidth: 1, borderColor: th.homeVisit ? c.success : c.border, flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
-            <Ionicons name="home-outline" size={13} color={th.homeVisit ? c.success : c.muted} />
-            <Text style={[styles.tagText, { color: th.homeVisit ? c.success : c.muted }]}>
-              {th.homeVisit
-                ? (th.serviceRadiusKm ? t('homeVisitRadius').replace('{radius}', th.serviceRadiusKm) : t('homeVisitTag'))
-                : 'Kein Hausbesuch'}
-            </Text>
-          </View>
-          <View style={[styles.tag, { backgroundColor: c.mutedBg, flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
-            <Ionicons name="location-outline" size={13} color={c.muted} />
-            <Text style={[styles.tagText, { color: c.muted }]}>{th.city || 'Ort offen'}</Text>
-          </View>
-          <View style={[styles.tag, { backgroundColor: c.mutedBg, flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
-            <Ionicons name="card-outline" size={13} color={c.muted} />
-            <Text style={[styles.tagText, { color: c.muted }]}>{th.kassenart || 'Alle Kassen'}</Text>
-          </View>
-        </View>
-        {(th.email || therapistPhone) && (
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginTop: 14, width: '100%', justifyContent: 'center' }}>
-            {th.email ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Ionicons name="mail-outline" size={14} color={c.muted} />
-                <Text style={{ color: c.muted, fontSize: 13 }}>{th.email}</Text>
+      <View
+        style={[
+          styles.practiceHeader,
+          {
+            backgroundColor: c.card,
+            borderColor: c.border,
+            paddingTop: 20,
+            paddingBottom: 20,
+            alignItems: 'stretch',
+          },
+        ]}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 18 }}>
+          <View style={{ position: 'relative' }}>
+            {th.photo ? (
+              <Image source={{ uri: th.photo }} style={[styles.therapistAvatarLarge, { width: 96, height: 96, borderRadius: 48 }]} />
+            ) : (
+              <View style={[styles.therapistAvatarLarge, { width: 96, height: 96, borderRadius: 48, backgroundColor: c.primary, alignItems: 'center', justifyContent: 'center' }]}>
+                <Text style={{ color: '#fff', fontSize: 28, fontWeight: '700' }}>
+                  {getPracticeInitials(therapistName)}
+                </Text>
               </View>
-            ) : null}
-            {therapistPhone ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Ionicons name="call-outline" size={14} color={c.muted} />
-                <Text style={{ color: c.muted, fontSize: 13 }}>{therapistPhone}</Text>
-              </View>
-            ) : null}
+            )}
+            <View style={{ position: 'absolute', right: -2, bottom: -2, width: 32, height: 32, borderRadius: 16, backgroundColor: c.accent, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: c.card }}>
+              <Ionicons name="checkmark" size={18} color={c.background} />
+            </View>
           </View>
-        )}
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.practiceHeaderName, { color: c.text, textAlign: 'left', marginBottom: 4 }]}>{therapistName}</Text>
+            <Text style={[styles.practiceHeaderCity, { color: c.muted, textAlign: 'left' }]}>{th.professionalTitle ?? ''}</Text>
+            <View style={[styles.tagRow, { marginTop: 14, gap: 10 }]}>
+              <View style={[styles.tag, { backgroundColor: c.mutedBg, borderWidth: 1, borderColor: th.homeVisit ? c.success : c.border, flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, paddingHorizontal: 14 }]}>
+                <Ionicons name="home-outline" size={15} color={th.homeVisit ? c.success : c.muted} />
+                <Text style={[styles.tagText, { color: th.homeVisit ? c.success : c.muted, fontSize: 13 }]}>
+                  {th.homeVisit
+                    ? `Hausbesuch${th.serviceRadiusKm ? ` bis ${th.serviceRadiusKm} km` : ''}`
+                    : 'Kein Hausbesuch'}
+                </Text>
+              </View>
+              <View style={[styles.tag, { backgroundColor: c.mutedBg, flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, paddingHorizontal: 14 }]}>
+                <Ionicons name="location-outline" size={15} color={c.muted} />
+                <Text style={[styles.tagText, { color: c.text, fontSize: 13 }]}>{th.city || 'Köln'}</Text>
+              </View>
+              <View style={[styles.tag, { backgroundColor: c.mutedBg, flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, paddingHorizontal: 14 }]}>
+                <Ionicons name="card-outline" size={15} color={c.muted} />
+                <Text style={[styles.tagText, { color: c.text, fontSize: 13 }]}>{th.kassenart || 'Alle Kassen'}</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        <View style={{ height: 1, backgroundColor: c.border, marginTop: 18, marginBottom: 18, opacity: 0.8 }} />
+
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 24 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <Ionicons name="mail-outline" size={22} color={c.accent} />
+            <Text style={{ color: c.text, fontSize: 15 }}>{displayEmail}</Text>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <Ionicons name="call-outline" size={22} color={c.accent} />
+            <Text style={{ color: c.text, fontSize: 15 }}>{therapistPhone}</Text>
+          </View>
+        </View>
+
         {th.bio ? (
-          <Text style={{ color: c.muted, fontSize: 14, textAlign: 'center', marginTop: 12, lineHeight: 20 }}>
+          <Text style={{ color: c.muted, fontSize: 15, marginTop: 18, lineHeight: 24 }}>
             {th.bio}
           </Text>
         ) : null}
       </View>
 
-      {(th.homeVisit || th.availability) && (
-        <View style={[styles.infoSection, { backgroundColor: c.successBg, borderColor: c.success, borderWidth: 1 }]}>
-          <Text style={[styles.filterSectionTitle, { color: c.success }]}>{t('contactAndArea')}</Text>
-          {th.serviceRadiusKm ? (
-            <View style={styles.detailInfoRow}>
-              <Text style={styles.detailIcon}>📍</Text>
-              <View>
-                <Text style={[styles.detailInfoLabel, { color: c.success }]}>{t('serviceAreaLabel')}</Text>
-                <Text style={[styles.detailInfoValue, { color: c.text }]}>{t('serviceAreaValue').replace('{radius}', th.serviceRadiusKm)}</Text>
+      <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border, paddingHorizontal: 0, paddingVertical: 0, overflow: 'hidden' }]}>
+        {therapistAreas.length > 0 && (
+          <View style={{ paddingHorizontal: 18, paddingTop: 18, paddingBottom: 18 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+              <Text style={[styles.filterSectionTitle, { color: c.muted, marginBottom: 0 }]}>{t('behandlungLabel')}</Text>
+              <Ionicons name="chevron-forward" size={18} color={c.muted} />
+            </View>
+            <View style={styles.tagRow}>
+              {therapistAreas.map((area) => (
+                <View key={area} style={[styles.tag, { backgroundColor: c.mutedBg, paddingHorizontal: 18, paddingVertical: 10 }]}>
+                  <Text style={[styles.tagText, { color: c.text, fontSize: 13 }]}>{area}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {therapistSpecializations.length > 0 && (
+          <View style={{ borderTopWidth: therapistAreas.length > 0 ? 1 : 0, borderTopColor: c.border, paddingHorizontal: 18, paddingTop: 18, paddingBottom: 18 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+              <Text style={[styles.filterSectionTitle, { color: c.muted, marginBottom: 0 }]}>{t('specsLabel')}</Text>
+              <Ionicons name="chevron-forward" size={18} color={c.muted} />
+            </View>
+            <View style={styles.tagRow}>
+              {therapistSpecializations.map((specialization) => (
+                <View key={specialization} style={[styles.tag, { backgroundColor: c.mutedBg, paddingHorizontal: 18, paddingVertical: 10 }]}>
+                  <Text style={[styles.tagText, { color: c.text, fontSize: 13 }]}>{specialization}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
+        <View style={{ borderTopWidth: (therapistAreas.length > 0 || therapistSpecializations.length > 0) ? 1 : 0, borderTopColor: c.border, flexDirection: 'row' }}>
+          {[
+            {
+              label: 'KASSENART',
+              icon: 'card-outline',
+              value: th.kassenart || 'Alle',
+            },
+            {
+              label: 'SPRACHEN',
+              icon: 'chatbubble-outline',
+              value: therapistLanguages[0] ? getLangLabel(therapistLanguages[0]) : 'Deutsch',
+            },
+            {
+              label: 'ENTFERNUNG',
+              icon: 'navigate-outline',
+              value: th.distKm != null ? `${formatDist(th.distKm)} entfernt` : '—',
+            },
+          ].map((item, index) => (
+            <View key={item.label} style={{ flex: 1, paddingHorizontal: 18, paddingVertical: 18, borderLeftWidth: index === 0 ? 0 : 1, borderLeftColor: c.border }}>
+              <Text style={[styles.filterSectionTitle, { color: c.muted, marginBottom: 12 }]}>{item.label}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Ionicons name={item.icon} size={18} color={c.text} />
+                <Text style={{ color: c.text, fontSize: 14, flexShrink: 1 }}>{item.value}</Text>
               </View>
             </View>
-            ) : null}
-          {th.availability ? (
-            <View style={styles.detailInfoRow}>
-              <Text style={styles.detailIcon}>🕐</Text>
-              <View>
-                <Text style={[styles.detailInfoLabel, { color: c.success }]}>{t('availabilityLabel')}</Text>
-                <Text style={[styles.detailInfoValue, { color: c.text }]}>{th.availability}</Text>
-              </View>
-            </View>
-          ) : null}
+          ))}
         </View>
-      )}
-
-      {therapistAreas.length > 0 && (
-        <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-            <Text style={[styles.filterSectionTitle, { color: c.muted, marginBottom: 0 }]}>{t('behandlungLabel')}</Text>
-            <Ionicons name="chevron-forward" size={16} color={c.muted} />
-          </View>
-          <View style={styles.tagRow}>
-            {therapistAreas.map((area) => (
-              <View key={area} style={[styles.tag, { backgroundColor: c.mutedBg }]}>
-                <Text style={[styles.tagText, { color: c.text }]}>{area}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
-      )}
-
-      {therapistSpecializations.length > 0 && (
-        <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-            <Text style={[styles.filterSectionTitle, { color: c.muted, marginBottom: 0 }]}>{t('specsLabel')}</Text>
-            <Ionicons name="chevron-forward" size={16} color={c.muted} />
-          </View>
-          <View style={styles.tagRow}>
-            {therapistSpecializations.map((specialization) => (
-              <View key={specialization} style={[styles.tag, { backgroundColor: c.mutedBg }]}>
-                <Text style={[styles.tagText, { color: c.text }]}>{specialization}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
-      )}
+      </View>
 
       {therapistCertifications.length > 0 && (
         <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
@@ -421,55 +444,7 @@ export function TherapistProfileScreen(props) {
         </View>
       )}
 
-      {(th.kassenart || th.distKm != null || th.availability || th.website) && (
-        <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 16 }}>
-            <View style={{ flex: 1, alignItems: 'flex-start', gap: 6 }}>
-              <Text style={[styles.filterSectionTitle, { color: c.muted, marginBottom: 0 }]}>KASSENART</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Ionicons name="card-outline" size={16} color={c.text} />
-                <Text style={{ color: c.text, fontSize: 14 }}>{th.kassenart || 'Alle'}</Text>
-              </View>
-            </View>
-            <View style={{ flex: 1, alignItems: 'flex-start', gap: 6 }}>
-              <Text style={[styles.filterSectionTitle, { color: c.muted, marginBottom: 0 }]}>SPRACHEN</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Ionicons name="chatbubble-outline" size={16} color={c.text} />
-                <Text style={{ color: c.text, fontSize: 14 }}>{therapistLanguages[0] ? getLangLabel(therapistLanguages[0]) : '—'}</Text>
-              </View>
-            </View>
-          </View>
-          {th.distKm != null ? (
-            <View style={[styles.detailInfoRow, { marginTop: 16 }]}>
-              <Text style={styles.detailIcon}>📍</Text>
-              <View>
-                <Text style={[styles.detailInfoLabel, { color: c.muted }]}>{t('distanceLabel')}</Text>
-                <Text style={[styles.detailInfoValue, { color: c.text }]}>{t('distanceAway').replace('{dist}', formatDist(th.distKm))}</Text>
-              </View>
-            </View>
-          ) : null}
-          {th.availability ? (
-            <View style={styles.detailInfoRow}>
-              <Text style={styles.detailIcon}>🕐</Text>
-              <View>
-                <Text style={[styles.detailInfoLabel, { color: c.muted }]}>{t('availabilityLabel')}</Text>
-                <Text style={[styles.detailInfoValue, { color: c.text }]}>{th.availability}</Text>
-              </View>
-            </View>
-          ) : null}
-          {th.website ? (
-            <Pressable style={styles.detailInfoRow} onPress={() => Linking.openURL(`https://${th.website}`)}>
-              <Text style={styles.detailIcon}>🌐</Text>
-              <View>
-                <Text style={[styles.detailInfoLabel, { color: c.muted }]}>Website</Text>
-                <Text style={[styles.detailInfoValue, { color: c.primary }]}>{th.website}</Text>
-              </View>
-            </Pressable>
-          ) : null}
-        </View>
-      )}
-
-      {th.email ? (
+      {displayEmail ? (
         <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
           <Text style={[styles.filterSectionTitle, { color: c.muted }]}>{t('contactTitle')}</Text>
           <Text style={{ color: c.muted, fontSize: 13, marginTop: 4 }}>
@@ -477,11 +452,14 @@ export function TherapistProfileScreen(props) {
           </Text>
           <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
             <Pressable style={[styles.ctaBtn, { backgroundColor: c.primary, flex: 1 }]} onPress={openEmailComposer}>
-              <Text style={styles.ctaBtnText}>{t('writeEmail')}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+                <Ionicons name="mail-outline" size={20} color="#fff" />
+                <Text style={styles.ctaBtnText}>{t('writeEmail')}</Text>
+              </View>
             </Pressable>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 14 }}>
-            <Text style={{ color: c.primary, fontSize: 14 }}>{th.email}</Text>
+            <Text style={{ color: c.primary, fontSize: 14 }}>{displayEmail}</Text>
             <Ionicons name="copy-outline" size={18} color={c.muted} />
           </View>
         </View>
@@ -507,10 +485,10 @@ export function TherapistProfileScreen(props) {
                         setSelectedSlotId(null);
                       }}
                       style={{
-                        minWidth: 86,
-                        paddingHorizontal: 14,
+                        minWidth: 82,
+                        paddingHorizontal: 12,
                         paddingVertical: 12,
-                        borderRadius: 16,
+                        borderRadius: 18,
                         borderWidth: 1,
                         borderColor: active ? c.primary : c.border,
                         backgroundColor: active ? c.primary : c.mutedBg,
@@ -530,18 +508,20 @@ export function TherapistProfileScreen(props) {
                 })}
               </ScrollView>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 16 }}>
-                {slotsForSelectedDate.map((slot) => {
+                {slotsForSelectedDate
+                  .filter((slot, index, arr) => arr.findIndex((candidate) => formatSlotTime(candidate.startsAt) === formatSlotTime(slot.startsAt)) === index)
+                  .map((slot) => {
                   const active = selectedSlotId === slot.id;
                   return (
                     <Pressable
                       key={slot.id}
                       onPress={() => setSelectedSlotId(slot.id)}
                       style={{
-                        width: '31%',
-                        minWidth: 92,
+                        width: '30%',
+                        minWidth: 88,
                         paddingVertical: 14,
                         paddingHorizontal: 8,
-                        borderRadius: 16,
+                        borderRadius: 18,
                         borderWidth: 1.5,
                         borderColor: active ? c.primary : c.border,
                         backgroundColor: active ? c.primaryBg : c.card,
