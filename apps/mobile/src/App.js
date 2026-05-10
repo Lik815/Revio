@@ -75,7 +75,7 @@ import {
 } from './mobile-compliance-step';
 import { translations } from './mobile-translations';
 import { PatientDashboardScreen } from './mobile-patient-dashboard';
-import { BookingRequestForm, PatientAppointmentCard, TherapistBookingCard } from './mobile-booking';
+import { BookingRequestForm, PatientAppointmentCard, STATUS_COLORS, TherapistBookingCard } from './mobile-booking';
 
 const formatProfileOverviewName = (fullName = '') => {
   const parts = String(fullName).trim().split(/\s+/).filter(Boolean);
@@ -359,6 +359,7 @@ export default function App() {
   const [selectedPracticeLoading, setSelectedPracticeLoading] = useState(false);
   const [selectedPracticeError, setSelectedPracticeError] = useState('');
   const [selectedTherapist, setSelectedTherapist] = useState(null);
+  const [selectedAppointment, setSelectedAppointment] = useState(null);
 
   // Favorites — stored locally on device only
   const [favorites, setFavorites] = useState([]);
@@ -544,6 +545,7 @@ export default function App() {
     setIncomingBookings([]);
     setMySlots([]);
     setDeletingSlotIds([]);
+    setSelectedAppointment(null);
     setFavoritesLastLoadedAt(0);
     setAppointmentsLastLoadedAt(0);
     setIncomingBookingsLastLoadedAt(0);
@@ -3015,6 +3017,135 @@ export default function App() {
     </View>
   );
 
+  const renderAppointmentDetail = (appointment) => {
+    const slotDate = appointment?.slot?.startsAt ?? appointment?.confirmedSlotAt ?? null;
+    const durationMin = appointment?.slot?.durationMin ?? 20;
+    const badge = STATUS_COLORS[appointment?.status] ?? STATUS_COLORS.EXPIRED;
+    const therapist = appointment?.therapist ?? null;
+    const therapistName = therapist?.fullName ?? 'Therapeut:in';
+    const therapistTitle = therapist?.professionalTitle ?? 'Physiotherapeut:in';
+    const therapistPhoto = resolveMediaUrl(therapist?.photo);
+    const initials = String(therapistName)
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((part) => part[0])
+      .join('')
+      .slice(0, 2)
+      .toUpperCase() || 'T';
+    const hasMessage = typeof appointment?.message === 'string' && appointment.message.trim().length > 0;
+    const dateLabel = slotDate
+      ? new Date(slotDate).toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' })
+      : 'Terminzeit wird noch abgestimmt';
+    const metaLabel = slotDate
+      ? `${new Date(slotDate).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr · ${durationMin} Min`
+      : `${durationMin} Min`;
+
+    const handleCancelFromDetail = async () => {
+      try {
+        const res = await fetch(`${getBaseUrl()}/bookings/${appointment.id}/cancel`, {
+          method: 'PATCH',
+          headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
+        });
+        if (res.ok) {
+          await loadMyAppointments(authToken);
+          setSelectedAppointment(null);
+        }
+      } catch {}
+    };
+
+    return renderTherapyTabShell(
+      'Termin',
+      <View style={{ gap: 12 }}>
+        <Pressable
+          onPress={() => setSelectedAppointment(null)}
+          style={{ alignSelf: 'flex-start', paddingVertical: 6, flexDirection: 'row', alignItems: 'center', gap: 6 }}
+        >
+          <Ionicons name="chevron-back" size={16} color={c.primary} />
+          <Text style={{ fontSize: 14, fontWeight: '600', color: c.primary }}>Zurück</Text>
+        </Pressable>
+
+        <View style={{ backgroundColor: c.card, borderRadius: 24, padding: 22, borderWidth: 1, borderColor: c.border, gap: 18, ...SHADOW.card }}>
+          <View style={{ alignSelf: 'flex-start', backgroundColor: badge.bg, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 }}>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: badge.text }}>{badge.label}</Text>
+          </View>
+
+          <View style={{ gap: 6 }}>
+            <Text style={{ fontSize: 34, fontWeight: '800', color: c.text, lineHeight: 38 }}>{dateLabel}</Text>
+            <Text style={{ fontSize: 16, color: c.muted, fontWeight: '500' }}>{metaLabel}</Text>
+          </View>
+
+          <View style={{ height: 1, backgroundColor: c.border }} />
+
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+            {therapistPhoto ? (
+              <Image
+                source={{ uri: therapistPhoto }}
+                style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: c.primaryBg }}
+              />
+            ) : (
+              <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: c.primaryBg, alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ fontSize: 22, fontWeight: '800', color: c.primary }}>{initials}</Text>
+              </View>
+            )}
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 18, fontWeight: '700', color: c.text }}>{therapistName}</Text>
+              <Text style={{ fontSize: 14, color: c.muted, marginTop: 3 }}>{therapistTitle}</Text>
+            </View>
+          </View>
+
+          {hasMessage ? (
+            <>
+              <View style={{ height: 1, backgroundColor: c.border }} />
+              <View style={{ gap: 8 }}>
+                <Text style={{ fontSize: 13, fontWeight: '700', letterSpacing: 0.4, color: c.muted, textTransform: 'uppercase' }}>
+                  Deine Nachricht
+                </Text>
+                <Text style={{ fontSize: 15, lineHeight: 22, color: c.muted, fontStyle: 'italic' }}>
+                  “{appointment.message.trim()}”
+                </Text>
+              </View>
+            </>
+          ) : null}
+
+          <View style={{ height: 1, backgroundColor: c.border }} />
+
+          <View style={{ gap: 12 }}>
+            {therapist ? (
+              <Pressable
+                onPress={() => {
+                  setSelectedAppointment(null);
+                  setSelectedTherapist(therapist);
+                }}
+                style={[styles.ctaBtn, { backgroundColor: c.primary, marginTop: 0 }]}
+              >
+                <Ionicons name="person-outline" size={16} color="#fff" style={{ marginRight: 6 }} />
+                <Text style={styles.ctaBtnText}>Profil ansehen</Text>
+              </Pressable>
+            ) : null}
+
+            {appointment?.status === 'PENDING' ? (
+              <Pressable
+                onPress={() => {
+                  Alert.alert(
+                    'Termin stornieren',
+                    'Möchtest du diese Anfrage wirklich stornieren?',
+                    [
+                      { text: 'Nein', style: 'cancel' },
+                      { text: 'Stornieren', style: 'destructive', onPress: handleCancelFromDetail },
+                    ],
+                  );
+                }}
+                style={{ alignSelf: 'center', paddingVertical: 6 }}
+              >
+                <Text style={{ fontSize: 14, fontWeight: '600', color: c.error }}>Termin stornieren</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        </View>
+      </View>,
+    );
+  };
+
   const renderFavoriteTherapists = () => (
     favorites.map((fav) => (
       <View key={fav.id} style={[styles.resultCard, { backgroundColor: c.card, borderColor: c.border }]}>
@@ -3109,6 +3240,7 @@ export default function App() {
                     <PatientAppointmentCard
                       key={nextApt.id} c={c} t={t} appointment={nextApt} isNext
                       onCancel={makeOnCancel(nextApt)}
+                      onOpenDetail={() => setSelectedAppointment(nextApt)}
                       onViewTherapist={() => { if (nextApt.therapist) setSelectedTherapist(nextApt.therapist); }}
                     />
                   </>
@@ -3124,6 +3256,7 @@ export default function App() {
                       <PatientAppointmentCard
                         key={apt.id} c={c} t={t} appointment={apt}
                         onCancel={makeOnCancel(apt)}
+                        onOpenDetail={() => setSelectedAppointment(apt)}
                         onViewTherapist={() => { if (apt.therapist) setSelectedTherapist(apt.therapist); }}
                       />
                     ))}
@@ -4193,6 +4326,7 @@ export default function App() {
   // ── Layout ────────────────────────────────────────────────────────────────
 
   const renderTab = () => {
+    if (activeTab === 'favorites' && selectedAppointment) return renderAppointmentDetail(selectedAppointment);
     if (selectedTherapist) return renderTherapistProfile(selectedTherapist);
     if (activeTab === 'favorites') return renderFavorites();
     if (activeTab === 'therapist') {

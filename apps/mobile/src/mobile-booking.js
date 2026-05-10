@@ -214,7 +214,7 @@ export function BookingRequestForm({ c, t, therapist, authToken, availableSlots,
 
 // ─── Status helpers ────────────────────────────────────────────────────────────
 
-const STATUS_COLORS = {
+export const STATUS_COLORS = {
   PENDING:   { bg: '#FFF9E6', text: '#B78700', label: 'Ausstehend' },
   CONFIRMED: { bg: '#E6F9EE', text: '#1A7A40', label: 'Bestätigt' },
   DECLINED:  { bg: '#FEF2F2', text: '#B91C1C', label: 'Abgelehnt' },
@@ -224,7 +224,7 @@ const STATUS_COLORS = {
 
 // ─── PatientAppointmentCard ────────────────────────────────────────────────────
 
-export function PatientAppointmentCard({ c, t, appointment, onCancel, onViewTherapist, isNext = false }) {
+export function PatientAppointmentCard({ c, t, appointment, onCancel, onOpenDetail, onViewTherapist, isNext = false }) {
   const { status, therapist, slot, confirmedSlotAt } = appointment;
   const badge = STATUS_COLORS[status] ?? STATUS_COLORS.EXPIRED;
   const slotDate = slot?.startsAt ?? confirmedSlotAt ?? null;
@@ -241,7 +241,7 @@ export function PatientAppointmentCard({ c, t, appointment, onCancel, onViewTher
     const timeStr = d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
 
     return (
-      <Pressable onPress={onViewTherapist} style={{ backgroundColor: c.primary, borderRadius: RADIUS.lg, padding: SPACE.lg, marginBottom: SPACE.sm, ...SHADOW.card }}>
+      <Pressable onPress={onOpenDetail} style={{ backgroundColor: c.primary, borderRadius: RADIUS.lg, padding: SPACE.lg, marginBottom: SPACE.sm, ...SHADOW.card }}>
         {/* Status + Therapeut */}
         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: SPACE.md }}>
           <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -264,10 +264,10 @@ export function PatientAppointmentCard({ c, t, appointment, onCancel, onViewTher
               <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>Stornieren</Text>
             </Pressable>
           ) : <View />}
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <Pressable onPress={(e) => { e.stopPropagation?.(); onViewTherapist?.(); }} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
             <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', fontWeight: '500' }}>Profil ansehen</Text>
             <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.5)" />
-          </View>
+          </Pressable>
         </View>
       </Pressable>
     );
@@ -277,7 +277,7 @@ export function PatientAppointmentCard({ c, t, appointment, onCancel, onViewTher
   const isInactive = !isActive;
   return (
     <Pressable
-      onPress={onViewTherapist}
+      onPress={onOpenDetail}
       style={{ backgroundColor: c.card, borderRadius: RADIUS.md, paddingHorizontal: SPACE.md, paddingVertical: 12, marginBottom: 6, flexDirection: 'row', alignItems: 'center', gap: 12, opacity: isInactive ? 0.7 : 1, ...SHADOW.card }}
     >
       {/* Datum-Block */}
@@ -313,7 +313,7 @@ export function PatientAppointmentCard({ c, t, appointment, onCancel, onViewTher
           <Text style={{ fontSize: 10, fontWeight: '700', color: badge.text }}>{badge.label}</Text>
         </View>
         {status === 'PENDING' ? (
-          <Pressable onPress={(e) => { Alert.alert('Stornieren?', '', [{ text: 'Nein', style: 'cancel' }, { text: 'Ja', style: 'destructive', onPress: onCancel }]); }}>
+          <Pressable onPress={(e) => { e.stopPropagation?.(); Alert.alert('Stornieren?', '', [{ text: 'Nein', style: 'cancel' }, { text: 'Ja', style: 'destructive', onPress: onCancel }]); }}>
             <Text style={{ fontSize: 11, color: c.muted }}>Stornieren</Text>
           </Pressable>
         ) : (
