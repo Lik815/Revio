@@ -3180,6 +3180,9 @@ export default function App() {
             <View style={{ flex: 1 }}>
               <Text style={{ fontSize: 18, fontWeight: '700', color: c.text }}>{therapistName}</Text>
               <Text style={{ fontSize: 14, color: c.muted, marginTop: 3 }}>{therapistTitle}</Text>
+              {therapist?.phone ? (
+                <Text style={{ fontSize: 13, color: c.primary, marginTop: 4 }}>{therapist.phone}</Text>
+              ) : null}
             </View>
           </View>
 

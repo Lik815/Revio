@@ -415,6 +415,9 @@ export function TherapistBookingCard({ c, t, request, onRespond }) {
           {request.patientEmail && (
             <Text style={{ ...TYPE.caption, color: c.muted, marginTop: 2 }}>{request.patientEmail}</Text>
           )}
+          {request.patientPhone && (
+            <Text style={{ ...TYPE.caption, color: c.muted, marginTop: 1 }}>{request.patientPhone}</Text>
+          )}
         </View>
         {isPending && (
           <View style={{ backgroundColor: '#FFF9E6', borderRadius: RADIUS.sm, paddingHorizontal: 8, paddingVertical: 4 }}>

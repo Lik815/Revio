@@ -212,6 +212,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
             status: 'PENDING',
             patientName,
             patientEmail: patient.email,
+            patientPhone: (patient as any).phone ?? null,
             confirmedSlotAt: slot.startsAt,
             consentAcceptedAt: now,
             responseDueAt: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),
@@ -255,7 +256,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
       where: { patientUserId: patient.id },
       include: {
         slot: true,
-        therapist: { select: { id: true, fullName: true, professionalTitle: true, city: true, photo: true } },
+        therapist: { select: { id: true, fullName: true, professionalTitle: true, city: true, photo: true, phone: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
