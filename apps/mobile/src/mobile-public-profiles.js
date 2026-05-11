@@ -349,10 +349,12 @@ export function TherapistProfileScreen(props) {
                 : 'Kein Hausbesuch'}
             </Text>
           </View>
-          <View style={[styles.tag, { backgroundColor: c.mutedBg, flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, paddingHorizontal: 14 }]}>
-            <Ionicons name="location-outline" size={15} color={c.muted} />
-            <Text style={[styles.tagText, { color: c.text, fontSize: 13 }]}>{th.city || 'Köln'}</Text>
-          </View>
+          {th.city ? (
+            <View style={[styles.tag, { backgroundColor: c.mutedBg, flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, paddingHorizontal: 14 }]}>
+              <Ionicons name="location-outline" size={15} color={c.muted} />
+              <Text style={[styles.tagText, { color: c.text, fontSize: 13 }]}>{th.city}</Text>
+            </View>
+          ) : null}
           <View style={[styles.tag, { backgroundColor: c.mutedBg, flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, paddingHorizontal: 14 }]}>
             <Ionicons name="card-outline" size={15} color={c.muted} />
             <Text style={[styles.tagText, { color: c.text, fontSize: 13 }]}>{th.kassenart || 'Alle Kassen'}</Text>
@@ -432,7 +434,9 @@ export function TherapistProfileScreen(props) {
               {
                 label: 'SPRACHEN',
                 icon: 'chatbubble-outline',
-                value: therapistLanguages[0] ? getLangLabel(therapistLanguages[0]) : 'Deutsch',
+                value: therapistLanguages.length > 0
+                  ? therapistLanguages.map(getLangLabel).join(', ')
+                  : '—',
               },
             ].map((item, index) => (
               <View key={item.label} style={{ flex: 1, minWidth: 0, paddingHorizontal: 18, paddingVertical: 18, borderLeftWidth: index === 0 ? 0 : 1, borderLeftColor: c.border }}>
