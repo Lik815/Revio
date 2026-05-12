@@ -22,6 +22,18 @@ import {
   TYPE,
 } from './mobile-utils';
 
+function formatNextSlot(isoString) {
+  if (!isoString) return null;
+  const d = new Date(isoString);
+  const now = new Date();
+  const diffDays = Math.floor((d - now) / 86400000);
+  const timeStr = d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+  if (diffDays < 0) return null;
+  if (diffDays === 0) return `Heute · ${timeStr} Uhr`;
+  if (diffDays === 1) return `Morgen · ${timeStr} Uhr`;
+  return `${d.toLocaleDateString('de-DE', { weekday: 'short' })} · ${timeStr} Uhr`;
+}
+
 // ── Map platform split ──────────────────────────────────────────────────────
 // Native (iOS / Android): real react-native-maps
 //   iOS  → Apple Maps / MapKit   (no API key required)
@@ -724,107 +736,84 @@ export function DiscoverScreen(props) {
         <SkeletonCard key={item} C={c} />
       ))}
 
-      {viewMode === 'list' && !searchLoading && safeResults.map((therapist) => (
-        <View key={therapist.id} style={[styles.resultCard, { backgroundColor: c.card, borderColor: c.border }]}>
-          <View style={styles.cardTop}>
-            <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }} onPress={() => openTherapistById(therapist.id)}>
-              <Image source={{ uri: therapist.photo }} style={[styles.avatar, { width: 60, height: 60, borderRadius: RADIUS.full }]} />
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.cardName, { color: c.text }]}>{therapist.fullName}</Text>
-                <Text style={[styles.cardTitle, { color: mutedText }]}>{therapist.professionalTitle}</Text>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 7 }}>
-                  <View style={[styles.metaPill, { backgroundColor: c.mutedBg }]}>
-                    <Text style={[styles.metaPillText, { color: c.text }]}>{getSearchMatchLabel(therapist, query)}</Text>
-                  </View>
-                </View>
-              </View>
-              <Text style={[styles.practiceArrow, { color: c.muted }]}>›</Text>
-            </Pressable>
-            <HeartButton isSaved={isFavorite(therapist.id)} onToggle={() => toggleFavorite(therapist)} unsavedColor={c.muted} hitSlop={iconHitSlop} />
-          </View>
+      {viewMode === 'list' && !searchLoading && safeResults.map((therapist) => {
+        const nextSlot = formatNextSlot(therapist.nextFreeSlotAt);
+        const spec = (therapist.specializations ?? [])[0] ?? null;
+        const initials = (therapist.fullName ?? '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
 
-          <View style={styles.tagRow}>
-            {(therapist.specializations ?? []).slice(0, 2).map((specialization) => (
-              <View key={specialization} style={[styles.tag, { backgroundColor: c.primaryBg }]}>
-                <Text style={[styles.tagText, { color: c.primary }]}>{specialization}</Text>
-              </View>
-            ))}
-            {(therapist.specializations ?? []).length > 2 && (
-              <View style={[styles.tag, { backgroundColor: c.mutedBg }]}>
-                <Text style={[styles.tagText, { color: mutedText }]}>+{therapist.specializations.length - 2}</Text>
-              </View>
-            )}
-            {therapist.homeVisit && (
-              <View style={[styles.tag, { backgroundColor: c.successBg, borderWidth: 1, borderColor: c.success }]}>
-                <Text style={[styles.tagText, { color: c.success }]}>🏠 {therapist.serviceRadiusKm ? `bis ${therapist.serviceRadiusKm} km` : t('homeVisitTag')}</Text>
-              </View>
-            )}
-            {therapist.kassenart && therapist.kassenart !== 'Alle' && (
-              <View style={[styles.tag, { backgroundColor: c.mutedBg }]}>
-                <Text style={[styles.tagText, { color: mutedText }]}>{therapist.kassenart}</Text>
-              </View>
-            )}
-            {therapist.requestable && (
-              <View style={[styles.tag, { backgroundColor: c.primaryBg, borderWidth: 1, borderColor: c.primary }]}>
-                <Text style={[styles.tagText, { color: c.primary }]}>📅 Direkt anfragbar</Text>
-              </View>
-            )}
-          </View>
-
-          {therapist.fortbildungen?.length > 0 && (
-            <View style={styles.tagRow}>
-              {(Array.isArray(therapist.fortbildungen) ? therapist.fortbildungen : []).slice(0, 2).map((qualification) => (
-                <View key={qualification} style={[styles.tag, { backgroundColor: c.successBg, borderWidth: 1, borderColor: c.success }]}>
-                  <Text style={[styles.tagText, { color: c.success }]}>{qualification}</Text>
-                </View>
-              ))}
-            </View>
-          )}
-
-          {therapist.homeVisit && therapist.city ? (
-            <View style={[styles.practiceBtn, { borderColor: c.border, backgroundColor: c.mutedBg }]}>
-              <View style={[styles.practiceInitial, { backgroundColor: c.successBg }]}>
-                <Ionicons name="home-outline" size={16} color={c.success} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.practiceName, { color: c.text }]}>{therapist.city}</Text>
-                {therapist.availability ? (
-                  <Text style={[styles.practiceCity, { color: c.muted }]} numberOfLines={1}>{therapist.availability}</Text>
-                ) : null}
-              </View>
-              {therapist.distKm != null && (
-                <View style={[styles.distBadge, { backgroundColor: c.successBg }]}>
-                  <Text style={[styles.distBadgeText, { color: c.success }]}>{formatDist(therapist.distKm)}</Text>
+        return (
+          <Pressable
+            key={therapist.id}
+            style={[styles.resultCard, { backgroundColor: c.card, borderColor: c.border }]}
+            onPress={() => openTherapistById(therapist.id)}
+          >
+            {/* ── Header: Avatar · Name · Herz · Chevron ── */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              {therapist.photo ? (
+                <Image source={{ uri: therapist.photo }} style={{ width: 56, height: 56, borderRadius: 28 }} />
+              ) : (
+                <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: c.primaryBg, alignItems: 'center', justifyContent: 'center' }}>
+                  <Text style={{ fontSize: 18, fontWeight: '700', color: c.primary }}>{initials}</Text>
                 </View>
               )}
-            </View>
-          ) : therapist.city ? (
-            <View style={[styles.practiceBtn, { borderColor: c.border, backgroundColor: c.mutedBg }]}>
-              <View style={[styles.practiceInitial, { backgroundColor: c.border }]}>
-                <Ionicons name="location-outline" size={16} color={mutedText} />
-              </View>
               <View style={{ flex: 1 }}>
-                <Text style={[styles.practiceName, { color: c.text }]}>{therapist.city}</Text>
-                {therapist.availability ? (
-                  <Text style={[styles.practiceCity, { color: c.muted }]} numberOfLines={1}>{therapist.availability}</Text>
-                ) : null}
+                <Text style={[styles.cardName, { color: c.text }]} numberOfLines={1}>{therapist.fullName}</Text>
+                <Text style={[styles.cardTitle, { color: mutedText }]} numberOfLines={1}>{therapist.professionalTitle}</Text>
               </View>
-              {therapist.distKm != null ? (
-                <View style={[styles.distBadge, { backgroundColor: c.successBg }]}>
-                  <Text style={[styles.distBadgeText, { color: c.success }]}>{formatDist(therapist.distKm)}</Text>
+              <Pressable
+                onPress={(e) => { e.stopPropagation?.(); toggleFavorite(therapist); }}
+                hitSlop={iconHitSlop}
+                style={{ padding: 4 }}
+              >
+                <Ionicons
+                  name={isFavorite(therapist.id) ? 'heart' : 'heart-outline'}
+                  size={20}
+                  color={isFavorite(therapist.id) ? '#E53935' : c.muted}
+                />
+              </Pressable>
+              <Ionicons name="chevron-forward" size={16} color={c.muted} />
+            </View>
+
+            {/* ── Meta-Zeile: 3 kompakte Infos ── */}
+            <View style={{ flexDirection: 'row', gap: 16, marginTop: 12, flexWrap: 'wrap' }}>
+              {therapist.homeVisit ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                  <Ionicons name="home-outline" size={13} color={c.success} />
+                  <Text style={{ fontSize: 13, color: c.success, fontWeight: '500' }}>Hausbesuch</Text>
+                </View>
+              ) : null}
+              {therapist.requestable ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                  <Ionicons name="calendar-outline" size={13} color={c.primary} />
+                  <Text style={{ fontSize: 13, color: c.primary, fontWeight: '500' }}>Direkt buchbar</Text>
+                </View>
+              ) : null}
+              {spec ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                  <Ionicons name="person-outline" size={13} color={mutedText} />
+                  <Text style={{ fontSize: 13, color: mutedText }} numberOfLines={1}>{spec}</Text>
                 </View>
               ) : null}
             </View>
-          ) : null}
 
-          <Pressable
-            style={[styles.ctaBtn, { backgroundColor: c.primary, marginTop: 2 }]}
-            onPress={() => openTherapistById(therapist.id)}
-          >
-            <Text style={styles.ctaBtnText}>{t('viewProfileBtn')}</Text>
+            {/* ── Footer: Ort · Distanz  /  Nächster Termin ── */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: c.border }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, flex: 1 }}>
+                <Ionicons name="location-outline" size={13} color={mutedText} />
+                <Text style={{ fontSize: 13, color: mutedText }} numberOfLines={1}>
+                  {therapist.city ?? '—'}{therapist.distKm != null ? ` · ${formatDist(therapist.distKm)}` : ''}
+                </Text>
+              </View>
+              {nextSlot ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 1 }}>
+                  <Ionicons name="calendar-outline" size={13} color={c.success} />
+                  <Text style={{ fontSize: 13, color: c.success, fontWeight: '500' }} numberOfLines={1}>{nextSlot}</Text>
+                </View>
+              ) : null}
+            </View>
           </Pressable>
-        </View>
-      ))}
+        );
+      })}
 
       {viewMode === 'list' && !searchLoading && safeResults.length === 0 && searched && (
         <View style={[styles.emptyState, { backgroundColor: c.card, borderColor: c.border }]}>
