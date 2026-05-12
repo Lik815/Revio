@@ -363,3 +363,195 @@ export function TherapistSlotManagerCard({ c, deletingSlotIds = [], mySlots, onA
     </View>
   );
 }
+
+// ─── TherapistTimeline ────────────────────────────────────────────────────────
+// Chronologische Timeline: freie Slots + gebuchte Termine + Anfragen nach Tag
+
+function getDayKey(isoString) {
+  const d = new Date(isoString);
+  return d.toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+function FreeSlotCard({ c, slot, onCancelSlot, deletingSlotIds }) {
+  const d = new Date(slot.startsAt);
+  const timeStr = d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+  const isDeleting = deletingSlotIds.includes(slot.id);
+  return (
+    <View style={{
+      flexDirection: 'row', alignItems: 'center',
+      borderWidth: 1.5, borderColor: c.border, borderRadius: 10,
+      borderStyle: 'dashed', backgroundColor: c.background,
+      paddingVertical: 10, paddingHorizontal: 14, marginBottom: 6,
+    }}>
+      <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: c.success ?? '#5A9E8E', marginRight: 10 }} />
+      <View style={{ flex: 1 }}>
+        <Text style={{ fontSize: 14, fontWeight: '600', color: c.muted }}>{timeStr} Uhr</Text>
+        <Text style={{ fontSize: 11, color: c.muted, marginTop: 1 }}>{slot.durationMin} Min · Frei</Text>
+      </View>
+      {isDeleting ? (
+        <ActivityIndicator size="small" color={c.muted} />
+      ) : (
+        <Pressable onPress={() => onCancelSlot(slot.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Ionicons name="trash-outline" size={16} color={c.muted} />
+        </Pressable>
+      )}
+    </View>
+  );
+}
+
+function BookedSlotCard({ c, slot, booking, onRespond, onTherapistCancel }) {
+  const [loading, setLoading] = useState(false);
+  const [showDecline, setShowDecline] = useState(false);
+  const [declinedReason, setDeclinedReason] = useState('');
+  const [error, setError] = useState('');
+  const d = new Date(slot.startsAt);
+  const timeStr = d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+  const isPending = booking?.status === 'PENDING';
+  const isConfirmed = booking?.status === 'CONFIRMED';
+
+  const handleRespond = async (action) => {
+    if (!onRespond || !booking) return;
+    setError(''); setLoading(true);
+    try {
+      const body = action === 'CONFIRM' ? { action: 'CONFIRM' } : { action: 'DECLINE', declinedReason: declinedReason.trim() || undefined };
+      await onRespond(booking.id, body);
+    } catch (e) {
+      setError(e?.message ?? 'Fehler beim Speichern.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const accentColor = isPending ? (c.warning ?? '#8A6000') : (c.primary);
+  const accentBg = isPending ? (c.warningBg ?? '#FEF5DC') : (c.primaryBg);
+
+  return (
+    <View style={{
+      backgroundColor: c.card, borderRadius: 10, borderWidth: 1,
+      borderColor: accentColor, marginBottom: 6, overflow: 'hidden',
+    }}>
+      <View style={{ height: 3, backgroundColor: accentColor }} />
+      <View style={{ padding: 12 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 6 }}>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 14, fontWeight: '700', color: c.text }}>{timeStr} Uhr · {slot.durationMin} Min</Text>
+            {booking?.patientName ? (
+              <Text style={{ fontSize: 13, color: c.text, marginTop: 2 }}>{booking.patientName}</Text>
+            ) : null}
+            {booking?.patientPhone ? (
+              <Text style={{ fontSize: 12, color: c.muted, marginTop: 1 }}>{booking.patientPhone}</Text>
+            ) : null}
+            {booking?.message ? (
+              <Text style={{ fontSize: 12, color: c.muted, fontStyle: 'italic', marginTop: 3 }}>„{booking.message}"</Text>
+            ) : null}
+          </View>
+          <View style={{ backgroundColor: accentBg, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 }}>
+            <Text style={{ fontSize: 10, fontWeight: '700', color: accentColor }}>
+              {isPending ? 'ANFRAGE' : 'BESTÄTIGT'}
+            </Text>
+          </View>
+        </View>
+
+        {isPending && showDecline && (
+          <View style={{ borderWidth: 1, borderColor: c.border, borderRadius: 8, backgroundColor: c.mutedBg, paddingHorizontal: 10, paddingVertical: 6, marginBottom: 8 }}>
+            <Text style={{ fontSize: 12, color: c.muted }} onChangeText={setDeclinedReason}>{declinedReason}</Text>
+          </View>
+        )}
+        {!!error && <Text style={{ fontSize: 12, color: c.error ?? '#DC2626', marginBottom: 6 }}>{error}</Text>}
+
+        {isPending && onRespond && (
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <Pressable
+              onPress={() => showDecline ? handleRespond('DECLINE') : setShowDecline(true)}
+              disabled={loading}
+              style={{ flex: 1, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: c.border, alignItems: 'center' }}
+            >
+              <Text style={{ fontSize: 13, fontWeight: '600', color: c.muted }}>{showDecline ? 'Ablehnen' : 'Ablehnen'}</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => handleRespond('CONFIRM')}
+              disabled={loading}
+              style={{ flex: 1, paddingVertical: 8, borderRadius: 8, backgroundColor: c.primary, alignItems: 'center' }}
+            >
+              {loading ? <ActivityIndicator size="small" color="#fff" /> : <Text style={{ fontSize: 13, fontWeight: '600', color: '#fff' }}>Bestätigen</Text>}
+            </Pressable>
+          </View>
+        )}
+
+        {isConfirmed && onTherapistCancel && (
+          <Pressable
+            onPress={() => onTherapistCancel(booking.id)}
+            style={{ paddingVertical: 6, alignItems: 'center' }}
+          >
+            <Text style={{ fontSize: 12, color: c.muted }}>Termin absagen</Text>
+          </Pressable>
+        )}
+      </View>
+    </View>
+  );
+}
+
+export function TherapistTimeline({ c, mySlots, incomingBookings, activeFilter, deletingSlotIds, onCancelSlot, onRespond, onTherapistCancel, slotsLoading, incomingLoading }) {
+  const items = useMemo(() => {
+    if (!Array.isArray(mySlots)) return {};
+    const bookingBySlotId = {};
+    if (Array.isArray(incomingBookings)) {
+      incomingBookings.forEach(b => { if (b.slotId) bookingBySlotId[b.slotId] = b; });
+    }
+
+    const visible = mySlots.filter(s => {
+      if (s.status === 'CANCELLED') return false;
+      if (activeFilter === 'free') return s.status === 'AVAILABLE';
+      if (activeFilter === 'booked') return s.status === 'BOOKED' && bookingBySlotId[s.id]?.status === 'CONFIRMED';
+      if (activeFilter === 'pending') return s.status === 'BOOKED' && bookingBySlotId[s.id]?.status === 'PENDING';
+      return true;
+    });
+
+    const sorted = [...visible].sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt));
+    const groups = {};
+    sorted.forEach(slot => {
+      const key = getDayKey(slot.startsAt);
+      if (!groups[key]) groups[key] = [];
+      groups[key].push({ slot, booking: bookingBySlotId[slot.id] ?? null });
+    });
+    return groups;
+  }, [mySlots, incomingBookings, activeFilter]);
+
+  if (slotsLoading && (!Array.isArray(mySlots) || mySlots.length === 0)) {
+    return (
+      <View style={{ alignItems: 'center', paddingVertical: 24 }}>
+        <ActivityIndicator color={c.primary} />
+      </View>
+    );
+  }
+
+  const days = Object.keys(items);
+  if (days.length === 0) {
+    return (
+      <View style={{ backgroundColor: c.card, borderRadius: 12, borderWidth: 1, borderColor: c.border, paddingVertical: 28, paddingHorizontal: 20, alignItems: 'center', marginBottom: 4 }}>
+        <Ionicons name="calendar-outline" size={28} color={c.muted} style={{ marginBottom: 8 }} />
+        <Text style={{ fontSize: 14, fontWeight: '600', color: c.text, textAlign: 'center' }}>
+          {activeFilter === 'free' ? 'Keine freien Slots' : activeFilter === 'pending' ? 'Keine offenen Anfragen' : 'Keine Termine'}
+        </Text>
+        <Text style={{ fontSize: 13, color: c.muted, textAlign: 'center', marginTop: 4, lineHeight: 18 }}>
+          {activeFilter === 'free' ? 'Lege neue Slots über den + Button an.' : 'Neue Einträge erscheinen hier automatisch.'}
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <>
+      {days.map(day => (
+        <View key={day} style={{ marginBottom: 12 }}>
+          <Text style={{ fontSize: 11, fontWeight: '700', letterSpacing: 0.5, color: c.muted, textTransform: 'uppercase', marginBottom: 8 }}>{day}</Text>
+          {items[day].map(({ slot, booking }) => (
+            slot.status === 'AVAILABLE'
+              ? <FreeSlotCard key={slot.id} c={c} slot={slot} onCancelSlot={onCancelSlot} deletingSlotIds={deletingSlotIds} />
+              : <BookedSlotCard key={slot.id} c={c} slot={slot} booking={booking} onRespond={onRespond} onTherapistCancel={onTherapistCancel} />
+          ))}
+        </View>
+      ))}
+    </>
+  );
+}

@@ -68,6 +68,7 @@ import {
 import {
   TherapistSlotComposer,
   TherapistSlotList,
+  TherapistTimeline,
 } from '../mobile-slot-composer';
 import {
   ComplianceStatusStep,
@@ -882,6 +883,7 @@ export default function App() {
   const [editTaxRegistrationStatus, setEditTaxRegistrationStatus] = useState(null);
   const [editHealthAuthorityStatus, setEditHealthAuthorityStatus] = useState(null);
   const [editCertifications, setEditCertifications] = useState([]);
+  const [activeFilterTherapist, setActiveFilterTherapist] = useState('all');
   const [profileSaving, setProfileSaving] = useState(false);
   const [therapistDocuments, setTherapistDocuments] = useState([]);
   const [documentUploading, setDocumentUploading] = useState(false);
@@ -3438,149 +3440,137 @@ export default function App() {
 
   const renderTherapyTabTherapist = () => {
     const slotBookingEnabled = loggedInTherapist?.bookingMode === 'FIRST_APPOINTMENT_REQUEST';
-    const pendingIncomingBookings = incomingBookings.filter((request) => request.status === 'PENDING');
-    const confirmedIncomingBookings = incomingBookings.filter((request) => request.status === 'CONFIRMED');
+    const pendingIncomingBookings = incomingBookings.filter((r) => r.status === 'PENDING');
     const freeSlots = mySlots.filter(s => s.status === 'AVAILABLE');
     const bookedSlots = mySlots.filter(s => s.status === 'BOOKED');
 
-    return renderTherapyTabShell(
-      therapyTabTitle,
-      <>
-        {/* ── Stats-Überblick ────────────────────────────────────────── */}
-        {slotBookingEnabled && (
-          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 4 }}>
-            {[
-              { label: 'Frei', value: freeSlots.length, color: c.success ?? '#5A9E8E', bg: c.successBg ?? '#EAF4F1' },
-              { label: 'Gebucht', value: bookedSlots.length, color: c.primary, bg: c.primaryBg },
-              { label: 'Anfragen', value: pendingIncomingBookings.length, color: c.warning ?? '#8A6000', bg: c.warningBg ?? '#FEF5DC' },
-            ].map(({ label, value, color, bg }) => (
-              <View key={label} style={{ flex: 1, backgroundColor: bg, borderRadius: 10, paddingVertical: 10, alignItems: 'center' }}>
-                <Text style={{ fontSize: 20, fontWeight: '800', color }}>{value}</Text>
-                <Text style={{ fontSize: 11, color, fontWeight: '600', marginTop: 1 }}>{label}</Text>
-              </View>
-            ))}
-          </View>
-        )}
+    const handleRespond = async (id, body) => {
+      const res = await fetch(`${getBaseUrl()}/bookings/${id}/respond`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error ?? `Fehler ${res.status}`);
+      }
+      loadIncomingBookings(authToken);
+      loadMySlots(authToken);
+    };
 
-        {/* ── CTA ───────────────────────────────────────────────────── */}
-        {slotBookingEnabled ? (
+    const handleTherapistCancel = async (bookingId) => {
+      Alert.alert('Termin absagen', 'Möchtest du diesen Termin wirklich absagen? Der Patient wird benachrichtigt.', [
+        { text: 'Abbrechen', style: 'cancel' },
+        { text: 'Absagen', style: 'destructive', onPress: async () => {
+          const res = await fetch(`${getBaseUrl()}/bookings/${bookingId}/therapist-cancel`, {
+            method: 'PATCH',
+            headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
+          });
+          if (res.ok) { loadIncomingBookings(authToken); loadMySlots(authToken); }
+          else Alert.alert('Fehler', 'Stornierung fehlgeschlagen.');
+        }},
+      ]);
+    };
+
+    const FILTERS = [
+      { key: 'all', label: 'Alle' },
+      { key: 'pending', label: `Anfragen${pendingIncomingBookings.length > 0 ? ` (${pendingIncomingBookings.length})` : ''}` },
+      { key: 'booked', label: 'Gebucht' },
+      { key: 'free', label: 'Frei' },
+    ];
+
+    return (
+      <View style={{ flex: 1 }}>
+        {/* ── Header ─────────────────────────────────────────────────── */}
+        <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 10, backgroundColor: c.background }}>
+          <View style={[styles.header, { marginBottom: 0 }]}>
+            <Image source={require('../../assets/icon.png')} style={styles.logoMark} />
+            <Text style={[styles.headerTitle, { color: c.text }]}>{therapyTabTitle}</Text>
+          </View>
+        </View>
+
+        <ScrollView
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: 90, paddingTop: 8 }]}
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={therapyRefreshing} onRefresh={handleTherapyRefresh} tintColor={c.primary} />}
+        >
+          {slotBookingEnabled ? (
+            <>
+              {/* ── KPI-Karten ──────────────────────────────────────── */}
+              <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+                {[
+                  { key: 'free', label: 'Frei', value: freeSlots.length, color: c.success ?? '#5A9E8E', bg: c.successBg ?? '#EAF4F1' },
+                  { key: 'booked', label: 'Gebucht', value: bookedSlots.length, color: c.primary, bg: c.primaryBg },
+                  { key: 'pending', label: 'Anfragen', value: pendingIncomingBookings.length, color: c.warning ?? '#8A6000', bg: c.warningBg ?? '#FEF5DC' },
+                ].map(({ key, label, value, color, bg }) => (
+                  <Pressable
+                    key={key}
+                    onPress={() => setActiveFilterTherapist(activeFilterTherapist === key ? 'all' : key)}
+                    style={{ flex: 1, backgroundColor: bg, borderRadius: 12, paddingVertical: 12, alignItems: 'center', borderWidth: activeFilterTherapist === key ? 2 : 0, borderColor: color }}
+                  >
+                    <Text style={{ fontSize: 22, fontWeight: '800', color }}>{value}</Text>
+                    <Text style={{ fontSize: 11, color, fontWeight: '600', marginTop: 1 }}>{label}</Text>
+                  </Pressable>
+                ))}
+              </View>
+
+              {/* ── Segment-Filterleiste ────────────────────────────── */}
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+                <View style={{ flexDirection: 'row', gap: 6 }}>
+                  {FILTERS.map(({ key, label }) => {
+                    const active = activeFilterTherapist === key;
+                    return (
+                      <Pressable
+                        key={key}
+                        onPress={() => setActiveFilterTherapist(key)}
+                        style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: active ? c.primary : c.card, borderWidth: 1, borderColor: active ? c.primary : c.border }}
+                      >
+                        <Text style={{ fontSize: 13, fontWeight: active ? '700' : '500', color: active ? '#fff' : c.text }}>{label}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </ScrollView>
+
+              {/* ── Timeline ────────────────────────────────────────── */}
+              <TherapistTimeline
+                c={c}
+                mySlots={mySlots}
+                incomingBookings={incomingBookings}
+                activeFilter={activeFilterTherapist}
+                deletingSlotIds={deletingSlotIds}
+                onCancelSlot={handleCancelSlot}
+                onRespond={handleRespond}
+                onTherapistCancel={handleTherapistCancel}
+                slotsLoading={shouldShowSectionLoading(slotsLoading, slotsLastLoadedAt)}
+                incomingLoading={shouldShowSectionLoading(incomingBookingsLoading, incomingBookingsLastLoadedAt)}
+              />
+            </>
+          ) : (
+            <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
+              {renderTherapySectionEmpty('Terminanfragen sind noch nicht aktiviert.', 'Aktiviere Terminanfragen in deinem Profil, um Slots anzulegen.')}
+            </View>
+          )}
+
+          {/* ── Favoriten ───────────────────────────────────────────── */}
+          <Text style={[styles.sectionLabel, { color: c.text, marginTop: 8 }]}>{t('favoritesTherapists') ?? 'Therapeut:innen'}</Text>
+          {shouldShowSectionLoading(favoritesLoading, favoritesLastLoadedAt)
+            ? renderTherapySectionLoading()
+            : favorites.length > 0
+              ? renderFavoriteTherapists()
+              : renderTherapySectionEmpty('Du hast noch keine Therapeut:innen gespeichert.', t('favoritesEmptyBody'))}
+        </ScrollView>
+
+        {/* ── FAB ─────────────────────────────────────────────────────── */}
+        {slotBookingEnabled && (
           <Pressable
             onPress={() => setShowSlotComposerModal(true)}
-            style={{ backgroundColor: c.primary, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 4 }}
+            style={{ position: 'absolute', bottom: 24, right: 20, width: 54, height: 54, borderRadius: 27, backgroundColor: c.primary, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.2, shadowRadius: 6, elevation: 6 }}
           >
-            <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' }}>
-              <Ionicons name="add" size={22} color="#fff" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 15, fontWeight: '700', color: '#fff' }}>Neuen Termin anlegen</Text>
-              <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.75)', marginTop: 1 }}>Datum, Uhrzeit und Dauer wählen</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.6)" />
+            <Ionicons name="add" size={28} color="#fff" />
           </Pressable>
-        ) : (
-          <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
-            {renderTherapySectionEmpty('Terminanfragen sind noch nicht aktiviert.', 'Aktiviere Terminanfragen in deinem Profil, um Slots anzulegen.')}
-          </View>
         )}
-
-        {/* ── Slots (getrennte Karten via groupByStatus) ─────────────── */}
-        <Text style={[styles.sectionLabel, { color: c.text }]}>Meine Termine</Text>
-        {slotBookingEnabled ? (
-          <TherapistSlotList
-            c={c}
-            deletingSlotIds={deletingSlotIds}
-            mySlots={mySlots}
-            onCancelSlot={handleCancelSlot}
-            slotsLoading={shouldShowSectionLoading(slotsLoading, slotsLastLoadedAt)}
-            groupByStatus
-            emptyText="Du hast noch keine Slots angelegt."
-          />
-        ) : (
-          <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
-            {renderTherapySectionEmpty('Noch keine Slot-Ansicht verfügbar.', 'Sobald Terminanfragen aktiviert sind, erscheinen deine freien und gebuchten Slots hier.')}
-          </View>
-        )}
-
-        {/* ── Eingehende Anfragen ────────────────────────────────────── */}
-        <Text style={[styles.sectionLabel, { color: c.text }]}>Eingehende Anfragen</Text>
-        {shouldShowSectionLoading(incomingBookingsLoading, incomingBookingsLastLoadedAt)
-          ? renderTherapySectionLoading()
-          : pendingIncomingBookings.length > 0
-            ? pendingIncomingBookings.map((request) => (
-              <TherapistBookingCard
-                key={request.id}
-                c={c}
-                t={t}
-                request={request}
-                onRespond={async (id, body) => {
-                  const res = await fetch(`${getBaseUrl()}/bookings/${id}/respond`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json', ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
-                    body: JSON.stringify(body),
-                  });
-                  if (!res.ok) {
-                    const data = await res.json().catch(() => ({}));
-                    throw new Error(data?.error ?? `Fehler ${res.status}`);
-                  }
-                  loadIncomingBookings(authToken);
-                  loadMySlots(authToken);
-                }}
-              />
-            ))
-            : <View style={{ backgroundColor: c.card, borderRadius: 12, borderWidth: 1, borderColor: c.border, paddingVertical: 20, paddingHorizontal: 16, alignItems: 'center', marginBottom: 4 }}>
-                <Ionicons name="checkmark-circle-outline" size={28} color={c.muted} style={{ marginBottom: 8 }} />
-                <Text style={{ fontSize: 14, fontWeight: '600', color: c.text, textAlign: 'center' }}>Keine offenen Anfragen</Text>
-                <Text style={{ fontSize: 13, color: c.muted, textAlign: 'center', marginTop: 4, lineHeight: 18 }}>Neue Buchungsanfragen von Patienten erscheinen hier automatisch.</Text>
-              </View>
-        }
-
-        {/* ── Bestätigte Termine ────────────────────────────────────── */}
-        {confirmedIncomingBookings.length > 0 && (
-          <>
-            <Text style={[styles.sectionLabel, { color: c.text }]}>Bestätigte Termine</Text>
-            {confirmedIncomingBookings.map((request) => (
-              <TherapistBookingCard
-                key={request.id}
-                c={c}
-                t={t}
-                request={request}
-                onRespond={async (id, body) => {
-                  const res = await fetch(`${getBaseUrl()}/bookings/${id}/respond`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json', ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
-                    body: JSON.stringify(body),
-                  });
-                  if (!res.ok) {
-                    const data = await res.json().catch(() => ({}));
-                    throw new Error(data?.error ?? `Fehler ${res.status}`);
-                  }
-                  loadIncomingBookings(authToken);
-                  loadMySlots(authToken);
-                }}
-                onCancel={async () => {
-                  const res = await fetch(`${getBaseUrl()}/bookings/${request.id}/therapist-cancel`, {
-                    method: 'PATCH',
-                    headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
-                  });
-                  if (res.ok) {
-                    loadIncomingBookings(authToken);
-                    loadMySlots(authToken);
-                  } else {
-                    Alert.alert('Fehler', 'Stornierung fehlgeschlagen. Bitte erneut versuchen.');
-                  }
-                }}
-              />
-            ))}
-          </>
-        )}
-
-        <Text style={[styles.sectionLabel, { color: c.text }]}>{t('favoritesTherapists') ?? 'Therapeut:innen'}</Text>
-        {shouldShowSectionLoading(favoritesLoading, favoritesLastLoadedAt)
-          ? renderTherapySectionLoading()
-          : favorites.length > 0
-            ? renderFavoriteTherapists()
-            : renderTherapySectionEmpty('Du hast noch keine Therapeut:innen gespeichert.', t('favoritesEmptyBody'))}
-      </>
+      </View>
     );
   };
 
