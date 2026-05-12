@@ -1538,8 +1538,8 @@ export default function App() {
         body: formData,
       });
       if (uploadRes.ok) {
-        await uploadRes.json();
-        setLoggedInTherapist(prev => ({ ...prev, photo: uri }));
+        const { url } = await uploadRes.json();
+        setLoggedInTherapist(prev => ({ ...prev, photo: url }));
         Alert.alert(t('alertSuccess'), t('alertAvatarSaved'));
       } else {
         const status = uploadRes.status;
