@@ -378,10 +378,10 @@ export async function bookingRoutes(fastify: FastifyInstance) {
     });
     if (!booking) return reply.status(404).send({ error: 'Booking not found' });
     if (booking.patientUserId !== patient.id) return reply.status(403).send({ error: 'Not your booking' });
-    if (booking.status !== 'PENDING') return reply.status(400).send({ error: 'Only pending requests can be cancelled' });
+    if (booking.status !== 'PENDING' && booking.status !== 'CONFIRMED') return reply.status(400).send({ error: 'Only pending or confirmed bookings can be cancelled' });
 
     const updated = await fastify.prisma.$transaction(async (tx) => {
-      const u = await tx.bookingRequest.update({ where: { id }, data: { status: 'CANCELLED' } });
+      const u = await tx.bookingRequest.update({ where: { id }, data: { status: 'CANCELLED', respondedAt: new Date() } });
       if (booking.slotId) {
         await tx.therapistSlot.update({ where: { id: booking.slotId }, data: { status: 'AVAILABLE' } });
       }
@@ -390,10 +390,13 @@ export async function bookingRoutes(fastify: FastifyInstance) {
 
     if (booking.therapist.expoPushToken) {
       const patientName = booking.patientName ?? 'Ein Patient';
+      const isConfirmed = booking.status === 'CONFIRMED';
       sendPushNotification(
         booking.therapist.expoPushToken,
-        'Terminanfrage storniert',
-        `${patientName} hat die Buchungsanfrage storniert.`,
+        isConfirmed ? 'Termin storniert' : 'Terminanfrage storniert',
+        isConfirmed
+          ? `${patientName} hat den bestätigten Termin storniert.`
+          : `${patientName} hat die Buchungsanfrage storniert.`,
         { bookingId: booking.id, screen: 'bookings' },
       );
     }
