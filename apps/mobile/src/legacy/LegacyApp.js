@@ -360,6 +360,25 @@ export default function App() {
   const [selectedPracticeError, setSelectedPracticeError] = useState('');
   const [selectedTherapist, setSelectedTherapist] = useState(null);
   const [selectedAppointment, setSelectedAppointment] = useState(null);
+  const [showCancelAppointmentModal, setShowCancelAppointmentModal] = useState(false);
+
+  const handleCancelSelectedAppointment = async () => {
+    if (!selectedAppointment) return;
+    try {
+      const res = await fetch(`${getBaseUrl()}/bookings/${selectedAppointment.id}/cancel`, {
+        method: 'PATCH',
+        headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
+      });
+      if (res.ok) {
+        await loadMyAppointments(authToken);
+        setSelectedAppointment(null);
+      } else {
+        Alert.alert('Fehler', 'Stornierung fehlgeschlagen. Bitte versuche es erneut.');
+      }
+    } catch {
+      Alert.alert('Fehler', 'Keine Verbindung. Bitte versuche es erneut.');
+    }
+  };
 
   // Favorites — stored locally on device only
   const [favorites, setFavorites] = useState([]);
@@ -3140,23 +3159,6 @@ export default function App() {
       ? `${new Date(slotDate).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr · ${durationMin} Min`
       : `${durationMin} Min`;
 
-    const handleCancelFromDetail = async () => {
-      try {
-        const res = await fetch(`${getBaseUrl()}/bookings/${appointment.id}/cancel`, {
-          method: 'PATCH',
-          headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
-        });
-        if (res.ok) {
-          await loadMyAppointments(authToken);
-          setSelectedAppointment(null);
-        } else {
-          Alert.alert('Fehler', 'Stornierung fehlgeschlagen. Bitte versuche es erneut.');
-        }
-      } catch {
-        Alert.alert('Fehler', 'Keine Verbindung. Bitte versuche es erneut.');
-      }
-    };
-
     return renderTherapyTabShell(
       'Termin',
       <View style={{ gap: 12 }}>
@@ -3233,19 +3235,7 @@ export default function App() {
 
             {(appointment?.status === 'PENDING' || appointment?.status === 'CONFIRMED') ? (
               <Pressable
-                onPress={() => {
-                  const isConfirmed = appointment.status === 'CONFIRMED';
-                  Alert.alert(
-                    'Termin stornieren',
-                    isConfirmed
-                      ? 'Möchtest du diesen bestätigten Termin wirklich stornieren?'
-                      : 'Möchtest du diese Anfrage wirklich stornieren?',
-                    [
-                      { text: 'Nein', style: 'cancel' },
-                      { text: 'Stornieren', style: 'destructive', onPress: handleCancelFromDetail },
-                    ],
-                  );
-                }}
+                onPress={() => setShowCancelAppointmentModal(true)}
                 style={{ alignSelf: 'center', paddingVertical: 6 }}
               >
                 <Text style={{ fontSize: 14, fontWeight: '600', color: c.error }}>Termin stornieren</Text>
@@ -4860,6 +4850,46 @@ export default function App() {
               >
                 <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>{t('doneBtn')}</Text>
               </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* ── Cancel Appointment Modal ───────────────────────────────────────── */}
+      <Modal visible={showCancelAppointmentModal} transparent animationType="fade" onRequestClose={() => setShowCancelAppointmentModal(false)}>
+        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', padding: 24 }} onPress={() => setShowCancelAppointmentModal(false)}>
+          <Pressable onPress={(e) => e.stopPropagation()}>
+            <View style={{ backgroundColor: c.card, borderRadius: 20, padding: 24, gap: 20 }}>
+              <View style={{ alignItems: 'center', gap: 12 }}>
+                <View style={{ width: 64, height: 64, borderRadius: 20, backgroundColor: '#FEE2E2', alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons name="close-circle" size={34} color="#DC2626" />
+                </View>
+                <Text style={{ fontSize: 20, fontWeight: '800', color: c.text, textAlign: 'center' }}>
+                  Termin stornieren
+                </Text>
+              </View>
+              <Text style={{ fontSize: 14, color: c.muted, textAlign: 'center', lineHeight: 21 }}>
+                {selectedAppointment?.status === 'CONFIRMED'
+                  ? 'Möchtest du diesen bestätigten Termin wirklich stornieren? Der Therapeut wird benachrichtigt.'
+                  : 'Möchtest du diese Anfrage wirklich stornieren?'}
+              </Text>
+              <View style={{ gap: 10 }}>
+                <Pressable
+                  style={{ backgroundColor: '#DC2626', borderRadius: 14, paddingVertical: 14, alignItems: 'center' }}
+                  onPress={async () => {
+                    setShowCancelAppointmentModal(false);
+                    await handleCancelSelectedAppointment();
+                  }}
+                >
+                  <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>Stornieren</Text>
+                </Pressable>
+                <Pressable
+                  style={{ backgroundColor: c.mutedBg, borderRadius: 14, paddingVertical: 14, alignItems: 'center' }}
+                  onPress={() => setShowCancelAppointmentModal(false)}
+                >
+                  <Text style={{ color: c.text, fontSize: 16, fontWeight: '600' }}>Abbrechen</Text>
+                </Pressable>
+              </View>
             </View>
           </Pressable>
         </Pressable>
