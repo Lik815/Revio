@@ -17,6 +17,7 @@ import { uploadRoutes } from './routes/upload.js';
 import { configRoutes } from './routes/config.js';
 import { bookingRoutes } from './routes/booking.js';
 import { feedbackRoutes } from './routes/feedback.js';
+import { notificationRoutes } from './routes/notifications.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -44,6 +45,7 @@ export async function buildApp() {
   await app.register(uploadRoutes);
   await app.register(bookingRoutes);
   await app.register(feedbackRoutes);
+  await app.register(notificationRoutes);
 
   // ── Scheduled expiry: release slots from stale PENDING bookings every 5 min
   app.addHook('onReady', () => {

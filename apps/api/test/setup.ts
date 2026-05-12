@@ -10,7 +10,7 @@ export async function setup() {
   // Remove stale test DB so migration starts fresh
   if (existsSync(TEST_DB)) rmSync(TEST_DB);
 
-  execSync('npx prisma db push --skip-generate', {
+  execSync('npx prisma db push --skip-generate --accept-data-loss', {
     env: { ...process.env, DATABASE_URL: `file:${TEST_DB}` },
     stdio: 'pipe',
   });

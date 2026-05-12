@@ -556,6 +556,15 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     const token = getToken(request);
     if (!token) return reply.unauthorized('Kein Token');
     const { expoPushToken } = z.object({ expoPushToken: z.string() }).parse(request.body);
+
+    // Patient (User) token
+    const user = await fastify.prisma.user.findUnique({ where: { sessionToken: token } });
+    if (user) {
+      await fastify.prisma.user.update({ where: { id: user.id }, data: { expoPushToken } });
+      return { success: true };
+    }
+
+    // Therapist token
     const therapist = await fastify.prisma.therapist.findUnique({ where: { sessionToken: token } });
     if (!therapist) return reply.unauthorized('Ungültiger Token');
     await fastify.prisma.therapist.update({ where: { id: therapist.id }, data: { expoPushToken } });

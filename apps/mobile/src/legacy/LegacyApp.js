@@ -1246,6 +1246,7 @@ export default function App() {
           setAccountType('patient');
           setLoggedInPatient(profile);
           loadMyAppointments(token);
+          registerPushToken(token);
           setShowLogin(false);
           setLoginEmail('');
           setLoginPassword('');
@@ -1298,6 +1299,7 @@ export default function App() {
           setAccountType('patient');
           setLoggedInPatient(profile);
           loadMyAppointments(token);
+          registerPushToken(token);
           setShowLogin(false);
           setLoginEmail('');
           setLoginPassword('');
@@ -4859,17 +4861,34 @@ export default function App() {
           {notifications.length === 0 ? (
             <Text style={{ color: c.muted, textAlign: 'center', marginTop: 24 }}>{t('noNotifications')}</Text>
           ) : (
-            notifications.map((n) => (
-              <View key={n.id} style={{ paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: c.border, flexDirection: 'row', gap: 10, alignItems: 'flex-start' }}>
-                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: c.error, marginTop: 5 }} />
-                <View style={{ flex: 1 }}>
-                  <Text style={{ color: c.text, fontSize: 14, lineHeight: 20 }}>{n.message}</Text>
-                  <Text style={{ color: c.muted, fontSize: 11, marginTop: 3 }}>
-                    {new Date(n.createdAt).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                  </Text>
+            notifications.map((n) => {
+              const iconMap = {
+                PROFILE_APPROVED: { name: 'checkmark-circle', color: c.success ?? '#22c55e' },
+                PROFILE_CHANGES_REQUESTED: { name: 'create-outline', color: c.primary },
+                PROFILE_REJECTED: { name: 'close-circle', color: c.error },
+                PROFILE_SUSPENDED: { name: 'pause-circle', color: c.error },
+                NEW_BOOKING_REQUEST: { name: 'calendar', color: c.primary },
+                BOOKING_CONFIRMED: { name: 'checkmark-circle', color: c.success ?? '#22c55e' },
+                BOOKING_DECLINED: { name: 'close-circle', color: c.error },
+                BOOKING_CANCELLED: { name: 'calendar-clear-outline', color: c.muted },
+                JOIN_REQUEST: { name: 'person-add-outline', color: c.primary },
+                INVITE: { name: 'mail-outline', color: c.primary },
+              };
+              const icon = iconMap[n.type] ?? { name: 'notifications-outline', color: c.primary };
+              return (
+                <View key={n.id} style={{ paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: c.border, flexDirection: 'row', gap: 12, alignItems: 'flex-start' }}>
+                  <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: c.card, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center', marginTop: 1 }}>
+                    <Ionicons name={icon.name} size={16} color={icon.color} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: c.text, fontSize: 14, lineHeight: 20 }}>{n.message}</Text>
+                    <Text style={{ color: c.muted, fontSize: 11, marginTop: 3 }}>
+                      {new Date(n.createdAt).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    </Text>
+                  </View>
                 </View>
-              </View>
-            ))
+              );
+            })
           )}
         </View>
       </Modal>

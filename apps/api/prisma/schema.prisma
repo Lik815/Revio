@@ -77,6 +77,7 @@ model User {
   passwordResetExpiresAt      DateTime?
   // Phone (added via migration 20260511090000)
   phone                       String?
+  expoPushToken               String?
   createdAt              DateTime                @default(now())
   updatedAt              DateTime                @updatedAt
   therapistProfile       Therapist?              @relation("TherapistUser")

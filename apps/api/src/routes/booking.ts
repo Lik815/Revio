@@ -307,9 +307,9 @@ export async function bookingRoutes(fastify: FastifyInstance) {
       const patientUser = booking.patientUserId
         ? await fastify.prisma.user.findUnique({ where: { id: booking.patientUserId } })
         : null;
-      if ((patientUser as any)?.expoPushToken) {
+      if (patientUser?.expoPushToken) {
         const slotDate = confirmedAt.toLocaleDateString('de-DE');
-        sendPushNotification((patientUser as any).expoPushToken, 'Termin bestätigt 🎉',
+        sendPushNotification(patientUser.expoPushToken, 'Termin bestätigt 🎉',
           `${therapist.fullName} hat deinen Termin am ${slotDate} bestätigt.`,
           { bookingId: booking.id, screen: 'bookings' });
       }
@@ -332,8 +332,8 @@ export async function bookingRoutes(fastify: FastifyInstance) {
       const patientUser = booking.patientUserId
         ? await fastify.prisma.user.findUnique({ where: { id: booking.patientUserId } })
         : null;
-      if ((patientUser as any)?.expoPushToken) {
-        sendPushNotification((patientUser as any).expoPushToken, 'Terminanfrage abgelehnt',
+      if (patientUser?.expoPushToken) {
+        sendPushNotification(patientUser.expoPushToken, 'Terminanfrage abgelehnt',
           `${therapist.fullName} konnte deinen Termin leider nicht bestätigen.`,
           { bookingId: booking.id, screen: 'bookings' });
       }
@@ -406,9 +406,9 @@ export async function bookingRoutes(fastify: FastifyInstance) {
     const patientUser = booking.patientUserId
       ? await fastify.prisma.user.findUnique({ where: { id: booking.patientUserId } })
       : null;
-    if ((patientUser as any)?.expoPushToken) {
+    if (patientUser?.expoPushToken) {
       sendPushNotification(
-        (patientUser as any).expoPushToken,
+        patientUser.expoPushToken,
         'Termin abgesagt',
         `${therapist.fullName} musste deinen Termin leider absagen.`,
         { bookingId: booking.id, screen: 'bookings' },
