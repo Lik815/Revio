@@ -313,11 +313,7 @@ export function PatientAppointmentCard({ c, t, appointment, onCancel, onOpenDeta
 
         {/* Footer */}
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: SPACE.md, paddingTop: SPACE.sm, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.15)' }}>
-          {(status === 'PENDING' || status === 'CONFIRMED') ? (
-            <Pressable onPress={(e) => { e.stopPropagation?.(); Alert.alert('Termin stornieren', 'Möchtest du diesen Termin wirklich stornieren?', [{ text: 'Nein', style: 'cancel' }, { text: 'Stornieren', style: 'destructive', onPress: onCancel }]); }}>
-              <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>Stornieren</Text>
-            </Pressable>
-          ) : <View />}
+          <View />
           <Pressable onPress={(e) => { e.stopPropagation?.(); onViewTherapist?.(); }} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
             <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', fontWeight: '500' }}>Profil ansehen</Text>
             <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.5)" />
@@ -366,13 +362,7 @@ export function PatientAppointmentCard({ c, t, appointment, onCancel, onOpenDeta
         <View style={{ backgroundColor: badge.bg, borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2 }}>
           <Text style={{ fontSize: 10, fontWeight: '700', color: badge.text }}>{badge.label}</Text>
         </View>
-        {(status === 'PENDING' || status === 'CONFIRMED') ? (
-          <Pressable onPress={(e) => { e.stopPropagation?.(); Alert.alert('Termin stornieren', 'Möchtest du diesen Termin wirklich stornieren?', [{ text: 'Nein', style: 'cancel' }, { text: 'Stornieren', style: 'destructive', onPress: onCancel }]); }}>
-            <Text style={{ fontSize: 11, color: c.muted }}>Stornieren</Text>
-          </Pressable>
-        ) : (
-          <Ionicons name="chevron-forward" size={14} color={c.muted} />
-        )}
+        <Ionicons name="chevron-forward" size={14} color={c.muted} />
       </View>
     </Pressable>
   );

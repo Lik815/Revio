@@ -3231,12 +3231,15 @@ export default function App() {
               </Pressable>
             ) : null}
 
-            {appointment?.status === 'PENDING' ? (
+            {(appointment?.status === 'PENDING' || appointment?.status === 'CONFIRMED') ? (
               <Pressable
                 onPress={() => {
+                  const isConfirmed = appointment.status === 'CONFIRMED';
                   Alert.alert(
                     'Termin stornieren',
-                    'Möchtest du diese Anfrage wirklich stornieren?',
+                    isConfirmed
+                      ? 'Möchtest du diesen bestätigten Termin wirklich stornieren?'
+                      : 'Möchtest du diese Anfrage wirklich stornieren?',
                     [
                       { text: 'Nein', style: 'cancel' },
                       { text: 'Stornieren', style: 'destructive', onPress: handleCancelFromDetail },
