@@ -1150,6 +1150,14 @@ export default function App() {
     }
   }, [authToken, accountType]);
 
+  // Load persisted dismissed notification IDs on login
+  useEffect(() => {
+    if (!authToken) { setDismissedNotifIds(new Set()); return; }
+    AsyncStorage.getItem('revio_dismissed_notif_ids').then((raw) => {
+      if (raw) { try { setDismissedNotifIds(new Set(JSON.parse(raw))); } catch {} }
+    });
+  }, [authToken]);
+
   // Poll notifications every 30s when logged in
   useEffect(() => {
     if (notificationPollRef.current) clearInterval(notificationPollRef.current);
@@ -1365,6 +1373,19 @@ export default function App() {
     } finally {
       setForgotPasswordLoading(false);
     }
+  };
+
+  const dismissNotification = async (id) => {
+    const next = new Set(dismissedNotifIds);
+    next.add(id);
+    setDismissedNotifIds(next);
+    await AsyncStorage.setItem('revio_dismissed_notif_ids', JSON.stringify([...next]));
+  };
+
+  const dismissAllNotifications = async () => {
+    const allIds = new Set(notifications.map((n) => n.id));
+    setDismissedNotifIds(allIds);
+    await AsyncStorage.setItem('revio_dismissed_notif_ids', JSON.stringify([...allIds]));
   };
 
   const handleLogout = async () => {
@@ -1668,6 +1689,7 @@ export default function App() {
   const discoverScrollRef = React.useRef(null);
   const registerScrollRef = React.useRef(null);
   const [notifications, setNotifications] = useState([]);
+  const [dismissedNotifIds, setDismissedNotifIds] = useState(new Set());
   const [showNotifications, setShowNotifications] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [feedbackEmail, setFeedbackEmail] = useState('');
@@ -3036,8 +3058,8 @@ export default function App() {
                 <Ionicons name="notifications-outline" size={18} color={c.muted} />
                 <Text style={[styles.optionLabel, { color: c.text }]}>{t('notificationsOption')}</Text>
               </View>
-              <Text style={[styles.optionValue, { color: notifications.length > 0 ? c.primary : c.muted }]}>
-                {notifications.length > 0 ? `${notifications.length} ›` : '›'}
+              <Text style={[styles.optionValue, { color: notifications.filter((n) => !dismissedNotifIds.has(n.id)).length > 0 ? c.primary : c.muted }]}>
+                {notifications.filter((n) => !dismissedNotifIds.has(n.id)).length > 0 ? `${notifications.filter((n) => !dismissedNotifIds.has(n.id)).length} ›` : '›'}
               </Text>
             </Pressable>
             <Pressable onPress={() => Linking.openSettings()} style={[styles.optionRow, { backgroundColor: c.card, borderColor: 'transparent', borderTopWidth: 1, borderTopColor: c.border }]}>
@@ -3369,7 +3391,7 @@ export default function App() {
           </View>
           <Pressable onPress={() => setShowNotifications(true)} style={{ padding: 8, position: 'relative' }}>
             <Ionicons name="notifications-outline" size={22} color={c.text} />
-            {notifications.length > 0 && (
+            {notifications.filter((n) => !dismissedNotifIds.has(n.id)).length > 0 && (
               <View style={{ position: 'absolute', top: 8, right: 8, width: 8, height: 8, borderRadius: 4, backgroundColor: c.error }} />
             )}
           </Pressable>
@@ -4858,39 +4880,56 @@ export default function App() {
         <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' }} onPress={() => setShowNotifications(false)} />
         <View style={{ backgroundColor: c.background, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, paddingBottom: 40, minHeight: 200 }}>
           <View style={{ width: 36, height: 4, backgroundColor: c.border, borderRadius: 2, alignSelf: 'center', marginBottom: 16 }} />
-          <Text style={{ fontSize: 18, fontWeight: '700', color: c.text, marginBottom: 16 }}>{t('notificationsTitle')}</Text>
-          {notifications.length === 0 ? (
-            <Text style={{ color: c.muted, textAlign: 'center', marginTop: 24 }}>{t('noNotifications')}</Text>
-          ) : (
-            notifications.map((n) => {
-              const iconMap = {
-                PROFILE_APPROVED: { name: 'checkmark-circle', color: c.success ?? '#22c55e' },
-                PROFILE_CHANGES_REQUESTED: { name: 'create-outline', color: c.primary },
-                PROFILE_REJECTED: { name: 'close-circle', color: c.error },
-                PROFILE_SUSPENDED: { name: 'pause-circle', color: c.error },
-                NEW_BOOKING_REQUEST: { name: 'calendar', color: c.primary },
-                BOOKING_CONFIRMED: { name: 'checkmark-circle', color: c.success ?? '#22c55e' },
-                BOOKING_DECLINED: { name: 'close-circle', color: c.error },
-                BOOKING_CANCELLED: { name: 'calendar-clear-outline', color: c.muted },
-                JOIN_REQUEST: { name: 'person-add-outline', color: c.primary },
-                INVITE: { name: 'mail-outline', color: c.primary },
-              };
-              const icon = iconMap[n.type] ?? { name: 'notifications-outline', color: c.primary };
-              return (
-                <View key={n.id} style={{ paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: c.border, flexDirection: 'row', gap: 12, alignItems: 'flex-start' }}>
-                  <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: c.card, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center', marginTop: 1 }}>
-                    <Ionicons name={icon.name} size={16} color={icon.color} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ color: c.text, fontSize: 14, lineHeight: 20 }}>{n.message}</Text>
-                    <Text style={{ color: c.muted, fontSize: 11, marginTop: 3 }}>
-                      {new Date(n.createdAt).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                    </Text>
-                  </View>
+          {(() => {
+            const visible = notifications.filter((n) => !dismissedNotifIds.has(n.id));
+            const iconMap = {
+              PROFILE_APPROVED: { name: 'checkmark-circle', color: c.success ?? '#22c55e' },
+              PROFILE_CHANGES_REQUESTED: { name: 'create-outline', color: c.primary },
+              PROFILE_REJECTED: { name: 'close-circle', color: c.error },
+              PROFILE_SUSPENDED: { name: 'pause-circle', color: c.error },
+              NEW_BOOKING_REQUEST: { name: 'calendar', color: c.primary },
+              BOOKING_CONFIRMED: { name: 'checkmark-circle', color: c.success ?? '#22c55e' },
+              BOOKING_DECLINED: { name: 'close-circle', color: c.error },
+              BOOKING_CANCELLED: { name: 'calendar-clear-outline', color: c.muted },
+              JOIN_REQUEST: { name: 'person-add-outline', color: c.primary },
+              INVITE: { name: 'mail-outline', color: c.primary },
+            };
+            return (
+              <>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                  <Text style={{ fontSize: 18, fontWeight: '700', color: c.text }}>{t('notificationsTitle')}</Text>
+                  {visible.length > 0 && (
+                    <Pressable onPress={dismissAllNotifications} hitSlop={8}>
+                      <Text style={{ fontSize: 13, color: c.muted }}>{t('clearAllBtn') ?? 'Alle löschen'}</Text>
+                    </Pressable>
+                  )}
                 </View>
-              );
-            })
-          )}
+                {visible.length === 0 ? (
+                  <Text style={{ color: c.muted, textAlign: 'center', marginTop: 24 }}>{t('noNotifications')}</Text>
+                ) : (
+                  visible.map((n) => {
+                    const icon = iconMap[n.type] ?? { name: 'notifications-outline', color: c.primary };
+                    return (
+                      <View key={n.id} style={{ paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: c.border, flexDirection: 'row', gap: 12, alignItems: 'flex-start' }}>
+                        <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: c.card, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center', marginTop: 1 }}>
+                          <Ionicons name={icon.name} size={16} color={icon.color} />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ color: c.text, fontSize: 14, lineHeight: 20 }}>{n.message}</Text>
+                          <Text style={{ color: c.muted, fontSize: 11, marginTop: 3 }}>
+                            {new Date(n.createdAt).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </Text>
+                        </View>
+                        <Pressable onPress={() => dismissNotification(n.id)} hitSlop={10} style={{ paddingTop: 2 }}>
+                          <Ionicons name="close-outline" size={20} color={c.muted} />
+                        </Pressable>
+                      </View>
+                    );
+                  })
+                )}
+              </>
+            );
+          })()}
         </View>
       </Modal>
 
@@ -5311,10 +5350,10 @@ export default function App() {
                     size={22}
                     color={active ? c.primary : c.muted}
                   />
-                  {tab.key === 'therapist' && loggedInTherapist && notifications.length > 0 && (
+                  {tab.key === 'therapist' && loggedInTherapist && notifications.filter((n) => !dismissedNotifIds.has(n.id)).length > 0 && (
                     <View style={{ position: 'absolute', top: -3, right: -5, backgroundColor: '#E53E3E', borderRadius: 6, minWidth: 12, height: 12, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 2 }}>
                       <Text style={{ color: '#fff', fontSize: 8, fontWeight: '800', lineHeight: 12 }}>
-                        {notifications.length}
+                        {notifications.filter((n) => !dismissedNotifIds.has(n.id)).length}
                       </Text>
                     </View>
                   )}
