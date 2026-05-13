@@ -226,8 +226,17 @@ export async function bookingRoutes(fastify: FastifyInstance) {
         expiresAt: result.responseDueAt,
       });
     } catch (err: any) {
-      const status = err.code ?? 400;
-      return reply.status(status).send({ error: err.message });
+      // Custom errors thrown inside the transaction carry a numeric .code
+      if (typeof err.code === 'number') {
+        return reply.status(err.code).send({ error: err.message });
+      }
+      // Prisma unique-constraint violation (e.g. slotId already booked)
+      if (err.code === 'P2002') {
+        return reply.status(409).send({ error: 'Slot ist nicht mehr verfügbar.' });
+      }
+      // Any other Prisma / unexpected error
+      fastify.log.error({ err }, 'POST /bookings unexpected error');
+      return reply.status(500).send({ error: 'Buchung konnte nicht abgeschlossen werden. Bitte versuche es erneut.' });
     }
   });
 
