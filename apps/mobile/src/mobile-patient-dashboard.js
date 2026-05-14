@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import {
   ActivityIndicator,
-  Alert,
+  Linking,
   Pressable,
   ScrollView,
   Text,
@@ -11,12 +11,28 @@ import {
 } from 'react-native';
 import { getBaseUrl, RADIUS, SHADOW, SPACE, TUNNEL_HEADERS, TYPE } from './mobile-utils';
 
-export function PatientDashboardScreen({ c, loggedInPatient, styles, t, authToken, onProfileSaved }) {
+export function PatientDashboardScreen({
+  c, loggedInPatient, styles, t, authToken, onProfileSaved,
+  favorites = [], myAppointments = [], onOpenTherapist,
+}) {
   const firstName = loggedInPatient?.firstName ?? '';
   const lastName = loggedInPatient?.lastName ?? '';
   const email = loggedInPatient?.email ?? '';
   const phone = loggedInPatient?.phone ?? null;
+  const createdAt = loggedInPatient?.createdAt ?? null;
   const initials = ((firstName[0] ?? '') + (lastName[0] ?? '')).toUpperCase() || '?';
+
+  const profileComplete = !!(firstName && lastName && phone);
+  const memberSince = createdAt ? new Date(createdAt).getFullYear() : null;
+
+  const activeApts = myAppointments.filter(a => ['PENDING', 'CONFIRMED'].includes(a.status));
+  const confirmedPast = myAppointments
+    .filter(a => a.status === 'CONFIRMED' && new Date(a.slot?.startsAt ?? a.confirmedSlotAt ?? 0) < new Date())
+    .sort((a, b) => new Date(b.slot?.startsAt ?? b.confirmedSlotAt ?? 0) - new Date(a.slot?.startsAt ?? a.confirmedSlotAt ?? 0));
+  const lastTherapy = confirmedPast[0] ?? null;
+  const lastTherapyDate = lastTherapy
+    ? new Date(lastTherapy.slot?.startsAt ?? lastTherapy.confirmedSlotAt).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    : null;
 
   const [editing, setEditing] = useState(false);
   const [editFirst, setEditFirst] = useState('');
@@ -33,10 +49,7 @@ export function PatientDashboardScreen({ c, loggedInPatient, styles, t, authToke
     setEditing(true);
   };
 
-  const cancelEdit = () => {
-    setEditing(false);
-    setSaveError('');
-  };
+  const cancelEdit = () => { setEditing(false); setSaveError(''); };
 
   const saveEdit = async () => {
     if (!editFirst.trim()) { setSaveError(t('firstNameRequired')); return; }
@@ -65,58 +78,64 @@ export function PatientDashboardScreen({ c, loggedInPatient, styles, t, authToke
       contentContainerStyle={[styles.scrollContent, { paddingHorizontal: 16, paddingBottom: 40, paddingTop: 60 }]}
       showsVerticalScrollIndicator={false}
     >
-      {/* ── Hero-Karte ──────────────────────────────────────────────── */}
-      <View style={[styles.practiceHeader, { backgroundColor: c.card, borderColor: c.border, alignItems: 'center' }]}>
-        <View style={[styles.therapistAvatarLarge, { borderRadius: 48, backgroundColor: c.primary, alignItems: 'center', justifyContent: 'center' }]}>
-          <Text style={{ color: '#fff', fontSize: 28, fontWeight: '700' }}>{initials}</Text>
-        </View>
-        <Text style={[styles.practiceHeaderName, { color: c.text, marginTop: 10 }]}>
-          {firstName} {lastName}
-        </Text>
-        <Text style={[styles.practiceHeaderCity, { color: c.textMuted ?? c.muted }]}>
-          {t('patientRoleLabel')}
-        </Text>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: SPACE.sm, marginTop: SPACE.sm, width: '100%' }}>
-          <View style={{ flex: 1, minWidth: '45%', borderWidth: 1, borderColor: c.border, borderRadius: RADIUS.md, padding: SPACE.md, gap: SPACE.xs, backgroundColor: c.card }}>
-            <Ionicons name="mail-outline" size={18} color={c.muted} />
-            <Text style={{ ...TYPE.label, color: c.textMuted ?? c.muted }}>{t('emailLabel')}</Text>
-            <Text style={{ ...TYPE.meta, color: c.text, fontWeight: '600' }} numberOfLines={1}>{email}</Text>
+      {/* ── Profilkopf ──────────────────────────────────────────────── */}
+      <View style={{ backgroundColor: c.card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: c.border, padding: SPACE.lg, marginBottom: SPACE.md }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACE.md }}>
+          {/* Avatar */}
+          <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: c.primary, alignItems: 'center', justifyContent: 'center' }}>
+            <Text style={{ color: '#fff', fontSize: 24, fontWeight: '700' }}>{initials}</Text>
           </View>
-          <View style={{ flex: 1, minWidth: '45%', borderWidth: 1, borderColor: c.border, borderRadius: RADIUS.md, padding: SPACE.md, gap: SPACE.xs, backgroundColor: c.card }}>
-            <Ionicons name="call-outline" size={18} color={phone ? c.primary : c.muted} />
-            <Text style={{ ...TYPE.label, color: c.textMuted ?? c.muted }}>{t('phoneLabel') ?? 'Telefon'}</Text>
-            <Text style={{ ...TYPE.meta, color: phone ? c.text : c.muted, fontWeight: phone ? '600' : '400' }} numberOfLines={1}>
-              {phone ?? t('phonePlaceholder') ?? '+49 …'}
+
+          {/* Name + Rolle + Badges */}
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 18, fontWeight: '700', color: c.text }} numberOfLines={1}>
+              {firstName} {lastName}
             </Text>
+            <Text style={{ fontSize: 13, color: c.muted, marginTop: 2 }}>{t('patientRoleLabel') ?? 'Patient:in'}</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+              {profileComplete && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: (c.successBg ?? '#f0fdf4'), borderRadius: 20, paddingVertical: 3, paddingHorizontal: 8 }}>
+                  <Ionicons name="checkmark-circle" size={11} color={c.success ?? '#22c55e'} />
+                  <Text style={{ fontSize: 11, color: c.success ?? '#22c55e', fontWeight: '600' }}>Profil vollständig</Text>
+                </View>
+              )}
+              {memberSince && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: c.mutedBg ?? '#f3f4f6', borderRadius: 20, paddingVertical: 3, paddingHorizontal: 8 }}>
+                  <Ionicons name="calendar-outline" size={11} color={c.muted} />
+                  <Text style={{ fontSize: 11, color: c.muted, fontWeight: '500' }}>Seit {memberSince}</Text>
+                </View>
+              )}
+            </View>
           </View>
+
+          {/* Edit-Button */}
+          <Pressable
+            onPress={openEdit}
+            style={{ width: 36, height: 36, borderRadius: 18, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' }}
+            hitSlop={8}
+          >
+            <Ionicons name="pencil-outline" size={16} color={c.text} />
+          </Pressable>
         </View>
       </View>
 
-      {/* ── Profil bearbeiten ──────────────────────────────────────── */}
-      {!editing ? (
-        <Pressable
-          onPress={openEdit}
-          style={[styles.registerBtn, { backgroundColor: c.card, borderWidth: 1, borderColor: c.border, marginTop: 12 }]}
-        >
-          <Text style={{ fontSize: 15, fontWeight: '600', color: c.text }}>{t('editProfileBtn')}</Text>
-        </Pressable>
-      ) : (
-        <View style={{ gap: 10 }}>
-          <Text style={{ fontSize: 16, fontWeight: '700', color: c.text, marginBottom: 4 }}>{t('editProfileAction')}</Text>
-
+      {/* ── Edit-Formular ───────────────────────────────────────────── */}
+      {editing && (
+        <View style={{ backgroundColor: c.card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: c.border, padding: SPACE.lg, marginBottom: SPACE.md, gap: 10 }}>
+          <Text style={{ fontSize: 15, fontWeight: '700', color: c.text }}>{t('editProfileAction')}</Text>
           <TextInput
             value={editFirst}
             onChangeText={setEditFirst}
             placeholder={t('firstNamePlaceholder')}
             placeholderTextColor={c.muted}
-            style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text }]}
+            style={[styles.regInput, { backgroundColor: c.mutedBg, borderColor: c.border, color: c.text }]}
           />
           <TextInput
             value={editLast}
             onChangeText={setEditLast}
             placeholder={t('lastNamePlaceholder') ?? t('lastName')}
             placeholderTextColor={c.muted}
-            style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text }]}
+            style={[styles.regInput, { backgroundColor: c.mutedBg, borderColor: c.border, color: c.text }]}
           />
           <TextInput
             value={editPhone}
@@ -124,26 +143,85 @@ export function PatientDashboardScreen({ c, loggedInPatient, styles, t, authToke
             placeholder={t('phonePlaceholder') ?? '+49 …'}
             placeholderTextColor={c.muted}
             keyboardType="phone-pad"
-            style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text }]}
+            style={[styles.regInput, { backgroundColor: c.mutedBg, borderColor: c.border, color: c.text }]}
           />
-
           {!!saveError && <Text style={{ color: c.error, fontSize: 13 }}>{saveError}</Text>}
-
-          <Pressable
-            onPress={saveEdit}
-            disabled={saving}
-            style={[styles.registerBtn, { backgroundColor: saving ? c.border : c.primary, opacity: saving ? 0.7 : 1 }]}
-          >
-            {saving
-              ? <ActivityIndicator color="#fff" size="small" />
-              : <Text style={styles.registerBtnText}>{t('saveBtn')}</Text>
-            }
-          </Pressable>
-          <Pressable onPress={cancelEdit} style={{ alignItems: 'center', paddingVertical: 10 }}>
-            <Text style={{ color: c.muted, fontSize: 14 }}>{t('cancelBtn')}</Text>
-          </Pressable>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <Pressable
+              onPress={cancelEdit}
+              style={{ flex: 1, borderRadius: RADIUS.md, borderWidth: 1, borderColor: c.border, paddingVertical: 12, alignItems: 'center' }}
+            >
+              <Text style={{ fontSize: 14, fontWeight: '600', color: c.muted }}>{t('cancelBtn')}</Text>
+            </Pressable>
+            <Pressable
+              onPress={saveEdit}
+              disabled={saving}
+              style={{ flex: 1, borderRadius: RADIUS.md, backgroundColor: saving ? c.border : c.primary, paddingVertical: 12, alignItems: 'center' }}
+            >
+              {saving
+                ? <ActivityIndicator color="#fff" size="small" />
+                : <Text style={{ fontSize: 14, fontWeight: '700', color: '#fff' }}>{t('saveBtn')}</Text>
+              }
+            </Pressable>
+          </View>
         </View>
       )}
+
+      {/* ── Kontakt ─────────────────────────────────────────────────── */}
+      <View style={{ backgroundColor: c.card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: c.border, padding: SPACE.lg, marginBottom: SPACE.md }}>
+        <Text style={{ fontSize: 15, fontWeight: '700', color: c.text, marginBottom: SPACE.md }}>Kontakt</Text>
+
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACE.md }}>
+          <Ionicons name="call-outline" size={18} color={c.muted} />
+          <Text style={{ flex: 1, fontSize: 15, color: phone ? c.text : c.muted }}>
+            {phone ?? (t('phonePlaceholder') ?? '+49 …')}
+          </Text>
+          {phone && (
+            <Pressable onPress={() => Linking.openURL(`tel:${phone}`)} hitSlop={8}>
+              <Ionicons name="call" size={20} color={c.success ?? '#22c55e'} />
+            </Pressable>
+          )}
+        </View>
+
+        <View style={{ height: 1, backgroundColor: c.border, marginVertical: SPACE.md }} />
+
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACE.md }}>
+          <Ionicons name="mail-outline" size={18} color={c.muted} />
+          <Text style={{ flex: 1, fontSize: 15, color: c.text }}>{email}</Text>
+          <Pressable onPress={() => Linking.openURL(`mailto:${email}`)} hitSlop={8}>
+            <Ionicons name="mail" size={20} color={c.success ?? '#22c55e'} />
+          </Pressable>
+        </View>
+      </View>
+
+      {/* ── Therapie-Übersicht ───────────────────────────────────────── */}
+      <View style={{ backgroundColor: c.card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: c.border, padding: SPACE.lg, marginBottom: SPACE.md }}>
+        <Text style={{ fontSize: 15, fontWeight: '700', color: c.text, marginBottom: SPACE.md }}>Therapie</Text>
+
+        <View style={{ flexDirection: 'row', gap: SPACE.sm }}>
+          {/* Gespeicherte Therapeuten */}
+          <View style={{ flex: 1, borderWidth: 1, borderColor: c.border, borderRadius: RADIUS.md, padding: SPACE.md, alignItems: 'center', gap: 4 }}>
+            <Text style={{ fontSize: 22, fontWeight: '800', color: c.primary }}>{favorites.length}</Text>
+            <Text style={{ fontSize: 11, color: c.muted, textAlign: 'center' }}>Gespeicherte{'\n'}Therapeuten</Text>
+          </View>
+
+          {/* Aktive Termine */}
+          <View style={{ flex: 1, borderWidth: 1, borderColor: c.border, borderRadius: RADIUS.md, padding: SPACE.md, alignItems: 'center', gap: 4 }}>
+            <Text style={{ fontSize: 22, fontWeight: '800', color: activeApts.length > 0 ? c.primary : c.muted }}>
+              {activeApts.length}
+            </Text>
+            <Text style={{ fontSize: 11, color: c.muted, textAlign: 'center' }}>Aktive{'\n'}Termine</Text>
+          </View>
+
+          {/* Letzte Therapie */}
+          <View style={{ flex: 1, borderWidth: 1, borderColor: c.border, borderRadius: RADIUS.md, padding: SPACE.md, alignItems: 'center', gap: 4 }}>
+            <Text style={{ fontSize: lastTherapyDate ? 13 : 22, fontWeight: '800', color: lastTherapyDate ? c.text : c.muted }} numberOfLines={2}>
+              {lastTherapyDate ?? '—'}
+            </Text>
+            <Text style={{ fontSize: 11, color: c.muted, textAlign: 'center' }}>Letzte{'\n'}Therapie</Text>
+          </View>
+        </View>
+      </View>
     </ScrollView>
   );
 }

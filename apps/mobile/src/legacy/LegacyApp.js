@@ -2738,6 +2738,9 @@ export default function App() {
       t={t}
       authToken={authToken}
       onProfileSaved={handlePatientSaveProfile}
+      favorites={favorites}
+      myAppointments={myAppointments}
+      onOpenTherapist={openTherapistById}
     />
   );
 

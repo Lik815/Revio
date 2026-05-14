@@ -311,6 +311,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
         firstName: (user as any).firstName ?? '',
         lastName: (user as any).lastName ?? '',
         phone: (user as any).phone ?? null,
+        createdAt: user.createdAt,
       };
     }
 
