@@ -398,11 +398,7 @@ export function TherapistDashboardScreen(props) {
             <View style={{ backgroundColor: c.card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: c.border, padding: SPACE.lg, marginBottom: SPACE.md }}>
               <Text style={{ fontSize: 15, fontWeight: '700', color: c.text, marginBottom: SPACE.sm }}>{t('languagesLabel')}</Text>
               <Text style={{ fontSize: 14, color: c.text, lineHeight: 22 }}>
-                {(th.languages ?? []).map((code) => {
-                  const upper = code.toUpperCase();
-                  const flag = LANG_FLAGS[upper] ?? '';
-                  return `${getLangLabel(code)} ${flag}`;
-                }).join('  ·  ')}
+                {(th.languages ?? []).map((code) => getLangLabel(code)).join('  ·  ')}
               </Text>
             </View>
           )}
