@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import {
   Image,
-  Linking,
   Modal,
   ScrollView,
   Pressable,
@@ -116,57 +115,88 @@ export function TherapistDashboardScreen(props) {
   const isApproved = th.reviewStatus === 'APPROVED';
   const docCount = (therapistDocuments ?? []).length;
   const docTotal = 2;
-
-  const statusChips = [
-    { icon: 'shield-checkmark-outline', label: isApproved ? t('statusApproved') : t('statusInReview'), color: isApproved ? c.success : c.muted },
-    { icon: 'eye-outline', label: `Sichtbar: ${th.isVisible ? 'Ja' : 'Nein'}`, color: th.isVisible ? c.success : c.muted },
-    ...(th.homeVisit ? [{ icon: 'home-outline', label: t('homeVisitLabel'), color: c.success }] : []),
-    { icon: 'document-outline', label: docCount > 0 ? t('existsLabel') : t('missingLabel'), color: docCount > 0 ? c.success : c.warning ?? '#d97706' },
-  ];
+  const displayPhone = th.phone ?? (t('phonePlaceholder') ?? '+49 ...');
 
   return (
     <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 40 }]}>
 
-      {/* ── Header ───────────────────────────────────────────────────── */}
-      <View style={{ backgroundColor: c.card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: c.border, padding: SPACE.lg, marginBottom: SPACE.md }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACE.md }}>
-          <Pressable onPress={handlePickPhoto} style={{ position: 'relative' }}>
-            {th.photo && !photoError ? (
-              <Image source={{ uri: th.photo }} style={{ width: 72, height: 72, borderRadius: 36 }} onError={() => setPhotoError(true)} />
-            ) : (
-              <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: c.primary, alignItems: 'center', justifyContent: 'center' }}>
-                <Text style={{ color: '#fff', fontSize: 24, fontWeight: '700' }}>{initials}</Text>
-              </View>
-            )}
-            <View style={{ position: 'absolute', bottom: 0, right: 0, backgroundColor: c.accent ?? c.primary, borderRadius: 10, padding: 3 }}>
-              <Ionicons name="camera-outline" size={12} color="#fff" />
+      {/* ── Header (analog Patient Profil) ───────────────────────────── */}
+      <View style={[styles.practiceHeader, { backgroundColor: c.card, borderColor: c.border, alignItems: 'center', marginBottom: SPACE.md }]}>
+        <Pressable onPress={handlePickPhoto} style={{ position: 'relative' }}>
+          {th.photo && !photoError ? (
+            <Image source={{ uri: th.photo }} style={[styles.therapistAvatarLarge, { borderRadius: 48 }]} onError={() => setPhotoError(true)} />
+          ) : (
+            <View style={[styles.therapistAvatarLarge, { borderRadius: 48, backgroundColor: c.primary, alignItems: 'center', justifyContent: 'center' }]}>
+              <Text style={{ color: '#fff', fontSize: 28, fontWeight: '700' }}>{initials}</Text>
             </View>
-          </Pressable>
-
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 18, fontWeight: '700', color: c.text }}>{fullName}</Text>
-            <Text style={{ fontSize: 13, color: c.muted, marginTop: 2 }}>{th.professionalTitle ?? ''}</Text>
+          )}
+          <View style={{ position: 'absolute', right: 2, bottom: 2, backgroundColor: c.accent ?? c.primary, borderRadius: 12, padding: 4, borderWidth: 2, borderColor: c.card }}>
+            <Ionicons name="camera-outline" size={12} color="#fff" />
           </View>
+        </Pressable>
 
+        <Text style={[styles.practiceHeaderName, { color: c.text, marginTop: 10 }]}>
+          {fullName}
+        </Text>
+        <Text style={[styles.practiceHeaderCity, { color: c.textMuted ?? c.muted }]}>
+          {th.professionalTitle ?? t('therapistRoleLabel') ?? 'Physiotherapeut:in'}
+        </Text>
+
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: SPACE.sm, marginTop: SPACE.sm, width: '100%' }}>
+          <View style={{ flex: 1, minWidth: '45%', borderWidth: 1, borderColor: c.border, borderRadius: RADIUS.md, padding: SPACE.md, gap: SPACE.xs, backgroundColor: c.card }}>
+            <Ionicons name="mail-outline" size={18} color={c.muted} />
+            <Text style={{ ...TYPE.label, color: c.textMuted ?? c.muted }}>{t('emailLabel')}</Text>
+            <Text style={{ ...TYPE.meta, color: c.text, fontWeight: '600' }} numberOfLines={1}>{th.email}</Text>
+          </View>
+          <View style={{ flex: 1, minWidth: '45%', borderWidth: 1, borderColor: c.border, borderRadius: RADIUS.md, padding: SPACE.md, gap: SPACE.xs, backgroundColor: c.card }}>
+            <Ionicons name="call-outline" size={18} color={th.phone ? c.primary : c.muted} />
+            <Text style={{ ...TYPE.label, color: c.textMuted ?? c.muted }}>{t('phoneLabel') ?? 'Telefon'}</Text>
+            <Text style={{ ...TYPE.meta, color: th.phone ? c.text : c.muted, fontWeight: th.phone ? '600' : '400' }} numberOfLines={1}>{displayPhone}</Text>
+          </View>
+        </View>
+
+        {!editMode ? (
           <Pressable
             onPress={onEnterEdit}
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderColor: c.border, borderRadius: RADIUS.md, paddingVertical: 8, paddingHorizontal: 12 }}
+            style={[styles.registerBtn, { backgroundColor: c.card, borderWidth: 1, borderColor: c.border, marginTop: 12, width: '100%' }]}
           >
-            <Ionicons name="pencil-outline" size={14} color={c.text} />
-            <Text style={{ fontSize: 13, fontWeight: '600', color: c.text }}>{t('editProfileBtn')}</Text>
+            <Text style={{ fontSize: 15, fontWeight: '600', color: c.text }}>{t('editProfileBtn')}</Text>
           </Pressable>
-        </View>
-
-        {/* Status chips */}
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: SPACE.md }}>
-          {statusChips.map((chip) => (
-            <View key={chip.label} style={{ flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderColor: chip.color + '55', borderRadius: 20, paddingVertical: 5, paddingHorizontal: 10, backgroundColor: chip.color + '15' }}>
-              <Ionicons name={chip.icon} size={12} color={chip.color} />
-              <Text style={{ fontSize: 12, fontWeight: '500', color: chip.color }}>{chip.label}</Text>
-            </View>
-          ))}
-        </View>
+        ) : null}
       </View>
+
+      {!editMode ? (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: SPACE.sm, marginBottom: SPACE.md }}>
+          <StatusMiniCard
+            icon="shield-checkmark-outline"
+            label="Prüfstatus"
+            value={isApproved ? t('statusApproved') : t('statusInReview')}
+            color={isApproved ? c.success : c.muted}
+            c={c}
+          />
+          <StatusMiniCard
+            icon="eye-outline"
+            label="Sichtbar"
+            value={th.isVisible ? 'Ja' : 'Nein'}
+            color={th.isVisible ? c.success : c.muted}
+            c={c}
+          />
+          <StatusMiniCard
+            icon="document-outline"
+            label="Nachweise"
+            value={`${docCount}/${docTotal}`}
+            color={docCount > 0 ? c.success : c.warning ?? '#d97706'}
+            c={c}
+          />
+          <StatusMiniCard
+            icon="home-outline"
+            label={t('homeVisitLabel')}
+            value={th.homeVisit ? (th.serviceRadiusKm ? `Bis ${th.serviceRadiusKm} km` : t('yesLabel')) : t('noLabel')}
+            color={th.homeVisit ? c.success : c.muted}
+            c={c}
+          />
+        </View>
+      ) : null}
 
       {editMode ? (
         <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
@@ -350,35 +380,6 @@ export function TherapistDashboardScreen(props) {
         </View>
       ) : (
         <>
-          {/* ── Kontakt ──────────────────────────────────────────────── */}
-          <View style={{ backgroundColor: c.card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: c.border, padding: SPACE.lg, marginBottom: SPACE.md }}>
-            <Text style={{ fontSize: 15, fontWeight: '700', color: c.text, marginBottom: SPACE.md }}>Kontakt</Text>
-
-            {/* Telefon */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACE.md }}>
-              <Ionicons name="call-outline" size={18} color={c.muted} />
-              <Text style={{ flex: 1, fontSize: 15, color: th.phone ? c.text : c.muted }}>
-                {th.phone ?? (t('phonePlaceholder') ?? '+49 …')}
-              </Text>
-              {th.phone ? (
-                <Pressable onPress={() => Linking.openURL(`tel:${th.phone}`)} hitSlop={8}>
-                  <Ionicons name="call" size={20} color={c.success ?? '#22c55e'} />
-                </Pressable>
-              ) : null}
-            </View>
-
-            <View style={{ height: 1, backgroundColor: c.border, marginVertical: SPACE.md }} />
-
-            {/* E-Mail */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACE.md }}>
-              <Ionicons name="mail-outline" size={18} color={c.muted} />
-              <Text style={{ flex: 1, fontSize: 15, color: c.text }}>{th.email}</Text>
-              <Pressable onPress={() => Linking.openURL(`mailto:${th.email}`)} hitSlop={8}>
-                <Ionicons name="mail" size={20} color={c.success ?? '#22c55e'} />
-              </Pressable>
-            </View>
-          </View>
-
           {/* ── Spezialisierungen ────────────────────────────────────── */}
           {(th.specializations ?? []).length > 0 && (
             <View style={{ backgroundColor: c.card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: c.border, padding: SPACE.lg, marginBottom: SPACE.md }}>
