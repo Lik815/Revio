@@ -3637,7 +3637,45 @@ export default function App() {
           {shouldShowSectionLoading(favoritesLoading, favoritesLastLoadedAt)
             ? renderTherapySectionLoading()
             : favorites.length > 0
-              ? renderFavoriteTherapists()
+              ? (
+                <View style={{ backgroundColor: c.card, borderRadius: 20, borderWidth: 1, borderColor: c.border, paddingVertical: 16, paddingHorizontal: 14, ...SHADOW.card }}>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                    <View style={{ flexDirection: 'row', alignItems: 'stretch', gap: 4 }}>
+                      {favorites.map((fav) => {
+                        const initials = (fav.fullName ?? '?')
+                          .split(/\s+/).filter(Boolean).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
+                        return (
+                          <Pressable
+                            key={fav.id}
+                            onPress={() => openTherapistById(fav.id)}
+                            style={{ width: 86, paddingVertical: 8, paddingHorizontal: 4 }}
+                          >
+                            <View style={{ alignSelf: 'center', marginBottom: 6 }}>
+                              {fav.photo ? (
+                                <Image source={{ uri: fav.photo }} style={{ width: 53, height: 53, borderRadius: 27 }} />
+                              ) : (
+                                <View style={{ width: 53, height: 53, borderRadius: 27, backgroundColor: c.primaryBg, alignItems: 'center', justifyContent: 'center' }}>
+                                  <Text style={{ fontSize: 15, fontWeight: '700', color: c.primary }}>{initials}</Text>
+                                </View>
+                              )}
+                              <Pressable
+                                onPress={(e) => { e.stopPropagation?.(); toggleFavorite(fav); }}
+                                hitSlop={ICON_HIT_SLOP}
+                                style={{ position: 'absolute', right: -3, top: -3, width: 20, height: 20, borderRadius: 10, backgroundColor: c.card, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' }}
+                              >
+                                <Ionicons name="heart" size={9} color={c.error ?? '#ef4444'} />
+                              </Pressable>
+                            </View>
+                            <Text numberOfLines={1} style={{ fontSize: 11, fontWeight: '600', color: c.text, textAlign: 'center' }}>
+                              {fav.fullName}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  </ScrollView>
+                </View>
+              )
               : renderTherapySectionEmpty('Du hast noch keine Therapeut:innen gespeichert.', t('favoritesEmptyBody'))}
         </ScrollView>
 
