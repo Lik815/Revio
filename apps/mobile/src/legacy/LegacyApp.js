@@ -3373,10 +3373,6 @@ export default function App() {
     const firstName = loggedInPatient?.firstName ?? null;
     const greeting = firstName ? `Hallo ${firstName}` : 'Hallo';
 
-    // Primärer Therapeut: aus nextApt oder erstem aktiven Termin oder ersten Favoriten
-    const primaryTherapist = nextApt?.therapist ?? activeApts[0]?.therapist ?? (favorites.length > 0 ? favorites[0] : null);
-    const secondaryFavs = favorites.filter(f => f.id !== primaryTherapist?.id);
-
     const openTherapist = (th) => {
       if (th?.id) openTherapistById(th.id, th);
       else if (th) setSelectedTherapist(th);
@@ -3390,12 +3386,8 @@ export default function App() {
             <Text style={{ fontSize: 22, fontWeight: '800', color: c.text }}>{greeting}</Text>
             <Text style={{ fontSize: 13, color: c.muted, marginTop: 1 }}>Deine Termine im Überblick</Text>
           </View>
-          <Pressable onPress={() => setShowNotifications(true)} style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: c.card, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' }}>
-            <Ionicons name="notifications-outline" size={18} color={c.text} />
-            {notifications.filter((n) => !dismissedNotifIds.has(n.id)).length > 0 && (
-              <View style={{ position: 'absolute', top: 3, right: 3, width: 8, height: 8, borderRadius: 4, backgroundColor: c.error }} />
-            )}
-          </Pressable>
+          {/* Notification bell moved to global overlay */}
+          <View style={{ width: 40 }} />
         </View>
 
         <ScrollView
@@ -3472,69 +3464,78 @@ export default function App() {
             </>
           )}
 
-          {/* ── Dein Therapeut ──────────────────────────────────────── */}
-          <Text style={[styles.sectionLabel, { color: c.text, marginTop: 20 }]}>Dein Therapeut</Text>
+          {/* ── Therapeuten (gespeichert) ───────────────────────────── */}
+          <Text style={[styles.sectionLabel, { color: c.text, marginTop: 20 }]}>Therapeuten</Text>
           {shouldShowSectionLoading(favoritesLoading, favoritesLastLoadedAt) ? (
             renderTherapySectionLoading()
-          ) : primaryTherapist ? (
-            <>
-              {/* Primäre Karte */}
-              <Pressable
-                onPress={() => openTherapist(primaryTherapist)}
-                style={{ backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.border, padding: 16, marginBottom: 10, flexDirection: 'row', alignItems: 'center', gap: 14, ...SHADOW.card }}
-              >
-                {primaryTherapist.photo ? (
-                  <Image source={{ uri: primaryTherapist.photo }} style={{ width: 56, height: 56, borderRadius: 28 }} />
-                ) : (
-                  <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: c.primaryBg, alignItems: 'center', justifyContent: 'center' }}>
-                    <Text style={{ fontSize: 18, fontWeight: '700', color: c.primary }}>
-                      {(primaryTherapist.fullName ?? '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
-                    </Text>
-                  </View>
-                )}
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 16, fontWeight: '700', color: c.text }}>{primaryTherapist.fullName}</Text>
-                  {primaryTherapist.professionalTitle ? (
-                    <Text style={{ fontSize: 13, color: c.muted, marginTop: 2 }}>{primaryTherapist.professionalTitle}</Text>
-                  ) : null}
-                  {primaryTherapist.city ? (
-                    <Text style={{ fontSize: 12, color: c.muted, marginTop: 2 }}>{primaryTherapist.city}</Text>
+          ) : (
+            <View style={{ backgroundColor: c.card, borderRadius: 20, borderWidth: 1, borderColor: c.border, paddingVertical: 14, paddingHorizontal: 12, ...SHADOW.card }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View style={{ flexDirection: 'row', alignItems: 'stretch', gap: 14 }}>
+                  <Pressable
+                    onPress={() => setActiveTab('therapist')}
+                    style={{ width: 144, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10, paddingVertical: 12 }}
+                  >
+                    <View style={{ width: 92, height: 92, borderRadius: 46, borderWidth: 2, borderColor: c.border, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+                      <Ionicons name="add" size={34} color={c.primary} />
+                    </View>
+                    <Text style={{ fontSize: 18, fontWeight: '700', color: c.text, textAlign: 'center' }}>Hinzufügen</Text>
+                    <Text style={{ fontSize: 14, color: c.muted, marginTop: 2, textAlign: 'center' }}>Therapeut</Text>
+                  </Pressable>
+
+                  {favorites.length > 0 ? (
+                    <>
+                      <View style={{ width: 1, backgroundColor: c.border, marginVertical: 10 }} />
+                      {favorites.map((fav) => {
+                        const initials = (fav.fullName ?? '?')
+                          .split(/\s+/)
+                          .filter(Boolean)
+                          .map((w) => w[0])
+                          .join('')
+                          .slice(0, 2)
+                          .toUpperCase();
+
+                        return (
+                          <Pressable
+                            key={fav.id}
+                            onPress={() => openTherapist(fav)}
+                            style={{ width: 190, paddingVertical: 10, paddingHorizontal: 4 }}
+                          >
+                            <View style={{ alignSelf: 'center', marginBottom: 12 }}>
+                              {fav.photo ? (
+                                <Image source={{ uri: fav.photo }} style={{ width: 112, height: 112, borderRadius: 56 }} />
+                              ) : (
+                                <View style={{ width: 112, height: 112, borderRadius: 56, backgroundColor: c.primaryBg, alignItems: 'center', justifyContent: 'center' }}>
+                                  <Text style={{ fontSize: 30, fontWeight: '700', color: c.primary }}>{initials}</Text>
+                                </View>
+                              )}
+                              <Pressable
+                                onPress={(e) => { e.stopPropagation?.(); toggleFavorite(fav); }}
+                                hitSlop={ICON_HIT_SLOP}
+                                style={{ position: 'absolute', right: -4, top: -4, width: 40, height: 40, borderRadius: 20, backgroundColor: c.success, alignItems: 'center', justifyContent: 'center' }}
+                              >
+                                <Ionicons name="heart" size={20} color="#fff" />
+                              </Pressable>
+                            </View>
+                            <Text numberOfLines={1} style={{ fontSize: 20, fontWeight: '700', color: c.text, textAlign: 'center' }}>
+                              {fav.fullName}
+                            </Text>
+                            <Text numberOfLines={1} style={{ fontSize: 15, color: c.muted, marginTop: 4, textAlign: 'center' }}>
+                              {fav.professionalTitle ?? 'Physiotherapeut:in'}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </>
                   ) : null}
                 </View>
-                <Ionicons name="chevron-forward" size={18} color={c.muted} />
-              </Pressable>
-
-              {/* Weitere Favoriten — kompakt */}
-              {secondaryFavs.length > 0 && (
-                <>
-                  <Text style={{ fontSize: 11, fontWeight: '700', letterSpacing: 0.5, color: c.muted, textTransform: 'uppercase', marginBottom: 8 }}>Weitere gespeicherte</Text>
-                  {secondaryFavs.map(fav => (
-                    <Pressable
-                      key={fav.id}
-                      onPress={() => openTherapist(fav)}
-                      style={{ backgroundColor: c.card, borderRadius: 10, borderWidth: 1, borderColor: c.border, paddingVertical: 10, paddingHorizontal: 14, marginBottom: 6, flexDirection: 'row', alignItems: 'center', gap: 10 }}
-                    >
-                      {fav.photo ? (
-                        <Image source={{ uri: fav.photo }} style={{ width: 36, height: 36, borderRadius: 18 }} />
-                      ) : (
-                        <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: c.primaryBg, alignItems: 'center', justifyContent: 'center' }}>
-                          <Text style={{ fontSize: 12, fontWeight: '700', color: c.primary }}>
-                            {(fav.fullName ?? '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
-                          </Text>
-                        </View>
-                      )}
-                      <View style={{ flex: 1 }}>
-                        <Text style={{ fontSize: 14, fontWeight: '600', color: c.text }}>{fav.fullName}</Text>
-                        {fav.city ? <Text style={{ fontSize: 12, color: c.muted }}>{fav.city}</Text> : null}
-                      </View>
-                      <Ionicons name="chevron-forward" size={16} color={c.muted} />
-                    </Pressable>
-                  ))}
-                </>
-              )}
-            </>
-          ) : (
-            renderTherapySectionEmpty('Du hast noch keine Therapeut:innen gespeichert.', t('favoritesEmptyBody'))
+              </ScrollView>
+              {favorites.length === 0 ? (
+                <Text style={{ fontSize: 13, color: c.muted, marginTop: 10, paddingHorizontal: 6 }}>
+                  {t('favoritesEmptyBody')}
+                </Text>
+              ) : null}
+            </View>
           )}
         </ScrollView>
       </View>
@@ -5317,6 +5318,32 @@ export default function App() {
       <View style={styles.appFrame}>
         {renderTab()}
       </View>
+
+      {/* ── Globale Notification-Glocke ─────────────────────────────────────── */}
+      {authToken && (
+        <Pressable
+          onPress={() => setShowNotifications(true)}
+          style={{
+            position: 'absolute',
+            top: 12,
+            right: 16,
+            width: 40,
+            height: 40,
+            borderRadius: 20,
+            backgroundColor: c.card,
+            borderWidth: 1,
+            borderColor: c.border,
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+          }}
+        >
+          <Ionicons name="notifications-outline" size={18} color={c.text} />
+          {notifications.filter((n) => !dismissedNotifIds.has(n.id)).length > 0 && (
+            <View style={{ position: 'absolute', top: 3, right: 3, width: 8, height: 8, borderRadius: 4, backgroundColor: c.error }} />
+          )}
+        </Pressable>
+      )}
 
       {/* Bottom nav */}
       <View style={[styles.navbar, { backgroundColor: c.nav, borderColor: c.border }]}>

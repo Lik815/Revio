@@ -414,18 +414,7 @@ export function DiscoverScreen(props) {
               <Image source={require('../assets/icon.png')} style={styles.logoMark} />
               <Text style={[styles.brandName, { color: c.text }]}>evio</Text>
             </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              {authToken && (
-                <Pressable
-                  onPress={() => setShowNotifications(true)}
-                  hitSlop={iconHitSlop}
-                  style={{ width: 40, height: 40, borderRadius: RADIUS.full, backgroundColor: c.card, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' }}
-                >
-                  <Ionicons name="notifications-outline" size={18} color={mutedText} />
-                  {visibleNotifCount > 0 && <View style={{ position: 'absolute', top: 3, right: 3, width: 8, height: 8, borderRadius: RADIUS.full, backgroundColor: c.error }} />}
-                </Pressable>
-              )}
-            </View>
+            <View style={{ width: 40 }} />
           </View>
           <View style={[styles.searchBox, { backgroundColor: c.card, borderColor: c.border }]}>
             <Ionicons name="search-outline" size={18} color={c.muted} />
@@ -570,18 +559,7 @@ export function DiscoverScreen(props) {
             <Image source={require('../assets/icon.png')} style={styles.logoMark} />
             <Text style={[styles.brandName, { color: c.text }]}>evio</Text>
           </View>
-          {authToken && (
-            <Pressable
-              onPress={() => setShowNotifications(true)}
-              hitSlop={iconHitSlop}
-              style={{ width: 40, height: 40, borderRadius: RADIUS.full, backgroundColor: c.card, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' }}
-            >
-              <Ionicons name="notifications-outline" size={18} color={mutedText} />
-              {visibleNotifCount > 0 && (
-                <View style={{ position: 'absolute', top: 3, right: 3, width: 8, height: 8, borderRadius: RADIUS.full, backgroundColor: c.error }} />
-              )}
-            </Pressable>
-          )}
+          <View style={{ width: 40 }} />
         </View>
 
         {!searched && (
