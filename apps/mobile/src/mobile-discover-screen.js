@@ -792,6 +792,18 @@ export function DiscoverScreen(props) {
                 </View>
               ) : null}
             </View>
+
+            {/* ── Telefon (optional) ── */}
+            {therapist.phone ? (
+              <Pressable
+                onPress={(e) => { e.stopPropagation?.(); callPhone(therapist.phone); }}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 }}
+                hitSlop={6}
+              >
+                <Ionicons name="call-outline" size={13} color={mutedText} />
+                <Text style={{ fontSize: 13, color: mutedText }} numberOfLines={1}>{therapist.phone}</Text>
+              </Pressable>
+            ) : null}
           </Pressable>
         );
       })}
