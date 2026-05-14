@@ -53,7 +53,7 @@ export function BookingRequestForm({ c, t, therapist, authToken, availableSlots,
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [rejectedSlotId, setRejectedSlotId] = useState(null);
-  const [forceFullPicker, setForceFullPicker] = useState(false);
+  const [rejectedSlotLabel, setRejectedSlotLabel] = useState('');
 
   const slots = (Array.isArray(availableSlots) ? availableSlots : []).filter(s => s?.id !== rejectedSlotId).reduce((acc, slot) => {
     const slotKey = `${slot?.startsAt ?? 'unknown'}-${slot?.durationMin ?? 20}`;
@@ -106,10 +106,11 @@ export function BookingRequestForm({ c, t, therapist, authToken, availableSlots,
       const data = await res.json();
       if (!res.ok) {
         if (res.status === 409) {
-          setError('Dieser Termin wurde gerade von jemand anderem gebucht. Bitte wähle einen anderen Slot.');
+          const rejected = slots.find((s) => s.id === selectedSlotId);
+          setRejectedSlotLabel(rejected ? formatSlot(rejected.startsAt, rejected.durationMin) : '');
           setRejectedSlotId(selectedSlotId);
           setSelectedSlotId(null);
-          setForceFullPicker(true);
+          setError('');
           if (onReloadSlots) onReloadSlots();
         } else {
           setError(data.error ?? 'Buchung fehlgeschlagen. Bitte erneut versuchen.');
@@ -176,9 +177,25 @@ export function BookingRequestForm({ c, t, therapist, authToken, availableSlots,
           <ActivityIndicator color={c.primary} />
           <Text style={{ ...TYPE.caption, color: c.muted, marginTop: 8 }}>Termine werden geladen…</Text>
         </View>
-      ) : !forceFullPicker && therapist?.selectedSlotId ? (
+      ) : therapist?.selectedSlotId ? (
         (() => {
           const preSelected = slots.find((s) => s.id === therapist.selectedSlotId);
+          const wasRejected = rejectedSlotId === therapist.selectedSlotId;
+          if (wasRejected) {
+            return (
+              <View style={{ borderRadius: RADIUS.sm, borderWidth: 1, borderColor: c.error ?? '#ef4444', backgroundColor: c.errorBg ?? '#fef2f2', padding: SPACE.md, marginBottom: SPACE.md }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <Ionicons name="close-circle-outline" size={18} color={c.error ?? '#ef4444'} />
+                  <Text style={{ fontSize: 14, color: c.error ?? '#ef4444', fontWeight: '600', flex: 1 }}>
+                    {rejectedSlotLabel ? `${rejectedSlotLabel} – nicht mehr verfügbar` : 'Dieser Termin ist nicht mehr verfügbar.'}
+                  </Text>
+                </View>
+                <Pressable onPress={onClose}>
+                  <Text style={{ fontSize: 14, color: c.primary, fontWeight: '600' }}>← Anderen Termin wählen</Text>
+                </Pressable>
+              </View>
+            );
+          }
           if (!preSelected) return null;
           return (
             <View

@@ -329,7 +329,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
       const updated = await fastify.prisma.$transaction(async (tx) => {
         const u = await tx.bookingRequest.update({
           where: { id },
-          data: { status: 'DECLINED', declinedReason: declineData.declinedReason, respondedAt: now },
+          data: { status: 'DECLINED', declinedReason: declineData.declinedReason, respondedAt: now, slotId: null },
           include: { slot: true },
         });
         if (booking.slotId) {
@@ -368,7 +368,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
     if (booking.status !== 'PENDING' && booking.status !== 'CONFIRMED') return reply.status(400).send({ error: 'Only pending or confirmed bookings can be cancelled' });
 
     const updated = await fastify.prisma.$transaction(async (tx) => {
-      const u = await tx.bookingRequest.update({ where: { id }, data: { status: 'CANCELLED', respondedAt: new Date() } });
+      const u = await tx.bookingRequest.update({ where: { id }, data: { status: 'CANCELLED', respondedAt: new Date(), slotId: null } });
       if (booking.slotId) {
         await tx.therapistSlot.update({ where: { id: booking.slotId }, data: { status: 'AVAILABLE' } });
       }
@@ -405,7 +405,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
     if (booking.status !== 'CONFIRMED') return reply.status(400).send({ error: 'Only confirmed bookings can be cancelled this way' });
 
     const updated = await fastify.prisma.$transaction(async (tx) => {
-      const u = await tx.bookingRequest.update({ where: { id }, data: { status: 'CANCELLED', respondedAt: new Date() } });
+      const u = await tx.bookingRequest.update({ where: { id }, data: { status: 'CANCELLED', respondedAt: new Date(), slotId: null } });
       if (booking.slotId) {
         await tx.therapistSlot.update({ where: { id: booking.slotId }, data: { status: 'AVAILABLE' } });
       }

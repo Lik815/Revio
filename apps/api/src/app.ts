@@ -59,7 +59,7 @@ export async function buildApp() {
         await app.prisma.$transaction([
           app.prisma.bookingRequest.updateMany({
             where: { id: { in: stale.map((b) => b.id) } },
-            data: { status: 'EXPIRED' },
+            data: { status: 'EXPIRED', slotId: null },
           }),
           ...stale
             .filter((b) => b.slotId)
