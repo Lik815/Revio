@@ -229,9 +229,14 @@ export const registerRoutes: FastifyPluginAsync = async (fastify) => {
     // Geocode therapist's own address (best-effort, never blocks registration)
     const streetPart = [data.street, data.houseNumber].filter(Boolean).join(' ');
     const cityPart = [data.postalCode, data.city].filter(Boolean).join(' ');
-    const coords = (data.street && data.city)
+    const exactCoords = (data.street && data.city)
       ? await geocodeAddress(streetPart, cityPart)
       : null;
+    const approxCoords = exactCoords ? null : await geocodeAddress('', cityPart || data.city || '');
+    const coords = exactCoords;
+    const precision = data.locationPrecision ?? 'approximate';
+    const publicLat = precision === 'exact' && exactCoords ? exactCoords.lat : (approxCoords?.lat ?? exactCoords?.lat ?? null);
+    const publicLng = precision === 'exact' && exactCoords ? exactCoords.lng : (approxCoords?.lng ?? exactCoords?.lng ?? null);
 
     const sessionToken = randomBytes(32).toString('hex');
 
@@ -257,9 +262,10 @@ export const registerRoutes: FastifyPluginAsync = async (fastify) => {
           postalCode: data.postalCode ?? null,
           street: data.street ?? null,
           houseNumber: data.houseNumber ?? null,
-          locationPrecision: data.locationPrecision ?? 'approximate',
-          latitude: coords?.lat ?? null,
-          longitude: coords?.lng ?? null,
+          locationPrecision: precision,
+          latitude: exactCoords?.lat ?? null,
+          longitude: exactCoords?.lng ?? null,
+          ...(publicLat != null ? { homeLat: publicLat, homeLng: publicLng! } : {}),
           gender: data.gender ?? null,
           specializations: data.specializations.join(', '),
           languages: data.languages.join(', '),

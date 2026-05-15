@@ -102,6 +102,16 @@ export function TherapistDashboardScreen(props) {
     certificationOptions,
     onOpenTherapyTab,
     onAddSlot,
+    editCity,
+    setEditCity,
+    editPostalCode,
+    setEditPostalCode,
+    editStreet,
+    setEditStreet,
+    editHouseNumber,
+    setEditHouseNumber,
+    editLocationPrecision,
+    setEditLocationPrecision,
   } = props;
 
   const [photoError, setPhotoError] = useState(false);
@@ -338,6 +348,66 @@ export function TherapistDashboardScreen(props) {
               </View>
             </View>
           )}
+          {/* ── Adresse ─────────────────────────────────────────────── */}
+          <Text style={[styles.filterSectionTitle, { color: c.muted, marginTop: 12 }]}>Adresse</Text>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <TextInput
+              style={[styles.inputField, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg, flex: 1 }]}
+              value={editStreet}
+              onChangeText={setEditStreet}
+              placeholder="Straße"
+              placeholderTextColor={c.muted}
+            />
+            <TextInput
+              style={[styles.inputField, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg, width: 80 }]}
+              value={editHouseNumber}
+              onChangeText={setEditHouseNumber}
+              placeholder="Nr."
+              placeholderTextColor={c.muted}
+            />
+          </View>
+          <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+            <TextInput
+              style={[styles.inputField, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg, width: 100 }]}
+              value={editPostalCode}
+              onChangeText={setEditPostalCode}
+              placeholder="PLZ"
+              placeholderTextColor={c.muted}
+              keyboardType="numeric"
+            />
+            <TextInput
+              style={[styles.inputField, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg, flex: 1 }]}
+              value={editCity}
+              onChangeText={setEditCity}
+              placeholder="Stadt"
+              placeholderTextColor={c.muted}
+            />
+          </View>
+          <Text style={[styles.filterSectionTitle, { color: c.muted, marginTop: 12 }]}>Kartenposition</Text>
+          <View style={{ gap: 8 }}>
+            {[
+              { value: 'approximate', label: 'Nur ungefähre Umgebung', sub: 'Deine genaue Adresse bleibt privat' },
+              { value: 'exact', label: 'Exakte Adresse', sub: 'Dein genauer Standort wird öffentlich angezeigt' },
+            ].map((opt) => {
+              const active = editLocationPrecision === opt.value;
+              return (
+                <Pressable
+                  key={opt.value}
+                  onPress={() => setEditLocationPrecision(opt.value)}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, borderRadius: RADIUS.md, borderWidth: 1.5, borderColor: active ? c.primary : c.border, backgroundColor: active ? c.primaryBg : c.mutedBg }}
+                >
+                  <View style={{ width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: active ? c.primary : c.muted, alignItems: 'center', justifyContent: 'center' }}>
+                    {active && <View style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: c.primary }} />}
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: active ? c.primary : c.text }}>{opt.label}</Text>
+                    <Text style={{ fontSize: 11, color: c.muted, marginTop: 1 }}>{opt.sub}</Text>
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
+
           <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
             <Pressable style={[styles.registerBtn, { flex: 1, backgroundColor: c.border, marginTop: 0 }]} onPress={() => setEditMode(false)}>
               <Text style={{ ...TYPE.heading, color: c.text }}>{t('cancelBtn')}</Text>

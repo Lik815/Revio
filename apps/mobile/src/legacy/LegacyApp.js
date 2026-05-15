@@ -876,6 +876,11 @@ export default function App() {
   const [editMode, setEditMode] = useState(false);
   const [editBio, setEditBio] = useState('');
   const [editPhone, setEditPhone] = useState('');
+  const [editCity, setEditCity] = useState('');
+  const [editPostalCode, setEditPostalCode] = useState('');
+  const [editStreet, setEditStreet] = useState('');
+  const [editHouseNumber, setEditHouseNumber] = useState('');
+  const [editLocationPrecision, setEditLocationPrecision] = useState('approximate');
   const [editSpecializations, setEditSpecializations] = useState('');
   const [editLanguages, setEditLanguages] = useState([]);
   const [editHomeVisit, setEditHomeVisit] = useState(false);
@@ -1497,6 +1502,11 @@ export default function App() {
           isVisible: editIsVisible,
           availability: editAvailability,
           bookingMode: editBookingMode,
+          city: editCity.trim() || undefined,
+          postalCode: editPostalCode.trim() || null,
+          street: editStreet.trim() || null,
+          houseNumber: editHouseNumber.trim() || null,
+          locationPrecision: editLocationPrecision,
         }),
       });
 
@@ -2493,6 +2503,11 @@ export default function App() {
 
       setEditBio(th.bio ?? '');
       setEditPhone(th.phone ?? '');
+      setEditCity(th.city ?? '');
+      setEditPostalCode(th.postalCode ?? '');
+      setEditStreet(th.street ?? '');
+      setEditHouseNumber(th.houseNumber ?? '');
+      setEditLocationPrecision(th.locationPrecision ?? 'approximate');
       setEditSpecializations((th.specializations ?? []).join(', '));
       setEditLanguages(normalizeLanguageCodes(th.languages));
       setEditHomeVisit(th.homeVisit ?? false);
@@ -2555,6 +2570,16 @@ export default function App() {
         editCertifications={editCertifications}
         setEditCertifications={setEditCertifications}
         certificationOptions={certificationOptions}
+        editCity={editCity}
+        setEditCity={setEditCity}
+        editPostalCode={editPostalCode}
+        setEditPostalCode={setEditPostalCode}
+        editStreet={editStreet}
+        setEditStreet={setEditStreet}
+        editHouseNumber={editHouseNumber}
+        setEditHouseNumber={setEditHouseNumber}
+        editLocationPrecision={editLocationPrecision}
+        setEditLocationPrecision={setEditLocationPrecision}
       />
     );
   };

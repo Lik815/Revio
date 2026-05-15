@@ -32,6 +32,10 @@ const updateMeSchema = z.object({
   photo: z.string().optional(),
   bookingMode: z.enum(['DIRECTORY_ONLY', 'FIRST_APPOINTMENT_REQUEST']).optional(),
   phone: z.string().max(30).nullable().optional(),
+  postalCode: z.string().max(20).nullable().optional(),
+  street: z.string().max(120).nullable().optional(),
+  houseNumber: z.string().max(30).nullable().optional(),
+  locationPrecision: z.enum(['approximate', 'exact']).optional(),
 });
 
 const splitList = (value: string) =>
@@ -458,20 +462,41 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     if (data.bookingMode !== undefined) updateData.bookingMode = data.bookingMode;
     if (data.phone !== undefined) updateData.phone = data.phone;
 
-    // Wenn city geändert: Stadt geocodieren → homeLat/homeLng setzen
-    if (data.city !== undefined) {
-      updateData.city = data.city;
-      const coords = await geocodeAddress('', data.city);
-      if (coords) {
-        updateData.homeLat = coords.lat;
-        updateData.homeLng = coords.lng;
+    if (data.postalCode !== undefined) updateData.postalCode = data.postalCode;
+    if (data.street !== undefined) updateData.street = data.street;
+    if (data.houseNumber !== undefined) updateData.houseNumber = data.houseNumber;
+    if (data.locationPrecision !== undefined) updateData.locationPrecision = data.locationPrecision;
+    if (data.city !== undefined) updateData.city = data.city;
+
+    // Re-geocode whenever any address field changes, then apply privacy rule for homeLat/homeLng
+    const addressChanged = data.city !== undefined || data.postalCode !== undefined
+      || data.street !== undefined || data.houseNumber !== undefined || data.locationPrecision !== undefined;
+    if (addressChanged || (therapist.homeLat === 0 && therapist.homeLng === 0)) {
+      const effectiveStreet = (data.street ?? therapist.street ?? '');
+      const effectiveHouseNumber = (data.houseNumber ?? therapist.houseNumber ?? '');
+      const effectiveCity = (data.city ?? therapist.city ?? '');
+      const effectivePostalCode = (data.postalCode ?? therapist.postalCode ?? '');
+      const effectivePrecision = (data.locationPrecision ?? (therapist as any).locationPrecision ?? 'approximate');
+      const streetPart = [effectiveStreet, effectiveHouseNumber].filter(Boolean).join(' ');
+      const cityPart = [effectivePostalCode, effectiveCity].filter(Boolean).join(' ');
+
+      const exactCoords = streetPart && effectiveCity ? await geocodeAddress(streetPart, cityPart) : null;
+      if (exactCoords) {
+        updateData.latitude = exactCoords.lat;
+        updateData.longitude = exactCoords.lng;
       }
-    } else if (therapist.homeLat === 0 && therapist.homeLng === 0 && therapist.city) {
-      // Einmalige Nachrüstung: bestehender Therapeut ohne Koordinaten
-      const coords = await geocodeAddress('', therapist.city);
-      if (coords) {
-        updateData.homeLat = coords.lat;
-        updateData.homeLng = coords.lng;
+      if (effectivePrecision === 'exact' && exactCoords) {
+        updateData.homeLat = exactCoords.lat;
+        updateData.homeLng = exactCoords.lng;
+      } else {
+        const approxCoords = await geocodeAddress('', cityPart || effectiveCity);
+        if (approxCoords) {
+          updateData.homeLat = approxCoords.lat;
+          updateData.homeLng = approxCoords.lng;
+        } else if (exactCoords) {
+          updateData.homeLat = exactCoords.lat;
+          updateData.homeLng = exactCoords.lng;
+        }
       }
     }
 
