@@ -452,7 +452,6 @@ export function DiscoverScreen(props) {
               </Pressable>
             </View>
           </View>
-          {showHeaderToggle && <View style={{ alignItems: 'flex-end' }}>{headerToggle}</View>}
           {filtersPanel}
           {(searched || safeResults.length > 0) && (
             <Text style={{ ...TYPE.meta, color: mutedText }}>
@@ -546,7 +545,29 @@ export function DiscoverScreen(props) {
             </View>
           )}
         </View>
-      </View>
+
+      {/* ── Floating Toggle (map mode) ── */}
+      {showHeaderToggle && (
+        <View
+          pointerEvents="box-none"
+          style={{ position: 'absolute', bottom: 16, left: 0, right: 0, alignItems: 'center', zIndex: 100, elevation: 10 }}
+        >
+          <View style={{ flexDirection: 'row', borderRadius: RADIUS.full, borderWidth: 1, borderColor: c.border, backgroundColor: c.card, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.10, shadowRadius: 6 }}>
+            {[{ key: 'list', icon: 'list' }, { key: 'map', icon: 'map' }].map((button, index) => (
+              <View key={button.key} style={{ flexDirection: 'row' }}>
+                {index > 0 && <View style={{ width: 1, backgroundColor: c.border }} />}
+                <Pressable
+                  onPress={() => setViewMode(button.key)}
+                  style={{ minWidth: 52, minHeight: 36, paddingHorizontal: 16, justifyContent: 'center', alignItems: 'center', backgroundColor: viewMode === button.key ? c.primaryBg : c.card }}
+                >
+                  <Ionicons name={viewMode === button.key ? button.icon : `${button.icon}-outline`} size={18} color={viewMode === button.key ? c.primary : mutedText} />
+                </Pressable>
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
+    </View>
     );
   }
 
@@ -679,7 +700,6 @@ export function DiscoverScreen(props) {
                 );
               })}
             </ScrollView>
-            {showHeaderToggle ? headerToggle : null}
           </View>
         )}
 
@@ -690,7 +710,7 @@ export function DiscoverScreen(props) {
       <ScrollView
         ref={discoverScrollRef}
         scrollEnabled={mapScrollEnabled}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: 20 }]}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: 80 }]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
@@ -835,6 +855,28 @@ export function DiscoverScreen(props) {
         </View>
       )}
       </ScrollView>
+
+      {/* ── Floating Toggle ── */}
+      {showHeaderToggle && (
+        <View
+          pointerEvents="box-none"
+          style={{ position: 'absolute', bottom: 16, left: 0, right: 0, alignItems: 'center', zIndex: 100, elevation: 10 }}
+        >
+          <View style={{ flexDirection: 'row', borderRadius: RADIUS.full, borderWidth: 1, borderColor: c.border, backgroundColor: c.card, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.10, shadowRadius: 6 }}>
+            {[{ key: 'list', icon: 'list' }, { key: 'map', icon: 'map' }].map((button, index) => (
+              <View key={button.key} style={{ flexDirection: 'row' }}>
+                {index > 0 && <View style={{ width: 1, backgroundColor: c.border }} />}
+                <Pressable
+                  onPress={() => setViewMode(button.key)}
+                  style={{ minWidth: 52, minHeight: 36, paddingHorizontal: 16, justifyContent: 'center', alignItems: 'center', backgroundColor: viewMode === button.key ? c.primaryBg : c.card }}
+                >
+                  <Ionicons name={viewMode === button.key ? button.icon : `${button.icon}-outline`} size={18} color={viewMode === button.key ? c.primary : mutedText} />
+                </Pressable>
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
     </View>
   );
 }
