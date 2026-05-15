@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import {
   Image,
-  Linking,
   Modal,
   ScrollView,
   Pressable,
@@ -360,11 +359,6 @@ export function TherapistDashboardScreen(props) {
               <Text style={{ flex: 1, fontSize: 15, color: th.phone ? c.text : c.muted }}>
                 {th.phone ?? (t('phonePlaceholder') ?? '+49 …')}
               </Text>
-              {th.phone ? (
-                <Pressable onPress={() => Linking.openURL(`tel:${th.phone}`)} hitSlop={8}>
-                  <Ionicons name="call" size={20} color={c.success ?? '#22c55e'} />
-                </Pressable>
-              ) : null}
             </View>
 
             <View style={{ height: 1, backgroundColor: c.border, marginVertical: SPACE.md }} />
@@ -373,9 +367,6 @@ export function TherapistDashboardScreen(props) {
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACE.md }}>
               <Ionicons name="mail-outline" size={18} color={c.muted} />
               <Text style={{ flex: 1, fontSize: 15, color: c.text }}>{th.email}</Text>
-              <Pressable onPress={() => Linking.openURL(`mailto:${th.email}`)} hitSlop={8}>
-                <Ionicons name="mail" size={20} color={c.success ?? '#22c55e'} />
-              </Pressable>
             </View>
           </View>
 
