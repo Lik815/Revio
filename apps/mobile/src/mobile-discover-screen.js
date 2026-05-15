@@ -460,6 +460,22 @@ export function DiscoverScreen(props) {
           )}
         </View>
 
+        {/* Radius selector bar */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', paddingHorizontal: 20, paddingVertical: 10, borderTopWidth: 1, borderBottomWidth: 1, borderColor: c.border, backgroundColor: c.background }}>
+          {[1, 3, 5, 10, 25].map((km) => {
+            const active = searchRadius === km;
+            return (
+              <Pressable
+                key={km}
+                onPress={() => setSearchRadius(km)}
+                style={{ minWidth: 52, alignItems: 'center', borderRadius: 22, paddingVertical: 7, paddingHorizontal: 12, backgroundColor: active ? c.primary : 'transparent' }}
+              >
+                <Text style={{ fontSize: 14, fontWeight: '700', color: active ? '#fff' : c.text }}>{km} km</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
         {/* Fullscreen map */}
         <View style={{ flex: 1, position: 'relative' }}>
           <MapView
@@ -509,19 +525,6 @@ export function DiscoverScreen(props) {
               </React.Fragment>
             ))}
           </MapView>
-
-          {/* Radius selector overlay */}
-          <View style={{ position: 'absolute', bottom: 20, left: 12, right: 12, flexDirection: 'row', gap: 6, justifyContent: 'center', zIndex: 20, elevation: 20 }}>
-            {[1, 3, 5, 10, 25].map((km) => (
-              <Pressable
-                key={km}
-                onPress={() => setSearchRadius(km)}
-                style={{ borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: searchRadius === km ? c.primary : 'rgba(0,0,0,0.55)', shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 3, shadowOffset: { width: 0, height: 1 }, elevation: 3 }}
-              >
-                <Text style={{ fontSize: 12, fontWeight: '700', color: '#fff' }}>{km} km</Text>
-              </Pressable>
-            ))}
-          </View>
 
           {searchLoading && (
             <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.25)', alignItems: 'center', justifyContent: 'center' }}>
