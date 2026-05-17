@@ -333,6 +333,7 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
         homeVisit: t.homeVisit,
         city: t.city,
         email: t.email || undefined,
+        phone: tAny.phone ?? null,
         bio: t.bio ?? undefined,
         photo: t.photo ?? undefined,
         relevance,

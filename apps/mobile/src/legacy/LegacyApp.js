@@ -1889,20 +1889,6 @@ export default function App() {
       let filtered = applyFilters(withDist, origin);
       let sourceList = withDist;
 
-      // If the current radius leaves the user with no visible results, fall back
-      // to city-wide matches so the seeded dataset still feels searchable in dev.
-      if (origin && filtered.length === 0) {
-        const cityOnlyMapped = await fetchSearchResults(q, effectiveCity, null);
-        const cityOnlyFiltered = applyFilters(cityOnlyMapped, null);
-        if (cityOnlyFiltered.length > 0) {
-          filtered = cityOnlyFiltered;
-          sourceList = cityOnlyMapped;
-        }
-      }
-
-      if (filtered.length === 0 && withDist.length > 0) {
-        Alert.alert(t('alertRadiusTooSmall'), t('alertRadiusTooSmallBody').replace('{n}', withDist.length).replace('{radius}', searchRadius));
-      }
       setResults(filtered);
       setAllApiTherapists(sourceList);
     } catch (err) {
@@ -1982,9 +1968,7 @@ export default function App() {
     AsyncStorage.setItem('savedCity', resolvedCity);
     AsyncStorage.setItem('savedLocationLabel', label || resolvedCity);
     setShowLocationSheet(false);
-    if (pendingQuery !== null || searchedRef.current) {
-      runSearchWith(pendingQuery ?? query, coords, resolvedCity, coords ?? null);
-    }
+    runSearchWith(pendingQuery ?? query, coords, resolvedCity, coords ?? null);
     setPendingQuery(null);
   };
 
@@ -2087,7 +2071,7 @@ export default function App() {
           const label = streetParts ? `${streetParts}, ${resolvedCity}` : resolvedCity;
           confirmLocationAndSearch(resolvedCity, { lat: parseFloat(lat), lng: parseFloat(lon) }, label);
         } else {
-          confirmLocationAndSearch(input, null, input);
+          Alert.alert(t('alertAddressNotFound'), t('alertAddressNotFoundBody'));
         }
       } else {
         // Try to geocode the input to get coordinates + normalized city
@@ -2100,12 +2084,11 @@ export default function App() {
           const label = streetParts ? `${streetParts}, ${resolvedCity}` : resolvedCity;
           confirmLocationAndSearch(resolvedCity, { lat: latitude, lng: longitude }, label);
         } else {
-          // Fallback: use input as-is (last word as city heuristic)
-          confirmLocationAndSearch(input, null, input);
+          Alert.alert(t('alertAddressNotFound'), t('alertAddressNotFoundBody'));
         }
       }
     } catch {
-      confirmLocationAndSearch(input, null, input);
+      Alert.alert(t('alertAddressFail'), t('alertAddressFailBody'));
     }
     setLocationLoading(false);
   };
@@ -5396,9 +5379,12 @@ export default function App() {
               />
               <Pressable
                 onPress={handleLocationSheetManual}
-                style={{ backgroundColor: locationSheetCity.trim() ? c.primary : c.mutedBg, borderRadius: 10, paddingHorizontal: 18, justifyContent: 'center' }}
+                disabled={!locationSheetCity.trim() || locationLoading}
+                style={{ backgroundColor: (locationSheetCity.trim() && !locationLoading) ? c.primary : c.mutedBg, borderRadius: 10, paddingHorizontal: 18, justifyContent: 'center' }}
               >
-                <Text style={{ color: locationSheetCity.trim() ? '#fff' : c.muted, fontSize: 15, fontWeight: '600' }}>{t('confirmLocation')}</Text>
+                <Text style={{ color: (locationSheetCity.trim() && !locationLoading) ? '#fff' : c.muted, fontSize: 15, fontWeight: '600' }}>
+                  {locationLoading ? '…' : t('confirmLocation')}
+                </Text>
               </Pressable>
             </View>
 

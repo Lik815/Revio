@@ -841,7 +841,11 @@ export function DiscoverScreen(props) {
         <View style={[styles.emptyState, { backgroundColor: c.card, borderColor: c.border }]}>
           <Text style={styles.emptyIcon}>🔍</Text>
           <Text style={[styles.emptyTitle, { color: c.text }]}>{t('noResults')}</Text>
-          <Text style={[styles.emptyBody, { color: c.muted }]}>{t('noResultsBody')}</Text>
+          <Text style={[styles.emptyBody, { color: c.muted }]}>
+            {userCoords
+              ? t('noResultsRadius').replace('{radius}', searchRadius)
+              : t('noResultsBody')}
+          </Text>
           <View style={styles.emptyActions}>
             <Pressable
               onPress={() => {

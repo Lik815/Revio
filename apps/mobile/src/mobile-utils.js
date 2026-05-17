@@ -233,6 +233,7 @@ const getLangLabel = (code) => LANGUAGE_MAP[normalizeLanguageCode(code)] ?? code
 const mapApiTherapist = (t) => ({
   id: t.id,
   email: t.email ?? '',
+  phone: t.phone ?? null,
   fullName: t.fullName,
   professionalTitle: t.professionalTitle,
   specializations: parseStringOrArray(t.specializations),
