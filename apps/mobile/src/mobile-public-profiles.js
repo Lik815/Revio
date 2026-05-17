@@ -235,8 +235,11 @@ export function TherapistProfileScreen(props) {
 
   const therapistName = typeof th?.fullName === 'string' && th.fullName.trim() ? th.fullName.trim() : 'Profil';
   const therapistLanguages = Array.isArray(th?.languages) ? th.languages : [];
-  const therapistAreas = Array.isArray(th?.behandlungsbereiche) ? th.behandlungsbereiche : [];
   const therapistSpecializations = Array.isArray(th?.specializations) ? th.specializations : [];
+  const therapistAreasRaw = Array.isArray(th?.behandlungsbereiche) ? th.behandlungsbereiche : [];
+  const normalizeList = (items) => items.map((i) => String(i).trim().toLowerCase()).filter(Boolean).sort();
+  const listsEqual = (a, b) => { const la = normalizeList(a); const lb = normalizeList(b); return la.length === lb.length && la.every((v, i) => v === lb[i]); };
+  const therapistAreas = listsEqual(therapistAreasRaw, therapistSpecializations) ? [] : therapistAreasRaw;
   const therapistCertifications = Array.isArray(th?.certifications) ? th.certifications : [];
   const therapistPhone = th?.phone || null;
   const displayEmail = th?.email || null;

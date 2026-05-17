@@ -250,7 +250,7 @@ const mapApiTherapist = (t) => ({
   fortbildungen: parseStringOrArray(t.certifications),
   distKm: typeof t.distKm === 'number' ? t.distKm : null,
   verifiziert: true,
-  behandlungsbereiche: parseStringOrArray(t.specializations),
+  behandlungsbereiche: parseStringOrArray(t.behandlungsbereiche ?? t.treatmentAreas ?? []),
   verfügbareZeiten: '',
   website: '',
   photo: resolveMediaUrl(t.photo) ?? `https://i.pravatar.cc/96?u=${t.id}`,

@@ -2237,7 +2237,11 @@ export default function App() {
       fortbildungen: Array.isArray(therapist.certifications) ? therapist.certifications : [],
       distKm: typeof therapist.distKm === 'number' ? therapist.distKm : null,
       verifiziert: true,
-      behandlungsbereiche: Array.isArray(therapist.specializations) ? therapist.specializations : [],
+      behandlungsbereiche: Array.isArray(therapist.behandlungsbereiche)
+        ? therapist.behandlungsbereiche
+        : Array.isArray(therapist.treatmentAreas)
+          ? therapist.treatmentAreas
+          : [],
       verfügbareZeiten: '',
       website: therapist.website ?? '',
       photo: resolveMediaUrl(therapist.photo) ?? null,
