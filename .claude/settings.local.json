@@ -19,7 +19,8 @@
       "Bash(DATABASE_URL='file:./prisma/prisma/dev.db' pnpm --filter api db:migrate)",
       "Bash(pkill -f \"tsx src/server\")",
       "Bash(pkill -f \"next dev\")",
-      "Bash(pkill -f \"expo start\")"
+      "Bash(pkill -f \"expo start\")",
+      "mcp__railway__list-services"
     ]
   }
 }

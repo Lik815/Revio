@@ -1,20 +1,20 @@
 :root {
-  --bg: #f5f3ee;
-  --bg-soft: #fbfaf6;
-  --surface: rgba(255, 255, 255, 0.86);
-  --surface-strong: #ffffff;
-  --line: rgba(28, 43, 51, 0.12);
-  --line-strong: rgba(28, 43, 51, 0.18);
-  --ink: #1c2b33;
-  --muted: #647781;
-  --accent: #355661;
-  --accent-soft: #e8eff1;
-  --sand: #ede6db;
-  --shadow: 0 18px 50px rgba(28, 43, 51, 0.08);
-  --radius-lg: 28px;
-  --radius-md: 20px;
-  --radius-sm: 14px;
-  --shell: 1160px;
+  --bg: #FBFBF9;
+  --bg-soft: #F5F7F8;
+  --surface: rgba(255, 255, 255, 0.9);
+  --surface-strong: #FFFFFF;
+  --line: rgba(27, 61, 47, 0.12);
+  --line-strong: rgba(27, 61, 47, 0.2);
+  --ink: #121212;
+  --muted: #6B838E;
+  --accent: #1B3D2F;
+  --accent-soft: #D1E8E2;
+  --sand: #F3EFE0;
+  --shadow: 0 20px 60px rgba(27, 61, 47, 0.08);
+  --radius-lg: 32px;
+  --radius-md: 24px;
+  --radius-sm: 16px;
+  --shell: 1200px;
 }
 
 * {
@@ -28,10 +28,10 @@ html {
 body {
   margin: 0;
   background:
-    radial-gradient(circle at top left, rgba(53, 86, 97, 0.08), transparent 32%),
-    linear-gradient(180deg, #faf8f2 0%, #f3f1ea 52%, #f7f5f0 100%);
+    radial-gradient(circle at top left, rgba(27, 61, 47, 0.06), transparent 35%),
+    linear-gradient(180deg, #FBFBF9 0%, #F5F7F8 100%);
   color: var(--ink);
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-family: "Inter", "Geist Sans", "Segoe UI", sans-serif;
 }
 
 a {
@@ -204,7 +204,7 @@ p {
 h1,
 h2,
 h3 {
-  font-family: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  font-family: "Instrument Serif", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
   letter-spacing: -0.04em;
   margin: 0;
   font-weight: 600;
