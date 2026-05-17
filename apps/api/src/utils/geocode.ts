@@ -17,8 +17,12 @@ export async function geocodeAddress(address: string, city: string): Promise<Geo
 
   const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1&countrycodes=de,at,ch`;
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 4000);
+
   try {
     const res = await fetch(url, {
+      signal: controller.signal,
       headers: {
         // Nominatim requires a User-Agent identifying your app
         'User-Agent': 'Revio/1.0 (contact@revio.de)',
@@ -35,7 +39,9 @@ export async function geocodeAddress(address: string, city: string): Promise<Geo
       lng: parseFloat(data[0].lon),
     };
   } catch {
-    // Geocoding is best-effort — don't fail the whole request if it errors
+    // Geocoding is best-effort — don't fail the whole request if it errors or times out
     return null;
+  } finally {
+    clearTimeout(timeout);
   }
 }
