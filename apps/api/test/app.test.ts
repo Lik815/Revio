@@ -1719,6 +1719,131 @@ describe('PATCH /auth/me location fields', () => {
   });
 });
 
+// ─── Change Password ──────────────────────────────────────────────────────────
+
+describe('PATCH /auth/password', () => {
+  const TOKEN = 'change-pw-session-token';
+  const OLD_PW = 'OldPassword1!';
+  const NEW_PW = 'NewPassword2!';
+
+  async function createUserWithToken(role: 'patient' | 'therapist' = 'patient') {
+    const passwordHash = await hashPassword(OLD_PW);
+    const user = await prisma.user.create({
+      data: { email: 'changepw@test.de', passwordHash, role, sessionToken: TOKEN },
+    });
+    return user;
+  }
+
+  it('changes password for authenticated patient', async () => {
+    await createUserWithToken('patient');
+
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/auth/password',
+      headers: { authorization: `Bearer ${TOKEN}` },
+      payload: { currentPassword: OLD_PW, newPassword: NEW_PW },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ ok: true });
+
+    // Old password no longer works
+    const loginOld = await app.inject({
+      method: 'POST', url: '/auth/login',
+      payload: { email: 'changepw@test.de', password: OLD_PW },
+    });
+    expect(loginOld.statusCode).toBe(401);
+
+    // New password works
+    const loginNew = await app.inject({
+      method: 'POST', url: '/auth/login',
+      payload: { email: 'changepw@test.de', password: NEW_PW },
+    });
+    expect(loginNew.statusCode).toBe(200);
+  });
+
+  it('rejects wrong current password', async () => {
+    await createUserWithToken('patient');
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/auth/password',
+      headers: { authorization: `Bearer ${TOKEN}` },
+      payload: { currentPassword: 'WrongPassword!', newPassword: NEW_PW },
+    });
+    expect(res.statusCode).toBe(401);
+  });
+
+  it('rejects new password shorter than 8 characters', async () => {
+    await createUserWithToken('patient');
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/auth/password',
+      headers: { authorization: `Bearer ${TOKEN}` },
+      payload: { currentPassword: OLD_PW, newPassword: 'short' },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('requires auth token', async () => {
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/auth/password',
+      payload: { currentPassword: OLD_PW, newPassword: NEW_PW },
+    });
+    expect(res.statusCode).toBe(401);
+  });
+
+  it('updates linked therapist passwordHash', async () => {
+    const user = await createUserWithToken('therapist');
+    const therapist = await prisma.therapist.create({
+      data: {
+        email: 'changepw@test.de',
+        fullName: 'PW Test',
+        professionalTitle: 'Physiotherapeut',
+        city: 'Berlin',
+        specializations: '',
+        languages: 'de',
+        certifications: '',
+        sessionToken: TOKEN,
+        userId: user.id,
+      } as any,
+    });
+
+    await app.inject({
+      method: 'PATCH',
+      url: '/auth/password',
+      headers: { authorization: `Bearer ${TOKEN}` },
+      payload: { currentPassword: OLD_PW, newPassword: NEW_PW },
+    });
+
+    const updated = await prisma.therapist.findUnique({ where: { id: therapist.id } });
+    expect(updated?.passwordHash).not.toBe(therapist.passwordHash);
+  });
+
+  it('clears password reset token after change', async () => {
+    await prisma.user.create({
+      data: {
+        email: 'changepw@test.de',
+        passwordHash: await hashPassword(OLD_PW),
+        role: 'patient',
+        sessionToken: TOKEN,
+        passwordResetToken: 'some-reset-token',
+        passwordResetExpiresAt: new Date(Date.now() + 3600_000),
+      },
+    });
+
+    await app.inject({
+      method: 'PATCH',
+      url: '/auth/password',
+      headers: { authorization: `Bearer ${TOKEN}` },
+      payload: { currentPassword: OLD_PW, newPassword: NEW_PW },
+    });
+
+    const user = await prisma.user.findFirst({ where: { email: 'changepw@test.de' } });
+    expect(user?.passwordResetToken).toBeNull();
+    expect(user?.passwordResetExpiresAt).toBeNull();
+  });
+});
+
 // ─── Admin Auth ───────────────────────────────────────────────────────────────
 
 describe('Admin authentication', () => {

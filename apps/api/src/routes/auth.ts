@@ -833,4 +833,52 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
 
     return { ok: true };
   });
+
+  // ── Change password (authenticated) ─────────────────────────────────────────
+  fastify.patch('/auth/password', async (request, reply) => {
+    const token = getToken(request);
+    if (!token) return reply.unauthorized('Kein Token');
+
+    const schema = z.object({
+      currentPassword: z.string().min(1),
+      newPassword: z.string().min(8, 'Passwort muss mindestens 8 Zeichen lang sein.'),
+    });
+
+    const parsed = schema.safeParse(request.body);
+    if (!parsed.success) {
+      const msg = parsed.error.errors[0]?.message ?? 'Ungültige Eingabe.';
+      return reply.badRequest(msg);
+    }
+
+    const { currentPassword, newPassword } = parsed.data;
+
+    const user = await fastify.prisma.user.findUnique({ where: { sessionToken: token } });
+    if (!user || !user.passwordHash) return reply.unauthorized('Ungültiger Token');
+
+    const valid = await verifyPassword(currentPassword, user.passwordHash);
+    if (!valid) return reply.unauthorized('Aktuelles Passwort ist falsch.');
+
+    const newHash = await hashPassword(newPassword);
+
+    await fastify.prisma.user.update({
+      where: { id: user.id },
+      data: { passwordHash: newHash, passwordResetToken: null, passwordResetExpiresAt: null },
+    });
+
+    if (user.role === 'therapist') {
+      await fastify.prisma.therapist.updateMany({
+        where: { userId: user.id },
+        data: { passwordHash: newHash },
+      });
+    }
+
+    if (user.role === 'manager') {
+      await fastify.prisma.practiceManager.updateMany({
+        where: { userId: user.id },
+        data: { passwordHash: newHash },
+      });
+    }
+
+    return { ok: true };
+  });
 };

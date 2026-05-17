@@ -1434,6 +1434,51 @@ export default function App() {
 
   const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
   const [deleteNameInput, setDeleteNameInput] = useState('');
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
+  const [currentPasswordInput, setCurrentPasswordInput] = useState('');
+  const [newPasswordInput, setNewPasswordInput] = useState('');
+  const [confirmPasswordInput, setConfirmPasswordInput] = useState('');
+  const [changePasswordLoading, setChangePasswordLoading] = useState(false);
+  const [changePasswordError, setChangePasswordError] = useState('');
+  const [changePasswordSuccess, setChangePasswordSuccess] = useState('');
+
+  const handleChangePassword = async () => {
+    setChangePasswordError('');
+    setChangePasswordSuccess('');
+    if (!currentPasswordInput.trim()) {
+      setChangePasswordError(t('changePasswordErrorCurrent'));
+      return;
+    }
+    if (newPasswordInput.length < 8) {
+      setChangePasswordError(t('changePasswordErrorTooShort'));
+      return;
+    }
+    if (newPasswordInput !== confirmPasswordInput) {
+      setChangePasswordError(t('changePasswordErrorMismatch'));
+      return;
+    }
+    setChangePasswordLoading(true);
+    try {
+      const res = await fetch(`${getBaseUrl()}/auth/password`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({ currentPassword: currentPasswordInput, newPassword: newPasswordInput }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setChangePasswordError(data.message ?? t('changePasswordErrorFail'));
+        return;
+      }
+      setCurrentPasswordInput('');
+      setNewPasswordInput('');
+      setConfirmPasswordInput('');
+      setChangePasswordSuccess(t('changePasswordSuccess'));
+    } catch {
+      setChangePasswordError(t('alertConnectionError'));
+    } finally {
+      setChangePasswordLoading(false);
+    }
+  };
 
   const markReviewNotificationSeen = async (notification = reviewNotification) => {
     if (notification?.therapistId && notification?.reviewStatus) {
@@ -3158,6 +3203,12 @@ export default function App() {
 
           {(loggedInTherapist || loggedInPatient) && (
             <View style={{ gap: 10, marginTop: 16 }}>
+              <Pressable
+                onPress={() => { setChangePasswordError(''); setChangePasswordSuccess(''); setShowChangePasswordModal(true); }}
+                style={{ borderRadius: 12, paddingVertical: 14, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, borderWidth: 1.5, borderColor: c.border, backgroundColor: c.card }}>
+                <Ionicons name="key-outline" size={18} color={c.muted} />
+                <Text style={{ color: c.text, fontSize: 16, fontWeight: '600' }}>{t('changePassword')}</Text>
+              </Pressable>
               <Pressable onPress={handleLogout}
                 style={{ borderRadius: 12, paddingVertical: 14, alignItems: 'center', borderWidth: 1.5, borderColor: c.border, backgroundColor: c.card }}>
                 <Text style={{ color: c.text, fontSize: 16, fontWeight: '600' }}>{t('logoutBtn')}</Text>
@@ -5455,6 +5506,60 @@ export default function App() {
             >
               <Text style={{ color: c.muted, fontSize: 14 }}>{t('laterBtn')}</Text>
             </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* ── Passwort ändern Modal ────────────────────────────────────────────── */}
+      <Modal visible={showChangePasswordModal} transparent animationType="fade" onRequestClose={() => setShowChangePasswordModal(false)}>
+        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'center', padding: 20 }} onPress={() => setShowChangePasswordModal(false)}>
+          <Pressable style={{ backgroundColor: c.card, borderRadius: 18, padding: 24 }} onPress={() => {}}>
+            <Text style={{ fontSize: 20, fontWeight: '800', color: c.text, marginBottom: 16 }}>{t('changePassword')}</Text>
+            <TextInput
+              value={currentPasswordInput}
+              onChangeText={setCurrentPasswordInput}
+              placeholder={t('currentPassword')}
+              placeholderTextColor={c.muted}
+              secureTextEntry
+              style={[styles.inputField, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg }]}
+            />
+            <TextInput
+              value={newPasswordInput}
+              onChangeText={setNewPasswordInput}
+              placeholder={t('newPassword')}
+              placeholderTextColor={c.muted}
+              secureTextEntry
+              style={[styles.inputField, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg, marginTop: 10 }]}
+            />
+            <TextInput
+              value={confirmPasswordInput}
+              onChangeText={setConfirmPasswordInput}
+              placeholder={t('confirmNewPassword')}
+              placeholderTextColor={c.muted}
+              secureTextEntry
+              style={[styles.inputField, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg, marginTop: 10 }]}
+            />
+            {!!changePasswordError && (
+              <Text style={{ color: c.error, fontSize: 13, marginTop: 10 }}>{changePasswordError}</Text>
+            )}
+            {!!changePasswordSuccess && (
+              <Text style={{ color: c.success, fontSize: 13, marginTop: 10 }}>{changePasswordSuccess}</Text>
+            )}
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 18 }}>
+              <Pressable
+                onPress={() => setShowChangePasswordModal(false)}
+                style={{ flex: 1, borderRadius: 12, borderWidth: 1, borderColor: c.border, paddingVertical: 13, alignItems: 'center' }}>
+                <Text style={{ color: c.text, fontWeight: '600' }}>{t('cancelBtn') || 'Abbrechen'}</Text>
+              </Pressable>
+              <Pressable
+                onPress={handleChangePassword}
+                disabled={changePasswordLoading}
+                style={{ flex: 1, borderRadius: 12, backgroundColor: changePasswordLoading ? c.mutedBg : c.primary, paddingVertical: 13, alignItems: 'center' }}>
+                {changePasswordLoading
+                  ? <ActivityIndicator color="#fff" size="small" />
+                  : <Text style={{ color: '#fff', fontWeight: '700' }}>{t('saveBtn') || 'Speichern'}</Text>}
+              </Pressable>
+            </View>
           </Pressable>
         </Pressable>
       </Modal>
