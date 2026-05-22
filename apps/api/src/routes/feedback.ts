@@ -29,18 +29,6 @@ async function resolveFeedbackActor(fastify: FastifyInstance, token: string | nu
   });
   if (therapist) return { userId: null, email: therapist.email, isAuthenticated: true };
 
-  const manager = await fastify.prisma.practiceManager.findUnique({
-    where: { sessionToken: token },
-    select: { userId: true, email: true },
-  });
-  if (manager) {
-    return {
-      userId: manager.userId ?? null,
-      email: manager.email,
-      isAuthenticated: true,
-    };
-  }
-
   return null;
 }
 

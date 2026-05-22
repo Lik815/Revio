@@ -1,7 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { scrypt, randomBytes } from 'crypto';
 import { promisify } from 'util';
-import { ensurePracticeLogoAsset } from './practice-logo.js';
 
 const scryptAsync = promisify(scrypt);
 const prisma = new PrismaClient();
@@ -193,7 +192,7 @@ async function main() {
     ];
     const photo1 = PHYSIO_PHOTOS[(i * 2) % PHYSIO_PHOTOS.length];
     const photo2 = PHYSIO_PHOTOS[(i * 2 + 1) % PHYSIO_PHOTOS.length];
-    const logo = ensurePracticeLogoAsset(PRACTICE_NAMES[i], cityName);
+    const logo = null;
 
     const p = await prisma.practice.create({
       data: {
@@ -400,7 +399,7 @@ async function main() {
       hours: 'Mo–Fr 9:00–18:00',
       lat: 50.95,
       lng: 6.97,
-      logo: ensurePracticeLogoAsset('Neuro Motion Lab', 'Köln'),
+      logo: null,
       reviewStatus: 'PENDING_REVIEW',
     },
   });

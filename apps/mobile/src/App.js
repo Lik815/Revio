@@ -2,6 +2,8 @@ import React from 'react';
 import { ActivityIndicator, Text, View, useColorScheme } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { COLORS } from './mobile-utils';
+import { AuthProvider } from './context/AuthContext';
+import { TherapyProvider } from './context/TherapyContext';
 
 const ENABLE_NEW_APP_SHELL = process.env.EXPO_PUBLIC_ENABLE_NEW_APP_SHELL === '1';
 
@@ -57,10 +59,12 @@ export default function App() {
   if (!ENABLE_NEW_APP_SHELL) {
     const LegacyApp = require('./legacy/LegacyApp').default;
     return (
-      <>
-        <StatusBar style={statusBarStyle} />
-        <LegacyApp />
-      </>
+      <AuthProvider>
+        <TherapyProvider>
+          <StatusBar style={statusBarStyle} />
+          <LegacyApp />
+        </TherapyProvider>
+      </AuthProvider>
     );
   }
 

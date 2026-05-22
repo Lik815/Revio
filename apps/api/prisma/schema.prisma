@@ -65,7 +65,8 @@ model User {
   id                     String                  @id @default(cuid())
   email                  String                  @unique
   passwordHash           String?
-  sessionToken           String?                 @unique
+  sessionToken              String?   @unique
+  sessionTokenExpiresAt     DateTime?
   role                   Role
   firstName                   String?
   lastName                    String?
@@ -109,7 +110,8 @@ model Therapist {
   isVisible             Boolean      @default(true)
   reviewStatus          ReviewStatus @default(PENDING_REVIEW)
   passwordHash          String?
-  sessionToken          String?      @unique
+  sessionToken              String?   @unique
+  sessionTokenExpiresAt     DateTime?
   photo                 String?
   expoPushToken         String?
   invitedByPracticeId   String?

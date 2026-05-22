@@ -5,11 +5,8 @@ import {
   ActivityIndicator,
   Animated,
   Alert,
-  Dimensions,
   Image,
-  Keyboard,
   KeyboardAvoidingView,
-  LayoutAnimation,
   Linking,
   Modal,
   Platform,
@@ -18,7 +15,6 @@ import {
   SafeAreaView,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   TextInput,
   View,
@@ -32,28 +28,18 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   COLORS,
   RADIUS,
-  REG_STEPS,
   SHADOW,
   SPACE,
   TYPE,
   fortbildungOptions,
-  kassenartOptions,
-  formatMissingProfileFields,
   getBaseUrl,
   TUNNEL_HEADERS,
-  getLangLabel,
-  getPracticeInitials,
   haversine,
-  languageOptions,
   mapApiTherapist,
   normalizeLanguageCodes,
   normalizeTherapistProfile,
-  regSpecOptions,
-  resolveMediaUrl,
   softenErrorMessage,
   tabs,
-  formatDayHeader,
-  formatKpiDate,
 } from '../mobile-utils';
 import { DiscoverScreen } from '../mobile-discover-screen';
 import {
@@ -69,16 +55,25 @@ import {
 } from '../mobile-therapist-dashboard';
 import {
   TherapistSlotComposer,
-  TherapistSlotList,
-  TherapistTimeline,
 } from '../mobile-slot-composer';
 import {
-  ComplianceStatusStep,
-  getComplianceStatusLabel,
-} from '../mobile-compliance-step';
+  } from '../mobile-compliance-step';
 import { translations } from '../mobile-translations';
-import { PatientDashboardScreen } from '../mobile-patient-dashboard';
-import { BookingRequestForm, PatientAppointmentCard, STATUS_COLORS, TherapistBookingCard } from '../mobile-booking';
+import {  } from '../mobile-patient-dashboard';
+import { BookingRequestForm } from '../mobile-booking';
+import { TherapistRegistrationFlow } from '../mobile-therapist-registration-flow';
+import { PatientSignupFlow } from '../mobile-patient-signup-flow';
+import { ChangePasswordModal } from '../mobile-change-password-modal';
+import { DeleteAccountModal } from '../mobile-delete-account-modal';
+import { FeedbackModal } from '../mobile-feedback-modal';
+import { ResetPasswordModal } from '../mobile-reset-password-modal';
+import { EmailVerifyScreen } from '../mobile-email-verify-screen';
+import { InviteClaimScreen } from '../mobile-invite-claim-screen';
+import { TherapyTabPatient, TherapyTabTherapist } from '../mobile-therapy-tabs';
+import { AppointmentDetail } from '../mobile-appointment-detail';
+import { OptionsScreen } from '../mobile-options-screen';
+import { useAuth } from '../context/AuthContext';
+import { useTherapyData } from '../context/TherapyContext';
 
 const formatProfileOverviewName = (fullName = '') => {
   const parts = String(fullName).trim().split(/\s+/).filter(Boolean);
@@ -104,72 +99,22 @@ function isValidEmail(value) {
 }
 
 const ICON_HIT_SLOP = { top: 10, bottom: 10, left: 10, right: 10 };
-const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024;
 const REVIEW_NOTIFICATION_TYPES = new Set([
   'PROFILE_APPROVED',
   'PROFILE_CHANGES_REQUESTED',
   'PROFILE_REJECTED',
   'PROFILE_SUSPENDED',
 ]);
-const REGISTRATION_COMPLIANCE_DRAFT_KEY = 'revio_registration_compliance_draft';
 const COMPLIANCE_STATUS_VALUES = ['yes', 'no', 'in_progress'];
 const HEALTH_AUTHORITY_STATUS_VALUES = ['yes', 'no', 'in_progress', 'unknown'];
-const FREELANCE_HELP_URL = 'https://my-revio.de/blog/freiberuflich-als-physiotherapeut-starten';
 
-function normalizeComplianceValue(value, allowedValues) {
-  return allowedValues.includes(value) ? value : null;
+
+
 }
 
-function normalizeComplianceDraft(value) {
-  return {
-    taxRegistrationStatus: normalizeComplianceValue(value?.taxRegistrationStatus, COMPLIANCE_STATUS_VALUES),
-    healthAuthorityStatus: normalizeComplianceValue(value?.healthAuthorityStatus, HEALTH_AUTHORITY_STATUS_VALUES),
-  };
-}
 
-function parseComplianceDraft(rawValue) {
-  if (!rawValue) return normalizeComplianceDraft(null);
 
-  try {
-    return normalizeComplianceDraft(JSON.parse(rawValue));
-  } catch {
-    return normalizeComplianceDraft(null);
-  }
-}
 
-function getTherapistComplianceDraftKey(therapistId) {
-  return `revio_therapist_compliance_draft_${therapistId}`;
-}
-
-function formatTherapistLocationSummary({
-  city,
-  postalCode,
-  street,
-  houseNumber,
-}) {
-  const streetLine = [street, houseNumber].filter(Boolean).join(' ').trim();
-  const cityLine = [postalCode, city].filter(Boolean).join(' ').trim();
-  return [streetLine, cityLine].filter(Boolean).join(', ');
-}
-
-function formatDocumentSize(bytes) {
-  if (!Number.isFinite(bytes) || bytes <= 0) return null;
-  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  return `${Math.round(bytes / 1024)} KB`;
-}
-
-function validateDocumentSize(asset, t) {
-  if (!asset?.size || asset.size <= 0) return true;
-  if (asset.size <= MAX_DOCUMENT_BYTES) return true;
-
-  Alert.alert(
-    t('alertDocumentTooLargeTitle'),
-    t('alertDocumentTooLargeBody')
-      .replace('{max}', formatDocumentSize(MAX_DOCUMENT_BYTES))
-      .replace('{name}', asset.name || t('documentFallback')),
-  );
-  return false;
-}
 
 function getReviewNotificationSeenKey(therapistId) {
   return `revio_seen_review_status_${therapistId}`;
@@ -387,266 +332,9 @@ export default function App() {
   };
 
   // Favorites — stored locally on device only
-  const [favorites, setFavorites] = useState([]);
-  const THERAPY_STALE_MS = 60 * 1000;
-
-  const [therapyRefreshing, setTherapyRefreshing] = useState(false);
-  const [favoritesLastLoadedAt, setFavoritesLastLoadedAt] = useState(0);
-  const [appointmentsLastLoadedAt, setAppointmentsLastLoadedAt] = useState(0);
-  const [incomingBookingsLastLoadedAt, setIncomingBookingsLastLoadedAt] = useState(0);
-  const [slotsLastLoadedAt, setSlotsLastLoadedAt] = useState(0);
 
   const shouldShowSectionLoading = (isLoading, lastLoadedAt) => isLoading && lastLoadedAt === 0;
-  const isTherapyDataStale = (lastLoadedAt) => !lastLoadedAt || Date.now() - lastLoadedAt > THERAPY_STALE_MS;
 
-  const loadFavorites = async (token, options = {}) => {
-    const { background = false } = options;
-    if (!background || favoritesLastLoadedAt === 0) setFavoritesLoading(true);
-    try {
-      const res = await fetch(`${getBaseUrl()}/auth/favorites/therapists`, {
-        headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setFavorites(Array.isArray(data.therapists) ? data.therapists : []);
-        setFavoritesLastLoadedAt(Date.now());
-      }
-    } catch {} finally {
-      setFavoritesLoading(false);
-    }
-  };
-
-  const loadMyAppointments = async (token, options = {}) => {
-    const { background = false } = options;
-    if (!background || appointmentsLastLoadedAt === 0) setMyAppointmentsLoading(true);
-    try {
-      const res = await fetch(`${getBaseUrl()}/bookings/my`, {
-        headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setMyAppointments(Array.isArray(data) ? data : []);
-        setAppointmentsLastLoadedAt(Date.now());
-      }
-    } catch {} finally {
-      setMyAppointmentsLoading(false);
-    }
-  };
-
-  const loadIncomingBookings = async (token, options = {}) => {
-    const { background = false } = options;
-    if (!background || incomingBookingsLastLoadedAt === 0) setIncomingBookingsLoading(true);
-    try {
-      const res = await fetch(`${getBaseUrl()}/bookings/incoming`, {
-        headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setIncomingBookings(Array.isArray(data) ? data : []);
-        setIncomingBookingsLastLoadedAt(Date.now());
-      }
-    } catch {} finally {
-      setIncomingBookingsLoading(false);
-    }
-  };
-
-  const getAuthenticatedFeedbackEmail = () => loggedInPatient?.email ?? loggedInTherapist?.email ?? '';
-
-  const closeFeedbackModal = () => {
-    setShowFeedbackModal(false);
-    setFeedbackError('');
-    setFeedbackLoading(false);
-  };
-
-  const openFeedbackModal = () => {
-    const authenticatedFeedbackEmail = getAuthenticatedFeedbackEmail();
-    setFeedbackError('');
-    setFeedbackMessage('');
-    setFeedbackEmail(authenticatedFeedbackEmail || '');
-    setShowFeedbackModal(true);
-  };
-
-  const submitFeedback = async () => {
-    const authenticatedFeedbackEmail = getAuthenticatedFeedbackEmail();
-    const message = feedbackMessage.trim();
-    const email = feedbackEmail.trim();
-
-    if (!message) {
-      setFeedbackError(t('feedbackMessageRequired'));
-      return;
-    }
-    if (!authenticatedFeedbackEmail && !isValidEmail(email)) {
-      setFeedbackError(t('feedbackEmailRequired'));
-      return;
-    }
-
-    setFeedbackLoading(true);
-    setFeedbackError('');
-    try {
-      const res = await fetch(`${getBaseUrl()}/feedback`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...TUNNEL_HEADERS,
-          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-        },
-        body: JSON.stringify({
-          ...(authenticatedFeedbackEmail ? {} : { email }),
-          message,
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        const apiMessage = typeof data?.message === 'string' ? data.message : '';
-        const apiError = typeof data?.error === 'string' ? data.error : '';
-        const combined = `${apiError} ${apiMessage}`.trim();
-
-        if (/AppFeedback|P2021|does not exist/i.test(combined)) {
-          setFeedbackError(t('feedbackTemporarilyUnavailable'));
-        } else {
-          setFeedbackError(apiMessage || apiError || t('feedbackSubmitError'));
-        }
-        return;
-      }
-
-      setFeedbackMessage('');
-      if (!authenticatedFeedbackEmail) setFeedbackEmail('');
-      setShowFeedbackModal(false);
-      Alert.alert(t('feedbackSuccessTitle'), t('feedbackSuccessBody'));
-    } catch {
-      setFeedbackError(t('feedbackSubmitError'));
-    } finally {
-      setFeedbackLoading(false);
-    }
-  };
-
-  const loadMySlots = async (token, options = {}) => {
-    const { background = false } = options;
-    if (!token) return;
-    if (!background || slotsLastLoadedAt === 0) setSlotsLoading(true);
-    try {
-      const res = await fetch(`${getBaseUrl()}/therapist/slots`, {
-        headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setMySlots(Array.isArray(data.slots) ? data.slots : []);
-        setSlotsLastLoadedAt(Date.now());
-      }
-    } catch {} finally {
-      setSlotsLoading(false);
-    }
-  };
-
-  const handleAddSlot = async ({ startsAt, durationMin }) => {
-    if (!authToken) return;
-    try {
-      const res = await fetch(`${getBaseUrl()}/therapist/slots`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
-        body: JSON.stringify({ slots: [{ startsAt, durationMin }] }),
-      });
-      if (res.ok) loadMySlots(authToken);
-    } catch {}
-  };
-
-  const handleCancelSlot = (slotId) => {
-    if (!authToken) return;
-    Alert.alert(
-      'Termin absagen',
-      'Möchtest du diesen Termin wirklich absagen?',
-      [
-        { text: 'Nein', style: 'cancel' },
-        {
-          text: 'Absagen', style: 'destructive', onPress: async () => {
-            setDeletingSlotIds((prev) => (prev.includes(slotId) ? prev : [...prev, slotId]));
-            try {
-              const res = await fetch(`${getBaseUrl()}/therapist/slots/${slotId}`, {
-                method: 'PATCH',
-                headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
-              });
-              if (res.ok) await loadMySlots(authToken, { background: true });
-              else Alert.alert('Fehler', 'Slot konnte nicht storniert werden.');
-            } catch {
-              Alert.alert('Fehler', 'Keine Verbindung. Bitte erneut versuchen.');
-            } finally {
-              setDeletingSlotIds((prev) => prev.filter((id) => id !== slotId));
-            }
-          },
-        },
-      ],
-    );
-  };
-
-  const resetTherapyData = () => {
-    setFavorites([]);
-    setMyAppointments([]);
-    setIncomingBookings([]);
-    setMySlots([]);
-    setDeletingSlotIds([]);
-    setSelectedAppointment(null);
-    setFavoritesLastLoadedAt(0);
-    setAppointmentsLastLoadedAt(0);
-    setIncomingBookingsLastLoadedAt(0);
-    setSlotsLastLoadedAt(0);
-    setFavoritesLoading(false);
-    setMyAppointmentsLoading(false);
-    setIncomingBookingsLoading(false);
-    setSlotsLoading(false);
-    setTherapyRefreshing(false);
-  };
-
-  const refreshTherapyTab = async ({ force = false } = {}) => {
-    if (!authToken) return;
-    const shouldRefreshFavorites = force || isTherapyDataStale(favoritesLastLoadedAt);
-    const shouldRefreshAppointments = force || isTherapyDataStale(appointmentsLastLoadedAt);
-    const shouldRefreshIncoming = force || isTherapyDataStale(incomingBookingsLastLoadedAt);
-    const shouldRefreshSlots = force || isTherapyDataStale(slotsLastLoadedAt);
-
-    const jobs = [];
-    if (shouldRefreshFavorites) jobs.push(loadFavorites(authToken, { background: true }));
-    if (accountType === 'patient') {
-      if (shouldRefreshAppointments) jobs.push(loadMyAppointments(authToken, { background: true }));
-    } else if (loggedInTherapist) {
-      if (shouldRefreshSlots) jobs.push(loadMySlots(authToken, { background: true }));
-      if (shouldRefreshIncoming) jobs.push(loadIncomingBookings(authToken, { background: true }));
-    }
-
-    if (jobs.length === 0) return;
-    await Promise.allSettled(jobs);
-  };
-
-  const handleTherapyRefresh = async () => {
-    if (!authToken) return;
-    setTherapyRefreshing(true);
-    try {
-      await refreshTherapyTab({ force: true });
-    } finally {
-      setTherapyRefreshing(false);
-    }
-  };
-
-  const [availableSlotsLoading, setAvailableSlotsLoading] = useState(false);
-
-  const loadAvailableSlots = async (therapistId) => {
-    setAvailableSlotsLoading(true);
-    try {
-      setAvailableSlotsTherapistId(therapistId);
-      const res = await fetch(`${getBaseUrl()}/therapists/${therapistId}/slots`, {
-        headers: { ...TUNNEL_HEADERS },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setAvailableSlots(Array.isArray(data.slots) ? data.slots : []);
-      } else {
-        setAvailableSlots([]);
-      }
-    } catch {
-      setAvailableSlots([]);
-    } finally {
-      setAvailableSlotsLoading(false);
-    }
-  };
 
   // ── Toast notification ────────────────────────────────────────────────────
   const [toastMsg, setToastMsg] = useState(null);
@@ -724,148 +412,39 @@ export default function App() {
 
   // Registration state
   const [showRegister, setShowRegister] = useState(false);
-  const [regStep, setRegStep] = useState(1);
-  const [regSubmitted, setRegSubmitted] = useState(false);
-  const [regLoading, setRegLoading] = useState(false);
-  const [regEmail, setRegEmail] = useState('');
-  const [regPassword, setRegPassword] = useState('');
-  const [regPasswordConfirm, setRegPasswordConfirm] = useState('');
-  const [regFirstName, setRegFirstName] = useState('');
-  const [regLastName, setRegLastName] = useState('');
-  const [regCity, setRegCity] = useState('');
-  const [regPostalCode, setRegPostalCode] = useState('');
-  const [regStreet, setRegStreet] = useState('');
-  const [regHouseNumber, setRegHouseNumber] = useState('');
-  const [regLocationPrecision, setRegLocationPrecision] = useState('approximate');
-  const [regSpecializations, setRegSpecializations] = useState([]);
-  const [regLanguages, setRegLanguages] = useState(['de']);
-  const [regFortbildungen, setRegFortbildungen] = useState([]);
-  const regFreelance = true;
-  const [regIsFreelance, setRegIsFreelance] = useState(null); // null | true | false
-  const [regHomeVisit, setRegHomeVisit] = useState(false);
-  const [regServiceRadius, setRegServiceRadius] = useState(null);
-  const [regKassenart, setRegKassenart] = useState([]);
-  const [regGender, setRegGender] = useState(null);
-  const [regSpecSearch, setRegSpecSearch] = useState('');
-  const [regLangSearch, setRegLangSearch] = useState('');
-  const [regDocument, setRegDocument] = useState(null);
-  const [regTaxRegistrationStatus, setRegTaxRegistrationStatus] = useState(null);
-  const [regHealthAuthorityStatus, setRegHealthAuthorityStatus] = useState(null);
-  const [regComplianceDraftReady, setRegComplianceDraftReady] = useState(false);
-  const [showRegFortbildungen, setShowRegFortbildungen] = useState(false);
-  const [showRegPassword, setShowRegPassword] = useState(false);
-  const [showRegPasswordConfirm, setShowRegPasswordConfirm] = useState(false);
-  const [regEmailVerified, setRegEmailVerified] = useState(false);
-  const [regOtpSent, setRegOtpSent] = useState(false);
-  const [regOtpCode, setRegOtpCode] = useState('');
-  const [regOtpError, setRegOtpError] = useState('');
-  const [regOtpLoading, setRegOtpLoading] = useState(false);
-  const [showRegStepInfo, setShowRegStepInfo] = useState(false);
+  const [showRoleSelect, setShowRoleSelect] = useState(false);
+  const [showSignup, setShowSignup] = useState(false);
+  const [showPatientName, setShowPatientName] = useState(false);
 
-  const resetSignupState = () => {
-    setSignupEmail('');
-    setSignupOtpSent(false);
-    setSignupOtpCode('');
-    setSignupOtpError('');
-    setSignupOtpLoading(false);
-    setSignupEmailVerified(false);
-    setSignupPassword('');
-    setSignupPasswordConfirm('');
-    setShowSignupPassword(false);
-    setShowSignupPasswordConfirm(false);
-    setSignupTerms(false);
-    setSignupError('');
-    setShowRoleSelect(false);
-    setShowPatientName(false);
-    setPatientRegFirstName('');
-    setPatientRegLastName('');
-    setPatientRegError('');
-  };
 
-  const toggleRegSpec = (s) => setRegSpecializations(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]);
-  const toggleRegLang = (l) => setRegLanguages(prev => prev.includes(l) ? prev.filter(x => x !== l) : [...prev, l]);
-  const toggleRegFort = (f) => setRegFortbildungen(prev => prev.includes(f) ? prev.filter(x => x !== f) : [...prev, f]);
-  const toggleRegKassenart = (k) => setRegKassenart(prev => prev.includes(k) ? prev.filter(x => x !== k) : [...prev, k]);
-
-  const resetRegState = () => {
-    setRegStep(1);
-    setRegSubmitted(false);
-    setRegEmail('');
-    setRegPassword('');
-    setRegPasswordConfirm('');
-    setRegFirstName('');
-    setRegLastName('');
-    setRegCity('');
-    setRegPostalCode('');
-    setRegStreet('');
-    setRegHouseNumber('');
-    setRegLocationPrecision('approximate');
-    setRegGender(null);
-    setRegSpecializations([]);
-    setRegLanguages(['de']);
-    setRegFortbildungen([]);
-    setRegHomeVisit(false);
-    setRegServiceRadius(null);
-    setRegKassenart([]);
-    setRegSpecSearch('');
-    setRegLangSearch('');
-    setRegDocument(null);
-    setRegTaxRegistrationStatus(null);
-    setRegHealthAuthorityStatus(null);
-    setRegComplianceDraftReady(false);
-    setShowRegFortbildungen(false);
-    setShowRegPassword(false);
-    setShowRegPasswordConfirm(false);
-    setShowRegStepInfo(false);
-    setRegEmailVerified(false);
-    setRegIsFreelance(null);
-    setRegOtpSent(false);
-    setRegOtpCode('');
-    setRegOtpError('');
-    setRegOtpLoading(false);
-    setRegLoading(false);
-    setShowEmailVerify(false);
-    setEmailVerifyStatus('idle');
-  };
-
-  // Auth state
-  const [authToken, setAuthToken] = useState(null);
-  const [loggedInTherapist, setLoggedInTherapist] = useState(null);
-  const [loggedInPatient, setLoggedInPatient] = useState(null);
-  const [accountType, setAccountType] = useState(null); // 'therapist' | 'patient' | null
-  const [myAppointments, setMyAppointments] = useState([]);
-  const [myAppointmentsLoading, setMyAppointmentsLoading] = useState(false);
-  const [incomingBookings, setIncomingBookings] = useState([]);
-  const [incomingBookingsLoading, setIncomingBookingsLoading] = useState(false);
-  const [availableSlots, setAvailableSlots] = useState([]);
-  const [availableSlotsTherapistId, setAvailableSlotsTherapistId] = useState(null);
-  const authenticatedFeedbackEmail = loggedInPatient?.email ?? loggedInTherapist?.email ?? '';
-  const [mySlots, setMySlots] = useState([]);
-  const [deletingSlotIds, setDeletingSlotIds] = useState([]);
-  const [slotsLoading, setSlotsLoading] = useState(false);
-  const [favoritesLoading, setFavoritesLoading] = useState(false);
+  // Auth — from AuthContext
+  const {
+    authToken, setAuthToken,
+    loggedInTherapist, setLoggedInTherapist,
+    loggedInPatient, setLoggedInPatient,
+    accountType, setAccountType,
+    loginAsTherapist, loginAsPatient, logout: logoutFromContext,
+  } = useAuth();
+  // Therapy data — from TherapyContext
+  const {
+    myAppointments, myAppointmentsLoading, setMyAppointments,
+    incomingBookings, incomingBookingsLoading, setIncomingBookings,
+    mySlots, slotsLoading, deletingSlotIds, setMySlots, setDeletingSlotIds,
+    favorites, favoritesLoading, favoritePractices,
+    setFavorites, setFavoritesLoading, setFavoritePractices,
+    availableSlots, availableSlotsTherapistId, availableSlotsLoading,
+    setAvailableSlots, setAvailableSlotsTherapistId,
+    therapyRefreshing, setTherapyRefreshing,
+    favoritesLastLoadedAt, appointmentsLastLoadedAt,
+    incomingBookingsLastLoadedAt, slotsLastLoadedAt,
+    loadFavorites, loadMyAppointments, loadIncomingBookings,
+    loadMySlots, loadAvailableSlots,
+    resetTherapyData, handleTherapyRefresh: handleTherapyRefreshCtx,
+  } = useTherapyData();
+  const handleTherapyRefresh = () => handleTherapyRefreshCtx(authToken, accountType, loggedInTherapist);
   const [showBookingForm, setShowBookingForm] = useState(false);
   const [bookingTargetTherapist, setBookingTargetTherapist] = useState(null);
   const blockTherapistEnrichRef = useRef(false);
-  const [showRoleSelect, setShowRoleSelect] = useState(false);
-  const [showSignup, setShowSignup] = useState(false);
-  const [signupEmail, setSignupEmail] = useState('');
-  const [signupOtpSent, setSignupOtpSent] = useState(false);
-  const [signupOtpCode, setSignupOtpCode] = useState('');
-  const [signupOtpError, setSignupOtpError] = useState('');
-  const [signupOtpLoading, setSignupOtpLoading] = useState(false);
-  const [signupEmailVerified, setSignupEmailVerified] = useState(false);
-  const [signupPassword, setSignupPassword] = useState('');
-  const [signupPasswordConfirm, setSignupPasswordConfirm] = useState('');
-  const [showSignupPassword, setShowSignupPassword] = useState(false);
-  const [showSignupPasswordConfirm, setShowSignupPasswordConfirm] = useState(false);
-  const [signupTerms, setSignupTerms] = useState(false);
-  const [signupError, setSignupError] = useState('');
-  const [showPatientName, setShowPatientName] = useState(false);
-  const [patientRegFirstName, setPatientRegFirstName] = useState('');
-  const [patientRegLastName, setPatientRegLastName] = useState('');
-  const [patientRegLoading, setPatientRegLoading] = useState(false);
-  const [patientRegError, setPatientRegError] = useState('');
   const [showLogin, setShowLogin] = useState(false);
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
@@ -873,59 +452,27 @@ export default function App() {
   const [loginNotice, setLoginNotice] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
   const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false);
-  const [editMode, setEditMode] = useState(false);
-  const [editBio, setEditBio] = useState('');
-  const [editPhone, setEditPhone] = useState('');
-  const [editCity, setEditCity] = useState('');
-  const [editPostalCode, setEditPostalCode] = useState('');
-  const [editStreet, setEditStreet] = useState('');
-  const [editHouseNumber, setEditHouseNumber] = useState('');
-  const [editLocationPrecision, setEditLocationPrecision] = useState('approximate');
-  const [editSpecializations, setEditSpecializations] = useState('');
-  const [editLanguages, setEditLanguages] = useState([]);
-  const [editHomeVisit, setEditHomeVisit] = useState(false);
-  const [editServiceRadius, setEditServiceRadius] = useState(null);
-  const [editKassenart, setEditKassenart] = useState('');
-  const [editGender, setEditGender] = useState(null);
-  const [editIsVisible, setEditIsVisible] = useState(true);
-  const [editBookingMode, setEditBookingMode] = useState('DIRECTORY_ONLY');
-  const [editAvailability, setEditAvailability] = useState('');
-  const [editTaxRegistrationStatus, setEditTaxRegistrationStatus] = useState(null);
-  const [editHealthAuthorityStatus, setEditHealthAuthorityStatus] = useState(null);
-  const [editCertifications, setEditCertifications] = useState([]);
   const [activeFilterTherapist, setActiveFilterTherapist] = useState('all');
   const [activeFilterPatient, setActiveFilterPatient] = useState('all');
   const [showArchivedApts, setShowArchivedApts] = useState(false);
-  const [profileSaving, setProfileSaving] = useState(false);
-  const [therapistDocuments, setTherapistDocuments] = useState([]);
-  const [documentUploading, setDocumentUploading] = useState(false);
 
 
   // Invite claim flow state
   const [showInviteClaim, setShowInviteClaim] = useState(false);
   const [inviteClaimToken, setInviteClaimToken] = useState(null);
-  const [inviteClaimData, setInviteClaimData] = useState(null); // { therapist, practice }
+  const [inviteClaimData, setInviteClaimData] = useState(null);
   const [inviteClaimLoading, setInviteClaimLoading] = useState(false);
 
   // Password reset deep-link state
   const [showResetPassword, setShowResetPassword] = useState(false);
   const [resetPasswordToken, setResetPasswordToken] = useState('');
-  const [resetPasswordNew, setResetPasswordNew] = useState('');
-  const [resetPasswordConfirm, setResetPasswordConfirm] = useState('');
-  const [resetPasswordError, setResetPasswordError] = useState('');
-  const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
-  const [resetPasswordDone, setResetPasswordDone] = useState(false);
 
   // Email verification deep-link state
   const [showEmailVerify, setShowEmailVerify] = useState(false);
   const [emailVerifyStatus, setEmailVerifyStatus] = useState('idle');
-  const [showPhotoPrompt, setShowPhotoPrompt] = useState(false); // 'verifying' | 'success' | 'error'
+  const [showPhotoPrompt, setShowPhotoPrompt] = useState(false);
   const [emailVerifyError, setEmailVerifyError] = useState('');
   const [inviteClaimError, setInviteClaimError] = useState('');
-  const [inviteClaimPassword, setInviteClaimPassword] = useState('');
-  const [inviteClaimPasswordConfirm, setInviteClaimPasswordConfirm] = useState('');
-  const [showInvitePassword, setShowInvitePassword] = useState(false);
-  const [showInvitePasswordConfirm, setShowInvitePasswordConfirm] = useState(false);
   const [showVisibilityModal, setShowVisibilityModal] = useState(false);
   const [showProfileSavedModal, setShowProfileSavedModal] = useState(false);
   const [profileSavedModalTitle, setProfileSavedModalTitle] = useState('');
@@ -933,10 +480,9 @@ export default function App() {
   const [visibilityLoading, setVisibilityLoading] = useState(false);
 
   const openSignupFlow = () => {
-    resetSignupState();
     setShowLogin(false);
     setShowRegister(false);
-    setShowSignup(true);
+    setShowRoleSelect(true);
   };
 
   const openProfileSavedModal = (title, body) => {
@@ -950,72 +496,7 @@ export default function App() {
     setEditMode(false);
   };
 
-  useEffect(() => {
-    let active = true;
 
-    AsyncStorage.getItem(REGISTRATION_COMPLIANCE_DRAFT_KEY)
-      .then((rawValue) => {
-        if (!active) return;
-        const draft = parseComplianceDraft(rawValue);
-        setRegTaxRegistrationStatus(draft.taxRegistrationStatus);
-        setRegHealthAuthorityStatus(draft.healthAuthorityStatus);
-      })
-      .finally(() => {
-        if (active) setRegComplianceDraftReady(true);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!regComplianceDraftReady) return;
-
-    if (!regTaxRegistrationStatus && !regHealthAuthorityStatus) {
-      AsyncStorage.removeItem(REGISTRATION_COMPLIANCE_DRAFT_KEY).catch(() => {});
-      return;
-    }
-
-    AsyncStorage.setItem(
-      REGISTRATION_COMPLIANCE_DRAFT_KEY,
-      JSON.stringify({
-        taxRegistrationStatus: regTaxRegistrationStatus ?? null,
-        healthAuthorityStatus: regHealthAuthorityStatus ?? null,
-      }),
-    ).catch(() => {});
-  }, [regComplianceDraftReady, regTaxRegistrationStatus, regHealthAuthorityStatus]);
-
-  useEffect(() => {
-    Promise.all([
-      AsyncStorage.getItem('revio_auth_token'),
-      AsyncStorage.getItem('revio_account_type'),
-    ]).then(async ([token]) => {
-      if (!token) return;
-      try {
-        const res = await fetch(`${getBaseUrl()}/auth/me`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (res.ok) {
-          const profile = await res.json();
-          setAuthToken(token);
-          if (profile.role === 'patient') {
-            setAccountType('patient');
-            setLoggedInPatient(profile);
-          } else {
-            setAccountType('therapist');
-            setLoggedInTherapist(normalizeTherapistProfile(profile));
-          }
-          loadFavorites(token);
-          if (profile.role === 'patient') loadMyAppointments(token);
-          else { loadIncomingBookings(token); loadMySlots(token); }
-        } else {
-          AsyncStorage.removeItem('revio_auth_token');
-          AsyncStorage.removeItem('revio_account_type');
-        }
-      } catch {}
-    });
-  }, []);
 
   // Email verification deep-link handler (revo://verify?token=xxx)
   const handleVerifyEmailLink = async (token) => {
@@ -1048,20 +529,6 @@ export default function App() {
         return;
       }
       const data = await res.json();
-      // Auth V2 verify-email returns no token (patient must log in after verification)
-      if (!data.token && !data.accessToken) {
-        setEmailVerifyStatus('success');
-        setTimeout(() => { setShowEmailVerify(false); setShowLogin(true); }, 2500);
-        return;
-      }
-      const verifyToken = data.accessToken || data.token;
-      await AsyncStorage.setItem('revio_auth_token', verifyToken);
-      setAuthToken(verifyToken);
-      const profileRes = await fetch(`${getBaseUrl()}/auth/me`, {
-        headers: { Authorization: `Bearer ${verifyToken}`, ...TUNNEL_HEADERS },
-      });
-      if (profileRes.ok) {
-        const profile = await profileRes.json();
         if (profile.role === 'patient') {
           await AsyncStorage.setItem('revio_account_type', 'patient');
           setAccountType('patient');
@@ -1145,78 +612,43 @@ export default function App() {
     return () => sub.remove();
   }, []);
 
-  // Fetch therapist's uploaded documents on login/session restore
-  useEffect(() => {
-    if (authToken && accountType === 'therapist') {
-      fetch(`${getBaseUrl()}/auth/documents`, {
-        headers: { Authorization: `Bearer ${authToken}` },
-      })
-        .then((r) => (r.ok ? r.json() : []))
-        .then((docs) => setTherapistDocuments(Array.isArray(docs) ? docs : []))
-        .catch(() => {});
-    } else {
-      setTherapistDocuments([]);
-    }
-  }, [authToken, accountType]);
 
-  // Load persisted dismissed notification IDs on login
+
+
+  // Notification polling
   useEffect(() => {
-    if (!authToken) { setDismissedNotifIds(new Set()); return; }
+    if (notificationPollRef.current) clearInterval(notificationPollRef.current);
+    if (!authToken) { setNotifications([]); setReviewNotification(null); setShowReviewNotificationModal(false); return; }
+    const fetchNotifications = async () => {
+      try {
+        const res = await fetch(`${getBaseUrl()}/notifications`, { headers: { Authorization: `Bearer ${authToken}` } });
+        if (!res.ok) return;
+        const data = await res.json();
+        let next = Array.isArray(data.notifications) ? data.notifications : [];
+        const reviewNotif = next.find((n) => REVIEW_NOTIFICATION_TYPES.has(n.type) && n.reviewStatus && n.therapistId);
+        if (accountType === 'therapist' && reviewNotif?.therapistId) {
+          const seenStatus = await AsyncStorage.getItem(getReviewNotificationSeenKey(reviewNotif.therapistId));
+          if (seenStatus === reviewNotif.reviewStatus) {
+            next = next.filter((n) => n.id !== reviewNotif.id);
+          } else {
+            setReviewNotification((prev) => prev?.id === reviewNotif.id ? prev : reviewNotif);
+            setShowReviewNotificationModal(true);
+            setLoggedInTherapist((prev) =>
+              prev?.id === reviewNotif.therapistId && prev.reviewStatus !== reviewNotif.reviewStatus
+                ? { ...prev, reviewStatus: reviewNotif.reviewStatus } : prev);
+          }
+        }
+        setNotifications(next);
+      } catch {}
+    };
     AsyncStorage.getItem('revio_dismissed_notif_ids').then((raw) => {
       if (raw) { try { setDismissedNotifIds(new Set(JSON.parse(raw))); } catch {} }
     });
-  }, [authToken]);
-
-  // Poll notifications every 30s when logged in
-  useEffect(() => {
-    if (notificationPollRef.current) clearInterval(notificationPollRef.current);
-    if (!authToken) {
-      setNotifications([]);
-      setReviewNotification(null);
-      setShowReviewNotificationModal(false);
-      return;
-    }
-    const fetchNotifications = async () => {
-      try {
-        const res = await fetch(`${getBaseUrl()}/notifications`, {
-          headers: { Authorization: `Bearer ${authToken}` },
-        });
-        if (res.ok) {
-          const data = await res.json();
-          let nextNotifications = Array.isArray(data.notifications) ? data.notifications : [];
-          const nextReviewNotification = nextNotifications.find(
-            (item) => REVIEW_NOTIFICATION_TYPES.has(item.type) && item.reviewStatus && item.therapistId,
-          );
-
-          if (accountType === 'therapist' && nextReviewNotification?.therapistId) {
-            const seenStatus = await AsyncStorage.getItem(
-              getReviewNotificationSeenKey(nextReviewNotification.therapistId),
-            );
-
-            if (seenStatus === nextReviewNotification.reviewStatus) {
-              nextNotifications = nextNotifications.filter((item) => item.id !== nextReviewNotification.id);
-            } else {
-              setReviewNotification((prev) =>
-                prev?.id === nextReviewNotification.id ? prev : nextReviewNotification,
-              );
-              setShowReviewNotificationModal(true);
-            }
-
-            setLoggedInTherapist((prev) => (
-              prev?.id === nextReviewNotification.therapistId && prev.reviewStatus !== nextReviewNotification.reviewStatus
-                ? { ...prev, reviewStatus: nextReviewNotification.reviewStatus }
-                : prev
-            ));
-          }
-
-          setNotifications(nextNotifications);
-        }
-      } catch {}
-    };
     fetchNotifications();
     notificationPollRef.current = setInterval(fetchNotifications, 30000);
     return () => clearInterval(notificationPollRef.current);
   }, [authToken, accountType]);
+
 
   const registerPushToken = async (token) => {
     try {
@@ -1478,52 +910,7 @@ export default function App() {
   };
 
   const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
-  const [deleteNameInput, setDeleteNameInput] = useState('');
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
-  const [currentPasswordInput, setCurrentPasswordInput] = useState('');
-  const [newPasswordInput, setNewPasswordInput] = useState('');
-  const [confirmPasswordInput, setConfirmPasswordInput] = useState('');
-  const [changePasswordLoading, setChangePasswordLoading] = useState(false);
-  const [changePasswordError, setChangePasswordError] = useState('');
-  const [changePasswordSuccess, setChangePasswordSuccess] = useState('');
-
-  const handleChangePassword = async () => {
-    setChangePasswordError('');
-    setChangePasswordSuccess('');
-    if (!currentPasswordInput.trim()) {
-      setChangePasswordError(t('changePasswordErrorCurrent'));
-      return;
-    }
-    if (newPasswordInput.length < 8) {
-      setChangePasswordError(t('changePasswordErrorTooShort'));
-      return;
-    }
-    if (newPasswordInput !== confirmPasswordInput) {
-      setChangePasswordError(t('changePasswordErrorMismatch'));
-      return;
-    }
-    setChangePasswordLoading(true);
-    try {
-      const res = await fetch(`${getBaseUrl()}/auth/password`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
-        body: JSON.stringify({ currentPassword: currentPasswordInput, newPassword: newPasswordInput }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setChangePasswordError(data.message ?? t('changePasswordErrorFail'));
-        return;
-      }
-      setCurrentPasswordInput('');
-      setNewPasswordInput('');
-      setConfirmPasswordInput('');
-      setChangePasswordSuccess(t('changePasswordSuccess'));
-    } catch {
-      setChangePasswordError(t('alertConnectionError'));
-    } finally {
-      setChangePasswordLoading(false);
-    }
-  };
 
   const markReviewNotificationSeen = async (notification = reviewNotification) => {
     if (notification?.therapistId && notification?.reviewStatus) {
@@ -1548,22 +935,9 @@ export default function App() {
     setShowDeleteAccountModal(true);
   };
 
-  const openFreelanceHelp = async () => {
-    try {
-      await Linking.openURL(FREELANCE_HELP_URL);
-    } catch {
-      if (Platform.OS === 'web') showWebAlert(t('freelanceCheckHelpOpenError'));
-      else Alert.alert(t('alertError'), t('freelanceCheckHelpOpenError'));
-    }
-  };
 
-  const scrollRegistrationToBottom = () => {
-    setTimeout(() => {
-      registerScrollRef.current?.scrollToEnd?.({ animated: true });
-    }, Platform.OS === 'ios' ? 140 : 220);
-  };
 
-  const handleSaveProfile = async () => {
+dleSaveProfile = async () => {
     if (!authToken || !loggedInTherapist?.id) return;
     setProfileSaving(true);
 
@@ -1650,7 +1024,7 @@ export default function App() {
     setProfileSaving(false);
   };
 
-  const handlePickPhoto = async () => {
+dlePickPhoto = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) return;
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -1690,7 +1064,7 @@ export default function App() {
     }
   };
 
-  const handlePickDocument = async () => {
+dlePickDocument = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
         type: ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'],
@@ -1792,19 +1166,14 @@ export default function App() {
   const [viewMode, setViewMode] = useState('list'); // 'list' | 'map'
   const [mapScrollEnabled, setMapScrollEnabled] = useState(true);
   const discoverScrollRef = React.useRef(null);
-  const registerScrollRef = React.useRef(null);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  // Notifications — from NotifContext (inline in render)
   const [notifications, setNotifications] = useState([]);
   const [dismissedNotifIds, setDismissedNotifIds] = useState(new Set());
   const [showNotifications, setShowNotifications] = useState(false);
-  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
-  const [feedbackEmail, setFeedbackEmail] = useState('');
-  const [feedbackMessage, setFeedbackMessage] = useState('');
-  const [feedbackError, setFeedbackError] = useState('');
-  const [feedbackLoading, setFeedbackLoading] = useState(false);
-  const [feedbackKeyboardInset, setFeedbackKeyboardInset] = useState(0);
-  const notificationPollRef = React.useRef(null);
   const [showReviewNotificationModal, setShowReviewNotificationModal] = useState(false);
   const [reviewNotification, setReviewNotification] = useState(null);
+  const notificationPollRef = React.useRef(null);
   const [locationLabel, setLocationLabel] = useState(''); // display: "Hauptstraße 5, München"
   const [showLocationSheet, setShowLocationSheet] = useState(false);
   const [showSlotComposerModal, setShowSlotComposerModal] = useState(false);
@@ -2228,55 +1597,7 @@ export default function App() {
     refreshTherapyTab();
   }, [activeTab, authToken, accountType, loggedInTherapist?.id, loggedInPatient?.id]);
 
-  useEffect(() => {
-    if (!showFeedbackModal) return;
-    if (authenticatedFeedbackEmail) {
-      setFeedbackEmail(authenticatedFeedbackEmail);
-    }
-  }, [authenticatedFeedbackEmail, showFeedbackModal]);
 
-  useEffect(() => {
-    if (!showFeedbackModal) {
-      setFeedbackKeyboardInset(0);
-      return;
-    }
-
-    const handleKeyboardShow = (event) => {
-      const windowHeight = Dimensions.get('window').height;
-      const keyboardHeight = Platform.OS === 'ios'
-        ? Math.max(0, windowHeight - (event.endCoordinates?.screenY ?? windowHeight))
-        : (event.endCoordinates?.height ?? 0);
-      if (typeof Keyboard.scheduleLayoutAnimation === 'function') {
-        Keyboard.scheduleLayoutAnimation(event);
-      } else if (Platform.OS === 'ios') {
-        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-      }
-      setFeedbackKeyboardInset(keyboardHeight);
-    };
-
-    const handleKeyboardHide = (event) => {
-      if (typeof Keyboard.scheduleLayoutAnimation === 'function') {
-        Keyboard.scheduleLayoutAnimation(event);
-      } else if (Platform.OS === 'ios') {
-        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-      }
-      setFeedbackKeyboardInset(0);
-    };
-
-    const showSubscription = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillChangeFrame' : 'keyboardDidShow',
-      handleKeyboardShow,
-    );
-    const hideSubscription = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
-      handleKeyboardHide,
-    );
-
-    return () => {
-      showSubscription.remove();
-      hideSubscription.remove();
-    };
-  }, [showFeedbackModal]);
 
 
 
@@ -2291,13 +1612,7 @@ export default function App() {
       const res = await fetch(`${getBaseUrl()}/practice-detail/${practice.id}`);
       if (res.ok) {
         const data = await res.json();
-        setSelectedPracticeTherapists((data.therapists ?? []).map(th => ({
-          ...th,
-          photo: th.photo
-            ? (th.photo.startsWith('http') ? th.photo : `${getBaseUrl()}${th.photo}`)
-            : `https://i.pravatar.cc/96?u=${th.id}`,
-          specializations: Array.isArray(th.specializations) ? th.specializations : [],
-        })));
+        setSelectedPracticeTherapists((data.therapists ?? []).map(mapApiTherapist));
       } else {
         const body = await res.json().catch(() => ({}));
         console.error('[openPractice] status:', res.status, 'body:', JSON.stringify(body));
@@ -2322,46 +1637,7 @@ export default function App() {
     );
   };
 
-  const mapPublicTherapistDetail = (therapist) => {
-    if (!therapist) return therapist;
-    return {
-      id: therapist.id,
-      email: therapist.email || null,
-      phone: therapist.phone ?? null,
-      fullName: therapist.fullName,
-      professionalTitle: therapist.professionalTitle,
-      specializations: Array.isArray(therapist.specializations) ? therapist.specializations : [],
-      languages: normalizeLanguageCodes(therapist.languages),
-      homeVisit: therapist.homeVisit ?? false,
-      serviceRadiusKm: therapist.serviceRadiusKm ?? null,
-      isVisible: true,
-      availability: therapist.availability ?? '',
-      city: therapist.city ?? '',
-      bio: therapist.bio ?? '',
-      kassenart: therapist.kassenart ?? null,
-      fortbildungen: Array.isArray(therapist.certifications) ? therapist.certifications : [],
-      distKm: typeof therapist.distKm === 'number' ? therapist.distKm : null,
-      verifiziert: true,
-      behandlungsbereiche: Array.isArray(therapist.behandlungsbereiche)
-        ? therapist.behandlungsbereiche
-        : Array.isArray(therapist.treatmentAreas)
-          ? therapist.treatmentAreas
-          : [],
-      verfügbareZeiten: '',
-      website: therapist.website ?? '',
-      photo: resolveMediaUrl(therapist.photo) ?? null,
-      practices: Array.isArray(therapist.practices)
-        ? therapist.practices.map((practice) => ({
-            ...practice,
-            logo: resolveMediaUrl(practice.logo),
-            photos: Array.isArray(practice.photos) ? practice.photos.map(resolveMediaUrl) : [],
-          }))
-        : [],
-      bookingMode: therapist.bookingMode ?? 'DIRECTORY_ONLY',
-      requestable: therapist.requestable ?? false,
-      nextFreeSlotAt: therapist.nextFreeSlotAt ?? null,
-    };
-  };
+  const mapPublicTherapistDetail = (therapist) => mapApiTherapist(therapist);
 
   const openTherapistById = async (id, fallbackTherapist = null) => {
     blockTherapistEnrichRef.current = false;
@@ -2583,493 +1859,39 @@ export default function App() {
 
   // ── Therapist dashboard (logged in) ───────────────��───────────────────────
 
-  const renderTherapistDashboard = () => {
-    const th = loggedInTherapist;
-
-    const enterEdit = async () => {
-      const draft = th?.id
-        ? parseComplianceDraft(await AsyncStorage.getItem(getTherapistComplianceDraftKey(th.id)))
-        : normalizeComplianceDraft(null);
-      const nextCompliance = draft.taxRegistrationStatus || draft.healthAuthorityStatus
-        ? draft
-        : normalizeComplianceDraft(th?.compliance);
-
-      setEditBio(th.bio ?? '');
-      setEditPhone(th.phone ?? '');
-      setEditCity(th.city ?? '');
-      setEditPostalCode(th.postalCode ?? '');
-      setEditStreet(th.street ?? '');
-      setEditHouseNumber(th.houseNumber ?? '');
-      setEditLocationPrecision(th.locationPrecision ?? 'approximate');
-      setEditSpecializations((th.specializations ?? []).join(', '));
-      setEditLanguages(normalizeLanguageCodes(th.languages));
-      setEditHomeVisit(th.homeVisit ?? false);
-      setEditServiceRadius(th.serviceRadiusKm ?? null);
-      setEditKassenart(th.kassenart ?? '');
-      setEditGender(th.gender ?? null);
-      setEditIsVisible(th.isVisible ?? true);
-      setEditBookingMode(th.bookingMode ?? 'DIRECTORY_ONLY');
-      setEditAvailability(th.availability ?? '');
-      setEditTaxRegistrationStatus(nextCompliance.taxRegistrationStatus);
-      setEditHealthAuthorityStatus(nextCompliance.healthAuthorityStatus);
-      setEditCertifications(Array.isArray(th.certifications) ? th.certifications : []);
-      setEditMode(true);
-    };
-
-    return (
-      <TherapistDashboardScreen
-        authToken={authToken}
-        c={c}
-        editAvailability={editAvailability}
-        editBio={editBio}
-        editPhone={editPhone}
-        setEditPhone={setEditPhone}
-        editHealthAuthorityStatus={editHealthAuthorityStatus}
-        editHomeVisit={editHomeVisit}
-        editIsVisible={editIsVisible}
-        editKassenart={editKassenart}
-        editLanguages={editLanguages}
-        editMode={editMode}
-        editServiceRadius={editServiceRadius}
-        editSpecializations={editSpecializations}
-        editTaxRegistrationStatus={editTaxRegistrationStatus}
-        documentUploading={documentUploading}
-        handlePickDocument={handlePickDocument}
-        handlePickPhoto={handlePickPhoto}
-        handleSaveProfile={handleSaveProfile}
-        therapistDocuments={therapistDocuments}
-        loggedInTherapist={loggedInTherapist}
-        onEnterEdit={enterEdit}
-        profileSaving={profileSaving}
-        setEditAvailability={setEditAvailability}
-        setEditBio={setEditBio}
-        setEditHomeVisit={setEditHomeVisit}
-        setEditIsVisible={setEditIsVisible}
-        setEditKassenart={setEditKassenart}
-        editGender={editGender}
-        setEditGender={setEditGender}
-        setEditHealthAuthorityStatus={setEditHealthAuthorityStatus}
-        setEditLanguages={setEditLanguages}
-        setEditMode={setEditMode}
-        setEditServiceRadius={setEditServiceRadius}
-        setEditSpecializations={setEditSpecializations}
-        setEditTaxRegistrationStatus={setEditTaxRegistrationStatus}
-        styles={styles}
-        t={t}
-        onOpenTherapyTab={() => setActiveTab('favorites')}
-        onAddSlot={handleAddSlot}
-        editBookingMode={editBookingMode}
-        setEditBookingMode={setEditBookingMode}
-        editCertifications={editCertifications}
-        setEditCertifications={setEditCertifications}
-        certificationOptions={certificationOptions}
-        editCity={editCity}
-        setEditCity={setEditCity}
-        editPostalCode={editPostalCode}
-        setEditPostalCode={setEditPostalCode}
-        editStreet={editStreet}
-        setEditStreet={setEditStreet}
-        editHouseNumber={editHouseNumber}
-        setEditHouseNumber={setEditHouseNumber}
-        editLocationPrecision={editLocationPrecision}
-        setEditLocationPrecision={setEditLocationPrecision}
-      />
-    );
-  };
+  const renderTherapistDashboard = () => (
+    <TherapistDashboardScreen
+      c={c} t={t} styles={styles}
+      certificationOptions={certificationOptions}
+      onOpenTherapyTab={() => setActiveTab('favorites')}
+      onAddSlot={handleAddSlot}
+      onProfileSaved={openProfileSavedModal}
+    />
+  );
 
   // ── Patient registration ──────────────────────────────────────────────────
 
   const renderRoleSelect = () => (
-    <View style={{ flex: 1, paddingHorizontal: 20 }}>
-      <Pressable
-        onPress={() => { setShowRoleSelect(false); setShowSignup(true); }}
-        style={{ paddingTop: 16, paddingBottom: 4, alignSelf: 'flex-start' }}
-      >
-        <Text style={{ fontSize: 15, color: c.primary }}>‹ {t('backBtn')}</Text>
-      </Pressable>
-      <View style={{ paddingTop: 8, paddingBottom: 20 }}>
-        <Text style={{ fontSize: 22, fontWeight: '800', color: c.text }}>{t('registerRoleTitle')}</Text>
-        <Text style={{ fontSize: 14, color: c.muted, marginTop: 4 }}>{t('registerRoleBody')}</Text>
-      </View>
-
-      <View style={{ gap: 12 }}>
-        {/* Patient — filled/primary */}
-        <Pressable
-          onPress={() => { setShowRoleSelect(false); setShowEmailVerify(false); setEmailVerifyStatus('idle'); setShowPatientName(true); }}
-          style={({ pressed }) => [{
-            backgroundColor: c.primary,
-            borderRadius: 16,
-            padding: 20,
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 16,
-            opacity: pressed ? 0.8 : 1,
-          }]}
-        >
-          <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' }}>
-            <Ionicons name="heart-outline" size={24} color="#FFFFFF" />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 16, fontWeight: '700', color: '#FFFFFF' }}>{t('registerRolePatient')}</Text>
-            <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.75)', marginTop: 2 }}>{t('registerRolePatientSub')}</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.75)" />
-        </Pressable>
-
-        {/* Therapeut — outlined */}
-        <Pressable
-          onPress={() => {
-            resetRegState();
-            setShowRoleSelect(false);
-            setRegEmail(signupEmail);
-            setRegPassword(signupPassword);
-            setRegPasswordConfirm(signupPassword);
-            setRegEmailVerified(true);
-            setShowRegister(true);
-            resetSignupState();
-          }}
-          style={({ pressed }) => [{
-            backgroundColor: c.card,
-            borderRadius: 16,
-            borderWidth: 1,
-            borderColor: c.border,
-            padding: 20,
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 16,
-            opacity: pressed ? 0.7 : 1,
-          }]}
-        >
-          <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: c.primaryBg, alignItems: 'center', justifyContent: 'center' }}>
-            <Ionicons name="person-outline" size={24} color={c.primary} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 16, fontWeight: '700', color: c.text }}>{t('registerRoleTherapist')}</Text>
-            <Text style={{ fontSize: 13, color: c.muted, marginTop: 2 }}>{t('registerRoleTherapistSub')}</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color={c.muted} />
-        </Pressable>
-      </View>
-    </View>
-  );
-
-  const handlePatientNameSubmit = async () => {
-    setPatientRegError('');
-    const email = signupEmail.trim().toLowerCase();
-    const firstName = patientRegFirstName.trim();
-    const lastName = patientRegLastName.trim();
-
-    if (!firstName || !lastName) {
-      setPatientRegError(t('patientRegNameRequired'));
-      return;
-    }
-    setPatientRegLoading(true);
-    try {
-      const res = await fetch(`${getBaseUrl()}/auth/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email,
-          password: signupPassword,
-          role: 'patient',
-          firstName,
-          lastName,
-        }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        setPatientRegError(err.message ?? t('alertConnectionError'));
-        return;
-      }
-      // Auto-login with the session token returned by registration
-      const data = await res.json().catch(() => ({}));
-      if (data.token) {
-        await AsyncStorage.setItem('revio_auth_token', data.token);
+    <PatientSignupFlow
+      visible={showRoleSelect || showSignup || showPatientName}
+      onClose={() => { setShowRoleSelect(false); setShowSignup(false); setShowPatientName(false); }}
+      onSignedUp={async (token) => {
+        await AsyncStorage.setItem('revio_auth_token', token);
         await AsyncStorage.setItem('revio_account_type', 'patient');
-        setAuthToken(data.token);
+        setAuthToken(token);
         setAccountType('patient');
-        setLoggedInPatient({
-          id: data.userId,
-          email,
-          role: 'patient',
-          firstName,
-          lastName,
-          phone: null,
-        });
-        loadFavorites(data.token);
-        loadMyAppointments(data.token);
-      }
-      setShowSignup(false);
-      resetSignupState();
-    } catch {
-      setPatientRegError(t('alertConnectionError') + '. ' + t('alertConnectionErrorBody'));
-    } finally {
-      setPatientRegLoading(false);
-    }
-  };
-
-  const renderPatientName = () => (
-    <ScrollView contentContainerStyle={[styles.scrollContent, { paddingHorizontal: 24, paddingBottom: 40 }]} keyboardShouldPersistTaps="handled">
-      <View style={{ paddingTop: 8, paddingBottom: 24 }}>
-        <Text style={{ fontSize: 26, fontWeight: '800', color: c.text }}>{t('patientNameTitle')}</Text>
-        <Text style={{ fontSize: 14, color: c.muted, marginTop: 6, lineHeight: 20 }}>{t('patientNameSubtitle')}</Text>
-      </View>
-
-      <View style={{ gap: 12, marginBottom: 24 }}>
-        <TextInput
-          style={[styles.regInput, { color: c.text, borderColor: patientRegFirstName ? c.primary : c.border, backgroundColor: c.mutedBg }]}
-          placeholder={t('firstName')}
-          placeholderTextColor={c.muted}
-          value={patientRegFirstName}
-          onChangeText={setPatientRegFirstName}
-          autoCapitalize="words"
-          autoFocus
-        />
-        <TextInput
-          style={[styles.regInput, { color: c.text, borderColor: patientRegLastName ? c.primary : c.border, backgroundColor: c.mutedBg }]}
-          placeholder={t('lastName')}
-          placeholderTextColor={c.muted}
-          value={patientRegLastName}
-          onChangeText={setPatientRegLastName}
-          autoCapitalize="words"
-        />
-      </View>
-
-      {!!patientRegError && (
-        <View style={[styles.noticeBox, { backgroundColor: c.errorBg, borderColor: c.error, marginBottom: 16 }]}>
-          <Ionicons name="alert-circle-outline" size={18} color={c.error} />
-          <Text style={{ fontSize: 14, color: c.error, flex: 1 }}>{patientRegError}</Text>
-        </View>
-      )}
-
-      <Pressable
-        style={[styles.registerBtn, { backgroundColor: patientRegLoading ? c.border : c.primary }]}
-        onPress={handlePatientNameSubmit}
-        disabled={patientRegLoading}
-      >
-        <Text style={styles.registerBtnText}>{patientRegLoading ? '…' : t('createAccountBtn')}</Text>
-      </Pressable>
-
-      <Pressable
-        style={{ marginTop: 16, alignItems: 'center', paddingVertical: 10 }}
-        onPress={() => { setShowPatientName(false); setShowRoleSelect(true); setPatientRegError(''); }}
-      >
-        <Text style={{ fontSize: 14, color: c.muted }}>{t('backBtn')}</Text>
-      </Pressable>
-    </ScrollView>
-  );
-
-
-  const handlePatientSaveProfile = (updated) => {
-    setLoggedInPatient((prev) => ({ ...prev, ...updated }));
-  };
-
-  const renderPatientDashboard = () => (
-    <PatientDashboardScreen
-      c={c}
-      loggedInPatient={loggedInPatient}
-      styles={styles}
-      t={t}
-      authToken={authToken}
-      onProfileSaved={handlePatientSaveProfile}
-      favorites={favorites}
-      myAppointments={myAppointments}
-      onOpenTherapist={openTherapistById}
+        const profileRes = await fetch(`${getBaseUrl()}/auth/me`, { headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${token}` } });
+        if (profileRes.ok) setLoggedInPatient(await profileRes.json());
+        loadFavorites(token);
+        loadMyAppointments(token);
+        setShowRoleSelect(false);
+      }}
+      onShowLogin={() => { setShowRoleSelect(false); setShowSignup(false); setShowPatientName(false); setShowLogin(true); }}
+      c={c} t={t} styles={styles}
     />
   );
-
-  // ── Therapist tab ─────────────────────────────────────────────────────────
-
-  const renderSignup = () => (
-    <ScrollView contentContainerStyle={[styles.scrollContent, { paddingHorizontal: 24, paddingBottom: 40 }]} keyboardShouldPersistTaps="handled">
-      {/* Back / cancel */}
-      <Pressable
-        onPress={() => {
-          if (signupOtpSent) {
-            setSignupOtpSent(false);
-            setSignupOtpCode('');
-            setSignupOtpError('');
-            setSignupOtpLoading(false);
-            setSignupEmailVerified(false);
-          } else {
-            setShowSignup(false);
-            resetSignupState();
-          }
-        }}
-        style={{ paddingTop: 16, paddingBottom: 4, alignSelf: 'flex-start' }}
-      >
-        <Text style={{ fontSize: 15, color: c.primary }}>‹ {signupOtpSent ? t('backBtn') : t('cancelBtn')}</Text>
-      </Pressable>
-
-      <View style={{ paddingTop: 8, paddingBottom: 20 }}>
-        <Text style={{ fontSize: 26, fontWeight: '800', color: c.text }}>
-          {signupOtpSent ? 'E-Mail bestätigen' : t('createAccountTitle')}
-        </Text>
-        <Text style={{ fontSize: 14, color: c.muted, marginTop: 6, lineHeight: 20 }}>
-          {signupOtpSent
-            ? `Wir haben einen 6-stelligen Code an ${signupEmail} gesendet.`
-            : t('emailVerificationSubtitle')}
-        </Text>
-      </View>
-
-      {/* ── Phase A: E-Mail + Passwort + AGB ─────────────────────────── */}
-      {!signupOtpSent && (
-        <View style={{ gap: 12 }}>
-          <TextInput
-            value={signupEmail}
-            onChangeText={(v) => { setSignupEmail(v); setSignupOtpError(''); }}
-            placeholder={t('emailLabel')}
-            placeholderTextColor={c.muted}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text }]}
-          />
-
-          <View style={{ position: 'relative' }}>
-            <TextInput
-              value={signupPassword}
-              onChangeText={setSignupPassword}
-              placeholder={t('signupPasswordPlaceholder')}
-              placeholderTextColor={c.muted}
-              secureTextEntry={!showSignupPassword}
-              textContentType="newPassword"
-              autoComplete="new-password"
-              style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text, paddingRight: 44 }]}
-            />
-            <Pressable onPress={() => setShowSignupPassword(v => !v)} hitSlop={ICON_HIT_SLOP} style={{ position: 'absolute', right: 12, top: 0, bottom: 0, justifyContent: 'center' }}>
-              <Ionicons name={showSignupPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color={c.muted} />
-            </Pressable>
-          </View>
-
-          <View style={{ position: 'relative' }}>
-            <TextInput
-              value={signupPasswordConfirm}
-              onChangeText={setSignupPasswordConfirm}
-              placeholder={t('signupPasswordConfirmPlaceholder')}
-              placeholderTextColor={c.muted}
-              secureTextEntry={!showSignupPasswordConfirm}
-              textContentType="newPassword"
-              autoComplete="new-password"
-              style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text, paddingRight: 44 }]}
-            />
-            <Pressable onPress={() => setShowSignupPasswordConfirm(v => !v)} hitSlop={ICON_HIT_SLOP} style={{ position: 'absolute', right: 12, top: 0, bottom: 0, justifyContent: 'center' }}>
-              <Ionicons name={showSignupPasswordConfirm ? 'eye-off-outline' : 'eye-outline'} size={20} color={c.muted} />
-            </Pressable>
-          </View>
-
-          {signupPasswordConfirm.length > 0 && signupPassword !== signupPasswordConfirm && (
-            <Text style={{ color: c.error, fontSize: 13 }}>{t('passwordsMismatch')}</Text>
-          )}
-
-          {signupPassword.length > 0 && signupPassword.length < 8 && (
-            <Text style={{ color: c.error, fontSize: 13 }}>Mindestens 8 Zeichen.</Text>
-          )}
-
-          {/* Terms */}
-          <Pressable onPress={() => setSignupTerms(v => !v)} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 4 }}>
-            <View style={{ width: 22, height: 22, borderRadius: 4, borderWidth: 2, borderColor: signupTerms ? c.primary : c.border, backgroundColor: signupTerms ? c.primary : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
-              {signupTerms && <Ionicons name="checkmark" size={14} color="#fff" />}
-            </View>
-            <Text style={{ flex: 1, fontSize: 13, color: c.muted }}>{t('termsCheckbox')}</Text>
-          </Pressable>
-
-          {!!signupOtpError && <Text style={{ color: c.error, fontSize: 13 }}>{signupOtpError}</Text>}
-
-          <Pressable
-            onPress={async () => {
-              if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(signupEmail)) { setSignupOtpError('Bitte gib eine gültige E-Mail ein.'); return; }
-              if (signupPassword.length < 8) { setSignupOtpError('Passwort muss mindestens 8 Zeichen haben.'); return; }
-              if (signupPassword !== signupPasswordConfirm) { setSignupOtpError(t('passwordsMismatch')); return; }
-              if (!signupTerms) { setSignupOtpError(t('termsRequired')); return; }
-              setSignupOtpLoading(true); setSignupOtpError('');
-              try {
-                const res = await fetch(`${getBaseUrl()}/register/send-otp`, {
-                  method: 'POST', headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ email: signupEmail.trim().toLowerCase() }),
-                });
-                const data = await res.json().catch(() => ({}));
-                if (!res.ok) { setSignupOtpError(data.message ?? 'Fehler beim Senden.'); return; }
-                setSignupOtpSent(true);
-              } catch { setSignupOtpError('Verbindungsfehler.'); }
-              finally { setSignupOtpLoading(false); }
-            }}
-            disabled={signupOtpLoading}
-            style={[styles.registerBtn, { backgroundColor: c.primary, marginTop: 8, opacity: signupOtpLoading ? 0.6 : 1 }]}
-          >
-            <Text style={styles.registerBtnText}>{signupOtpLoading ? '...' : 'Weiter →'}</Text>
-          </Pressable>
-
-          <Pressable style={{ marginTop: 4, alignSelf: 'flex-end' }} onPress={() => { setShowSignup(false); setShowLogin(true); resetSignupState(); }}>
-            <Text style={{ color: c.muted, fontSize: 13 }}>{t('alreadyHaveAccount')} {t('loginAction')}</Text>
-          </Pressable>
-        </View>
-      )}
-
-      {/* ── Phase B: OTP bestätigen ───────────────────────────────────── */}
-      {signupOtpSent && (
-        <View style={{ gap: 12 }}>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <TextInput
-              value={signupOtpCode}
-              onChangeText={(v) => { setSignupOtpCode(v.replace(/\D/g, '').slice(0, 6)); setSignupOtpError(''); }}
-              placeholder="000000"
-              placeholderTextColor={c.muted}
-              keyboardType="number-pad"
-              maxLength={6}
-              style={[styles.regInput, { flex: 1, backgroundColor: c.card, borderColor: c.border, color: c.text, letterSpacing: 6, fontSize: 20, textAlign: 'center' }]}
-            />
-            <Pressable
-              onPress={async () => {
-                if (signupOtpCode.length !== 6) return;
-                setSignupOtpLoading(true); setSignupOtpError('');
-                try {
-                  const res = await fetch(`${getBaseUrl()}/register/confirm-otp`, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email: signupEmail.trim().toLowerCase(), code: signupOtpCode }),
-                  });
-                  const data = await res.json().catch(() => ({}));
-                  if (!res.ok) { setSignupOtpError(data.message ?? 'Falscher Code.'); return; }
-                  setSignupEmailVerified(true);
-                  setShowSignup(false);
-                  setShowRoleSelect(true);
-                } catch { setSignupOtpError('Verbindungsfehler.'); }
-                finally { setSignupOtpLoading(false); }
-              }}
-              disabled={signupOtpCode.length !== 6 || signupOtpLoading}
-              style={[styles.regInput, { justifyContent: 'center', alignItems: 'center', paddingHorizontal: 14, backgroundColor: signupOtpCode.length === 6 ? c.primary : c.border }]}
-            >
-              <Text style={{ color: '#fff', fontWeight: '600', fontSize: 13 }}>{signupOtpLoading ? '...' : 'Bestätigen'}</Text>
-            </Pressable>
-          </View>
-
-          {!!signupOtpError && <Text style={{ color: c.error, fontSize: 13 }}>{signupOtpError}</Text>}
-
-          <View style={{ flexDirection: 'row', gap: 16 }}>
-            <Pressable onPress={async () => {
-              setSignupOtpLoading(true); setSignupOtpError('');
-              try {
-                const res = await fetch(`${getBaseUrl()}/register/send-otp`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: signupEmail.trim().toLowerCase() }) });
-                if (!res.ok) { const d = await res.json().catch(() => ({})); setSignupOtpError(d.message ?? 'Fehler beim Senden.'); }
-              } catch { setSignupOtpError('Verbindungsfehler.'); }
-              finally { setSignupOtpLoading(false); }
-            }}>
-              <Text style={{ color: c.primary, fontSize: 13 }}>Code erneut senden</Text>
-            </Pressable>
-            <Pressable onPress={() => {
-              setSignupOtpSent(false);
-              setSignupOtpCode('');
-              setSignupOtpError('');
-              setSignupOtpLoading(false);
-              setSignupEmailVerified(false);
-            }}>
-              <Text style={{ color: c.muted, fontSize: 13 }}>Andere E-Mail</Text>
-            </Pressable>
-          </View>
-        </View>
-      )}
-    </ScrollView>
-  );
-
+  const renderSignup = renderRoleSelect;
+  const renderPatientName = renderRoleSelect;
   const renderTherapist = () => (
     <TherapistLandingScreen
       __DEV__={__DEV__}
@@ -3083,205 +1905,27 @@ export default function App() {
 
   // ── Optionen tab ──────────────────────────────────────────────────────────
 
-  const renderOptions = () => {
-    const SectionHeader = ({ title }) => (
-      <Text style={{ fontSize: 11, fontWeight: '700', color: c.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginTop: 20, marginBottom: 6, paddingHorizontal: 4 }}>{title}</Text>
-    );
-    const OptionRow = ({ label, value, onPress, icon, valueColor, last }) => (
-      <Pressable
-        onPress={onPress}
-        style={[styles.optionRow, { backgroundColor: c.card, borderColor: c.border, marginBottom: last ? 0 : 1, borderRadius: 0 }]}
-      >
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          {icon ? <Ionicons name={icon} size={18} color={c.muted} /> : null}
-          <Text style={[styles.optionLabel, { color: c.text }]}>{label}</Text>
-        </View>
-        <Text style={[styles.optionValue, { color: valueColor ?? c.muted }]}>{value} ›</Text>
-      </Pressable>
-    );
-    const OptionGroup = ({ children }) => (
-      <View style={{ borderRadius: 14, overflow: 'hidden', borderWidth: 1, borderColor: c.border }}>{children}</View>
-    );
-
-    return (
-      <View style={{ flex: 1 }}>
-        <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 10, backgroundColor: c.background }}>
-          <View style={[styles.header, { marginBottom: 0 }]}>
-            <Image source={require('../../assets/icon.png')} style={styles.logoMark} />
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.headerTitle, { color: c.text }]}>{t('optionsTitle')}</Text>
-              <Text style={[styles.headerSub, { color: c.muted }]}>{t('optionsSubtitle')}</Text>
-            </View>
-          </View>
-        </View>
-        <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 32, paddingTop: SPACE.sm }]} showsVerticalScrollIndicator={false}>
-
-          {/* ── Mein Profil ── */}
-          {loggedInTherapist && (
-            <>
-              <SectionHeader title="Mein Profil" />
-              <OptionGroup>
-                <Pressable onPress={() => setActiveTab('therapist')} style={[styles.optionRow, { backgroundColor: c.card, borderColor: 'transparent' }]}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
-                    <View style={{ width: 44, height: 44, borderRadius: 999, backgroundColor: c.mutedBg, overflow: 'hidden', justifyContent: 'center', alignItems: 'center' }}>
-                      {loggedInTherapist.photo
-                        ? <Image source={{ uri: loggedInTherapist.photo.startsWith('http') ? loggedInTherapist.photo : `${getBaseUrl()}${loggedInTherapist.photo}` }} style={{ width: 44, height: 44, borderRadius: 999 }} />
-                        : <Text style={{ fontSize: 18, fontWeight: '700', color: c.muted }}>{(loggedInTherapist.fullName ?? '?')[0].toUpperCase()}</Text>
-                      }
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 15, fontWeight: '600', color: c.text }}>{loggedInTherapist.fullName ?? '—'}</Text>
-                      <Text style={{ fontSize: 12, color: loggedInTherapist.isVisible && loggedInTherapist.reviewStatus === 'APPROVED' ? c.success : c.muted }}>
-                        {loggedInTherapist.isVisible && loggedInTherapist.reviewStatus === 'APPROVED' ? t('publiclyVisible') : t('notYetPublic')}
-                      </Text>
-                    </View>
-                  </View>
-                  <Ionicons name="chevron-forward" size={18} color={c.muted} />
-                </Pressable>
-              </OptionGroup>
-            </>
-          )}
-
-          {loggedInPatient && (
-            <>
-              <SectionHeader title="Mein Profil" />
-              <OptionGroup>
-                <Pressable onPress={() => setActiveTab('therapist')} style={[styles.optionRow, { backgroundColor: c.card, borderColor: 'transparent' }]}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
-                    <View style={{ width: 44, height: 44, borderRadius: 999, backgroundColor: c.primary, alignItems: 'center', justifyContent: 'center' }}>
-                      <Text style={{ fontSize: 16, fontWeight: '700', color: '#fff' }}>{((loggedInPatient.firstName?.[0] ?? '') + (loggedInPatient.lastName?.[0] ?? '')).toUpperCase() || '?'}</Text>
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 15, fontWeight: '600', color: c.text }}>{loggedInPatient.firstName} {loggedInPatient.lastName}</Text>
-                      <Text style={{ fontSize: 12, color: c.muted }}>{t('patientRoleLabel')}</Text>
-                    </View>
-                  </View>
-                  <Ionicons name="chevron-forward" size={18} color={c.muted} />
-                </Pressable>
-              </OptionGroup>
-            </>
-          )}
-
-          {!loggedInTherapist && !loggedInPatient && (
-            <>
-              <SectionHeader title="Mein Profil" />
-              <OptionGroup>
-                <Pressable onPress={() => { setActiveTab('therapist'); setShowLogin(true); }} style={[styles.optionRow, { backgroundColor: c.card, borderColor: 'transparent' }]}>
-                  <Text style={[styles.optionLabel, { color: c.muted }]}>{t('notLoggedIn')}</Text>
-                  <Text style={[styles.optionValue, { color: c.primary }]}>{t('loginAction')} ›</Text>
-                </Pressable>
-              </OptionGroup>
-            </>
-          )}
-
-          {/* ── App-Einstellungen ── */}
-          <SectionHeader title="App-Einstellungen" />
-          <OptionGroup>
-            <View style={[styles.optionRow, { backgroundColor: c.card, borderColor: 'transparent' }]}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                <Ionicons name="language-outline" size={18} color={c.muted} />
-                <Text style={[styles.optionLabel, { color: c.text }]}>{t('languageOption')}</Text>
-              </View>
-              <View style={styles.themeToggleRow}>
-                {[{ key: 'de', label: 'DE' }, { key: 'en', label: 'EN' }].map(({ key, label }) => (
-                  <Pressable key={key} onPress={() => { setAppLanguage(key); AsyncStorage.setItem('appLanguage', key); }}
-                    style={[styles.themeBtn, appLanguage === key ? { backgroundColor: c.primary, borderColor: c.primary } : { backgroundColor: c.mutedBg, borderColor: c.border }]}>
-                    <Text style={[styles.themeBtnText, { color: appLanguage === key ? '#FFFFFF' : c.muted }]}>{label}</Text>
-                  </Pressable>
-                ))}
-              </View>
-            </View>
-            <Pressable onPress={() => setShowNotifications(true)} style={[styles.optionRow, { backgroundColor: c.card, borderColor: 'transparent', borderTopWidth: 1, borderTopColor: c.border }]}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                <Ionicons name="notifications-outline" size={18} color={c.muted} />
-                <Text style={[styles.optionLabel, { color: c.text }]}>{t('notificationsOption')}</Text>
-              </View>
-              <Text style={[styles.optionValue, { color: notifications.filter((n) => !dismissedNotifIds.has(n.id)).length > 0 ? c.primary : c.muted }]}>
-                {notifications.filter((n) => !dismissedNotifIds.has(n.id)).length > 0 ? `${notifications.filter((n) => !dismissedNotifIds.has(n.id)).length} ›` : '›'}
-              </Text>
-            </Pressable>
-            <Pressable onPress={() => Linking.openSettings()} style={[styles.optionRow, { backgroundColor: c.card, borderColor: 'transparent', borderTopWidth: 1, borderTopColor: c.border }]}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                <Ionicons name="phone-portrait-outline" size={18} color={c.muted} />
-                <Text style={[styles.optionLabel, { color: c.text }]}>{t('deviceSettings')}</Text>
-              </View>
-              <Text style={[styles.optionValue, { color: c.muted }]}>›</Text>
-            </Pressable>
-            <View style={[styles.optionRow, { backgroundColor: c.card, borderColor: 'transparent', borderTopWidth: 1, borderTopColor: c.border }]}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                <Ionicons name="contrast-outline" size={18} color={c.muted} />
-                <Text style={[styles.optionLabel, { color: c.text }]}>{t('appearanceOption')}</Text>
-              </View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACE.sm }}>
-                <Text style={[styles.optionValue, { color: c.muted }]}>{themeMode === 'dark' ? t('themeDark') : t('themeLight')}</Text>
-                <Switch value={themeMode === 'dark'} onValueChange={(v) => { const m = v ? 'dark' : 'light'; setThemeMode(m); AsyncStorage.setItem('themeMode', m); }}
-                  trackColor={{ false: c.border, true: c.primary }} ios_backgroundColor={c.border} thumbColor="#FFFFFF" />
-              </View>
-            </View>
-          </OptionGroup>
-
-          {/* ── Hilfe & Support ── */}
-          <SectionHeader title={t('helpSupportSection')} />
-          <OptionGroup>
-            <Pressable style={[styles.optionRow, { backgroundColor: c.card, borderColor: 'transparent' }]}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                <Ionicons name="help-circle-outline" size={18} color={c.muted} />
-                <Text style={[styles.optionLabel, { color: c.text }]}>{t('faqOption')}</Text>
-              </View>
-              <Text style={[styles.optionValue, { color: c.muted }]}>{t('comingSoon')} ›</Text>
-            </Pressable>
-            <Pressable onPress={openFeedbackModal} style={[styles.optionRow, { backgroundColor: c.card, borderColor: 'transparent', borderTopWidth: 1, borderTopColor: c.border }]}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                <Ionicons name="chatbubble-outline" size={18} color={c.muted} />
-                <Text style={[styles.optionLabel, { color: c.text }]}>{t('appFeedback')}</Text>
-              </View>
-              <Text style={[styles.optionValue, { color: c.primary }]}>›</Text>
-            </Pressable>
-          </OptionGroup>
-
-          {/* ── Rechtliches ── */}
-          <SectionHeader title={t('legalSection')} />
-          <OptionGroup>
-            <Pressable style={[styles.optionRow, { backgroundColor: c.card, borderColor: 'transparent' }]}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                <Ionicons name="document-text-outline" size={18} color={c.muted} />
-                <Text style={[styles.optionLabel, { color: c.text }]}>{t('termsLabel')}</Text>
-              </View>
-              <Text style={[styles.optionValue, { color: c.muted }]}>›</Text>
-            </Pressable>
-            <Pressable style={[styles.optionRow, { backgroundColor: c.card, borderColor: 'transparent', borderTopWidth: 1, borderTopColor: c.border }]}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                <Ionicons name="shield-outline" size={18} color={c.muted} />
-                <Text style={[styles.optionLabel, { color: c.text }]}>{t('privacyLabel')}</Text>
-              </View>
-              <Text style={[styles.optionValue, { color: c.muted }]}>›</Text>
-            </Pressable>
-          </OptionGroup>
-
-          {/* ── App-Version & Logout ── */}
-          <Text style={{ fontSize: 12, color: c.muted, textAlign: 'center', marginTop: 20 }}>Version 0.1.0 MVP</Text>
-
-          {(loggedInTherapist || loggedInPatient) && (
-            <View style={{ gap: 10, marginTop: 16 }}>
-              <Pressable
-                onPress={() => { setChangePasswordError(''); setChangePasswordSuccess(''); setShowChangePasswordModal(true); }}
-                style={{ borderRadius: 12, paddingVertical: 14, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, borderWidth: 1.5, borderColor: c.border, backgroundColor: c.card }}>
-                <Ionicons name="key-outline" size={18} color={c.muted} />
-                <Text style={{ color: c.text, fontSize: 16, fontWeight: '600' }}>{t('changePassword')}</Text>
-              </Pressable>
-              <Pressable onPress={handleLogout}
-                style={{ borderRadius: 12, paddingVertical: 14, alignItems: 'center', borderWidth: 1.5, borderColor: c.border, backgroundColor: c.card }}>
-                <Text style={{ color: c.text, fontSize: 16, fontWeight: '600' }}>{t('logoutBtn')}</Text>
-              </Pressable>
-              <Pressable onPress={handleDeleteAccount} style={{ borderRadius: 12, paddingVertical: 14, alignItems: 'center' }}>
-                <Text style={{ color: c.muted, fontSize: 14 }}>{t('deleteAccount')}</Text>
-              </Pressable>
-            </View>
-          )}
-        </ScrollView>
-      </View>
-    );
-  };
+  const renderOptions = () => (
+    <OptionsScreen
+      loggedInTherapist={loggedInTherapist}
+      loggedInPatient={loggedInPatient}
+      accountType={accountType}
+      themeMode={themeMode}
+      setThemeMode={setThemeMode}
+      appLanguage={appLanguage}
+      setAppLanguage={setAppLanguage}
+      notifications={notifications}
+      dismissedNotifIds={dismissedNotifIds}
+      onShowNotifications={() => setShowNotifications(true)}
+      onShowLogin={() => { setShowLogin(true); setActiveTab('therapist'); }}
+      onShowRegister={() => setShowRegister(true)}
+      onShowFeedback={openFeedbackModal}
+      onShowChangePassword={() => setShowChangePasswordModal(true)}
+      onDeleteAccount={() => setShowDeleteAccountModal(true)}
+      onNavigateToProfile={() => setActiveTab('therapist')}
+      c={c} t={t} styles={styles}
+    />
+  );
 
 
   const renderTherapyTabShell = (title, body) => (
@@ -3366,168 +2010,16 @@ export default function App() {
     </View>
   );
 
-  const renderAppointmentDetail = (appointment) => {
-    const slotDate = appointment?.slot?.startsAt ?? appointment?.confirmedSlotAt ?? null;
-    const durationMin = appointment?.slot?.durationMin ?? 20;
-    const badge = STATUS_COLORS[appointment?.status] ?? STATUS_COLORS.EXPIRED;
-    const therapist = appointment?.therapist ?? null;
-    const therapistName = therapist?.fullName ?? 'Therapeut:in';
-    const therapistTitle = therapist?.professionalTitle ?? 'Physiotherapeut:in';
-    const therapistPhoto = resolveMediaUrl(therapist?.photo);
-    const hasMessage = typeof appointment?.message === 'string' && appointment.message.trim().length > 0;
-    const isActive = appointment?.status === 'PENDING' || appointment?.status === 'CONFIRMED';
-
-    const date = slotDate ? new Date(slotDate) : null;
-    const bigDateLabel = date
-      ? date.toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' })
-      : 'Termin';
-    const weekdayDateLabel = date
-      ? date.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
-      : 'Terminzeit wird noch abgestimmt';
-    const timeLabel = date
-      ? `${date.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr (${durationMin} Min)`
-      : `${durationMin} Min`;
-
-    const statusIcon = appointment?.status === 'CONFIRMED'
-      ? 'checkmark-circle-outline'
-      : appointment?.status === 'PENDING'
-        ? 'time-outline'
-        : 'close-circle-outline';
-
-    return renderTherapyTabShell(
-      'Termin',
-      <View style={{ gap: 14 }}>
-        <Pressable
-          onPress={() => setSelectedAppointment(null)}
-          style={{ alignSelf: 'flex-start', paddingVertical: 6, flexDirection: 'row', alignItems: 'center', gap: 6 }}
-        >
-          <Ionicons name="chevron-back" size={16} color={c.primary} />
-          <Text style={{ fontSize: 14, fontWeight: '600', color: c.primary }}>Zurück</Text>
-        </Pressable>
-
-        {/* Main Card */}
-        <View style={{ backgroundColor: c.card, borderRadius: 28, padding: 24, borderWidth: 1, borderColor: c.border, gap: 20, ...SHADOW.card }}>
-
-          {/* Status Pill */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', backgroundColor: badge.bg, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 7, gap: 6 }}>
-            <Ionicons name={statusIcon} size={14} color={badge.text} />
-            <Text style={{ fontSize: 13, fontWeight: '700', color: badge.text }}>{badge.label}</Text>
-          </View>
-
-          {/* Datum + Illustration */}
-          <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
-            <View style={{ flex: 1, gap: 8 }}>
-              <Text style={{ fontSize: 32, fontWeight: '800', color: c.text, lineHeight: 36 }}>{bigDateLabel}</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Ionicons name="calendar-outline" size={14} color={c.muted} />
-                <Text style={{ fontSize: 13, color: c.muted, fontWeight: '500' }}>{weekdayDateLabel}</Text>
-              </View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Ionicons name="time-outline" size={14} color={c.muted} />
-                <Text style={{ fontSize: 13, color: c.muted, fontWeight: '500' }}>{timeLabel}</Text>
-              </View>
-            </View>
-            {/* Illustration */}
-            <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: c.primaryBg, alignItems: 'center', justifyContent: 'center', marginLeft: 12 }}>
-              <Ionicons name="calendar-outline" size={28} color={c.primary} />
-            </View>
-          </View>
-
-          <View style={{ height: 1, backgroundColor: c.border }} />
-
-          {/* Therapeut Block */}
-          <View style={{ gap: 12 }}>
-            <Text style={{ fontSize: 12, fontWeight: '700', color: c.muted, textTransform: 'uppercase', letterSpacing: 0.6 }}>Therapeut:in</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-              {therapistPhoto ? (
-                <Image source={{ uri: therapistPhoto }} style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: c.primaryBg }} />
-              ) : (
-                <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: c.primaryBg, alignItems: 'center', justifyContent: 'center' }}>
-                  <Ionicons name="person-outline" size={24} color={c.primary} />
-                </View>
-              )}
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 17, fontWeight: '700', color: c.text }}>{therapistName}</Text>
-                <Text style={{ fontSize: 13, color: c.muted, marginTop: 2 }}>{therapistTitle}</Text>
-                {therapist?.phone ? (
-                  <Pressable
-                    onPress={() => Linking.openURL(`tel:${therapist.phone}`)}
-                    style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 5 }}
-                  >
-                    <Ionicons name="call" size={13} color={c.primary} />
-                    <Text style={{ fontSize: 13, color: c.primary, fontWeight: '600' }}>{therapist.phone}</Text>
-                  </Pressable>
-                ) : null}
-              </View>
-            </View>
-          </View>
-
-          {/* Nachricht */}
-          {hasMessage ? (
-            <>
-              <View style={{ height: 1, backgroundColor: c.border }} />
-              <View style={{ gap: 6 }}>
-                <Text style={{ fontSize: 12, fontWeight: '700', letterSpacing: 0.4, color: c.muted, textTransform: 'uppercase' }}>Deine Nachricht</Text>
-                <Text style={{ fontSize: 14, lineHeight: 21, color: c.muted, fontStyle: 'italic' }}>"{appointment.message.trim()}"</Text>
-              </View>
-            </>
-          ) : null}
-
-          {/* Ablehnungsgrund */}
-          {appointment?.status === 'DECLINED' && appointment?.declinedReason ? (
-            <>
-              <View style={{ height: 1, backgroundColor: c.border }} />
-              <View style={{ gap: 6, backgroundColor: '#FEF2F2', borderRadius: 12, padding: 14 }}>
-                <Text style={{ fontSize: 12, fontWeight: '700', letterSpacing: 0.4, color: '#DC2626', textTransform: 'uppercase' }}>Grund der Absage</Text>
-                <Text style={{ fontSize: 14, lineHeight: 20, color: '#7F1D1D' }}>{appointment.declinedReason}</Text>
-              </View>
-            </>
-          ) : null}
-
-          {/* Hinweisbox */}
-          {isActive ? (
-            <View style={{ flexDirection: 'row', gap: 12, backgroundColor: c.primaryBg, borderRadius: 16, padding: 14, borderWidth: 1, borderColor: c.primary + '30' }}>
-              <Ionicons name="information-circle-outline" size={20} color={c.primary} style={{ marginTop: 1 }} />
-              <View style={{ flex: 1, gap: 3 }}>
-                <Text style={{ fontSize: 13, fontWeight: '700', color: c.primary }}>Wichtiger Hinweis</Text>
-                <Text style={{ fontSize: 13, color: c.text, lineHeight: 18 }}>Bitte erscheine 5–10 Minuten vor deinem Termin. Falls du verhindert bist, storniere bitte rechtzeitig.</Text>
-              </View>
-            </View>
-          ) : null}
-
-          <View style={{ height: 1, backgroundColor: c.border }} />
-
-          {/* CTAs */}
-          <View style={{ gap: 10 }}>
-            {therapist ? (
-              <Pressable
-                onPress={() => {
-                  setSelectedAppointment(null);
-                  if (therapist?.id) openTherapistById(therapist.id, therapist);
-                  else setSelectedTherapist(therapist);
-                }}
-                style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: c.primary, borderRadius: 999, paddingVertical: 15, gap: 8 }}
-              >
-                <Ionicons name="person-outline" size={18} color="#fff" />
-                <Text style={{ fontSize: 16, fontWeight: '700', color: '#fff' }}>Profil ansehen</Text>
-                <Ionicons name="chevron-forward" size={16} color="#fff" />
-              </Pressable>
-            ) : null}
-
-            {isActive ? (
-              <Pressable
-                onPress={() => setShowCancelAppointmentModal(true)}
-                style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: 999, paddingVertical: 14, gap: 8, borderWidth: 1.5, borderColor: c.error, backgroundColor: 'transparent' }}
-              >
-                <Ionicons name="trash-outline" size={17} color={c.error} />
-                <Text style={{ fontSize: 15, fontWeight: '700', color: c.error }}>Termin stornieren</Text>
-              </Pressable>
-            ) : null}
-          </View>
-        </View>
-      </View>,
-    );
-  };
+  const renderAppointmentDetail = (appointment) => (
+    <AppointmentDetail
+      appointment={appointment}
+      onBack={() => setSelectedAppointment(null)}
+      onOpenTherapist={openTherapistById}
+      onCancelRequest={() => setShowCancelAppointmentModal(true)}
+      renderTherapyTabShell={renderTherapyTabShell}
+      c={c} t={t} styles={styles}
+    />
+  );
 
   const renderFavoriteTherapists = () => (
     favorites.map((fav) => (
@@ -3580,392 +2072,61 @@ export default function App() {
     </View>
   );
 
-  const renderTherapyTabPatient = () => {
-    const getDate = (a) => new Date(a.slot?.startsAt ?? a.confirmedSlotAt ?? 0);
-    const now = new Date();
+  const renderTherapyTabPatient = () => (
+    <TherapyTabPatient
+      myAppointments={myAppointments}
+      myAppointmentsLoading={myAppointmentsLoading}
+      favorites={favorites}
+      activeFilterPatient={activeFilterPatient}
+      setActiveFilterPatient={setActiveFilterPatient}
+      therapyRefreshing={therapyRefreshing}
+      appointmentsLastLoadedAt={appointmentsLastLoadedAt}
+      notifications={notifications}
+      dismissedNotifIds={dismissedNotifIds}
+      onShowNotifications={() => setShowNotifications(true)}
+      onRefresh={handleTherapyRefresh}
+      onOpenTherapistById={openTherapistById}
+      onSelectAppointment={setSelectedAppointment}
+      c={c} t={t} styles={styles}
+      renderFavoritesVertical={renderFavoritesVertical}
+      renderTherapyTabShell={renderTherapyTabShell}
+      renderTherapySectionLoading={renderTherapySectionLoading}
+    />
+  );
 
-    const kommend = [...myAppointments]
-      .filter(a => ['CONFIRMED', 'PENDING'].includes(a.status) && getDate(a) >= now)
-      .sort((a, b) => getDate(a) - getDate(b));
-
-    const vergangen = [...myAppointments]
-      .filter(a =>
-        ['CANCELLED', 'DECLINED', 'EXPIRED'].includes(a.status) ||
-        (a.status === 'CONFIRMED' && getDate(a) < now)
-      )
-      .sort((a, b) => getDate(b) - getDate(a));
-
-    const nextApt = kommend[0] ?? null;
-
-    const openTherapist = (th) => {
-      if (th?.id) openTherapistById(th.id, th);
-      else if (th) setSelectedTherapist(th);
-    };
-
-    const groupByDay = (appointments) => {
-      const groups = {};
-      appointments.forEach(apt => {
-        const key = formatDayHeader(getDate(apt).toISOString());
-        if (!groups[key]) groups[key] = [];
-        groups[key].push(apt);
-      });
-      return groups;
-    };
-
-    const filteredKommend = activeFilterPatient === 'vergangen' || activeFilterPatient === 'favoriten' ? [] : kommend;
-    const filteredVergangen = activeFilterPatient === 'kommend' || activeFilterPatient === 'favoriten' ? [] : vergangen;
-
-    const msUntil = nextApt ? getDate(nextApt) - now : 0;
-    const hoursUntil = Math.floor(msUntil / 3600000);
-    const minsUntil = Math.floor((msUntil % 3600000) / 60000);
-    const countdown = msUntil > 0
-      ? (hoursUntil > 0 ? `in ${hoursUntil} Std. ${minsUntil} Min.` : `in ${minsUntil} Min.`)
-      : null;
-
-    return (
-      <View style={{ flex: 1 }}>
-        {/* ── Header ─────────────────────────────────────────────────── */}
-        <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 10, backgroundColor: c.background }}>
-          <View style={[styles.header, { marginBottom: 0 }]}>
-            <Image source={require('../../assets/icon.png')} style={styles.logoMark} />
-            <Text style={[styles.headerTitle, { color: c.text, flex: 1 }]}>Meine Termine</Text>
-            <Pressable onPress={() => setShowNotifications(true)} style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: c.card, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' }}>
-              <Ionicons name="notifications-outline" size={18} color={c.text} />
-              {notifications.filter(n => !dismissedNotifIds.has(n.id)).length > 0 && (
-                <View style={{ position: 'absolute', top: 3, right: 3, width: 8, height: 8, borderRadius: 4, backgroundColor: c.error }} />
-              )}
-            </Pressable>
-          </View>
-        </View>
-
-        <ScrollView
-          contentContainerStyle={[styles.scrollContent, { paddingBottom: 32, paddingTop: 8 }]}
-          showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={therapyRefreshing} onRefresh={handleTherapyRefresh} tintColor={c.primary} />}
-        >
-          {/* ── Hero ────────────────────────────────────────────────── */}
-          {nextApt ? (
-            <Pressable
-              onPress={() => setSelectedAppointment(nextApt)}
-              style={{ backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.border, padding: 16, marginBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 14 }}
-            >
-              <View style={{ width: 48, height: 48, borderRadius: 12, backgroundColor: c.successBg ?? '#EAF4F1', alignItems: 'center', justifyContent: 'center' }}>
-                <Ionicons name="calendar-outline" size={24} color={c.success ?? '#5A9E8E'} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 11, fontWeight: '600', color: c.muted, textTransform: 'uppercase', letterSpacing: 0.4 }}>Nächster Termin</Text>
-                <Text style={{ fontSize: 18, fontWeight: '800', color: c.text, marginTop: 2 }}>
-                  {new Date(getDate(nextApt)).toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'long' })}{', '}
-                  {new Date(getDate(nextApt)).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
-                </Text>
-                {countdown && <Text style={{ fontSize: 12, color: c.success ?? '#5A9E8E', marginTop: 2 }}>{countdown}</Text>}
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={c.muted} />
-            </Pressable>
-          ) : null}
-
-          {/* ── KPI-Karten ──────────────────────────────────────────── */}
-          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
-            <Pressable
-              onPress={() => setActiveFilterPatient(activeFilterPatient === 'kommend' ? 'all' : 'kommend')}
-              style={{ flex: 1, backgroundColor: c.primaryBg, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 4, alignItems: 'center', borderWidth: activeFilterPatient === 'kommend' ? 2 : 0, borderColor: c.primary }}
-            >
-              <Text style={{ fontSize: 20, fontWeight: '800', color: c.primary }}>{kommend.length}</Text>
-              <Text style={{ fontSize: 10, color: c.primary, fontWeight: '600', marginTop: 2, textAlign: 'center' }}>Gebuchte Termine</Text>
-              <Ionicons name="calendar-outline" size={14} color={c.primary} style={{ marginTop: 3, opacity: 0.7 }} />
-              <Ionicons name="chevron-forward" size={10} color={c.primary} style={{ position: 'absolute', top: 8, right: 6, opacity: 0.5 }} />
-            </Pressable>
-            <Pressable
-              onPress={() => setActiveFilterPatient(activeFilterPatient === 'vergangen' ? 'all' : 'vergangen')}
-              style={{ flex: 1, backgroundColor: c.warningBg ?? '#FEF5DC', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 4, alignItems: 'center', borderWidth: activeFilterPatient === 'vergangen' ? 2 : 0, borderColor: c.warning ?? '#8A6000' }}
-            >
-              <Text style={{ fontSize: 20, fontWeight: '800', color: c.warning ?? '#8A6000' }}>{vergangen.length}</Text>
-              <Text style={{ fontSize: 10, color: c.warning ?? '#8A6000', fontWeight: '600', marginTop: 2, textAlign: 'center' }}>Vergangene Termine</Text>
-              <Ionicons name="time-outline" size={14} color={c.warning ?? '#8A6000'} style={{ marginTop: 3, opacity: 0.7 }} />
-              <Ionicons name="chevron-forward" size={10} color={c.warning ?? '#8A6000'} style={{ position: 'absolute', top: 8, right: 6, opacity: 0.5 }} />
-            </Pressable>
-            <Pressable
-              onPress={() => setActiveFilterPatient(activeFilterPatient === 'favoriten' ? 'all' : 'favoriten')}
-              style={{ flex: 1, backgroundColor: '#FEF2F2', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 4, alignItems: 'center', borderWidth: activeFilterPatient === 'favoriten' ? 2 : 0, borderColor: c.error ?? '#ef4444' }}
-            >
-              <Text style={{ fontSize: 20, fontWeight: '800', color: c.error ?? '#ef4444' }}>{favorites.length}</Text>
-              <Text style={{ fontSize: 10, color: c.error ?? '#ef4444', fontWeight: '600', marginTop: 2, textAlign: 'center' }}>Favoriten</Text>
-              <Ionicons name="heart-outline" size={14} color={c.error ?? '#ef4444'} style={{ marginTop: 3, opacity: 0.7 }} />
-              <Ionicons name="chevron-forward" size={10} color={c.error ?? '#ef4444'} style={{ position: 'absolute', top: 8, right: 6, opacity: 0.5 }} />
-            </Pressable>
-          </View>
-
-          {/* ── Filter-Tabs ─────────────────────────────────────────── */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
-            <View style={{ flexDirection: 'row', gap: 6 }}>
-              {[
-                { key: 'all', label: 'Alle' },
-                { key: 'kommend', label: 'Kommend' },
-                { key: 'vergangen', label: 'Vergangen' },
-                { key: 'favoriten', label: 'Favoriten' },
-              ].map(({ key, label }) => {
-                const active = activeFilterPatient === key;
-                return (
-                  <Pressable
-                    key={key}
-                    onPress={() => setActiveFilterPatient(key)}
-                    style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: active ? c.primary : c.card, borderWidth: 1, borderColor: active ? c.primary : c.border }}
-                  >
-                    <Text style={{ fontSize: 13, fontWeight: active ? '700' : '500', color: active ? '#fff' : c.text }}>{label}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </ScrollView>
-
-          {/* ── Favoriten-Filter ────────────────────────────────────── */}
-          {activeFilterPatient === 'favoriten' ? (
-            <View style={{ backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.border, paddingHorizontal: 16, paddingBottom: 4 }}>
-              {renderFavoritesVertical((fav) => openTherapist(fav), { showAll: true })}
-            </View>
-          ) : (
-            <>
-              {/* ── Timeline ──────────────────────────────────────── */}
-              {shouldShowSectionLoading(myAppointmentsLoading, appointmentsLastLoadedAt) ? (
-                renderTherapySectionLoading()
-              ) : myAppointments.length === 0 ? (
-                <View style={{ backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.border, paddingVertical: 32, paddingHorizontal: 20, alignItems: 'center', marginBottom: 12 }}>
-                  <Ionicons name="calendar-outline" size={36} color={c.muted} style={{ marginBottom: 12 }} />
-                  <Text style={{ fontSize: 16, fontWeight: '700', color: c.text, textAlign: 'center' }}>Noch keine Termine</Text>
-                  <Text style={{ fontSize: 13, color: c.muted, textAlign: 'center', marginTop: 6, lineHeight: 20 }}>
-                    Suche eine Therapeutin oder einen Therapeuten und buche deinen ersten Termin.
-                  </Text>
-                </View>
-              ) : (
-                <>
-                  {Object.entries(groupByDay(filteredKommend)).map(([day, apts]) => (
-                    <View key={day} style={{ marginBottom: 12 }}>
-                      <Text style={{ fontSize: 11, fontWeight: '700', letterSpacing: 0.5, color: c.muted, textTransform: 'uppercase', marginBottom: 8 }}>{day}</Text>
-                      {apts.map(apt => (
-                        <PatientAppointmentCard key={apt.id} c={c} appointment={apt} onOpenDetail={() => setSelectedAppointment(apt)} onViewTherapist={() => openTherapist(apt.therapist)} />
-                      ))}
-                    </View>
-                  ))}
-                  {filteredVergangen.length > 0 && (
-                    <Text style={{ fontSize: 11, fontWeight: '700', letterSpacing: 0.5, color: c.muted, textTransform: 'uppercase', marginBottom: 8, marginTop: filteredKommend.length > 0 ? 8 : 0 }}>
-                      Vergangene Termine
-                    </Text>
-                  )}
-                  {Object.entries(groupByDay(filteredVergangen)).map(([day, apts]) => (
-                    <View key={day} style={{ marginBottom: 12 }}>
-                      <Text style={{ fontSize: 11, fontWeight: '700', letterSpacing: 0.5, color: c.muted, textTransform: 'uppercase', marginBottom: 8 }}>{day}</Text>
-                      {apts.map(apt => (
-                        <PatientAppointmentCard key={apt.id} c={c} appointment={apt} isPast onOpenDetail={() => setSelectedAppointment(apt)} onViewTherapist={() => openTherapist(apt.therapist)} />
-                      ))}
-                    </View>
-                  ))}
-                  {filteredKommend.length === 0 && filteredVergangen.length === 0 && (
-                    <View style={{ backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.border, paddingVertical: 28, paddingHorizontal: 20, alignItems: 'center' }}>
-                      <Text style={{ fontSize: 14, fontWeight: '600', color: c.text, textAlign: 'center' }}>Keine Termine</Text>
-                      <Text style={{ fontSize: 13, color: c.muted, textAlign: 'center', marginTop: 4 }}>Für diesen Filter gibt es keine Einträge.</Text>
-                    </View>
-                  )}
-                </>
-              )}
-
-              {/* ── Gespeicherte Therapeuten ────────────────────────── */}
-              <Text style={[styles.sectionLabel, { color: c.text, marginTop: 16, textTransform: 'uppercase', fontSize: 11, letterSpacing: 0.5 }]}>Gespeicherte Therapeuten</Text>
-              <View style={{ backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.border, paddingHorizontal: 16, paddingBottom: 4 }}>
-                {renderFavoritesVertical((fav) => openTherapist(fav), { onShowAll: () => setActiveFilterPatient('favoriten') })}
-              </View>
-            </>
-          )}
-        </ScrollView>
-      </View>
-    );
-  };
-
-  const renderTherapyTabTherapist = () => {
-    const slotBookingEnabled = loggedInTherapist?.bookingMode === 'FIRST_APPOINTMENT_REQUEST';
-    const pendingIncomingBookings = incomingBookings.filter((r) => r.status === 'PENDING');
-    const freeSlots = mySlots.filter(s => s.status === 'AVAILABLE');
-    const bookedSlots = mySlots.filter(s => s.status === 'BOOKED');
-
-    const handleRespond = async (id, body) => {
-      const res = await fetch(`${getBaseUrl()}/bookings/${id}/respond`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data?.error ?? `Fehler ${res.status}`);
-      }
-      loadIncomingBookings(authToken);
-      loadMySlots(authToken);
-    };
-
-    const handleTherapistCancel = (bookingId) => {
-      setTherapistCancelBookingId(bookingId);
-      setShowTherapistCancelModal(true);
-    };
-
-    const handleOpenDetail = (booking) => {
-      setTherapistDetailBooking(booking);
-      setTherapistCancelBookingId(booking.id);
-      setShowTherapistCancelModal(true);
-    };
-
-    const FILTERS = [
-      { key: 'all', label: 'Alle' },
-      { key: 'booked', label: 'Gebucht' },
-      { key: 'free', label: 'Frei' },
-      { key: 'favoriten', label: 'Favoriten' },
-    ];
-
-    const nextFreeSlot = [...freeSlots].sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt))[0];
-    const nextFreeSlotTime = nextFreeSlot
-      ? new Date(nextFreeSlot.startsAt).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
-      : null;
-
-    return (
-      <View style={{ flex: 1 }}>
-        {/* ── Header ─────────────────────────────────────────────────── */}
-        <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 10, backgroundColor: c.background }}>
-          <View style={[styles.header, { marginBottom: 0 }]}>
-            <Image source={require('../../assets/icon.png')} style={styles.logoMark} />
-            <Text style={[styles.headerTitle, { color: c.text, flex: 1 }]}>{therapyTabTitle}</Text>
-            <Pressable onPress={() => setShowNotifications(true)} style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: c.card, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' }}>
-              <Ionicons name="notifications-outline" size={18} color={c.text} />
-              {notifications.filter(n => !dismissedNotifIds.has(n.id)).length > 0 && (
-                <View style={{ position: 'absolute', top: 3, right: 3, width: 8, height: 8, borderRadius: 4, backgroundColor: c.error }} />
-              )}
-            </Pressable>
-          </View>
-        </View>
-
-        <ScrollView
-          contentContainerStyle={[styles.scrollContent, { paddingBottom: 90, paddingTop: 8 }]}
-          showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={therapyRefreshing} onRefresh={handleTherapyRefresh} tintColor={c.primary} />}
-        >
-          {slotBookingEnabled ? (
-            <>
-              {/* ── Hero ────────────────────────────────────────────── */}
-              <Pressable
-                onPress={() => setActiveFilterTherapist('free')}
-                style={{ backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.border, padding: 16, marginBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 14 }}
-              >
-                <View style={{ width: 48, height: 48, borderRadius: 12, backgroundColor: c.successBg ?? '#EAF4F1', alignItems: 'center', justifyContent: 'center' }}>
-                  <Ionicons name="time-outline" size={24} color={c.success ?? '#5A9E8E'} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 11, fontWeight: '600', color: c.muted, textTransform: 'uppercase', letterSpacing: 0.4 }}>Freie Termine heute</Text>
-                  <Text style={{ fontSize: 20, fontWeight: '800', color: c.text, marginTop: 2 }}>{freeSlots.length} freie Termine</Text>
-                  {nextFreeSlotTime && <Text style={{ fontSize: 12, color: c.muted, marginTop: 2 }}>Nächster Slot: {nextFreeSlotTime} Uhr</Text>}
-                </View>
-                <Ionicons name="chevron-forward" size={18} color={c.muted} />
-              </Pressable>
-
-              {/* ── KPI-Karten ──────────────────────────────────────── */}
-              <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
-                {[
-                  { key: 'booked', label: 'Gebuchte Termine', value: bookedSlots.length, color: c.primary, icon: 'calendar-outline' },
-                  { key: 'pending', label: 'Anfragen', value: pendingIncomingBookings.length, color: c.warning ?? '#B7791F', icon: 'person-outline' },
-                  { key: 'favoriten', label: 'Favoriten', value: favorites.length, color: c.error ?? '#ef4444', icon: 'heart-outline' },
-                ].map(({ key, label, value, color, icon }) => {
-                  const active = activeFilterTherapist === key;
-                  return (
-                    <Pressable
-                      key={key}
-                      onPress={() => setActiveFilterTherapist(active ? 'all' : key)}
-                      style={{
-                        flex: 1,
-                        backgroundColor: c.card,
-                        borderRadius: 14,
-                        paddingVertical: 16,
-                        paddingHorizontal: 4,
-                        alignItems: 'center',
-                        borderWidth: active ? 1.6 : 1.25,
-                        borderColor: color,
-                        shadowColor: color,
-                        shadowOpacity: active ? 0.10 : 0.04,
-                        shadowRadius: active ? 8 : 4,
-                        shadowOffset: { width: 0, height: 2 },
-                        elevation: active ? 2 : 1,
-                      }}
-                    >
-                      <Text style={{ fontSize: 20, fontWeight: '800', color }}>{value}</Text>
-                      <Text style={{ fontSize: 10, color, fontWeight: '600', marginTop: 2, textAlign: 'center' }}>{label}</Text>
-                      <Ionicons name={icon} size={15} color={color} style={{ marginTop: 8 }} />
-                    </Pressable>
-                  );
-                })}
-              </View>
-
-              {/* ── Segment-Filterleiste ────────────────────────────── */}
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
-                <View style={{ flexDirection: 'row', gap: 6 }}>
-                  {FILTERS.map(({ key, label }) => {
-                    const active = activeFilterTherapist === key;
-                    return (
-                      <Pressable
-                        key={key}
-                        onPress={() => setActiveFilterTherapist(key)}
-                        style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: active ? c.primary : c.card, borderWidth: 1, borderColor: active ? c.primary : c.border }}
-                      >
-                        <Text style={{ fontSize: 13, fontWeight: active ? '700' : '500', color: active ? '#fff' : c.text }}>{label}</Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              </ScrollView>
-
-              {/* ── Timeline oder Favoriten ──────────────────────────── */}
-              {activeFilterTherapist === 'favoriten' ? (
-                <View style={{ backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.border, paddingHorizontal: 16, paddingBottom: 4 }}>
-                  {renderFavoritesVertical((fav) => openTherapistById(fav.id), { showAll: true })}
-                </View>
-              ) : (
-                <TherapistTimeline
-                  c={c}
-                  mySlots={mySlots}
-                  incomingBookings={incomingBookings}
-                  activeFilter={activeFilterTherapist}
-                  deletingSlotIds={deletingSlotIds}
-                  onCancelSlot={handleCancelSlot}
-                  onRespond={handleRespond}
-                  onTherapistCancel={handleTherapistCancel}
-                  onOpenDetail={handleOpenDetail}
-                  slotsLoading={shouldShowSectionLoading(slotsLoading, slotsLastLoadedAt)}
-                  incomingLoading={shouldShowSectionLoading(incomingBookingsLoading, incomingBookingsLastLoadedAt)}
-                />
-              )}
-            </>
-          ) : (
-            <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
-              {renderTherapySectionEmpty('Terminanfragen sind noch nicht aktiviert.', 'Aktiviere Terminanfragen in deinem Profil, um Slots anzulegen.')}
-            </View>
-          )}
-
-          {/* ── Gespeicherte Therapeuten ─────────────────────────────── */}
-          {activeFilterTherapist !== 'favoriten' && (
-            <>
-              <Text style={[styles.sectionLabel, { color: c.text, marginTop: 16, textTransform: 'uppercase', fontSize: 11, letterSpacing: 0.5 }]}>Gespeicherte Therapeuten</Text>
-              <View style={{ backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.border, paddingHorizontal: 16, paddingBottom: 4 }}>
-                {renderFavoritesVertical((fav) => openTherapistById(fav.id), { onShowAll: () => setActiveFilterTherapist('favoriten') })}
-              </View>
-            </>
-          )}
-        </ScrollView>
-
-        {/* ── FAB ─────────────────────────────────────────────────────── */}
-        {slotBookingEnabled && (
-          <Pressable
-            onPress={() => setShowSlotComposerModal(true)}
-            style={{ position: 'absolute', bottom: 24, right: 20, width: 54, height: 54, borderRadius: 27, backgroundColor: c.primary, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.2, shadowRadius: 6, elevation: 6 }}
-          >
-            <Ionicons name="add" size={28} color="#fff" />
-          </Pressable>
-        )}
-      </View>
-    );
-  };
+  const renderTherapyTabTherapist = () => (
+    <TherapyTabTherapist
+      authToken={authToken}
+      mySlots={mySlots}
+      slotsLoading={slotsLoading}
+      incomingBookings={incomingBookings}
+      incomingBookingsLoading={incomingBookingsLoading}
+      favorites={favorites}
+      deletingSlotIds={deletingSlotIds}
+      activeFilterTherapist={activeFilterTherapist}
+      setActiveFilterTherapist={setActiveFilterTherapist}
+      therapyRefreshing={therapyRefreshing}
+      slotsLastLoadedAt={slotsLastLoadedAt}
+      incomingBookingsLastLoadedAt={incomingBookingsLastLoadedAt}
+      onRefresh={handleTherapyRefresh}
+      onLoadMySlots={loadMySlots}
+      onLoadIncomingBookings={loadIncomingBookings}
+      onOpenTherapistById={openTherapistById}
+      notifications={notifications}
+      dismissedNotifIds={dismissedNotifIds}
+      onShowNotifications={() => setShowNotifications(true)}
+      onCancelSlot={handleCancelSlot}
+      onTherapistCancelRequest={(bookingId) => { setTherapistCancelBookingId(bookingId); setShowTherapistCancelModal(true); }}
+      onSelectTherapistDetailBooking={setTherapistDetailBooking}
+      setShowSlotComposerModal={setShowSlotComposerModal}
+      loggedInTherapist={loggedInTherapist}
+      c={c} t={t} styles={styles}
+      renderFavoritesVertical={renderFavoritesVertical}
+      renderTherapyTabShell={renderTherapyTabShell}
+      renderTherapySectionLoading={renderTherapySectionLoading}
+      renderTherapySectionEmpty={renderTherapySectionEmpty}
+    />
+  );
 
   const renderTherapyTabManager = () => renderTherapyTabShell(
     therapyTabTitle,
@@ -3982,709 +2143,24 @@ export default function App() {
 
   // ── Register flow ──────────────────────────────────────────────────────────
 
-  const renderRegister = () => {
-    if (regSubmitted) {
-      return (
-        <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 20 }]}>
-          <View style={[styles.infoCard, { backgroundColor: c.card, borderColor: c.border, alignItems: 'center', paddingVertical: 40 }]}>
-            <Text style={{ fontSize: 48, marginBottom: 16 }}>🎉</Text>
-            <Text style={[styles.infoTitle, { color: c.text, textAlign: 'center' }]}>{t('regCompleteTitle')}</Text>
-            <Text style={[styles.infoBody, { color: c.muted, textAlign: 'center', marginTop: 8 }]}>
-              {__DEV__
-                ? t('registrationInfoBodyDev')
-                : t('regCompleteBody')}
-            </Text>
-            <Pressable
-              style={[styles.registerBtn, { backgroundColor: c.primary, marginTop: 24, paddingHorizontal: 32 }]}
-              onPress={() => { setShowRegister(false); resetRegState(); }}
-            >
-              <Text style={styles.registerBtnText}>{t('verifyEmailBtn')}</Text>
-            </Pressable>
-          </View>
-        </ScrollView>
-      );
-    }
-
-    const renderProgress = () => (
-      <View style={styles.regProgressRow}>
-        {Array.from({ length: REG_STEPS }).map((_, i) => (
-          <View
-            key={i}
-            style={[styles.regProgressBar, { backgroundColor: i < regStep ? c.primary : c.border }]}
-          />
-        ))}
-      </View>
-    );
-
-    const canProceed = () => {
-      switch (regStep) {
-        case 1:
-          return (
-            regFirstName.trim().length > 0 &&
-            regLastName.trim().length > 0 &&
-            regCity.trim().length > 0 &&
-            regPostalCode.trim().length === 5
-          );
-        case 2:
-          return regIsFreelance === true;
-        case 5:
-          return Boolean(regDocument);
-        default:
-          return true;
-      }
-    };
-
-    const renderStepContent = () => {
-      switch (regStep) {
-        case 1:
-          return (
-            <>
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
-                <Text style={[styles.regStepTitle, { color: c.text, marginBottom: 0 }]}>{t('personalDetailsTitle')}</Text>
-                <Pressable onPress={() => setShowRegStepInfo(v => !v)} hitSlop={ICON_HIT_SLOP} style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                  <Text style={{ fontSize: 12, color: c.muted }}>{t('infoLabel')}</Text>
-                  <Ionicons name={showRegStepInfo ? 'chevron-up' : 'chevron-down'} size={13} color={c.muted} />
-                </Pressable>
-              </View>
-              {showRegStepInfo && (
-                <View style={{ backgroundColor: c.mutedBg, borderRadius: 10, padding: 12, borderWidth: 1, borderColor: c.border }}>
-                  <Text style={{ fontSize: 13, color: c.muted, lineHeight: 19 }}>{REG_STEP_INFO[1]}</Text>
-                </View>
-              )}
-              <View style={{ flexDirection: 'row', gap: 8, marginBottom: 2 }}>
-                {[{ key: 'female', label: 'Therapeutin' }, { key: 'male', label: 'Therapeut' }].map((opt) => {
-                  const active = regGender === opt.key;
-                  return (
-                    <Pressable
-                      key={opt.key}
-                      onPress={() => setRegGender(active ? null : opt.key)}
-                      style={[styles.regInput, { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, backgroundColor: active ? c.primaryBg ?? c.mutedBg : c.card, borderColor: active ? c.primary : c.border }]}
-                    >
-                      <Ionicons name={opt.key === 'female' ? 'female-outline' : 'male-outline'} size={15} color={active ? c.primary : c.muted} />
-                      <Text style={{ color: active ? c.primary : c.text, fontWeight: active ? '600' : '400', fontSize: 14 }}>{opt.label}</Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-              <TextInput value={regFirstName} onChangeText={setRegFirstName} placeholder={t('firstNamePlaceholder')} placeholderTextColor={c.muted} style={[styles.regInput, { backgroundColor: c.card, borderColor: regFirstName.length > 0 && regFirstName.trim().length === 0 ? c.saved : c.border, color: c.text }]} />
-              {regFirstName.length > 0 && regFirstName.trim().length === 0 && (
-                <Text style={{ color: c.saved, fontSize: 13, marginTop: -6 }}>{t('firstNameRequired')}</Text>
-              )}
-              <TextInput value={regLastName} onChangeText={setRegLastName} placeholder={t('lastNamePlaceholder')} placeholderTextColor={c.muted} style={[styles.regInput, { backgroundColor: c.card, borderColor: regLastName.length > 0 && regLastName.trim().length === 0 ? c.saved : c.border, color: c.text }]} />
-              {regLastName.length > 0 && regLastName.trim().length === 0 && (
-                <Text style={{ color: c.saved, fontSize: 13, marginTop: -6 }}>{t('lastNameRequired')}</Text>
-              )}
-              <View style={{ flexDirection: 'row', gap: 10 }}>
-                <View style={{ width: 110 }}>
-                  <TextInput
-                    value={regPostalCode}
-                    onChangeText={(value) => setRegPostalCode(value.replace(/\D/g, '').slice(0, 5))}
-                    placeholder={t('postalCodePlaceholder')}
-                    placeholderTextColor={c.muted}
-                    keyboardType="number-pad"
-                    maxLength={5}
-                    style={[styles.regInput, { backgroundColor: c.card, borderColor: regPostalCode.length > 0 && regPostalCode.length !== 5 ? c.saved : c.border, color: c.text }]}
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <TextInput
-                    value={regCity}
-                    onChangeText={setRegCity}
-                    placeholder={t('cityPlaceholder')}
-                    placeholderTextColor={c.muted}
-                    autoCapitalize="words"
-                    style={[styles.regInput, { backgroundColor: c.card, borderColor: regCity.length > 0 && regCity.trim().length === 0 ? c.saved : c.border, color: c.text }]}
-                  />
-                </View>
-              </View>
-              {regPostalCode.length > 0 && regPostalCode.length !== 5 && (
-                <Text style={{ color: c.saved, fontSize: 13, marginTop: -6 }}>{t('postalCodeInvalid')}</Text>
-              )}
-              <View style={{ flexDirection: 'row', gap: 10 }}>
-                <View style={{ flex: 1 }}>
-                  <TextInput
-                    value={regStreet}
-                    onChangeText={setRegStreet}
-                    placeholder={t('streetOptionalPlaceholder')}
-                    placeholderTextColor={c.muted}
-                    autoCapitalize="words"
-                    style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text }]}
-                  />
-                </View>
-                <View style={{ width: 118 }}>
-                  <TextInput
-                    value={regHouseNumber}
-                    onChangeText={setRegHouseNumber}
-                    placeholder={t('houseNumberOptionalPlaceholder')}
-                    placeholderTextColor={c.muted}
-                    autoCapitalize="characters"
-                    style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text }]}
-                  />
-                </View>
-              </View>
-              <View style={{ marginTop: 2, gap: 10 }}>
-                <Text style={{ fontSize: 13, color: c.muted, lineHeight: 18 }}>
-                  {t('locationPrecisionQuestion')}
-                </Text>
-                <View style={{ gap: 10 }}>
-                  {[
-                    {
-                      key: 'approximate',
-                      label: t('locationPrecisionApproximate'),
-                      sub: t('locationPrecisionApproximateSub'),
-                    },
-                    {
-                      key: 'exact',
-                      label: t('locationPrecisionExact'),
-                      sub: t('locationPrecisionExactSub'),
-                    },
-                  ].map((option) => (
-                    <Pressable
-                      key={option.key}
-                      onPress={() => setRegLocationPrecision(option.key)}
-                      style={[styles.optionRow, {
-                        backgroundColor: regLocationPrecision === option.key ? c.primaryBg : c.card,
-                        borderColor: regLocationPrecision === option.key ? c.primary : c.border,
-                      }]}
-                    >
-                      <View style={{ flex: 1 }}>
-                        <Text style={[styles.optionLabel, { color: c.text }]}>{option.label}</Text>
-                        <Text style={[styles.optionValue, { color: c.muted, fontSize: 12 }]}>{option.sub}</Text>
-                      </View>
-                      {regLocationPrecision === option.key && <Ionicons name="checkmark-circle" size={22} color={c.primary} />}
-                    </Pressable>
-                  ))}
-                </View>
-              </View>
-            </>
-          );
-        case 2:
-          return (
-            <>
-              <Text style={[styles.regStepTitle, { color: c.text }]}>{t('freelanceCheckTitle')}</Text>
-              <Text style={{ fontSize: 14, color: c.muted, marginBottom: SPACE.lg, lineHeight: 20 }}>
-                {t('freelanceCheckBody')}
-              </Text>
-              <View style={{ marginTop: -4, marginBottom: SPACE.lg, gap: 4 }}>
-                <Text style={{ fontSize: 13, color: c.muted, lineHeight: 18 }}>
-                  {t('freelanceCheckHelpTitle')}
-                </Text>
-                <Pressable onPress={openFreelanceHelp} hitSlop={8} style={{ alignSelf: 'flex-start' }}>
-                  <Text style={{ fontSize: 13, color: c.primary, fontWeight: '600', lineHeight: 18 }}>
-                    {t('freelanceCheckHelpLink')}
-                  </Text>
-                </Pressable>
-              </View>
-              <View style={{ gap: 12 }}>
-                <Pressable
-                  onPress={() => setRegIsFreelance(true)}
-                  style={[styles.optionRow, {
-                    backgroundColor: regIsFreelance === true ? c.primaryBg : c.card,
-                    borderColor: regIsFreelance === true ? c.primary : c.border,
-                  }]}
-                >
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.optionLabel, { color: c.text }]}>{t('yesLabel')}</Text>
-                    <Text style={[styles.optionValue, { color: c.muted, fontSize: 12 }]}>{t('freelanceCheckYesSub')}</Text>
-                  </View>
-                  {regIsFreelance === true && <Ionicons name="checkmark-circle" size={22} color={c.primary} />}
-                </Pressable>
-                <Pressable
-                  onPress={() => setRegIsFreelance(false)}
-                  style={[styles.optionRow, {
-                    backgroundColor: regIsFreelance === false ? '#FEF2F2' : c.card,
-                    borderColor: regIsFreelance === false ? c.error : c.border,
-                  }]}
-                >
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.optionLabel, { color: c.text }]}>{t('noLabel')}</Text>
-                    <Text style={[styles.optionValue, { color: c.muted, fontSize: 12 }]}>{t('freelanceCheckNoSub')}</Text>
-                  </View>
-                  {regIsFreelance === false && <Ionicons name="close-circle" size={22} color={c.error} />}
-                </Pressable>
-              </View>
-              {regIsFreelance === false && (
-                <View style={[styles.noticeBox, { backgroundColor: '#FEF2F2', borderColor: c.error, marginTop: SPACE.md }]}>
-                  <Text style={styles.noticeIcon}>⚠️</Text>
-                  <Text style={[styles.noticeBody, { color: c.error }]}>{t('freelanceCheckBlockedMsg')}</Text>
-                </View>
-              )}
-            </>
-          );
-        case 3: {
-          const langSuggestions4 = regLangSearch.length > 0
-            ? languageOptions.filter(l => getLangLabel(l).toLowerCase().includes(regLangSearch.toLowerCase()) && !regLanguages.includes(l)).slice(0, 6)
-            : [];
-          const specSuggestions4 = regSpecSearch.length > 0
-            ? regSpecOptions.filter(s => s.toLowerCase().includes(regSpecSearch.toLowerCase()) && !regSpecializations.includes(s)).slice(0, 6)
-            : [];
-          return (
-            <>
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
-                <Text style={[styles.regStepTitle, { color: c.text, marginBottom: 0 }]}>{t('langAndSpecTitle')}</Text>
-                <Pressable onPress={() => setShowRegStepInfo(v => !v)} hitSlop={ICON_HIT_SLOP} style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                  <Text style={{ fontSize: 12, color: c.muted }}>{t('infoLabel')}</Text>
-                  <Ionicons name={showRegStepInfo ? 'chevron-up' : 'chevron-down'} size={13} color={c.muted} />
-                </Pressable>
-              </View>
-              {showRegStepInfo && (
-                <View style={{ backgroundColor: c.mutedBg, borderRadius: 10, padding: 12, borderWidth: 1, borderColor: c.border, marginBottom: SPACE.sm }}>
-                  <Text style={{ fontSize: 13, color: c.muted, lineHeight: 19 }}>{REG_STEP_INFO[3]}</Text>
-                </View>
-              )}
-
-              <Text style={[styles.filterSectionTitle, { color: c.muted }]}>
-                {t('specializationsOptional')} <Text style={styles.optionalInlineLabel}>{t('optionalHint')}</Text>
-              </Text>
-              <TextInput
-                value={regSpecSearch}
-                onChangeText={setRegSpecSearch}
-                onFocus={scrollRegistrationToBottom}
-                placeholder={t('searchSpecPlaceholder')}
-                placeholderTextColor={c.muted}
-                style={[styles.regInput, { backgroundColor: c.card, borderColor: c.border, color: c.text }]}
-              />
-              {specSuggestions4.length > 0 && (
-                <View style={{ borderRadius: RADIUS.sm, borderWidth: 1, borderColor: c.border, marginTop: -8, marginBottom: 8, overflow: 'hidden', backgroundColor: c.card }}>
-                  {specSuggestions4.map((s, i) => (
-                    <Pressable
-                      key={s}
-                      onPress={() => { toggleRegSpec(s); setRegSpecSearch(''); }}
-                      style={{ padding: SPACE.md, borderTopWidth: i > 0 ? 1 : 0, borderColor: c.border }}
-                    >
-                      <Text style={{ ...TYPE.body, color: c.text }}>{s}</Text>
-                    </Pressable>
-                  ))}
-                </View>
-              )}
-              {regSpecializations.length > 0 && (
-                <View style={[styles.tagRow, { marginBottom: 8 }]}>
-                  {regSpecializations.map((s) => (
-                    <Pressable key={s} onPress={() => toggleRegSpec(s)} style={[styles.chip, { backgroundColor: c.primary, borderColor: c.primary }]}>
-                      <Text style={[styles.chipText, { color: '#FFFFFF' }]}>{s} ×</Text>
-                    </Pressable>
-                  ))}
-                </View>
-              )}
-
-              <Pressable
-                onPress={() => setShowRegFortbildungen((value) => !value)}
-                style={[styles.collapseToggle, { backgroundColor: c.card, borderColor: c.border }]}
-              >
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.filterSectionTitle, { color: c.muted, marginBottom: 2 }]}>{t('certificationsLabel')}</Text>
-                  <Text style={[styles.metaNote, { color: c.textMuted }]}>{t('optionalBadge')}</Text>
-                </View>
-                <Ionicons name={showRegFortbildungen ? 'chevron-up-outline' : 'chevron-down-outline'} size={18} color={c.textMuted} />
-              </Pressable>
-              {showRegFortbildungen && certificationOptions.map((opt) => {
-                const checked = regFortbildungen.includes(opt.key);
-                return (
-                  <Pressable key={opt.key} onPress={() => toggleRegFort(opt.key)} style={styles.checkRow}>
-                    <View style={[styles.checkbox, { borderColor: checked ? c.primary : c.border, backgroundColor: checked ? c.primary : 'transparent' }]}>
-                      {checked && <Text style={styles.checkmark}>✓</Text>}
-                    </View>
-                    <Text style={[styles.checkLabel, { color: c.text }]}>{opt.label}</Text>
-                  </Pressable>
-                );
-              })}
-              {regFortbildungen.length > 0 && (
-                <View style={[styles.tagRow, { marginTop: 4, marginBottom: 4 }]}>
-                  {regFortbildungen.map((f) => (
-                    <Pressable key={f} onPress={() => toggleRegFort(f)} style={[styles.chip, { backgroundColor: c.primary, borderColor: c.primary }]}>
-                      <Text style={[styles.chipText, { color: '#FFFFFF' }]}>{getCertificationLabel(f)} ×</Text>
-                    </Pressable>
-                  ))}
-                </View>
-              )}
-
-              <View style={styles.sectionBadgeRow}>
-                <Text style={[styles.filterSectionTitle, { color: c.muted, marginBottom: 0 }]}>{t('languagesLabel')}</Text>
-                <View style={[styles.inlineMetaPill, { backgroundColor: c.primaryBg }]}>
-                  <Text style={[styles.inlineMetaPillText, { color: c.primary }]}>{t('requiredBadge')}</Text>
-                </View>
-              </View>
-              <Text style={[styles.metaNote, { color: c.textMuted, marginBottom: 8 }]}>{t('germanPreselected')}</Text>
-              <TextInput
-                value={regLangSearch}
-                onChangeText={setRegLangSearch}
-                onFocus={scrollRegistrationToBottom}
-                placeholder={t('addLangPlaceholder')}
-                placeholderTextColor={c.muted}
-                style={[styles.regInput, { backgroundColor: c.card, borderColor: regLanguages.length > 0 ? c.primary : c.border, color: c.text }]}
-              />
-              {langSuggestions4.length > 0 && (
-                <View style={{ borderRadius: RADIUS.sm, borderWidth: 1, borderColor: c.border, marginTop: -8, marginBottom: 4, overflow: 'hidden', backgroundColor: c.card }}>
-                  {langSuggestions4.map((l, i) => (
-                    <Pressable key={l} onPress={() => { toggleRegLang(l); setRegLangSearch(''); }}
-                      style={{ padding: SPACE.md, borderTopWidth: i > 0 ? 1 : 0, borderColor: c.border }}>
-                      <Text style={{ ...TYPE.body, color: c.text }}>{getLangLabel(l)}</Text>
-                    </Pressable>
-                  ))}
-                </View>
-              )}
-              {regLanguages.length > 0 && (
-                <View style={[styles.tagRow, { marginTop: 4, marginBottom: 8 }]}>
-                  {regLanguages.map(l => (
-                    <Pressable key={l} onPress={() => toggleRegLang(l)} style={[styles.chip, { backgroundColor: c.primary, borderColor: c.primary }]}>
-                      <Text style={[styles.chipText, { color: '#FFFFFF' }]}>{getLangLabel(l)} ×</Text>
-                    </Pressable>
-                  ))}
-                </View>
-              )}
-
-              {/* Hausbesuche */}
-              <View style={[styles.detailInfoRow, { marginTop: 16 }]}>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.filterSectionTitle, { color: c.muted }]}>{t('homeVisitOffer')}</Text>
-                  <Text style={{ fontSize: 12, color: c.muted, marginTop: 2 }}>{t('homeVisitOfferSub')}</Text>
-                </View>
-                <Switch value={regHomeVisit} onValueChange={(v) => { setRegHomeVisit(v); if (!v) setRegServiceRadius(null); }} trackColor={{ true: c.success }} />
-              </View>
-              {regHomeVisit && (
-                <View style={{ marginTop: 10 }}>
-                  <Text style={[styles.filterSectionTitle, { color: c.muted }]}>{t('serviceAreaQuestion')}</Text>
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 6 }}>
-                    {[5, 10, 15, 20, 30, 50].map((km) => (
-                      <Pressable
-                        key={km}
-                        onPress={() => setRegServiceRadius(km)}
-                        style={[styles.kassenartBtn, {
-                          backgroundColor: regServiceRadius === km ? c.success : c.mutedBg,
-                          borderColor: regServiceRadius === km ? c.success : c.border,
-                        }]}
-                      >
-                        <Text style={[styles.kassenartText, { color: regServiceRadius === km ? '#fff' : c.text }]}>{km} km</Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                </View>
-              )}
-
-              {/* Kassenzulassung */}
-              <Text style={[styles.filterSectionTitle, { color: c.muted, marginTop: 16 }]}>{t('kassenartLabel')}</Text>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 6 }}>
-                {kassenartOptions.filter(o => o.key !== null).map((option) => {
-                  const active = regKassenart.includes(option.key);
-                  return (
-                    <Pressable
-                      key={option.key}
-                      onPress={() => toggleRegKassenart(option.key)}
-                      style={[styles.kassenartBtn, {
-                        backgroundColor: active ? c.primary : c.mutedBg,
-                        borderColor: active ? c.primary : c.border,
-                      }]}
-                    >
-                      <Text style={[styles.kassenartText, { color: active ? '#fff' : c.text }]}>{option.label}</Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </>
-          );
-        }
-        case 4:
-          return (
-            <>
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
-                <Text style={[styles.regStepTitle, { color: c.text, marginBottom: 0 }]}>{t('complianceSectionTitle')}</Text>
-                <Pressable onPress={() => setShowRegStepInfo(v => !v)} hitSlop={ICON_HIT_SLOP} style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                  <Text style={{ fontSize: 12, color: c.muted }}>{t('infoLabel')}</Text>
-                  <Ionicons name={showRegStepInfo ? 'chevron-up' : 'chevron-down'} size={13} color={c.muted} />
-                </Pressable>
-              </View>
-              {showRegStepInfo && (
-                <View style={{ backgroundColor: c.mutedBg, borderRadius: 10, padding: 12, borderWidth: 1, borderColor: c.border, marginBottom: SPACE.sm }}>
-                  <Text style={{ fontSize: 13, color: c.muted, lineHeight: 19 }}>{REG_STEP_INFO[4]}</Text>
-                </View>
-              )}
-              <ComplianceStatusStep
-                c={c}
-                healthAuthorityStatus={regHealthAuthorityStatus}
-                onChangeHealthAuthorityStatus={setRegHealthAuthorityStatus}
-                onChangeTaxRegistrationStatus={setRegTaxRegistrationStatus}
-                t={t}
-                taxRegistrationStatus={regTaxRegistrationStatus}
-              />
-            </>
-          );
-        case 5:
-          return (
-            <>
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
-                <Text style={[styles.regStepTitle, { color: c.text, marginBottom: 0 }]}>{t('registrationDocumentTitle')}</Text>
-                <Pressable onPress={() => setShowRegStepInfo(v => !v)} hitSlop={ICON_HIT_SLOP} style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                  <Text style={{ fontSize: 12, color: c.muted }}>{t('infoLabel')}</Text>
-                  <Ionicons name={showRegStepInfo ? 'chevron-up' : 'chevron-down'} size={13} color={c.muted} />
-                </Pressable>
-              </View>
-              {showRegStepInfo && (
-                <View style={{ backgroundColor: c.mutedBg, borderRadius: 10, padding: 12, borderWidth: 1, borderColor: c.border, marginBottom: SPACE.sm }}>
-                  <Text style={{ fontSize: 13, color: c.muted, lineHeight: 19 }}>{REG_STEP_INFO[5]}</Text>
-                </View>
-              )}
-
-              <View style={[styles.noticeBox, { backgroundColor: c.mutedBg, borderColor: c.border, marginBottom: SPACE.sm }]}>
-                <Text style={styles.noticeIcon}>📄</Text>
-                <View style={{ flex: 1, gap: 4 }}>
-                  <Text style={[styles.noticeBody, { color: c.muted }]}>{t('registrationDocumentBody')}</Text>
-                  <Text style={{ color: c.muted, fontSize: 12, lineHeight: 18 }}>{t('registrationDocumentSizeHint')}</Text>
-                </View>
-              </View>
-
-              <Pressable
-                onPress={handlePickRegistrationDocument}
-                style={[styles.optionRow, { backgroundColor: c.card, borderColor: c.border, marginBottom: SPACE.sm }]}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                  <Ionicons name="document-attach-outline" size={18} color={c.primary} />
-                  <Text style={[styles.optionLabel, { color: c.text }]}>
-                    {regDocument ? t('registrationDocumentReplaceBtn') : t('registrationDocumentUploadBtn')}
-                  </Text>
-                </View>
-                <Text style={[styles.optionValue, { color: c.primary }]}>›</Text>
-              </Pressable>
-
-              {regDocument ? (
-                <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
-                  <Text style={[styles.filterSectionTitle, { color: c.muted, marginBottom: 8 }]}>{t('registrationDocumentSelected')}</Text>
-                  <Text style={{ color: c.text, fontSize: 14, fontWeight: '600' }}>{regDocument.name || 'Dokument'}</Text>
-                  <Text style={{ color: c.muted, fontSize: 12, marginTop: 4 }}>
-                    {[
-                      regDocument.mimeType || 'application/octet-stream',
-                      formatDocumentSize(regDocument.size),
-                    ].filter(Boolean).join(' • ')}
-                  </Text>
-                </View>
-              ) : (
-                <Text style={{ color: c.saved, fontSize: 13 }}>{t('registrationDocumentMissing')}</Text>
-              )}
-            </>
-          );
-        case 6:
-          return (
-            <>
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
-                <Text style={[styles.regStepTitle, { color: c.text, marginBottom: 0 }]}>{t('previewSubmitTitle')}</Text>
-                <Pressable onPress={() => setShowRegStepInfo(v => !v)} hitSlop={ICON_HIT_SLOP} style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                  <Text style={{ fontSize: 12, color: c.muted }}>{t('infoLabel')}</Text>
-                  <Ionicons name={showRegStepInfo ? 'chevron-up' : 'chevron-down'} size={13} color={c.muted} />
-                </Pressable>
-              </View>
-              {showRegStepInfo && (
-                <View style={{ backgroundColor: c.mutedBg, borderRadius: 10, padding: 12, borderWidth: 1, borderColor: c.border }}>
-                  <Text style={{ fontSize: 13, color: c.muted, lineHeight: 19 }}>{REG_STEP_INFO[6]}</Text>
-                </View>
-              )}
-              {[
-                { label: t('nameLabel'), value: `${regFirstName} ${regLastName}`.trim() || '—' },
-                { label: t('emailLabel'), value: regEmail || '—' },
-                {
-                  label: t('locationSummaryLabel'),
-                  value: formatTherapistLocationSummary({
-                    city: regCity,
-                    postalCode: regPostalCode,
-                    street: regStreet,
-                    houseNumber: regHouseNumber,
-                  }) || '—',
-                },
-                { label: t('activityLabel'), value: t('freelanceLabel') },
-                { label: t('specsLabel'), value: regSpecializations.join(', ') || '—' },
-                { label: t('languagesLabel'), value: regLanguages.map(getLangLabel).join(', ') || '—' },
-                { label: t('certificationsShort'), value: regFortbildungen.map(getCertificationLabel).join(', ') || '—' },
-                { label: t('homeVisitOffer'), value: regHomeVisit ? (regServiceRadius ? `Ja, ${regServiceRadius} km` : 'Ja') : 'Nein' },
-                { label: t('kassenartLabel'), value: regKassenart.length ? regKassenart.join(', ') : '—' },
-                { label: t('taxRegistrationLabel'), value: getComplianceStatusLabel(regTaxRegistrationStatus, t) },
-                { label: t('healthAuthorityLabel'), value: getComplianceStatusLabel(regHealthAuthorityStatus, t) },
-                { label: t('documentLabel'), value: regDocument?.name || '—' },
-              ].map(row => (
-                <View key={row.label} style={[styles.previewRow, { borderBottomColor: c.border }]}>
-                  <Text style={[styles.previewLabel, { color: c.muted }]}>{row.label}</Text>
-                  <Text style={[styles.previewValue, { color: c.text }]}>{row.value}</Text>
-                </View>
-              ))}
-              <View style={[styles.noticeBox, { backgroundColor: c.mutedBg, borderColor: c.border }]}>
-                <Text style={styles.noticeIcon}>ℹ️</Text>
-                <Text style={[styles.noticeBody, { color: c.muted }]}>
-                  {t('profileReviewNotice')}
-                </Text>
-              </View>
-            </>
-          );
-        default:
-          return null;
-      }
-    };
-
-    const REG_STEP_INFO = {
-      1: t('regStepInfoText2'),
-      3: t('regStepInfoText4'),
-      4: t('regStepInfoText5'),
-      5: t('regStepInfoText6'),
-      6: t('regStepInfoText7'),
-    };
-
-    return (
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      <ScrollView
-        ref={registerScrollRef}
-        contentContainerStyle={[styles.scrollContent, { paddingHorizontal: 20, paddingBottom: 56, gap: SPACE.sm }]}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
-        automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
-      >
-        <Pressable
-          onPress={() => {
-            if (regStep === 1) {
-              setShowRegister(false);
-              resetRegState();
-              setShowRoleSelect(true);
-            } else {
-              setRegStep(s => s - 1);
-              setShowRegStepInfo(false);
-            }
-          }}
-          style={styles.backBtn}
-        >
-          <Text style={[styles.backBtnText, { color: c.primary }]}>‹ {regStep === 1 ? t('cancelBtn') : t('backBtn')}</Text>
-        </Pressable>
-
-        {/* Header */}
-        <View style={{ marginBottom: 2 }}>
-          <Text style={{ fontSize: 16, fontWeight: '700', color: c.text }}>{t('registrationTitle')}</Text>
-          <Text style={{ fontSize: 11, color: c.muted }}>Schritt {regStep} von {REG_STEPS}</Text>
-        </View>
-
-        {renderProgress()}
-
-        {renderStepContent()}
-
-        <Pressable
-          style={[styles.registerBtn, { backgroundColor: canProceed() && !regLoading ? c.primary : c.border, marginTop: 8 }]}
-          onPress={async () => {
-            if (!canProceed() || regLoading) return;
-            if (regStep < REG_STEPS) {
-              setRegStep(s => s + 1);
-              setShowRegStepInfo(false);
-            } else {
-              setRegLoading(true);
-              try {
-                const res = await fetch(`${getBaseUrl()}/register/therapist`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    email: regEmail,
-                    password: regPassword,
-                    fullName: `${regFirstName} ${regLastName}`.trim(),
-                    city: regCity.trim() || undefined,
-                    postalCode: regPostalCode || undefined,
-                    street: regStreet.trim() || undefined,
-                    houseNumber: regHouseNumber.trim() || undefined,
-                    locationPrecision: regLocationPrecision,
-                    specializations: regSpecializations,
-                    languages: regLanguages.map(l => l.toLowerCase()),
-                    certifications: regFortbildungen,
-                    homeVisit: regHomeVisit === true,
-                    serviceRadiusKm: regHomeVisit === true ? (regServiceRadius ?? null) : null,
-                    kassenart: regKassenart.length ? regKassenart.join(',') : undefined,
-                    gender: regGender ?? undefined,
-                    compliance: {
-                      taxRegistrationStatus: regTaxRegistrationStatus ?? undefined,
-                      healthAuthorityStatus: regHealthAuthorityStatus ?? undefined,
-                    },
-                  }),
-                });
-                const resData = await res.json().catch(() => ({}));
-                if (!res.ok) {
-                  const msg = typeof resData.message === 'string' ? resData.message : (resData.error ?? `Fehler ${res.status}`);
-                  setRegLoading(false);
-                  // OTP window expired → send user back to step 1 with the error pre-filled
-                  if (msg.includes('abgelaufen') || msg.includes('nicht bestätigt')) {
-                    setRegStep(1);
-                    setRegEmailVerified(false);
-                    setRegOtpSent(false);
-                    setRegOtpCode('');
-                    setRegOtpError(msg);
-                    return;
-                  }
-                  showWebAlert(msg);
-                  return;
-                }
-                if (resData.token) {
-                  await AsyncStorage.setItem('revio_auth_token', resData.token);
-                  await AsyncStorage.setItem('revio_account_type', 'therapist');
-                  setAuthToken(resData.token);
-                  setAccountType('therapist');
-
-                  if (regDocument?.uri) {
-                    try {
-                      setDocumentUploading(true);
-                      const formData = new FormData();
-                      formData.append('document', {
-                        uri: regDocument.uri,
-                        name: regDocument.name || 'nachweis',
-                        type: regDocument.mimeType || 'application/octet-stream',
-                      });
-
-                      const uploadRes = await fetch(`${getBaseUrl()}/upload/document`, {
-                        method: 'POST',
-                        headers: { Authorization: `Bearer ${resData.token}` },
-                        body: formData,
-                      });
-
-                      if (uploadRes.ok) {
-                        const { id, originalName } = await uploadRes.json();
-                        setTherapistDocuments((prev) => [{ id, originalName, mimetype: regDocument.mimeType }, ...prev]);
-                      } else {
-                        Alert.alert(t('registrationDocumentUploadFailedTitle'), t('registrationDocumentUploadFailedBody'));
-                      }
-                    } catch {
-                      Alert.alert(t('registrationDocumentUploadFailedTitle'), t('registrationDocumentUploadFailedBody'));
-                    } finally {
-                      setDocumentUploading(false);
-                    }
-                  }
-
-                  const profileRes = await fetch(`${getBaseUrl()}/auth/me`, {
-                    headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${resData.token}` },
-                  });
-                  if (profileRes.ok) setLoggedInTherapist(normalizeTherapistProfile(await profileRes.json()));
-                  loadFavorites(resData.token);
-                  loadIncomingBookings(resData.token);
-                  await AsyncStorage.removeItem(REGISTRATION_COMPLIANCE_DRAFT_KEY);
-                  setShowRegister(false);
-                  resetRegState();
-                  return;
-                }
-              } catch {
-                setRegLoading(false);
-                showWebAlert(`${t('alertConnectionError')}. ${t('alertConnectionErrorBody')}`);
-                return;
-              }
-              setRegSubmitted(true);
-            }
-          }}
-        >
-          {regLoading && regStep >= REG_STEPS
-            ? <ActivityIndicator color="#fff" size="small" />
-            : <Text style={styles.registerBtnText}>{regStep < REG_STEPS ? 'Weiter →' : 'Profil einreichen'}</Text>
-          }
-        </Pressable>
-      </ScrollView>
-
-      {regLoading && (
-        <View style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', zIndex: 999 }}>
-          <View style={{ backgroundColor: c.card, borderRadius: 20, paddingVertical: 32, paddingHorizontal: 40, alignItems: 'center', gap: 16, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 16, elevation: 10 }}>
-            <ActivityIndicator size="large" color={c.primary} />
-            <Text style={{ color: c.text, fontSize: 16, fontWeight: '700' }}>Profil wird erstellt…</Text>
-            <Text style={{ color: c.muted, fontSize: 13, textAlign: 'center' }}>Einen Moment bitte.</Text>
-          </View>
-        </View>
-      )}
-      </KeyboardAvoidingView>
-    );
-  };
+  const renderRegister = () => (
+    <TherapistRegistrationFlow
+      visible={showRegister}
+      onClose={() => { setShowRegister(false); }}
+      onRegistered={async (token) => {
+        await AsyncStorage.setItem('revio_auth_token', token);
+        await AsyncStorage.setItem('revio_account_type', 'therapist');
+        setAuthToken(token);
+        setAccountType('therapist');
+        const profileRes = await fetch(`${getBaseUrl()}/auth/me`, { headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${token}` } });
+        if (profileRes.ok) setLoggedInTherapist(normalizeTherapistProfile(await profileRes.json()));
+        loadFavorites(token);
+        loadIncomingBookings(token);
+        setShowRegister(false);
+      }}
+      c={c} t={t} styles={styles}
+    />
+  );
 
   // ── Invite Claim Screen ───────────────────────────────────────────────────
 
@@ -4732,184 +2208,34 @@ export default function App() {
   };
 
   const renderEmailVerifyScreen = () => (
-    <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 20 }]}>
-      <View style={[styles.infoCard, { backgroundColor: c.card, borderColor: c.border, alignItems: 'center', paddingVertical: 48 }]}>
-        {emailVerifyStatus === 'verifying' && (
-          <>
-            <Text style={{ fontSize: 40, marginBottom: 16 }}>⏳</Text>
-            <Text style={[styles.infoTitle, { color: c.text, textAlign: 'center' }]}>{t('emailBeingVerified')}</Text>
-            <Text style={[styles.infoBody, { color: c.muted, textAlign: 'center', marginTop: 8 }]}>{t('pleaseWait')}</Text>
-            <Pressable
-              style={{ marginTop: 24, padding: 12 }}
-              onPress={() => { setShowEmailVerify(false); setEmailVerifyStatus('idle'); setEmailVerifyError(''); }}
-            >
-              <Text style={{ fontSize: 14, color: c.muted, textAlign: 'center' }}>{t('cancelBtn')}</Text>
-            </Pressable>
-          </>
-        )}
-        {emailVerifyStatus === 'success' && (
-          <>
-            <Text style={{ fontSize: 40, marginBottom: 16 }}>✅</Text>
-            <Text style={[styles.infoTitle, { color: c.text, textAlign: 'center' }]}>{t('emailVerified')}</Text>
-            <Text style={[styles.infoBody, { color: c.muted, textAlign: 'center', marginTop: 8 }]}>{t('autoLogin')}</Text>
-          </>
-        )}
-        {emailVerifyStatus === 'error' && (
-          <>
-            <Text style={{ fontSize: 40, marginBottom: 16 }}>❌</Text>
-            <Text style={[styles.infoTitle, { color: c.text, textAlign: 'center' }]}>{t('confirmFailed')}</Text>
-            <Text style={[styles.infoBody, { color: c.muted, textAlign: 'center', marginTop: 8 }]}>{softenErrorMessage(emailVerifyError)}</Text>
-            <Pressable
-              style={[styles.registerBtn, { backgroundColor: c.primary, marginTop: 24, paddingHorizontal: 32 }]}
-              onPress={() => { setShowEmailVerify(false); setEmailVerifyStatus('idle'); }}
-            >
-              <Text style={styles.registerBtnText}>{t('backBtn')}</Text>
-            </Pressable>
-          </>
-        )}
-      </View>
-    </ScrollView>
+    <EmailVerifyScreen
+      status={emailVerifyStatus}
+      error={emailVerifyError}
+      onCancel={() => { setShowEmailVerify(false); setEmailVerifyStatus('idle'); setEmailVerifyError(''); }}
+      c={c} t={t} styles={styles}
+    />
   );
 
-  const renderInviteClaimScreen = () => {
-    if (inviteClaimLoading && !inviteClaimData) {
-      return (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: c.background }}>
-          <Text style={{ color: c.muted, fontSize: 15 }}>{t('inviteChecking')}</Text>
-        </View>
-      );
-    }
-
-    if (inviteClaimError && !inviteClaimData) {
-      return (
-        <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 40 }]}>
-          <View style={[styles.infoCard, { backgroundColor: c.card, borderColor: c.border, marginTop: 40 }]}>
-            <Ionicons name="alert-circle-outline" size={40} color={c.error} style={{ alignSelf: 'center' }} />
-            <Text style={[styles.infoTitle, { color: c.text, textAlign: 'center' }]}>{t('inviteCheckFailed')}</Text>
-            <Text style={[styles.infoBody, { color: c.muted, textAlign: 'center' }]}>{softenErrorMessage(inviteClaimError)}</Text>
-            <Pressable
-              style={[styles.registerBtn, { backgroundColor: c.primary, marginTop: 8 }]}
-              onPress={() => { setShowInviteClaim(false); setInviteClaimError(''); }}
-            >
-              <Text style={styles.registerBtnText}>{t('toAppBtn')}</Text>
-            </Pressable>
-          </View>
-        </ScrollView>
-      );
-    }
-
-    if (!inviteClaimData) return null;
-
-    const { therapist: inviteTherapist, practice: invitePractice } = inviteClaimData;
-
-    const handleClaim = async () => {
-      if (!inviteClaimPassword || inviteClaimPassword.length < 6) {
-        setInviteClaimError(t('passwordMinLength'));
-        return;
-      }
-      if (inviteClaimPassword !== inviteClaimPasswordConfirm) {
-        setInviteClaimError(t('passwordsMismatch'));
-        return;
-      }
-      setInviteClaimLoading(true);
-      setInviteClaimError('');
-      try {
-        const res = await fetch(`${getBaseUrl()}/invite/claim`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token: inviteClaimToken, password: inviteClaimPassword }),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          setInviteClaimError(data.message ?? t('accountActivationError'));
-          return;
-        }
-        // Store token and load profile
-        await AsyncStorage.setItem('revio_auth_token', data.token);
-        setAuthToken(data.token);
-        const profileRes = await fetch(`${getBaseUrl()}/auth/me`, {
-          headers: { Authorization: `Bearer ${data.token}` },
-        });
+  const renderInviteClaimScreen = () => (
+    <InviteClaimScreen
+      loading={inviteClaimLoading}
+      error={inviteClaimError}
+      claimData={inviteClaimData}
+      token={inviteClaimToken}
+      onClose={() => { setShowInviteClaim(false); setInviteClaimError(''); }}
+      onClaimed={async (token) => {
+        await AsyncStorage.setItem('revio_auth_token', token);
+        setAuthToken(token);
+        const profileRes = await fetch(`${getBaseUrl()}/auth/me`, { headers: { Authorization: `Bearer ${token}` } });
         if (profileRes.ok) setLoggedInTherapist(normalizeTherapistProfile(await profileRes.json()));
         setShowInviteClaim(false);
         setInviteClaimToken(null);
         setInviteClaimData(null);
-        setInviteClaimPassword('');
-        setInviteClaimPasswordConfirm('');
-        // Show visibility modal
         setShowVisibilityModal(true);
-      } catch {
-        setInviteClaimError(t('connectionErrorRetry'));
-      } finally {
-        setInviteClaimLoading(false);
-      }
-    };
-
-    return (
-      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 40 }]} keyboardShouldPersistTaps="handled">
-        <View style={[styles.infoCard, { backgroundColor: c.card, borderColor: c.border, marginTop: 20, alignItems: 'center' }]}>
-          <Image source={require('../../assets/icon.png')} style={{ width: 56, height: 56, borderRadius: 16 }} />
-          <Text style={[styles.infoTitle, { color: c.text, textAlign: 'center', marginTop: 8 }]}>{t('youWereInvited')}</Text>
-          <Text style={[styles.infoBody, { color: c.muted, textAlign: 'center' }]}>
-            {t('inviteSetPasswordInfo').replace('{name}', invitePractice.name)}
-          </Text>
-        </View>
-
-        <View style={[styles.infoCard, { backgroundColor: c.card, borderColor: c.border }]}>
-          <Text style={[styles.filterSectionTitle, { color: c.muted }]}>{t('yourProfile')}</Text>
-          <Text style={[styles.detailInfoValue, { color: c.text, fontWeight: '700', fontSize: 17 }]}>{inviteTherapist.fullName}</Text>
-          <Text style={[styles.detailInfoValue, { color: c.muted }]}>{inviteTherapist.professionalTitle}</Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
-            <Ionicons name="business-outline" size={14} color={c.muted} />
-            <Text style={[styles.detailInfoValue, { color: c.muted }]}>{invitePractice.name}, {invitePractice.city}</Text>
-          </View>
-        </View>
-
-        <View style={[styles.infoCard, { backgroundColor: c.card, borderColor: c.border }]}>
-          <Text style={[styles.filterSectionTitle, { color: c.muted }]}>{t('setPassword')}</Text>
-          <View style={{ position: 'relative', marginTop: 6 }}>
-            <TextInput
-              style={[styles.regInput, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg, marginTop: 0, paddingRight: 44 }]}
-              value={inviteClaimPassword}
-              onChangeText={setInviteClaimPassword}
-              placeholder={t('passwordPlaceholder')}
-              placeholderTextColor={c.muted}
-              secureTextEntry={!showInvitePassword}
-              autoCapitalize="none"
-            />
-              <Pressable onPress={() => setShowInvitePassword(v => !v)} hitSlop={ICON_HIT_SLOP} style={{ position: 'absolute', right: 12, top: 0, bottom: 0, justifyContent: 'center' }}>
-              <Ionicons name={showInvitePassword ? 'eye-off-outline' : 'eye-outline'} size={20} color={c.muted} />
-            </Pressable>
-          </View>
-          <View style={{ position: 'relative', marginTop: 10 }}>
-            <TextInput
-              style={[styles.regInput, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg, marginTop: 0, paddingRight: 44 }]}
-              value={inviteClaimPasswordConfirm}
-              onChangeText={setInviteClaimPasswordConfirm}
-              placeholder={t('passwordConfirmPlaceholder')}
-              placeholderTextColor={c.muted}
-              secureTextEntry={!showInvitePasswordConfirm}
-              autoCapitalize="none"
-            />
-            <Pressable onPress={() => setShowInvitePasswordConfirm(v => !v)} hitSlop={ICON_HIT_SLOP} style={{ position: 'absolute', right: 12, top: 0, bottom: 0, justifyContent: 'center' }}>
-              <Ionicons name={showInvitePasswordConfirm ? 'eye-off-outline' : 'eye-outline'} size={20} color={c.muted} />
-            </Pressable>
-          </View>
-          {!!inviteClaimError && (
-            <Text style={{ color: c.error, fontSize: 13, marginTop: 8 }}>{softenErrorMessage(inviteClaimError)}</Text>
-          )}
-          <Pressable
-            style={[styles.registerBtn, { backgroundColor: inviteClaimLoading ? c.border : c.primary, marginTop: 16 }]}
-            onPress={handleClaim}
-            disabled={inviteClaimLoading}
-          >
-            <Text style={styles.registerBtnText}>{inviteClaimLoading ? 'Aktivieren…' : 'Konto aktivieren'}</Text>
-          </Pressable>
-        </View>
-      </ScrollView>
-    );
-  };
-
+      }}
+      c={c} t={t} styles={styles}
+    />
+  );
   // ── Layout ────────────────────────────────────────────────────────────────
 
   const renderTab = () => {
@@ -4975,78 +2301,13 @@ export default function App() {
       )}
 
       {/* ── Notification Sheet ──────────────────────────────────────────────── */}
-      <Modal visible={showResetPassword} transparent animationType="slide" onRequestClose={() => setShowResetPassword(false)}>
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
-          <View style={{ backgroundColor: c.background, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 28, paddingBottom: 48 }}>
-            <View style={{ width: 36, height: 4, backgroundColor: c.border, borderRadius: 2, alignSelf: 'center', marginBottom: 20 }} />
-            {resetPasswordDone ? (
-              <>
-                <Text style={{ fontSize: 22, fontWeight: '800', color: c.text, marginBottom: 8 }}>Passwort geändert</Text>
-                <Text style={{ fontSize: 15, color: c.muted, marginBottom: 24 }}>Du kannst dich jetzt mit deinem neuen Passwort anmelden.</Text>
-                <Pressable onPress={() => { setShowResetPassword(false); setShowLogin(true); }}
-                  style={{ backgroundColor: c.primary, borderRadius: 12, paddingVertical: 16, alignItems: 'center' }}>
-                  <Text style={{ color: '#fff', fontWeight: '700', fontSize: 16 }}>Zur Anmeldung</Text>
-                </Pressable>
-              </>
-            ) : (
-              <>
-                <Text style={{ fontSize: 22, fontWeight: '800', color: c.text, marginBottom: 8 }}>Neues Passwort</Text>
-                <Text style={{ fontSize: 15, color: c.muted, marginBottom: 24 }}>Wähle ein neues Passwort für dein Konto.</Text>
-                <Text style={{ fontSize: 12, fontWeight: '600', color: c.muted, marginBottom: 6 }}>NEUES PASSWORT</Text>
-                <TextInput
-                  value={resetPasswordNew}
-                  onChangeText={setResetPasswordNew}
-                  placeholder="Mindestens 8 Zeichen"
-                  placeholderTextColor={c.muted}
-                  secureTextEntry
-                  style={{ borderWidth: 1, borderColor: c.border, borderRadius: 12, backgroundColor: c.mutedBg, color: c.text, fontSize: 16, padding: 14, marginBottom: 14 }}
-                />
-                <Text style={{ fontSize: 12, fontWeight: '600', color: c.muted, marginBottom: 6 }}>PASSWORT BESTÄTIGEN</Text>
-                <TextInput
-                  value={resetPasswordConfirm}
-                  onChangeText={setResetPasswordConfirm}
-                  placeholder="Passwort wiederholen"
-                  placeholderTextColor={c.muted}
-                  secureTextEntry
-                  style={{ borderWidth: 1, borderColor: c.border, borderRadius: 12, backgroundColor: c.mutedBg, color: c.text, fontSize: 16, padding: 14, marginBottom: 16 }}
-                />
-                {!!resetPasswordError && (
-                  <View style={{ backgroundColor: c.errorBg, borderRadius: 10, padding: 12, marginBottom: 14, flexDirection: 'row', gap: 8 }}>
-                    <Ionicons name="alert-circle-outline" size={16} color={c.error} />
-                    <Text style={{ color: c.error, fontSize: 14, flex: 1 }}>{resetPasswordError}</Text>
-                  </View>
-                )}
-                <Pressable
-                  disabled={resetPasswordLoading}
-                  onPress={async () => {
-                    setResetPasswordError('');
-                    if (resetPasswordNew.length < 8) { setResetPasswordError('Passwort muss mindestens 8 Zeichen lang sein.'); return; }
-                    if (resetPasswordNew !== resetPasswordConfirm) { setResetPasswordError('Passwörter stimmen nicht überein.'); return; }
-                    setResetPasswordLoading(true);
-                    try {
-                      const res = await fetch(`${getBaseUrl()}/auth/reset-password`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', ...TUNNEL_HEADERS },
-                        body: JSON.stringify({ token: resetPasswordToken, password: resetPasswordNew }),
-                      });
-                      const data = await res.json().catch(() => ({}));
-                      if (!res.ok) { setResetPasswordError(data.message ?? 'Fehler beim Zurücksetzen.'); return; }
-                      setResetPasswordDone(true);
-                    } catch { setResetPasswordError('Verbindungsfehler. Bitte erneut versuchen.'); }
-                    finally { setResetPasswordLoading(false); }
-                  }}
-                  style={{ backgroundColor: resetPasswordLoading ? c.border : c.primary, borderRadius: 12, paddingVertical: 16, alignItems: 'center' }}
-                >
-                  {resetPasswordLoading
-                    ? <ActivityIndicator color="#fff" />
-                    : <Text style={{ color: '#fff', fontWeight: '700', fontSize: 16 }}>Passwort speichern</Text>
-                  }
-                </Pressable>
-              </>
-            )}
-          </View>
-        </View>
-      </Modal>
+      <ResetPasswordModal
+        visible={showResetPassword}
+        token={resetPasswordToken}
+        onClose={() => setShowResetPassword(false)}
+        onDone={() => setShowLogin(true)}
+        c={c}
+      />
 
       <Modal visible={showBookingForm} animationType="slide" onRequestClose={() => { setShowBookingForm(false); setBookingTargetTherapist(null); }}>
         <View style={{ flex: 1, backgroundColor: c.background }}>
@@ -5081,103 +2342,13 @@ export default function App() {
         </View>
       </Modal>
 
-      <Modal visible={showFeedbackModal} transparent animationType="slide" onRequestClose={closeFeedbackModal}>
-        <View style={{ flex: 1, justifyContent: 'flex-end' }}>
-          <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' }} onPress={closeFeedbackModal} />
-          <View
-            style={{
-              backgroundColor: c.background,
-              borderTopLeftRadius: 20,
-              borderTopRightRadius: 20,
-              maxHeight: '82%',
-              marginBottom: feedbackKeyboardInset,
-            }}
-          >
-            <ScrollView
-              keyboardShouldPersistTaps="handled"
-              contentContainerStyle={{ padding: 24, paddingBottom: 40 }}
-              showsVerticalScrollIndicator={false}
-            >
-              <View style={{ width: 36, height: 4, backgroundColor: c.border, borderRadius: 2, alignSelf: 'center', marginBottom: 16 }} />
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                <Text style={{ fontSize: 18, fontWeight: '700', color: c.text }}>{t('appFeedbackTitle')}</Text>
-                <Pressable onPress={closeFeedbackModal} hitSlop={ICON_HIT_SLOP}>
-                  <Ionicons name="close" size={22} color={c.muted} />
-                </Pressable>
-              </View>
-              <Text style={{ color: c.muted, lineHeight: 20, marginBottom: 16 }}>{t('appFeedbackBody')}</Text>
-
-              <Text style={{ ...TYPE.label, color: c.text, marginBottom: 8 }}>{t('feedbackEmailLabel')}</Text>
-              <TextInput
-                value={authenticatedFeedbackEmail || feedbackEmail}
-                onChangeText={setFeedbackEmail}
-                editable={!authenticatedFeedbackEmail}
-                autoCapitalize="none"
-                keyboardType="email-address"
-                placeholder={t('feedbackEmailPlaceholder')}
-                placeholderTextColor={c.muted}
-                style={[
-                  styles.regInput,
-                  {
-                    marginTop: 0,
-                    backgroundColor: c.card,
-                    borderColor: c.border,
-                    color: authenticatedFeedbackEmail ? c.muted : c.text,
-                    opacity: authenticatedFeedbackEmail ? 0.8 : 1,
-                  },
-                ]}
-              />
-              {authenticatedFeedbackEmail ? (
-                <Text style={{ color: c.muted, fontSize: 12, marginTop: 6 }}>{t('feedbackEmailHintLoggedIn')}</Text>
-              ) : null}
-
-              <Text style={{ ...TYPE.label, color: c.text, marginTop: 18, marginBottom: 8 }}>{t('feedbackMessageLabel')}</Text>
-              <TextInput
-                value={feedbackMessage}
-                onChangeText={setFeedbackMessage}
-                multiline
-                textAlignVertical="top"
-                placeholder={t('feedbackMessagePlaceholder')}
-                placeholderTextColor={c.muted}
-                style={[
-                  styles.regInput,
-                  {
-                    marginTop: 0,
-                    minHeight: 120,
-                    backgroundColor: c.card,
-                    borderColor: c.border,
-                    color: c.text,
-                    paddingTop: 14,
-                  },
-                ]}
-              />
-
-              {!!feedbackError && (
-                <Text style={{ color: c.error, fontSize: 13, marginTop: 12 }}>{feedbackError}</Text>
-              )}
-
-              <Pressable
-                onPress={submitFeedback}
-                disabled={feedbackLoading}
-                style={[
-                  styles.registerBtn,
-                  {
-                    backgroundColor: feedbackLoading ? c.border : c.primary,
-                    marginTop: 18,
-                    opacity: feedbackLoading ? 0.8 : 1,
-                  },
-                ]}
-              >
-                {feedbackLoading ? (
-                  <ActivityIndicator color="#fff" size="small" />
-                ) : (
-                  <Text style={styles.registerBtnText}>{t('feedbackSend')}</Text>
-                )}
-              </Pressable>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
+      <FeedbackModal
+        visible={showFeedbackModal}
+        onClose={closeFeedbackModal}
+        authToken={authToken}
+        authenticatedEmail={loggedInPatient?.email ?? loggedInTherapist?.email ?? ''}
+        c={c} t={t}
+      />
 
       <Modal visible={showNotifications} transparent animationType="slide" onRequestClose={() => setShowNotifications(false)}>
         <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' }} onPress={() => setShowNotifications(false)} />
@@ -5576,115 +2747,22 @@ export default function App() {
       </Modal>
 
       {/* ── Passwort ändern Modal ────────────────────────────────────────────── */}
-      <Modal visible={showChangePasswordModal} transparent animationType="fade" onRequestClose={() => setShowChangePasswordModal(false)}>
-        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'center', padding: 20 }} onPress={() => setShowChangePasswordModal(false)}>
-          <Pressable style={{ backgroundColor: c.card, borderRadius: 18, padding: 24 }} onPress={() => {}}>
-            <Text style={{ fontSize: 20, fontWeight: '800', color: c.text, marginBottom: 16 }}>{t('changePassword')}</Text>
-            <TextInput
-              value={currentPasswordInput}
-              onChangeText={setCurrentPasswordInput}
-              placeholder={t('currentPassword')}
-              placeholderTextColor={c.muted}
-              secureTextEntry
-              style={[styles.inputField, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg }]}
-            />
-            <TextInput
-              value={newPasswordInput}
-              onChangeText={setNewPasswordInput}
-              placeholder={t('newPassword')}
-              placeholderTextColor={c.muted}
-              secureTextEntry
-              style={[styles.inputField, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg, marginTop: 10 }]}
-            />
-            <TextInput
-              value={confirmPasswordInput}
-              onChangeText={setConfirmPasswordInput}
-              placeholder={t('confirmNewPassword')}
-              placeholderTextColor={c.muted}
-              secureTextEntry
-              style={[styles.inputField, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg, marginTop: 10 }]}
-            />
-            {!!changePasswordError && (
-              <Text style={{ color: c.error, fontSize: 13, marginTop: 10 }}>{changePasswordError}</Text>
-            )}
-            {!!changePasswordSuccess && (
-              <Text style={{ color: c.success, fontSize: 13, marginTop: 10 }}>{changePasswordSuccess}</Text>
-            )}
-            <View style={{ flexDirection: 'row', gap: 10, marginTop: 18 }}>
-              <Pressable
-                onPress={() => setShowChangePasswordModal(false)}
-                style={{ flex: 1, borderRadius: 12, borderWidth: 1, borderColor: c.border, paddingVertical: 13, alignItems: 'center' }}>
-                <Text style={{ color: c.text, fontWeight: '600' }}>{t('cancelBtn') || 'Abbrechen'}</Text>
-              </Pressable>
-              <Pressable
-                onPress={handleChangePassword}
-                disabled={changePasswordLoading}
-                style={{ flex: 1, borderRadius: 12, backgroundColor: changePasswordLoading ? c.mutedBg : c.primary, paddingVertical: 13, alignItems: 'center' }}>
-                {changePasswordLoading
-                  ? <ActivityIndicator color="#fff" size="small" />
-                  : <Text style={{ color: '#fff', fontWeight: '700' }}>{t('saveBtn') || 'Speichern'}</Text>}
-              </Pressable>
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
+      <ChangePasswordModal
+        visible={showChangePasswordModal}
+        onClose={() => setShowChangePasswordModal(false)}
+        authToken={authToken}
+        c={c} t={t}
+      />
 
       {/* ── Konto löschen Modal ──────────────────────────────────────────────── */}
-      <Modal visible={showDeleteAccountModal} transparent animationType="fade" onRequestClose={() => setShowDeleteAccountModal(false)}>
-        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', padding: 24 }} onPress={() => setShowDeleteAccountModal(false)}>
-          <Pressable style={{ backgroundColor: c.card, borderRadius: 20, padding: 24, gap: 16 }} onPress={() => {}}>
-            <Text style={{ fontSize: 20, fontWeight: '700', color: c.error, textAlign: 'center' }}>{t('deleteAccountConfirmTitle')}</Text>
-            <Text style={{ fontSize: 14, color: c.muted, textAlign: 'center', lineHeight: 20 }}>
-              {t('deleteAccountConfirmMsg')}
-            </Text>
-            {(() => {
-              const expectedLastName = loggedInTherapist
-                ? (loggedInTherapist.fullName?.split(' ').slice(-1)[0] ?? '')
-                : (loggedInPatient?.lastName ?? '');
-              return expectedLastName ? (
-                <View style={{ backgroundColor: c.errorBg, borderRadius: RADIUS.md, padding: 14, borderWidth: 1, borderColor: c.error }}>
-                  <Text style={{ fontSize: 13, color: c.error, marginBottom: 10 }}>
-                    {t('enterLastNameConfirm')}
-                  </Text>
-                  <TextInput
-                    value={deleteNameInput}
-                    onChangeText={setDeleteNameInput}
-                    placeholder={expectedLastName}
-                    placeholderTextColor={c.muted}
-                    autoCapitalize="words"
-                    style={{ backgroundColor: c.background, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: c.error, color: c.text, paddingHorizontal: 14, paddingVertical: 10, fontSize: 15 }}
-                  />
-                </View>
-              ) : null;
-            })()}
-            <Pressable
-              onPress={async () => { setShowDeleteAccountModal(false); await deleteAccountConfirmed(); }}
-              disabled={(() => {
-                const expectedLastName = loggedInTherapist
-                  ? (loggedInTherapist.fullName?.split(' ').slice(-1)[0] ?? '')
-                  : (loggedInPatient?.lastName ?? '');
-                return expectedLastName
-                  ? deleteNameInput.trim().toLowerCase() !== expectedLastName.toLowerCase()
-                  : false;
-              })()}
-              style={({ pressed }) => {
-                const expectedLastName = loggedInTherapist
-                  ? (loggedInTherapist.fullName?.split(' ').slice(-1)[0] ?? '')
-                  : (loggedInPatient?.lastName ?? '');
-                const enabled = expectedLastName
-                  ? deleteNameInput.trim().toLowerCase() === expectedLastName.toLowerCase()
-                  : true;
-                return { backgroundColor: c.error, borderRadius: RADIUS.md, paddingVertical: 14, alignItems: 'center', opacity: enabled ? (pressed ? 0.7 : 1) : 0.35 };
-              }}
-            >
-              <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>{t('deleteAccountFinal')}</Text>
-            </Pressable>
-            <Pressable onPress={() => setShowDeleteAccountModal(false)} style={{ alignItems: 'center', paddingVertical: 8 }}>
-              <Text style={{ color: c.muted, fontSize: 14 }}>{t('cancelBtn')}</Text>
-            </Pressable>
-          </Pressable>
-        </Pressable>
-      </Modal>
+      <DeleteAccountModal
+        visible={showDeleteAccountModal}
+        onClose={() => setShowDeleteAccountModal(false)}
+        onConfirmed={deleteAccountConfirmed}
+        loggedInTherapist={loggedInTherapist}
+        loggedInPatient={loggedInPatient}
+        c={c} t={t}
+      />
 
       <View style={styles.appFrame}>
         {renderTab()}

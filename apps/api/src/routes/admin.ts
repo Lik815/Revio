@@ -6,7 +6,6 @@ import { join, dirname, basename } from 'path';
 import { fileURLToPath } from 'url';
 import { getEnv } from '../env.js';
 import { geocodeAddress } from '../utils/geocode.js';
-import { tryEnsurePracticeLogoAsset } from '../../prisma/practice-logo.js';
 import { getTherapistPublicationState, getTherapistRequestabilityState } from '../utils/profile-completeness.js';
 import { sendProfileApprovedEmail, sendProfileRejectedEmail, sendProfileChangesRequestedEmail } from '../utils/mailer.js';
 import { sendPushNotification } from '../utils/push.js';
@@ -728,27 +727,6 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
     return { total: practices.length, updated, failed };
   });
 
-  // POST /admin/practices/regenerate-logos — regenerate all managed practice logos on disk
-  fastify.post('/practices/regenerate-logos', async (_request, _reply) => {
-    const practices = await fastify.prisma.practice.findMany();
-    let regenerated = 0;
-    let failed = 0;
-
-    for (const p of practices) {
-      const result = tryEnsurePracticeLogoAsset(p.name, p.city);
-      if (result) {
-        await fastify.prisma.practice.update({
-          where: { id: p.id },
-          data: { logo: result },
-        });
-        regenerated++;
-      } else {
-        failed++;
-      }
-    }
-
-    return { total: practices.length, regenerated, failed };
-  });
 
   // Documents
   fastify.get('/therapists/:id/documents', async (request, reply) => {

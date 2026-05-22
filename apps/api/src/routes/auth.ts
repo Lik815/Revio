@@ -5,6 +5,7 @@ import { hashPassword, verifyPassword, getToken } from './auth-utils.js';
 import {
   getTherapistProfileCompletion,
   getTherapistPublicationState,
+  getProfileStatus,
 } from '../utils/profile-completeness.js';
 import { geocodeAddress } from '../utils/geocode.js';
 import { sendPasswordResetEmail } from '../utils/mailer.js';
@@ -41,6 +42,9 @@ const updateMeSchema = z.object({
 const splitList = (value: string) =>
   value.split(',').map((s) => s.trim()).filter(Boolean);
 
+const TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+const newTokenExpiry = () => new Date(Date.now() + TOKEN_TTL_MS);
+
 const LOGIN_TEMPORARY_UNAVAILABLE_MESSAGE = 'Server momentan nicht erreichbar. Bitte spaeter erneut versuchen.';
 
 const isDatabaseUnavailableError = (error: unknown) => {
@@ -68,7 +72,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
 
       const user = await fastify.prisma.user.findUnique({
         where: { email },
-        include: { therapistProfile: true, managerProfile: true },
+        include: { therapistProfile: true },
       });
 
       if (user?.passwordHash) {
@@ -82,7 +86,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
         const token = randomBytes(32).toString('hex');
         await fastify.prisma.user.update({
           where: { id: user.id },
-          data: { sessionToken: token },
+          data: { sessionToken: token, sessionTokenExpiresAt: newTokenExpiry() },
         });
 
         if (user.role === 'patient') {
@@ -93,26 +97,6 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
           };
         }
 
-        if (user.role === 'manager') {
-          const manager = user.managerProfile ?? await fastify.prisma.practiceManager.findFirst({
-            where: { userId: user.id },
-          });
-          if (!manager) return reply.unauthorized('Manager-Profil nicht gefunden');
-
-          await fastify.prisma.practiceManager.update({
-            where: { id: manager.id },
-            data: { sessionToken: token },
-          });
-          const practice = manager.practiceId ? await fastify.prisma.practice.findUnique({ where: { id: manager.practiceId } }) : null;
-          return {
-            token,
-            userId: user.id,
-            accountType: 'manager',
-            practiceId: manager.practiceId,
-            name: practice?.name ?? null,
-          };
-        }
-
         const therapist = user.therapistProfile
           ?? await fastify.prisma.therapist.findFirst({ where: { userId: user.id } })
           ?? await fastify.prisma.therapist.findUnique({ where: { email } });
@@ -120,7 +104,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
 
         await fastify.prisma.therapist.update({
           where: { id: therapist.id },
-          data: { sessionToken: token },
+          data: { sessionToken: token, sessionTokenExpiresAt: newTokenExpiry() },
         });
         return {
           token,
@@ -147,7 +131,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
           const token = randomBytes(32).toString('hex');
           await fastify.prisma.user.update({
             where: { id: ensuredUser.id },
-            data: { sessionToken: token },
+            data: { sessionToken: token, sessionTokenExpiresAt: newTokenExpiry() },
           });
           await fastify.prisma.therapist.update({
             where: { id: therapist.id },
@@ -160,40 +144,6 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
             accountType: 'therapist',
             therapistId: therapist.id,
             fullName: therapist.fullName,
-          };
-        }
-      }
-
-      const manager = await fastify.prisma.practiceManager.findUnique({ where: { email } });
-      if (manager?.passwordHash) {
-        const validManager = await verifyPassword(password, manager.passwordHash);
-        if (validManager) {
-          const existingUser = await fastify.prisma.user.findUnique({ where: { email } });
-          const ensuredUser = existingUser ?? await fastify.prisma.user.create({
-            data: {
-              email,
-              passwordHash: manager.passwordHash,
-              role: 'manager',
-            },
-          });
-
-          const token = randomBytes(32).toString('hex');
-          await fastify.prisma.user.update({
-            where: { id: ensuredUser.id },
-            data: { sessionToken: token },
-          });
-          await fastify.prisma.practiceManager.update({
-            where: { id: manager.id },
-            data: { sessionToken: token, userId: manager.userId ?? ensuredUser.id },
-          });
-          const practice = manager.practiceId ? await fastify.prisma.practice.findUnique({ where: { id: manager.practiceId } }) : null;
-
-          return {
-            token,
-            userId: ensuredUser.id,
-            accountType: 'manager',
-            practiceId: manager.practiceId,
-            name: practice?.name ?? null,
           };
         }
       }
@@ -266,7 +216,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     const sessionToken = randomBytes(32).toString('hex');
     await fastify.prisma.user.update({
       where: { id: user.id },
-      data: { emailVerifiedAt: new Date(), emailVerificationToken: null, sessionToken },
+      data: { emailVerifiedAt: new Date(), emailVerificationToken: null, sessionToken, sessionTokenExpiresAt: newTokenExpiry() },
     });
 
     const therapist = user.therapistProfile ?? await fastify.prisma.therapist.findFirst({
@@ -294,6 +244,13 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     let therapist = null as any;
     const user = await fastify.prisma.user.findUnique({
       where: { sessionToken: token },
+    });
+    if (user?.sessionTokenExpiresAt && user.sessionTokenExpiresAt < new Date()) {
+      await fastify.prisma.user.update({ where: { id: user.id }, data: { sessionToken: null, sessionTokenExpiresAt: null } });
+      return reply.unauthorized('Sitzung abgelaufen. Bitte erneut anmelden.');
+    }
+    const userWithProfile = await fastify.prisma.user.findUnique({
+      where: { sessionToken: token },
       include: {
         therapistProfile: {
           include: {
@@ -307,19 +264,19 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     });
 
     // Patient profile — return directly without therapist lookup
-    if (user?.role === 'patient') {
+    if (userWithProfile?.role === 'patient') {
       return {
-        id: user.id,
-        email: user.email,
+        id: userWithProfile.id,
+        email: userWithProfile.email,
         role: 'patient',
-        firstName: (user as any).firstName ?? '',
-        lastName: (user as any).lastName ?? '',
-        phone: (user as any).phone ?? null,
-        createdAt: user.createdAt,
+        firstName: (userWithProfile as any).firstName ?? '',
+        lastName: (userWithProfile as any).lastName ?? '',
+        phone: (userWithProfile as any).phone ?? null,
+        createdAt: userWithProfile.createdAt,
       };
     }
 
-    if (user?.therapistProfile) therapist = user.therapistProfile;
+    if (userWithProfile?.therapistProfile) therapist = userWithProfile.therapistProfile;
 
     if (!therapist) {
       therapist = await fastify.prisma.therapist.findUnique({
@@ -334,12 +291,6 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     }
     if (!therapist) return reply.unauthorized('Ungültiger Token');
 
-    const managerAccount = await fastify.prisma.practiceManager.findUnique({
-      where: { therapistId: therapist.id },
-      include: { assignments: { include: { practice: { select: { id: true, name: true, city: true } } }, take: 1 } },
-    });
-    const adminPractice = managerAccount?.assignments[0]?.practice ?? null;
-
     const publication = getTherapistPublicationState(therapist, { links: therapist.links });
     return {
       id: therapist.id,
@@ -352,7 +303,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       homeVisit: therapist.homeVisit,
       serviceRadiusKm: (therapist as any).serviceRadiusKm ?? null,
       kassenart: (therapist as any).kassenart ?? '',
-      emailVerified: !!(user?.emailVerifiedAt ?? true),
+      emailVerified: !!(userWithProfile?.emailVerifiedAt ?? true),
       specializations: splitList(therapist.specializations),
       languages: splitList(therapist.languages),
       certifications: splitList(therapist.certifications),
@@ -376,9 +327,14 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       taxRegistrationStatus: therapist.taxRegistrationStatus ?? null,
       healthAuthorityStatus: therapist.healthAuthorityStatus ?? null,
       complianceUpdatedAt: therapist.complianceUpdatedAt ?? null,
+      compliance: {
+        taxRegistrationStatus: therapist.taxRegistrationStatus ?? null,
+        healthAuthorityStatus: therapist.healthAuthorityStatus ?? null,
+        updatedAt: therapist.complianceUpdatedAt ?? null,
+      },
       bookingMode: therapist.bookingMode ?? 'DIRECTORY_ONLY',
+      profileStatus: getProfileStatus(therapist as any),
       ...publication,
-      adminPractice: adminPractice ?? null,
       practices: therapist.links.map((l: any) => ({
         id: l.practice.id,
         name: l.practice.name,
@@ -434,13 +390,6 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       therapist = await fastify.prisma.therapist.findUnique({
         where: { sessionToken: token },
       });
-    }
-    // Also allow manager token to edit their linked therapist profile
-    if (!therapist) {
-      const manager = await fastify.prisma.practiceManager.findUnique({ where: { sessionToken: token } });
-      if (manager?.therapistId) {
-        therapist = await fastify.prisma.therapist.findUnique({ where: { id: manager.therapistId } });
-      }
     }
     if (!therapist) return reply.unauthorized('Ungültiger Token');
 
@@ -556,6 +505,45 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     };
   });
 
+  fastify.patch('/auth/me/compliance', async (request, reply) => {
+    const token = getToken(request);
+    if (!token) return reply.unauthorized('Kein Token');
+
+    const schema = z.object({
+      taxRegistrationStatus: z.enum(['yes', 'no', 'in_progress']).nullable().optional(),
+      healthAuthorityStatus: z.enum(['yes', 'no', 'in_progress', 'unknown']).nullable().optional(),
+    });
+    const parsed = schema.safeParse(request.body);
+    if (!parsed.success) return reply.badRequest(parsed.error.flatten().toString());
+
+    const user = await fastify.prisma.user.findUnique({ where: { sessionToken: token } });
+    const therapist = (user
+      ? (await fastify.prisma.therapist.findFirst({ where: { userId: user.id } }))
+        ?? (await fastify.prisma.therapist.findUnique({ where: { sessionToken: token } }))
+      : await fastify.prisma.therapist.findUnique({ where: { sessionToken: token } }));
+    if (!therapist) return reply.unauthorized('Ungültiger Token');
+
+    const updateData: Record<string, unknown> = { complianceUpdatedAt: new Date() };
+    if (parsed.data.taxRegistrationStatus !== undefined) updateData.taxRegistrationStatus = parsed.data.taxRegistrationStatus;
+    if (parsed.data.healthAuthorityStatus !== undefined) updateData.healthAuthorityStatus = parsed.data.healthAuthorityStatus;
+
+    const updated = await fastify.prisma.therapist.update({ where: { id: therapist.id }, data: updateData as any });
+
+    const merged = { ...therapist, ...updated };
+    const { missingFields } = getTherapistProfileCompletion(merged as any);
+    const profileStatus = getProfileStatus(merged as any);
+
+    return {
+      compliance: {
+        taxRegistrationStatus: (updated as any).taxRegistrationStatus ?? null,
+        healthAuthorityStatus: (updated as any).healthAuthorityStatus ?? null,
+        updatedAt: (updated as any).complianceUpdatedAt ?? null,
+      },
+      profileStatus,
+      missingFields,
+    };
+  });
+
   fastify.delete('/auth/me', async (request, reply) => {
     const token = getToken(request);
     if (!token) return reply.unauthorized('Kein Token');
@@ -584,7 +572,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     if (user) {
       await fastify.prisma.user.update({
         where: { id: user.id },
-        data: { sessionToken: null },
+        data: { sessionToken: null, sessionTokenExpiresAt: null },
       });
     }
 
@@ -650,18 +638,12 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     if (user) {
       await fastify.prisma.user.update({
         where: { id: user.id },
-        data: { sessionToken: null },
+        data: { sessionToken: null, sessionTokenExpiresAt: null },
       });
-      if (user.role === 'manager') {
-        await fastify.prisma.practiceManager.updateMany({
-          where: { userId: user.id },
-          data: { sessionToken: null },
-        });
-      }
       if (user.role === 'therapist') {
         await fastify.prisma.therapist.updateMany({
           where: { userId: user.id },
-          data: { sessionToken: null },
+          data: { sessionToken: null, sessionTokenExpiresAt: null },
         });
       }
       return { success: true };
@@ -673,7 +655,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     if (therapist) {
       await fastify.prisma.therapist.update({
         where: { id: therapist.id },
-        data: { sessionToken: null },
+        data: { sessionToken: null, sessionTokenExpiresAt: null },
       });
     }
 
@@ -775,7 +757,22 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     const { email } = parsed.data;
 
     // Always return success to prevent email enumeration
-    const user = await fastify.prisma.user.findUnique({ where: { email } });
+    let user = await fastify.prisma.user.findUnique({ where: { email } });
+
+    // Legacy: Therapist without a User row — create one now
+    if (!user) {
+      const legacyTherapist = await fastify.prisma.therapist.findUnique({ where: { email } });
+      if (legacyTherapist?.passwordHash && !legacyTherapist.userId) {
+        user = await fastify.prisma.user.create({
+          data: { email, passwordHash: legacyTherapist.passwordHash, role: 'therapist' },
+        });
+        await fastify.prisma.therapist.update({
+          where: { id: legacyTherapist.id },
+          data: { userId: user.id },
+        });
+      }
+    }
+
     if (!user) return { ok: true };
 
     const token = randomBytes(32).toString('hex');
@@ -834,6 +831,33 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     return { ok: true };
   });
 
+  // Browser landing page for reset-password link
+  fastify.get('/auth/reset-password', async (request, reply) => {
+    const { token } = request.query as { token?: string };
+    reply.header('Content-Type', 'text/html; charset=utf-8');
+    if (!token) return reply.code(400).send('<html><body>Token fehlt.</body></html>');
+
+    const user = await fastify.prisma.user.findFirst({
+      where: { passwordResetToken: token, passwordResetExpiresAt: { gt: new Date() } },
+    });
+    if (!user) {
+      return reply.code(400).send(`
+        <html><head><meta charset="utf-8"></head><body style="font-family:sans-serif;text-align:center;padding:60px 20px">
+          <h2>Link nicht mehr gültig</h2>
+          <p>Bitte fordere einen neuen Link an.</p>
+        </body></html>
+      `);
+    }
+
+    return reply.send(`
+      <html><head><meta charset="utf-8"></head><body style="font-family:sans-serif;text-align:center;padding:60px 20px">
+        <h2>Passwort zurücksetzen</h2>
+        <p>Öffne die Revio-App, um dein Passwort zurückzusetzen.</p>
+        <a href="revo://reset-password?token=${token}" style="display:inline-block;background:#3E6271;color:#fff;padding:14px 28px;border-radius:10px;text-decoration:none;font-weight:600;margin-top:16px">App öffnen</a>
+      </body></html>
+    `);
+  });
+
   // ── Change password (authenticated) ─────────────────────────────────────────
   fastify.patch('/auth/password', async (request, reply) => {
     const token = getToken(request);
@@ -867,13 +891,6 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
 
     if (user.role === 'therapist') {
       await fastify.prisma.therapist.updateMany({
-        where: { userId: user.id },
-        data: { passwordHash: newHash },
-      });
-    }
-
-    if (user.role === 'manager') {
-      await fastify.prisma.practiceManager.updateMany({
         where: { userId: user.id },
         data: { passwordHash: newHash },
       });

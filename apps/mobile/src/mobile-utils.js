@@ -268,6 +268,7 @@ const mapApiTherapist = (t) => ({
     logo: resolveMediaUrl(p.logo),
     photos: p.photos ?? [],
   })),
+  website: t.website ?? '',
   bookingMode: t.bookingMode ?? 'DIRECTORY_ONLY',
   requestable: t.requestable ?? false,
   nextFreeSlotAt: t.nextFreeSlotAt ?? null,

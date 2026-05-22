@@ -508,5 +508,5 @@ Future agents (post-MVP) are documented in [`docs/product.md`](docs/product.md) 
 | [`docs/search-ranking.md`](docs/search-ranking.md) | Query processing, scoring tiers, filters, suggestions, map interaction |
 | [`docs/design-system.md`](docs/design-system.md) | Brand, colors, typography, components, icons, splash screen |
 | [`todo.md`](todo.md) | Current roadmap and completed items |
-| [`structure.md`](structure.md) | Detailed project structure and development phases |
+| [`history.md`](history.md) | Archived project history, including the removed legacy `structure.md` content |
 | [`revioApp/agents.md`](revioApp/agents.md) | Original full agent specification (superseded by docs/) |

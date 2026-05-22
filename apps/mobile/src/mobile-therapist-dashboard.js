@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import {
   Image,
@@ -10,6 +11,9 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
 import { TherapistSlotComposer } from './mobile-slot-composer';
 
 import {
@@ -19,11 +23,60 @@ import {
   resolveMediaUrl,
   SPACE,
   TYPE,
+  getBaseUrl,
+  TUNNEL_HEADERS,
+  normalizeTherapistProfile,
+  normalizeLanguageCodes,
 } from './mobile-utils';
 import {
   ComplianceStatusStep,
   getComplianceStatusLabel,
 } from './mobile-compliance-step';
+import { useAuth } from './context/AuthContext';
+
+const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024;
+
+function getTherapistComplianceDraftKey(therapistId) {
+  return `revio_therapist_compliance_draft_${therapistId}`;
+}
+
+function formatDocumentSize(bytes) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return null;
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${Math.round(bytes / 1024)} KB`;
+}
+
+function validateDocumentSize(asset, t) {
+  if (!asset?.size || asset.size <= 0) return true;
+  if (asset.size <= MAX_DOCUMENT_BYTES) return true;
+  Alert.alert(
+    t('alertDocumentTooLargeTitle'),
+    t('alertDocumentTooLargeBody')
+      .replace('{max}', formatDocumentSize(MAX_DOCUMENT_BYTES))
+      .replace('{name}', asset.name || t('documentFallback')),
+  );
+  return false;
+}
+
+function normalizeComplianceValue(value, allowedValues) {
+  return allowedValues.includes(value) ? value : null;
+}
+
+const COMPLIANCE_STATUS_VALUES = ['yes', 'no', 'in_progress'];
+const HEALTH_AUTHORITY_STATUS_VALUES = ['yes', 'no', 'in_progress', 'unknown'];
+
+function normalizeComplianceDraft(value) {
+  return {
+    taxRegistrationStatus: normalizeComplianceValue(value?.taxRegistrationStatus, COMPLIANCE_STATUS_VALUES),
+    healthAuthorityStatus: normalizeComplianceValue(value?.healthAuthorityStatus, HEALTH_AUTHORITY_STATUS_VALUES),
+  };
+}
+
+function parseComplianceDraft(rawValue) {
+  if (!rawValue) return normalizeComplianceDraft(null);
+  try { return normalizeComplianceDraft(JSON.parse(rawValue)); }
+  catch { return normalizeComplianceDraft(null); }
+}
 
 const LANG_FLAGS = {
   DE: '🇩🇪', EN: '🇬🇧', FR: '🇫🇷', ES: '🇪🇸', IT: '🇮🇹',
@@ -56,67 +109,186 @@ function StatusMiniCard({ icon, label, value, color, c }) {
   );
 }
 
-export function TherapistDashboardScreen(props) {
-  const {
-    c,
-    documentUploading,
-    editAvailability,
-    editBio,
-    editPhone,
-    editHomeVisit,
-    editIsVisible,
-    editGender,
-    editKassenart,
-    editLanguages,
-    editHealthAuthorityStatus,
-    editMode,
-    editServiceRadius,
-    editSpecializations,
-    editTaxRegistrationStatus,
-    handlePickDocument,
-    handlePickPhoto,
-    handleSaveProfile,
-    loggedInTherapist,
-    onEnterEdit,
-    profileSaving,
-    setEditAvailability,
-    setEditBio,
-    setEditPhone,
-    setEditHomeVisit,
-    setEditIsVisible,
-    setEditGender,
-    setEditKassenart,
-    setEditLanguages,
-    setEditHealthAuthorityStatus,
-    setEditMode,
-    setEditServiceRadius,
-    setEditSpecializations,
-    setEditTaxRegistrationStatus,
-    styles,
-    t,
-    therapistDocuments,
-    editBookingMode,
-    setEditBookingMode,
-    editCertifications,
-    setEditCertifications,
-    certificationOptions,
-    onOpenTherapyTab,
-    onAddSlot,
-    editCity,
-    setEditCity,
-    editPostalCode,
-    setEditPostalCode,
-    editStreet,
-    setEditStreet,
-    editHouseNumber,
-    setEditHouseNumber,
-    editLocationPrecision,
-    setEditLocationPrecision,
-  } = props;
+export function TherapistDashboardScreen({ c, t, styles, certificationOptions, onOpenTherapyTab, onAddSlot, onProfileSaved }) {
+  const { authToken, loggedInTherapist, setLoggedInTherapist } = useAuth();
+
+  // Edit state
+  const [editMode, setEditMode] = useState(false);
+  const [editBio, setEditBio] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [editCity, setEditCity] = useState('');
+  const [editPostalCode, setEditPostalCode] = useState('');
+  const [editStreet, setEditStreet] = useState('');
+  const [editHouseNumber, setEditHouseNumber] = useState('');
+  const [editLocationPrecision, setEditLocationPrecision] = useState('approximate');
+  const [editSpecializations, setEditSpecializations] = useState('');
+  const [editLanguages, setEditLanguages] = useState([]);
+  const [editHomeVisit, setEditHomeVisit] = useState(false);
+  const [editServiceRadius, setEditServiceRadius] = useState(null);
+  const [editKassenart, setEditKassenart] = useState('');
+  const [editGender, setEditGender] = useState(null);
+  const [editIsVisible, setEditIsVisible] = useState(true);
+  const [editBookingMode, setEditBookingMode] = useState('DIRECTORY_ONLY');
+  const [editAvailability, setEditAvailability] = useState('');
+  const [editTaxRegistrationStatus, setEditTaxRegistrationStatus] = useState(null);
+  const [editHealthAuthorityStatus, setEditHealthAuthorityStatus] = useState(null);
+  const [editCertifications, setEditCertifications] = useState([]);
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [therapistDocuments, setTherapistDocuments] = useState([]);
+  const [documentUploading, setDocumentUploading] = useState(false);
 
   const [photoError, setPhotoError] = useState(false);
   const [showSlotModal, setShowSlotModal] = useState(false);
   const [adminExpanded, setAdminExpanded] = useState(false);
+
+  // Load documents on mount / token change
+  useEffect(() => {
+    if (!authToken) { setTherapistDocuments([]); return; }
+    fetch(`${getBaseUrl()}/auth/documents`, { headers: { Authorization: `Bearer ${authToken}` } })
+      .then(r => r.ok ? r.json() : [])
+      .then(docs => setTherapistDocuments(Array.isArray(docs) ? docs : []))
+      .catch(() => {});
+  }, [authToken]);
+
+  const enterEdit = async () => {
+    const th = loggedInTherapist;
+    if (!th) return;
+    const draft = th.id
+      ? parseComplianceDraft(await AsyncStorage.getItem(getTherapistComplianceDraftKey(th.id)))
+      : normalizeComplianceDraft(null);
+    const nextCompliance = draft.taxRegistrationStatus || draft.healthAuthorityStatus
+      ? draft : normalizeComplianceDraft(th?.compliance);
+    setEditBio(th.bio ?? '');
+    setEditPhone(th.phone ?? '');
+    setEditCity(th.city ?? '');
+    setEditPostalCode(th.postalCode ?? '');
+    setEditStreet(th.street ?? '');
+    setEditHouseNumber(th.houseNumber ?? '');
+    setEditLocationPrecision(th.locationPrecision ?? 'approximate');
+    setEditSpecializations((th.specializations ?? []).join(', '));
+    setEditLanguages(normalizeLanguageCodes(th.languages));
+    setEditHomeVisit(th.homeVisit ?? false);
+    setEditServiceRadius(th.serviceRadiusKm ?? null);
+    setEditKassenart(th.kassenart ?? '');
+    setEditGender(th.gender ?? null);
+    setEditIsVisible(th.isVisible ?? true);
+    setEditBookingMode(th.bookingMode ?? 'DIRECTORY_ONLY');
+    setEditAvailability(th.availability ?? '');
+    setEditTaxRegistrationStatus(nextCompliance.taxRegistrationStatus);
+    setEditHealthAuthorityStatus(nextCompliance.healthAuthorityStatus);
+    setEditCertifications(Array.isArray(th.certifications) ? th.certifications : []);
+    setEditMode(true);
+  };
+
+  const handleSaveProfile = async () => {
+    if (!authToken || !loggedInTherapist?.id) return;
+    setProfileSaving(true);
+    const complianceDraftKey = getTherapistComplianceDraftKey(loggedInTherapist.id);
+    const compliancePayload = {
+      taxRegistrationStatus: editTaxRegistrationStatus ?? null,
+      healthAuthorityStatus: editHealthAuthorityStatus ?? null,
+    };
+    try {
+      await AsyncStorage.setItem(complianceDraftKey, JSON.stringify(compliancePayload));
+      const patchBody = {
+        bio: editBio, phone: editPhone.trim() || null,
+        specializations: editSpecializations.split(',').map(s => s.trim()).filter(Boolean),
+        languages: editLanguages.map(l => l.toLowerCase()),
+        certifications: editCertifications,
+        homeVisit: editHomeVisit,
+        serviceRadiusKm: editHomeVisit ? (editServiceRadius ?? null) : null,
+        kassenart: editKassenart, gender: editGender,
+        isVisible: editIsVisible, availability: editAvailability,
+        bookingMode: editBookingMode,
+        city: editCity.trim() || undefined, postalCode: editPostalCode.trim() || null,
+        street: editStreet.trim() || null, houseNumber: editHouseNumber.trim() || null,
+        locationPrecision: editLocationPrecision,
+      };
+      const profileRes = await fetch(`${getBaseUrl()}/auth/me`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify(patchBody),
+      });
+      const profileData = await profileRes.json().catch(() => ({}));
+      const complianceRes = await fetch(`${getBaseUrl()}/auth/me/compliance`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify(compliancePayload),
+      });
+      const complianceData = await complianceRes.json().catch(() => ({}));
+      if (complianceRes.ok) await AsyncStorage.removeItem(complianceDraftKey);
+      if (profileRes.ok || complianceRes.ok) {
+        const refreshRes = await fetch(`${getBaseUrl()}/auth/me`, { headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` } });
+        if (refreshRes.ok) setLoggedInTherapist(normalizeTherapistProfile(await refreshRes.json()));
+      }
+      if (profileRes.ok && complianceRes.ok) {
+        onProfileSaved(t('profileSavedModalTitle'), t('profileSavedModalBody'));
+      } else if (profileRes.ok) {
+        setEditMode(false);
+        onProfileSaved(t('alertHint'), t('profileSavedCompliancePendingBody'));
+      } else if (complianceRes.ok) {
+        setEditMode(false);
+        onProfileSaved(t('alertHint'), profileData.message ?? t('complianceOnlySavedBody'));
+      } else {
+        Alert.alert(t('alertError'), profileData.message ?? complianceData.message ?? t('alertProfileSaveFail'));
+      }
+    } catch {
+      Alert.alert(t('alertConnectionError'), t('alertConnectionErrorBody'));
+    }
+    setProfileSaving(false);
+  };
+
+  const handlePickPhoto = async () => {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) return;
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true, aspect: [1, 1], quality: 0.7, base64: false,
+    });
+    if (result.canceled || !result.assets?.[0]?.uri) return;
+    const asset = result.assets[0];
+    try {
+      const formData = new FormData();
+      formData.append('photo', { uri: asset.uri, name: asset.uri.split('/').pop() || 'photo.jpg', type: asset.mimeType || 'image/jpeg' });
+      const uploadRes = await fetch(`${getBaseUrl()}/upload/photo`, {
+        method: 'POST', headers: { Authorization: `Bearer ${authToken}` }, body: formData,
+      });
+      if (uploadRes.ok) {
+        const { url } = await uploadRes.json();
+        setLoggedInTherapist(prev => ({ ...prev, photo: url }));
+        Alert.alert(t('alertSuccess'), t('alertAvatarSaved'));
+      } else {
+        Alert.alert(t('alertError'), `${t('alertPhotoUploadFail')} (${uploadRes.status})`);
+      }
+    } catch { Alert.alert(t('alertConnectionError'), t('alertConnectionErrorBody')); }
+  };
+
+  const handlePickDocument = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'],
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled || !result.assets?.[0]) return;
+      const asset = result.assets[0];
+      if (!validateDocumentSize(asset, t)) return;
+      const formData = new FormData();
+      formData.append('document', { uri: asset.uri, name: asset.name, type: asset.mimeType || 'application/octet-stream' });
+      setDocumentUploading(true);
+      const res = await fetch(`${getBaseUrl()}/upload/document`, {
+        method: 'POST', headers: { Authorization: `Bearer ${authToken}` }, body: formData,
+      });
+      if (res.ok) {
+        const { id, originalName } = await res.json();
+        setTherapistDocuments(prev => [{ id, originalName, mimetype: asset.mimeType }, ...prev]);
+        Alert.alert(t('alertUploaded'), t('alertUploadedBody').replace('{name}', originalName));
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        Alert.alert(t('alertError'), errData.message ?? t('alertDocUploadFail'));
+      }
+    } catch { Alert.alert(t('alertConnectionError'), t('alertConnectionErrorBody')); }
+    finally { setDocumentUploading(false); }
+  };
 
   const th = loggedInTherapist;
   if (!th) return null;
@@ -158,7 +330,7 @@ export function TherapistDashboardScreen(props) {
           </View>
 
           <Pressable
-            onPress={editMode ? () => setEditMode(false) : onEnterEdit}
+            onPress={editMode ? () => setEditMode(false) : enterEdit}
             style={{ width: 36, height: 36, borderRadius: 18, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' }}
             hitSlop={8}
           >

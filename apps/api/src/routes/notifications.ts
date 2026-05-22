@@ -195,37 +195,6 @@ export const notificationRoutes: FastifyPluginAsync = async (fastify) => {
       return { notifications };
     }
 
-    // ── Manager path ───────────────────────────────────────────────────────
-    const manager = await fastify.prisma.practiceManager.findUnique({
-      where: { sessionToken: token },
-      include: { assignments: { select: { practiceId: true } } },
-    });
-    if (manager) {
-      const practiceIds = manager.assignments.map((a: any) => a.practiceId);
-      if (practiceIds.length > 0) {
-        const joinRequests = await fastify.prisma.therapistPracticeLink.findMany({
-          where: { practiceId: { in: practiceIds }, status: 'PROPOSED', initiatedBy: 'THERAPIST' } as any,
-          include: {
-            therapist: { select: { id: true, fullName: true } },
-            practice: { select: { id: true, name: true } },
-          },
-          orderBy: { createdAt: 'desc' },
-        });
-        for (const link of joinRequests) {
-          notifications.push({
-            id: link.id,
-            type: 'JOIN_REQUEST',
-            message: `${(link as any).therapist.fullName} möchte ${(link as any).practice.name} beitreten.`,
-            createdAt: link.createdAt,
-            linkId: link.id,
-            practiceId: (link as any).practice.id,
-            actionLabel: 'Anfrage öffnen',
-          });
-        }
-      }
-      return { notifications };
-    }
-
     return reply.unauthorized('Kein Token');
   });
 };

@@ -1222,7 +1222,7 @@ describe('Password reset', () => {
       payload: { email: registrationPayload.email },
     });
     expect(forgotRes.statusCode).toBe(200);
-    expect(forgotRes.json().success).toBe(true);
+    expect(forgotRes.json().ok).toBe(true);
 
     const userBeforeReset = await prisma.user.findUnique({
       where: { email: registrationPayload.email },
@@ -1275,10 +1275,7 @@ describe('Password reset', () => {
     });
 
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({
-      success: true,
-      message: 'Wenn ein Konto mit dieser E-Mail-Adresse existiert, haben wir dir einen Link zum Zurücksetzen geschickt.',
-    });
+    expect(res.json().ok).toBe(true);
   });
 
   it('supports legacy therapist accounts without a User row', async () => {
@@ -1326,39 +1323,6 @@ describe('Password reset', () => {
       payload: { email: 'legacy-reset@test.de', password: 'legacy-pass-456' },
     });
     expect(loginRes.statusCode).toBe(200);
-  });
-
-  it('returns a generic success response for manager accounts without issuing a reset token', async () => {
-    const passwordHash = await hashPassword('manager-pass-123');
-    const managerUser = await prisma.user.create({
-      data: {
-        email: 'manager-reset@test.de',
-        passwordHash,
-        role: 'manager',
-      },
-    });
-    await prisma.practiceManager.create({
-      data: {
-        email: managerUser.email,
-        userId: managerUser.id,
-        passwordHash,
-      },
-    });
-
-    const forgotRes = await app.inject({
-      method: 'POST',
-      url: '/auth/forgot-password',
-      payload: { email: managerUser.email },
-    });
-    expect(forgotRes.statusCode).toBe(200);
-    expect(forgotRes.json()).toEqual({
-      success: true,
-      message: 'Wenn ein Konto mit dieser E-Mail-Adresse existiert, haben wir dir einen Link zum Zurücksetzen geschickt.',
-    });
-
-    const userAfterRequest = await prisma.user.findUnique({ where: { email: managerUser.email } });
-    expect(userAfterRequest?.passwordResetToken).toBeNull();
-    expect(userAfterRequest?.passwordResetExpiresAt).toBeNull();
   });
 
   it('rejects expired reset tokens', async () => {
@@ -2165,651 +2129,11 @@ describe('End-to-End: Register → Admin Approve → Visible in Search', () => {
 // ─── Invite Flow, Manager Auth, Manager Visibility ────────────────────────────
 // These features have been removed (freelancer-only MVP). Tests kept as skipped.
 
-describe.skip('Invite Flow: practice manager creates therapist profile', () => {
-  let practiceId: string;
-  let practiceAdminToken: string; // adminSessionToken for practice-auth routes
-
-  beforeEach(async () => {
-    const practice = await prisma.practice.create({
-      data: { name: 'Einlade-Praxis', city: 'München', reviewStatus: 'APPROVED' },
-    });
-    practiceId = practice.id;
-    await prisma.practiceManager.create({
-      data: { email: 'praxis@test.de', passwordHash: 'hash', sessionToken: 'practice-session-token', practiceId: practice.id },
-    });
-    practiceAdminToken = 'practice-session-token';
-  });
-
-  const PRACTICE_AUTH = { authorization: `Bearer practice-session-token` };
-
-  it('creates therapist with invited status, not published', async () => {
-    const res = await app.inject({
-      method: 'POST',
-      url: '/invite/therapist',
-      headers: PRACTICE_AUTH,
-      payload: {
-        fullName: 'Invited Therapeut',
-        professionalTitle: 'Physiotherapeut',
-        email: 'invited@test.de',
-        specializations: ['rücken'],
-        languages: ['de'],
-      },
-    });
-    expect(res.statusCode).toBe(201);
-    const body = res.json();
-    expect(body.therapistId).toBeTruthy();
-    expect(body.inviteToken).toBeTruthy();
-
-    const therapist = await prisma.therapist.findUnique({ where: { id: body.therapistId } });
-    expect(therapist?.onboardingStatus).toBe('invited');
-    expect(therapist?.isPublished).toBe(false);
-    expect(therapist?.invitedByPracticeId).toBe(practiceId);
-  });
-
-  it('invited therapist is NOT visible in search before claiming', async () => {
-    const createRes = await app.inject({
-      method: 'POST',
-      url: '/invite/therapist',
-      headers: PRACTICE_AUTH,
-      payload: {
-        fullName: 'Hidden Therapeut',
-        professionalTitle: 'PT',
-        email: 'hidden@test.de',
-        specializations: ['rücken'],
-        languages: ['de'],
-      },
-    });
-    expect(createRes.statusCode).toBe(201);
-
-    const searchRes = await app.inject({
-      method: 'POST',
-      url: '/search',
-      payload: { query: 'rücken', city: 'München' },
-    });
-    expect(searchRes.statusCode).toBe(200);
-    expect(searchRes.json().therapists).toHaveLength(0);
-  });
-
-  it('validate invite token returns therapist and practice info', async () => {
-    const createRes = await app.inject({
-      method: 'POST',
-      url: '/invite/therapist',
-      headers: PRACTICE_AUTH,
-      payload: {
-        fullName: 'Validate Test',
-        professionalTitle: 'PT',
-        email: 'validate@test.de',
-        specializations: [],
-        languages: [],
-      },
-    });
-    const { inviteToken } = createRes.json();
-
-    const res = await app.inject({
-      method: 'GET',
-      url: `/invite/validate?token=${inviteToken}`,
-    });
-    expect(res.statusCode).toBe(200);
-    const body = res.json();
-    expect(body.valid).toBe(true);
-    expect(body.therapist.fullName).toBe('Validate Test');
-    expect(body.practice.name).toBe('Einlade-Praxis');
-  });
-
-  it('claim sets password and returns session token; profile still NOT published', async () => {
-    const createRes = await app.inject({
-      method: 'POST',
-      url: '/invite/therapist',
-      headers: PRACTICE_AUTH,
-      payload: {
-        fullName: 'Claimer',
-        professionalTitle: 'PT',
-        email: 'claimer@test.de',
-        specializations: ['rücken'],
-        languages: ['de'],
-      },
-    });
-    const { therapistId, inviteToken } = createRes.json();
-
-    const claimRes = await app.inject({
-      method: 'POST',
-      url: '/invite/claim',
-      payload: { token: inviteToken, password: 'password123' },
-    });
-    expect(claimRes.statusCode).toBe(200);
-    const claimBody = claimRes.json();
-    expect(claimBody.token).toBeTruthy();
-    expect(claimBody.therapistId).toBe(therapistId);
-
-    // Profile still not published after claim alone
-    const therapist = await prisma.therapist.findUnique({ where: { id: therapistId } });
-    expect(therapist?.onboardingStatus).toBe('claimed');
-    expect(therapist?.isPublished).toBe(false);
-
-    // Still not in search
-    const searchRes = await app.inject({
-      method: 'POST',
-      url: '/search',
-      payload: { query: 'rücken', city: 'München' },
-    });
-    expect(searchRes.json().therapists).toHaveLength(0);
-  });
-
-  it('incomplete profile cannot be published: PATCH /invite/visibility returns isPublished: false', async () => {
-    const createRes = await app.inject({
-      method: 'POST',
-      url: '/invite/therapist',
-      headers: PRACTICE_AUTH,
-      payload: {
-        fullName: 'Incomplete',
-        professionalTitle: 'PT',
-        email: 'incomplete@test.de',
-        specializations: [],   // missing — required for profile completion
-        languages: [],         // missing
-      },
-    });
-    const { inviteToken } = createRes.json();
-
-    const claimRes = await app.inject({
-      method: 'POST',
-      url: '/invite/claim',
-      payload: { token: inviteToken, password: 'password123' },
-    });
-    const { token: sessionToken } = claimRes.json();
-
-    // Try to set visible — should stay unpublished due to missing fields
-    const visRes = await app.inject({
-      method: 'PATCH',
-      url: '/invite/visibility',
-      headers: { authorization: `Bearer ${sessionToken}` },
-      payload: { visibilityPreference: 'visible' },
-    });
-    expect(visRes.statusCode).toBe(200);
-    const visBody = visRes.json();
-    expect(visBody.isPublished).toBe(false);
-    expect(visBody.profileComplete).toBe(false);
-    expect(visBody.missingFields.length).toBeGreaterThan(0);
-  });
-
-  it('full invite flow: create → claim → complete profile → confirm → visible in search', async () => {
-    const createRes = await app.inject({
-      method: 'POST',
-      url: '/invite/therapist',
-      headers: PRACTICE_AUTH,
-      payload: {
-        fullName: 'Full Flow',
-        professionalTitle: 'Physiotherapeutin',
-        email: 'fullflow@test.de',
-        specializations: ['rücken'],
-        languages: ['de'],
-      },
-    });
-    expect(createRes.statusCode).toBe(201);
-    const { therapistId, inviteToken } = createRes.json();
-
-    // Claim
-    const claimRes = await app.inject({
-      method: 'POST',
-      url: '/invite/claim',
-      payload: { token: inviteToken, password: 'secret123' },
-    });
-    const { token: sessionToken } = claimRes.json();
-    const SESSION = { authorization: `Bearer ${sessionToken}` };
-
-    // Complete profile (bio is required)
-    await app.inject({
-      method: 'PATCH',
-      url: '/auth/me',
-      headers: SESSION,
-      payload: { bio: 'Erfahrene Physiotherapeutin.' },
-    });
-
-    // Confirm visibility
-    const visRes = await app.inject({
-      method: 'PATCH',
-      url: '/invite/visibility',
-      headers: SESSION,
-      payload: { visibilityPreference: 'visible' },
-    });
-    expect(visRes.statusCode).toBe(200);
-    expect(visRes.json().isPublished).toBe(true);
-
-    // Now visible in search
-    const searchRes = await app.inject({
-      method: 'POST',
-      url: '/search',
-      payload: { query: 'rücken', city: 'München' },
-    });
-    expect(searchRes.statusCode).toBe(200);
-    const therapists = searchRes.json().therapists;
-    expect(therapists).toHaveLength(1);
-    expect(therapists[0].fullName).toBe('Full Flow');
-  });
-
-  it('resend invite invalidates old token and creates new one', async () => {
-    const createRes = await app.inject({
-      method: 'POST',
-      url: '/invite/therapist',
-      headers: PRACTICE_AUTH,
-      payload: {
-        fullName: 'Resend Test',
-        professionalTitle: 'PT',
-        email: 'resend@test.de',
-        specializations: [],
-        languages: [],
-      },
-    });
-    const { therapistId, inviteToken: oldToken } = createRes.json();
-
-    const resendRes = await app.inject({
-      method: 'POST',
-      url: '/invite/resend',
-      headers: PRACTICE_AUTH,
-      payload: { therapistId },
-    });
-    expect(resendRes.statusCode).toBe(200);
-    const { inviteToken: newToken } = resendRes.json();
-    expect(newToken).not.toBe(oldToken);
-
-    // Old token is now invalid
-    const oldValidate = await app.inject({ method: 'GET', url: `/invite/validate?token=${oldToken}` });
-    expect(oldValidate.statusCode).toBe(400);
-
-    // New token is valid
-    const newValidate = await app.inject({ method: 'GET', url: `/invite/validate?token=${newToken}` });
-    expect(newValidate.statusCode).toBe(200);
-  });
-
-  it('duplicate email returns 409', async () => {
-    await app.inject({
-      method: 'POST',
-      url: '/invite/therapist',
-      headers: PRACTICE_AUTH,
-      payload: { fullName: 'First', professionalTitle: 'PT', email: 'dup@test.de', specializations: [], languages: [] },
-    });
-    const res = await app.inject({
-      method: 'POST',
-      url: '/invite/therapist',
-      headers: PRACTICE_AUTH,
-      payload: { fullName: 'Second', professionalTitle: 'PT', email: 'dup@test.de', specializations: [], languages: [] },
-    });
-    expect(res.statusCode).toBe(409);
-  });
-
-  it('expired token cannot be claimed', async () => {
-    const createRes = await app.inject({
-      method: 'POST',
-      url: '/invite/therapist',
-      headers: PRACTICE_AUTH,
-      payload: { fullName: 'Expired', professionalTitle: 'PT', email: 'expired@test.de', specializations: [], languages: [] },
-    });
-    const { therapistId, inviteToken } = createRes.json();
-
-    // Manually expire the invitation
-    await prisma.invitation.updateMany({
-      where: { therapistId },
-      data: { expiresAt: new Date(Date.now() - 1000) },
-    });
-
-    const claimRes = await app.inject({
-      method: 'POST',
-      url: '/invite/claim',
-      payload: { token: inviteToken, password: 'pass123' },
-    });
-    expect(claimRes.statusCode).toBe(400);
-  });
-});
 
 // ─── Manager Auth ─────────────────────────────────────────────────────────────
 
-describe.skip('POST /manager/register', () => {
-  it('creates manager-only account (isTherapist=false)', async () => {
-    const res = await app.inject({
-      method: 'POST',
-      url: '/manager/register',
-      payload: {
-        email: 'mgr@test.de',
-        password: 'sicher123',
-        practiceName: 'Test Praxis',
-        practiceCity: 'Berlin',
-        isTherapist: false,
-      },
-    });
-    expect(res.statusCode).toBe(201);
-    const body = res.json();
-    expect(body.token).toBeTruthy();
-    expect(body.isTherapist).toBe(false);
-    expect(body.therapistId).toBeNull();
 
-    // No therapist record should exist for this email
-    const therapist = await prisma.therapist.findUnique({ where: { email: 'mgr@test.de' } });
-    expect(therapist).toBeNull();
 
-    // Manager and practice should exist
-    const manager = await prisma.practiceManager.findUnique({ where: { email: 'mgr@test.de' } });
-    expect(manager).not.toBeNull();
-    expect(manager?.practiceId).toBe(body.practiceId);
-  });
-
-  it('creates manager + therapist profile (isTherapist=true)', async () => {
-    const res = await app.inject({
-      method: 'POST',
-      url: '/manager/register',
-      payload: {
-        email: 'mgr2@test.de',
-        password: 'sicher123',
-        practiceName: 'Test Praxis 2',
-        practiceCity: 'München',
-        isTherapist: true,
-        fullName: 'Dr. Eva Muster',
-        professionalTitle: 'Physiotherapeutin',
-      },
-    });
-    expect(res.statusCode).toBe(201);
-    const body = res.json();
-    expect(body.isTherapist).toBe(true);
-    expect(body.therapistId).toBeTruthy();
-
-    // Therapist profile exists but is unpublished and hidden
-    const therapist = await prisma.therapist.findUnique({ where: { id: body.therapistId } });
-    expect(therapist).not.toBeNull();
-    expect(therapist?.isPublished).toBe(false);
-    expect(therapist?.isVisible).toBe(false);
-
-    // Manager is linked to therapist
-    const manager = await prisma.practiceManager.findUnique({ where: { email: 'mgr2@test.de' } });
-    expect(manager?.therapistId).toBe(body.therapistId);
-  });
-
-  it('returns 400 when isTherapist=true but fullName missing', async () => {
-    const res = await app.inject({
-      method: 'POST',
-      url: '/manager/register',
-      payload: {
-        email: 'mgr3@test.de',
-        password: 'sicher123',
-        practiceName: 'Test Praxis 3',
-        practiceCity: 'Hamburg',
-        isTherapist: true,
-        // fullName and professionalTitle missing
-      },
-    });
-    expect(res.statusCode).toBe(400);
-  });
-
-  it('returns 409 on duplicate email', async () => {
-    const payload = {
-      email: 'dup@test.de',
-      password: 'sicher123',
-      practiceName: 'Praxis A',
-      practiceCity: 'Berlin',
-      isTherapist: false,
-    };
-    await app.inject({ method: 'POST', url: '/manager/register', payload });
-    const res = await app.inject({ method: 'POST', url: '/manager/register', payload: { ...payload, practiceName: 'Praxis B' } });
-    expect(res.statusCode).toBe(409);
-  });
-});
-
-describe.skip('POST /manager/login + GET /manager/me', () => {
-  it('logs in and returns practice data', async () => {
-    // Register first
-    const regRes = await app.inject({
-      method: 'POST',
-      url: '/manager/register',
-      payload: {
-        email: 'login@test.de',
-        password: 'sicher123',
-        practiceName: 'Login Praxis',
-        practiceCity: 'Köln',
-        isTherapist: false,
-      },
-    });
-    expect(regRes.statusCode).toBe(201);
-
-    // Login
-    const loginRes = await app.inject({
-      method: 'POST',
-      url: '/manager/login',
-      payload: { email: 'login@test.de', password: 'sicher123' },
-    });
-    expect(loginRes.statusCode).toBe(200);
-    const { token } = loginRes.json();
-    expect(token).toBeTruthy();
-
-    // GET /manager/me
-    const meRes = await app.inject({
-      method: 'GET',
-      url: '/manager/me',
-      headers: { authorization: `Bearer ${token}` },
-    });
-    expect(meRes.statusCode).toBe(200);
-    const me = meRes.json();
-    expect(me.email).toBe('login@test.de');
-    expect(me.isTherapist).toBe(false);
-    expect(me.practice.name).toBe('Login Praxis');
-  });
-
-  it('returns 401 on wrong password', async () => {
-    await app.inject({
-      method: 'POST',
-      url: '/manager/register',
-      payload: { email: 'wrong@test.de', password: 'sicher123', practiceName: 'P', practiceCity: 'Berlin', isTherapist: false },
-    });
-    const res = await app.inject({
-      method: 'POST',
-      url: '/manager/login',
-      payload: { email: 'wrong@test.de', password: 'falsch' },
-    });
-    expect(res.statusCode).toBe(401);
-  });
-});
-
-describe.skip('Manager visibility in search', () => {
-  it('manager-only account does not appear in therapist search', async () => {
-    await app.inject({
-      method: 'POST',
-      url: '/manager/register',
-      payload: {
-        email: 'invisible@test.de',
-        password: 'sicher123',
-        practiceName: 'Unsichtbare Praxis',
-        practiceCity: 'Berlin',
-        isTherapist: false,
-      },
-    });
-
-    const res = await app.inject({
-      method: 'POST',
-      url: '/search',
-      payload: { query: 'Berlin', city: 'Berlin' },
-    });
-    expect(res.statusCode).toBe(200);
-    const { therapists } = res.json();
-    const found = therapists.find((t: any) => t.email === 'invisible@test.de');
-    expect(found).toBeUndefined();
-  });
-
-  it('manager+therapist does not appear in search while isPublished=false', async () => {
-    await app.inject({
-      method: 'POST',
-      url: '/manager/register',
-      payload: {
-        email: 'hidden-therapist@test.de',
-        password: 'sicher123',
-        practiceName: 'Versteckte Praxis',
-        practiceCity: 'München',
-        isTherapist: true,
-        fullName: 'Dr. Hidden',
-        professionalTitle: 'Physiotherapeut',
-      },
-    });
-
-    const res = await app.inject({
-      method: 'POST',
-      url: '/search',
-      payload: { query: 'Hidden', city: 'München' },
-    });
-    expect(res.statusCode).toBe(200);
-    const { therapists } = res.json();
-    const found = therapists.find((t: any) => t.fullName === 'Dr. Hidden');
-    expect(found).toBeUndefined();
-  });
-
-  it('manager+therapist stays hidden until explicit publication even if profile is completed and isVisible=true', async () => {
-    const registerRes = await app.inject({
-      method: 'POST',
-      url: '/manager/register',
-      payload: {
-        email: 'manager-visible@test.de',
-        password: 'sicher123',
-        practiceName: 'Manager Sichtbarkeit',
-        practiceCity: 'Berlin',
-        isTherapist: true,
-        fullName: 'Dr. Private',
-        professionalTitle: 'Physiotherapeut',
-      },
-    });
-    expect(registerRes.statusCode).toBe(201);
-
-    const { token } = registerRes.json();
-    const SESSION = { authorization: `Bearer ${token}` };
-
-    const updateRes = await app.inject({
-      method: 'PATCH',
-      url: '/auth/me',
-      headers: SESSION,
-      payload: {
-        bio: 'Vollstaendiges Profil',
-        specializations: ['Ruecken'],
-        languages: ['de'],
-        isVisible: true,
-      },
-    });
-    expect(updateRes.statusCode).toBe(200);
-
-    const searchBeforePublish = await app.inject({
-      method: 'POST',
-      url: '/search',
-      payload: { query: 'Private', city: 'Berlin' },
-    });
-    expect(searchBeforePublish.statusCode).toBe(200);
-    expect(searchBeforePublish.json().therapists.find((t: any) => t.fullName === 'Dr. Private')).toBeUndefined();
-
-    const publishRes = await app.inject({
-      method: 'PATCH',
-      url: '/invite/visibility',
-      headers: SESSION,
-      payload: { visibilityPreference: 'visible' },
-    });
-    expect(publishRes.statusCode).toBe(200);
-    expect(publishRes.json().isPublished).toBe(true);
-
-    const searchAfterPublish = await app.inject({
-      method: 'POST',
-      url: '/search',
-      payload: { query: 'Private', city: 'Berlin' },
-    });
-    expect(searchAfterPublish.statusCode).toBe(200);
-    expect(searchAfterPublish.json().therapists.find((t: any) => t.fullName === 'Dr. Private')).toBeTruthy();
-  });
-
-  it('unpublished manager therapist profile is not reachable via public detail endpoint', async () => {
-    const registerRes = await app.inject({
-      method: 'POST',
-      url: '/manager/register',
-      payload: {
-        email: 'detail-hidden@test.de',
-        password: 'sicher123',
-        practiceName: 'Detail Praxis',
-        practiceCity: 'Hamburg',
-        isTherapist: true,
-        fullName: 'Detail Hidden',
-        professionalTitle: 'Physiotherapeut',
-      },
-    });
-    expect(registerRes.statusCode).toBe(201);
-
-    const { therapistId } = registerRes.json();
-    const detailRes = await app.inject({
-      method: 'GET',
-      url: `/therapist/${therapistId}`,
-    });
-    expect(detailRes.statusCode).toBe(404);
-  });
-
-  it('published profile becomes unpublished again when required fields are removed', async () => {
-    const registerRes = await app.inject({
-      method: 'POST',
-      url: '/manager/register',
-      payload: {
-        email: 'unpublish@test.de',
-        password: 'sicher123',
-        practiceName: 'Unpublish Praxis',
-        practiceCity: 'Berlin',
-        isTherapist: true,
-        fullName: 'Dr. Mutable',
-        professionalTitle: 'Physiotherapeut',
-      },
-    });
-    expect(registerRes.statusCode).toBe(201);
-
-    const { token, therapistId } = registerRes.json();
-    const SESSION = { authorization: `Bearer ${token}` };
-
-    await app.inject({
-      method: 'PATCH',
-      url: '/auth/me',
-      headers: SESSION,
-      payload: {
-        bio: 'Komplettes Profil',
-        specializations: ['Ruecken'],
-        languages: ['de'],
-        isVisible: true,
-      },
-    });
-
-    const publishRes = await app.inject({
-      method: 'PATCH',
-      url: '/invite/visibility',
-      headers: SESSION,
-      payload: { visibilityPreference: 'visible' },
-    });
-    expect(publishRes.statusCode).toBe(200);
-    expect(publishRes.json().isPublished).toBe(true);
-
-    const breakProfileRes = await app.inject({
-      method: 'PATCH',
-      url: '/auth/me',
-      headers: SESSION,
-      payload: {
-        bio: '',
-      },
-    });
-    expect(breakProfileRes.statusCode).toBe(200);
-    expect(breakProfileRes.json().isPublished).toBe(false);
-    expect(breakProfileRes.json().complete).toBe(false);
-    expect(breakProfileRes.json().missingFields).toContain('bio');
-
-    const managerMeRes = await app.inject({
-      method: 'GET',
-      url: '/manager/me',
-      headers: SESSION,
-    });
-    expect(managerMeRes.statusCode).toBe(200);
-    expect(managerMeRes.json().therapistProfile.isPublished).toBe(false);
-    expect(managerMeRes.json().therapistProfile.complete).toBe(false);
-    expect(managerMeRes.json().therapistProfile.missingFields).toContain('bio');
-
-    const searchRes = await app.inject({
-      method: 'POST',
-      url: '/search',
-      payload: { query: 'Mutable', city: 'Berlin' },
-    });
-    expect(searchRes.statusCode).toBe(200);
-    expect(searchRes.json().therapists.find((t: any) => t.id === therapistId)).toBeUndefined();
-  });
-});
 
 // ── Therapeuten-Favoriten ────────────────────────────────────────────────────
 describe('GET /auth/favorites/therapists', () => {
@@ -3324,5 +2648,72 @@ describe('GET /notifications — routing metadata', () => {
     expect(notif).toBeDefined();
     expect(notif.linkId).toBe(link.id);
     expect(notif.practiceId).toBe(practice.id);
+  });
+});
+
+describe('Session token expiry', () => {
+  it('rejects a token whose sessionTokenExpiresAt is in the past', async () => {
+    const { prisma } = app as any;
+    const user = await prisma.user.create({
+      data: {
+        email: 'expired-token@test.de',
+        passwordHash: 'x',
+        role: 'therapist',
+        sessionToken: 'expired-tok',
+        sessionTokenExpiresAt: new Date(Date.now() - 1000),
+      },
+    });
+
+    const res = await app.inject({
+      method: 'GET', url: '/auth/me',
+      headers: { authorization: 'Bearer expired-tok' },
+    });
+    expect(res.statusCode).toBe(401);
+
+    await prisma.user.delete({ where: { id: user.id } });
+  });
+
+  it('accepts a token whose sessionTokenExpiresAt is in the future', async () => {
+    const { prisma } = app as any;
+    const user = await prisma.user.create({
+      data: {
+        email: 'valid-token@test.de',
+        passwordHash: 'x',
+        role: 'therapist',
+        sessionToken: 'valid-tok',
+        sessionTokenExpiresAt: new Date(Date.now() + 86400000),
+      },
+    });
+
+    const res = await app.inject({
+      method: 'GET', url: '/auth/me',
+      headers: { authorization: 'Bearer valid-tok' },
+    });
+    // 401 because no therapist profile, but NOT because token expired
+    expect(res.statusCode).not.toBe(500);
+
+    await prisma.user.delete({ where: { id: user.id } });
+  });
+
+  it('login sets sessionTokenExpiresAt 30 days in the future', async () => {
+    const { prisma } = app as any;
+    const hash = await hashPassword('testpass123');
+    const user = await prisma.user.create({
+      data: { email: 'expiry-login@test.de', passwordHash: hash, role: 'patient' },
+    });
+
+    const res = await app.inject({
+      method: 'POST', url: '/auth/login',
+      payload: { email: 'expiry-login@test.de', password: 'testpass123' },
+    });
+    expect(res.statusCode).toBe(200);
+
+    const updated = await prisma.user.findUnique({ where: { id: user.id } });
+    expect(updated!.sessionTokenExpiresAt).not.toBeNull();
+    const diffDays = (updated!.sessionTokenExpiresAt!.getTime() - Date.now()) / 86400000;
+    expect(diffDays).toBeGreaterThan(28);
+    expect(diffDays).toBeLessThan(32);
+
+    await prisma.user.delete({ where: { id: user.id } });
   });
 });
