@@ -993,6 +993,8 @@ export default function App() {
   const [mapScrollEnabled, setMapScrollEnabled] = useState(true);
   const discoverScrollRef = React.useRef(null);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const openFeedbackModal = () => setShowFeedbackModal(true);
+  const closeFeedbackModal = () => setShowFeedbackModal(false);
   // Notifications — from NotifContext (inline in render)
   const [notifications, setNotifications] = useState([]);
   const [dismissedNotifIds, setDismissedNotifIds] = useState(new Set());
@@ -1765,6 +1767,17 @@ export default function App() {
     />
   );
 
+
+  const handleCancelSlot = async (slotId) => {
+    if (!authToken) return;
+    try {
+      await fetch(`${getBaseUrl()}/therapist/slots/${slotId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${authToken}` },
+      });
+      await loadMySlots(authToken);
+    } catch {}
+  };
 
   const renderTherapyTabShell = (title, body) => (
     <View style={{ flex: 1 }}>
