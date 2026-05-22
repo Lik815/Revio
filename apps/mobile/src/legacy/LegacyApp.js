@@ -1764,6 +1764,7 @@ export default function App() {
       onShowChangePassword={() => setShowChangePasswordModal(true)}
       onDeleteAccount={() => setShowDeleteAccountModal(true)}
       onNavigateToProfile={() => setActiveTab('therapist')}
+      onLogout={handleLogout}
       c={c} t={t} styles={styles}
     />
   );

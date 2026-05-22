@@ -9,7 +9,7 @@ export function OptionsScreen({
   appLanguage, setAppLanguage,
   notifications, dismissedNotifIds,
   onShowNotifications, onShowLogin, onShowRegister,
-  onShowFeedback, onShowChangePassword, onDeleteAccount,
+  onShowFeedback, onShowChangePassword, onDeleteAccount, onLogout,
   onNavigateToProfile,
   c, t, styles,
 }) {
@@ -160,7 +160,7 @@ const renderOptions = () => {
             </View>
             <Text style={[styles.optionValue, { color: c.muted }]}>{t('comingSoon')} ›</Text>
           </Pressable>
-          <Pressable onPress={openFeedbackModal} style={[styles.optionRow, { backgroundColor: c.card, borderColor: 'transparent', borderTopWidth: 1, borderTopColor: c.border }]}>
+          <Pressable onPress={onShowFeedback} style={[styles.optionRow, { backgroundColor: c.card, borderColor: 'transparent', borderTopWidth: 1, borderTopColor: c.border }]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
               <Ionicons name="chatbubble-outline" size={18} color={c.muted} />
               <Text style={[styles.optionLabel, { color: c.text }]}>{t('appFeedback')}</Text>
@@ -194,16 +194,16 @@ const renderOptions = () => {
         {(loggedInTherapist || loggedInPatient) && (
           <View style={{ gap: 10, marginTop: 16 }}>
             <Pressable
-              onPress={() => { setChangePasswordError(''); setChangePasswordSuccess(''); onShowChangePassword(); }}
+              onPress={() => { onShowChangePassword(); }}
               style={{ borderRadius: 12, paddingVertical: 14, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, borderWidth: 1.5, borderColor: c.border, backgroundColor: c.card }}>
               <Ionicons name="key-outline" size={18} color={c.muted} />
               <Text style={{ color: c.text, fontSize: 16, fontWeight: '600' }}>{t('changePassword')}</Text>
             </Pressable>
-            <Pressable onPress={handleLogout}
+            <Pressable onPress={onLogout}
               style={{ borderRadius: 12, paddingVertical: 14, alignItems: 'center', borderWidth: 1.5, borderColor: c.border, backgroundColor: c.card }}>
               <Text style={{ color: c.text, fontSize: 16, fontWeight: '600' }}>{t('logoutBtn')}</Text>
             </Pressable>
-            <Pressable onPress={handleDeleteAccount} style={{ borderRadius: 12, paddingVertical: 14, alignItems: 'center' }}>
+            <Pressable onPress={onDeleteAccount} style={{ borderRadius: 12, paddingVertical: 14, alignItems: 'center' }}>
               <Text style={{ color: c.muted, fontSize: 14 }}>{t('deleteAccount')}</Text>
             </Pressable>
           </View>
