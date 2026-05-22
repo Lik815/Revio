@@ -430,9 +430,10 @@ export default function App() {
     incomingBookingsLastLoadedAt, slotsLastLoadedAt,
     loadFavorites, loadMyAppointments, loadIncomingBookings,
     loadMySlots, loadAvailableSlots,
-    resetTherapyData, handleTherapyRefresh: handleTherapyRefreshCtx,
+    resetTherapyData, refreshTherapyTab: refreshTherapyTabCtx, handleTherapyRefresh: handleTherapyRefreshCtx,
   } = useTherapyData();
   const handleTherapyRefresh = () => handleTherapyRefreshCtx(authToken, accountType, loggedInTherapist);
+  const refreshTherapyTab = () => refreshTherapyTabCtx(authToken, accountType, loggedInTherapist);
   const [showBookingForm, setShowBookingForm] = useState(false);
   const [bookingTargetTherapist, setBookingTargetTherapist] = useState(null);
   const blockTherapistEnrichRef = useRef(false);
