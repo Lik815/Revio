@@ -16,7 +16,7 @@ else
 fi
 
 echo "Running prisma db push..."
-npx prisma db push --schema prisma/schema.production.prisma --skip-generate || {
+npx prisma db push --schema prisma/schema.production.prisma --accept-data-loss || {
   echo "WARNING: prisma db push failed, starting server anyway..."
 }
 

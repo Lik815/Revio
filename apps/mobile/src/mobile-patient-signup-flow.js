@@ -4,7 +4,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getBaseUrl, TUNNEL_HEADERS } from './mobile-utils';
+import { getBaseUrl, ICON_HIT_SLOP, TUNNEL_HEADERS } from './mobile-utils';
 
 export function PatientSignupFlow({
   visible,

@@ -212,4 +212,3 @@ const renderOptions = () => {
     </View>
   );
 };
-}

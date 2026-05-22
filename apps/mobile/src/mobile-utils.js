@@ -391,6 +391,8 @@ const GERMAN_CITIES = [
   'Stralsund', 'Suhl', 'Troisdorf', 'Weimar', 'Wilhelmshaven',
 ];
 
+const ICON_HIT_SLOP = { top: 12, bottom: 12, left: 12, right: 12 };
+
 export {
   COLORS,
   SPACE,
@@ -420,6 +422,7 @@ export {
   resolveMediaUrl,
   softenErrorMessage,
   tabs,
+  ICON_HIT_SLOP,
   GERMAN_CITIES,
   formatDayHeader,
   formatKpiDate,
