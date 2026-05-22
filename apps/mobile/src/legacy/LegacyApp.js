@@ -467,6 +467,8 @@ export default function App() {
   const [inviteClaimError, setInviteClaimError] = useState('');
   const [showVisibilityModal, setShowVisibilityModal] = useState(false);
   const [showProfileSavedModal, setShowProfileSavedModal] = useState(false);
+  const [showSlotCreatedModal, setShowSlotCreatedModal] = useState(false);
+  const [createdSlot, setCreatedSlot] = useState(null);
   const [profileSavedModalTitle, setProfileSavedModalTitle] = useState('');
   const [profileSavedModalBody, setProfileSavedModalBody] = useState('');
   const [visibilityLoading, setVisibilityLoading] = useState(false);
@@ -1691,11 +1693,15 @@ export default function App() {
   const handleAddSlot = async (slot) => {
     if (!authToken) return;
     try {
-      await fetch(`${getBaseUrl()}/therapist/slots`, {
+      const res = await fetch(`${getBaseUrl()}/therapist/slots`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
         body: JSON.stringify({ slots: [slot] }),
       });
+      if (res.ok) {
+        setCreatedSlot(slot);
+        setShowSlotCreatedModal(true);
+      }
       await loadMySlots(authToken);
     } catch {}
   };
@@ -2364,6 +2370,43 @@ export default function App() {
         </Pressable>
       </Modal>
 
+
+      {/* ── Slot Created Modal ─────────────────────────────────────────────── */}
+      <Modal visible={showSlotCreatedModal} transparent animationType="fade" onRequestClose={() => setShowSlotCreatedModal(false)}>
+        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', padding: 24 }} onPress={() => setShowSlotCreatedModal(false)}>
+          <Pressable onPress={(e) => e.stopPropagation()}>
+            <View style={{ backgroundColor: c.card, borderRadius: 20, padding: 24, gap: 16 }}>
+              <View style={{ alignItems: 'center', gap: 12 }}>
+                <View style={{ width: 64, height: 64, borderRadius: 20, backgroundColor: c.accentBg, alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons name="calendar-outline" size={32} color={c.accent} />
+                </View>
+                <Text style={{ fontSize: 20, fontWeight: '800', color: c.text, textAlign: 'center' }}>
+                  Termin erstellt
+                </Text>
+              </View>
+              {createdSlot?.startsAt ? (
+                <View style={{ backgroundColor: c.primaryBg, borderRadius: 12, padding: 16, alignItems: 'center', gap: 4 }}>
+                  <Text style={{ fontSize: 18, fontWeight: '700', color: c.primary }}>
+                    {new Date(createdSlot.startsAt).toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long' })}
+                  </Text>
+                  <Text style={{ fontSize: 15, color: c.primary }}>
+                    {new Date(createdSlot.startsAt).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr · {createdSlot.durationMin ?? 20} Min.
+                  </Text>
+                </View>
+              ) : null}
+              <Text style={{ fontSize: 14, color: c.muted, textAlign: 'center', lineHeight: 20 }}>
+                Der Termin ist jetzt für Patienten sichtbar und buchbar.
+              </Text>
+              <Pressable
+                style={{ backgroundColor: c.primary, borderRadius: 14, paddingVertical: 14, alignItems: 'center' }}
+                onPress={() => setShowSlotCreatedModal(false)}
+              >
+                <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>Fertig</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
       {/* ── Cancel Appointment Modal ───────────────────────────────────────── */}
       <Modal visible={showCancelAppointmentModal} transparent animationType="fade" onRequestClose={() => setShowCancelAppointmentModal(false)}>
         <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', padding: 24 }} onPress={() => setShowCancelAppointmentModal(false)}>
