@@ -378,7 +378,6 @@ export default function App() {
   const isFavorite = (id) => favorites.some(f => f.id === id);
 
   // Practice favorites — stored locally
-  const [favoritePractices, setFavoritePractices] = useState([]);
   useEffect(() => {
     AsyncStorage.getItem('revio_fav_practices').then(val => {
       if (!val) return;
