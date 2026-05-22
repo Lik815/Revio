@@ -21,7 +21,16 @@ export function AuthProvider({ children }) {
       fetch(`${getBaseUrl()}/auth/me`, {
         headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${token}` },
       })
-        .then(r => r.ok ? r.json() : null)
+        .then(async r => {
+          if (!r.ok) {
+            // Session invalid/expired — clear stored credentials
+            await AsyncStorage.multiRemove(['revio_auth_token', 'revio_account_type']);
+            setAuthToken(null);
+            setAccountType(null);
+            return null;
+          }
+          return r.json();
+        })
         .then(profile => {
           if (!profile) return;
           if (profile.role === 'patient') {
