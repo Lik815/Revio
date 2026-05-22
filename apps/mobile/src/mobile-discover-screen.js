@@ -378,6 +378,15 @@ export function DiscoverScreen(props) {
       </View>
     </View>
         </ScrollView>
+        <View style={{ padding: 16, paddingBottom: 32, backgroundColor: c.card, borderTopWidth: 1, borderTopColor: c.border }}>
+          <Pressable
+            onPress={() => { setShowFilters(false); runSearch(); }}
+            style={{ backgroundColor: c.primary, borderRadius: 14, paddingVertical: 15, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 }}
+          >
+            <Ionicons name="search-outline" size={18} color="#fff" />
+            <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>Suchen</Text>
+          </Pressable>
+        </View>
       </KeyboardAvoidingView>
     </Modal>
   );
