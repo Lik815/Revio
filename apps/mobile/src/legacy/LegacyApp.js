@@ -108,14 +108,6 @@ const REVIEW_NOTIFICATION_TYPES = new Set([
 const COMPLIANCE_STATUS_VALUES = ['yes', 'no', 'in_progress'];
 const HEALTH_AUTHORITY_STATUS_VALUES = ['yes', 'no', 'in_progress', 'unknown'];
 
-
-
-}
-
-
-
-
-
 function getReviewNotificationSeenKey(therapistId) {
   return `revio_seen_review_status_${therapistId}`;
 }
