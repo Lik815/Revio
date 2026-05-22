@@ -37,7 +37,7 @@ const renderOptions = () => {
     <View style={{ flex: 1 }}>
       <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 10, backgroundColor: c.background }}>
         <View style={[styles.header, { marginBottom: 0 }]}>
-          <Image source={require('../../assets/icon.png')} style={styles.logoMark} />
+          <Image source={require('../assets/icon.png')} style={styles.logoMark} />
           <View style={{ flex: 1 }}>
             <Text style={[styles.headerTitle, { color: c.text }]}>{t('optionsTitle')}</Text>
             <Text style={[styles.headerSub, { color: c.muted }]}>{t('optionsSubtitle')}</Text>
