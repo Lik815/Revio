@@ -59,7 +59,7 @@ import {
 import {
   } from '../mobile-compliance-step';
 import { translations } from '../mobile-translations';
-import {  } from '../mobile-patient-dashboard';
+import { PatientDashboardScreen } from '../mobile-patient-dashboard';
 import { BookingRequestForm } from '../mobile-booking';
 import { TherapistRegistrationFlow } from '../mobile-therapist-registration-flow';
 import { PatientSignupFlow } from '../mobile-patient-signup-flow';
@@ -1854,6 +1854,18 @@ dlePickDocument = async () => {
 
   // ── Therapist dashboard (logged in) ───────────────��───────────────────────
 
+  const handleAddSlot = async (slot) => {
+    if (!authToken) return;
+    try {
+      await fetch(`${getBaseUrl()}/therapist/slots`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({ slots: [slot] }),
+      });
+      await loadMySlots(authToken);
+    } catch {}
+  };
+
   const renderTherapistDashboard = () => (
     <TherapistDashboardScreen
       c={c} t={t} styles={styles}
@@ -2232,6 +2244,18 @@ dlePickDocument = async () => {
     />
   );
   // ── Layout ────────────────────────────────────────────────────────────────
+
+  const renderPatientDashboard = () => (
+    <PatientDashboardScreen
+      c={c} t={t} styles={styles}
+      loggedInPatient={loggedInPatient}
+      authToken={authToken}
+      favorites={favorites}
+      myAppointments={myAppointments}
+      onOpenTherapist={openTherapistById}
+      onProfileSaved={openProfileSavedModal}
+    />
+  );
 
   const renderTab = () => {
     if (activeTab === 'favorites' && selectedAppointment) return renderAppointmentDetail(selectedAppointment);
@@ -2722,7 +2746,6 @@ dlePickDocument = async () => {
                 setShowPhotoPrompt(false);
                 await AsyncStorage.setItem('revio_photo_prompt_dismissed', '1');
                 setActiveTab('therapist');
-                setTimeout(() => handlePickPhoto(), 300);
               }}
               style={{ backgroundColor: c.primary, borderRadius: 12, paddingVertical: 14, paddingHorizontal: 32, width: '100%', alignItems: 'center', marginTop: 4 }}
             >
@@ -2802,7 +2825,6 @@ dlePickDocument = async () => {
                 if (tab.key !== 'therapist') {
                   setShowLogin(false);
                   setShowRegister(false);
-                  setShowRegFortbildungen(false);
                   setShowInviteClaim(false);
                 }
                 if (tab.key === 'discover') {
