@@ -111,7 +111,6 @@ const handlePatientNameSubmit = async () => {
   }
 };
 
-const renderPatientName = () => (
 const renderRoleSelect = () => (
   <View style={{ flex: 1, paddingHorizontal: 20 }}>
     <Pressable

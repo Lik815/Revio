@@ -96,7 +96,7 @@ const renderOptions = () => {
           <>
             <SectionHeader title="Mein Profil" />
             <OptionGroup>
-              <Pressable onPress={() => { onNavigateToProfile() setShowLogin(true); }} style={[styles.optionRow, { backgroundColor: c.card, borderColor: 'transparent' }]}>
+              <Pressable onPress={() => { onNavigateToProfile(); onShowLogin(); }} style={[styles.optionRow, { backgroundColor: c.card, borderColor: 'transparent' }]}>
                 <Text style={[styles.optionLabel, { color: c.muted }]}>{t('notLoggedIn')}</Text>
                 <Text style={[styles.optionValue, { color: c.primary }]}>{t('loginAction')} ›</Text>
               </Pressable>

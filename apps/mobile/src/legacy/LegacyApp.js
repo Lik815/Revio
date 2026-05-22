@@ -520,19 +520,23 @@ export default function App() {
         return;
       }
       const data = await res.json();
-        if (profile.role === 'patient') {
-          await AsyncStorage.setItem('revio_account_type', 'patient');
-          setAccountType('patient');
-          setLoggedInPatient(profile);
-          setEmailVerifyStatus('success');
-          setTimeout(() => setShowEmailVerify(false), 2500);
-          return;
+      if (data.token) {
+        await AsyncStorage.setItem('revio_auth_token', data.token);
+        await AsyncStorage.setItem('revio_account_type', data.accountType ?? 'therapist');
+        setAuthToken(data.token);
+        setAccountType(data.accountType ?? 'therapist');
+        const profileRes = await fetch(`${getBaseUrl()}/auth/me`, {
+          headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${data.token}` },
+        });
+        if (profileRes.ok) {
+          const profile = await profileRes.json();
+          if (profile.role === 'patient') {
+            setLoggedInPatient(profile);
+          } else {
+            setLoggedInTherapist(normalizeTherapistProfile(profile));
+            if (!profile.photo) setTimeout(() => setShowPhotoPrompt(true), 2800);
+          }
         }
-        await AsyncStorage.setItem('revio_account_type', 'therapist');
-        setAccountType('therapist');
-        const therapistProfile = normalizeTherapistProfile(profile);
-        setLoggedInTherapist(therapistProfile);
-        if (!profile.photo) setTimeout(() => setShowPhotoPrompt(true), 2800);
       }
       setEmailVerifyStatus('success');
       setTimeout(() => setShowEmailVerify(false), 2500);
