@@ -3,7 +3,7 @@ import {
   Image, Linking, Pressable, ScrollView, Text, View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { resolveMediaUrl } from './mobile-utils';
+import { resolveMediaUrl, SHADOW } from './mobile-utils';
 import { STATUS_COLORS } from './mobile-booking';
 
 export function AppointmentDetail({
