@@ -1761,37 +1761,86 @@ export default function App() {
     if (shouldShowSectionLoading(favoritesLoading, favoritesLastLoadedAt)) return renderTherapySectionLoading();
     if (favorites.length === 0) return renderTherapySectionEmpty('Du hast noch keine Therapeut:innen gespeichert.', t('favoritesEmptyBody'));
     const shown = showAll ? favorites : favorites.slice(0, 2);
+    const mutedColor = c.textMuted ?? c.muted;
     return (
-      <View>
+      <View style={{ gap: 10 }}>
         {shown.map((fav) => {
           const initials = (fav.fullName ?? '?').split(/\s+/).filter(Boolean).map(w => w[0]).join('').slice(0, 2).toUpperCase();
-          const subtitle = [fav.professionalTitle, (fav.specializations ?? [])[0]].filter(Boolean).join(' · ');
+          const spec = (fav.specializations ?? [])[0] ?? null;
           return (
             <Pressable
               key={fav.id}
               onPress={() => onOpenProfile(fav)}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: c.border }}
+              style={[styles.resultCard, { backgroundColor: c.card, borderColor: c.border }]}
             >
-              {fav.photo ? (
-                <Image source={{ uri: fav.photo }} style={{ width: 48, height: 48, borderRadius: 24 }} />
-              ) : (
-                <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: c.primaryBg, alignItems: 'center', justifyContent: 'center' }}>
-                  <Text style={{ fontSize: 16, fontWeight: '700', color: c.primary }}>{initials}</Text>
+              {/* ── Header ── */}
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12 }}>
+                <View>
+                  {fav.photo ? (
+                    <Image source={{ uri: fav.photo }} style={{ width: 48, height: 48, borderRadius: 24 }} />
+                  ) : (
+                    <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: c.primaryBg, alignItems: 'center', justifyContent: 'center' }}>
+                      <Text style={{ fontSize: 15, fontWeight: '700', color: c.primary }}>{initials}</Text>
+                    </View>
+                  )}
+                  {fav.requestable ? (
+                    <View style={{ position: 'absolute', bottom: 1, right: 1, width: 11, height: 11, borderRadius: 5.5, backgroundColor: c.success, borderWidth: 2, borderColor: c.card }} />
+                  ) : null}
                 </View>
-              )}
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 14, fontWeight: '700', color: c.text }} numberOfLines={1}>{fav.fullName}</Text>
-                {!!subtitle && <Text style={{ fontSize: 12, color: c.muted, marginTop: 2 }} numberOfLines={1}>{subtitle}</Text>}
+                <View style={{ flex: 1, paddingTop: 1 }}>
+                  <Text style={{ fontSize: 15, fontWeight: '700', color: c.text, lineHeight: 21 }} numberOfLines={1}>{fav.fullName}</Text>
+                  <Text style={{ fontSize: 13, color: mutedColor, lineHeight: 18, marginTop: 1 }} numberOfLines={1}>{fav.professionalTitle}</Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, paddingTop: 2 }}>
+                  <Pressable onPress={(e) => { e.stopPropagation?.(); toggleFavorite(fav); }} hitSlop={ICON_HIT_SLOP} style={{ padding: 4 }}>
+                    <Ionicons name="heart" size={17} color={c.error ?? '#ef4444'} />
+                  </Pressable>
+                  <Ionicons name="chevron-forward" size={13} color={c.muted} style={{ opacity: 0.45 }} />
+                </View>
               </View>
-              <Pressable onPress={(e) => { e.stopPropagation?.(); toggleFavorite(fav); }} hitSlop={ICON_HIT_SLOP}>
-                <Ionicons name="heart" size={18} color={c.error ?? '#ef4444'} />
-              </Pressable>
-              <Ionicons name="chevron-forward" size={16} color={c.muted} />
+
+              {/* ── Status-Badge ── */}
+              {fav.requestable ? (
+                <View style={{ marginTop: 9 }}>
+                  <View style={{ alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: c.successBg, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 }}>
+                    <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: c.success }} />
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: c.success }}>Direkt buchbar</Text>
+                  </View>
+                </View>
+              ) : null}
+
+              {/* ── Eigenschaften ── */}
+              {(fav.homeVisit || spec) ? (
+                <View style={{ marginTop: 10, gap: 6 }}>
+                  {fav.homeVisit ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+                      <Ionicons name="home-outline" size={13} color={mutedColor} />
+                      <Text style={{ fontSize: 13, color: c.text }}>Hausbesuch möglich</Text>
+                    </View>
+                  ) : null}
+                  {spec ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+                      <Ionicons name="medical-outline" size={13} color={mutedColor} />
+                      <Text style={{ fontSize: 13, color: c.text }} numberOfLines={1}>{spec}</Text>
+                    </View>
+                  ) : null}
+                </View>
+              ) : null}
+
+              {/* ── Footer ── */}
+              {fav.city ? (
+                <View style={{ marginTop: 10, paddingTop: 9, borderTopWidth: 1, borderTopColor: c.border }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                    <Ionicons name="location-outline" size={12} color={mutedColor} />
+                    <Text style={{ fontSize: 12, color: mutedColor }} numberOfLines={1}>{fav.city}</Text>
+                  </View>
+                </View>
+              ) : null}
             </Pressable>
           );
         })}
         {!showAll && favorites.length > 2 && (
-          <Pressable onPress={onShowAll} style={{ paddingTop: 12, alignItems: 'center' }}>
+          <Pressable onPress={onShowAll} style={{ paddingTop: 6, alignItems: 'center' }}>
             <Text style={{ fontSize: 13, color: c.primary, fontWeight: '600' }}>Alle Favoriten anzeigen ›</Text>
           </Pressable>
         )}
@@ -1952,20 +2001,23 @@ export default function App() {
     }
     return (
       <View style={{ flex: 1 }}>
-        <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 10, backgroundColor: c.background }}>
-          <View style={[styles.header, { marginBottom: 0 }]}>
+        <View style={{ paddingHorizontal: 20, paddingTop: 14, paddingBottom: 6, backgroundColor: c.background }}>
+          <View style={[styles.header, { marginBottom: 0, alignItems: 'center' }]}>
             <Image source={require('../../assets/icon.png')} style={styles.logoMark} />
-            <Text style={[styles.headerTitle, { color: c.text, flex: 1 }]}>{t('favoritesTitle')}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.headerTitle, { color: c.text }]}>{t('favoritesTitle')}</Text>
+              <Text style={{ fontSize: 13, color: c.muted, marginTop: 4 }}>
+                {favorites.length} gespeicherte {favorites.length === 1 ? 'Therapeut:in' : 'Therapeut:innen'}
+              </Text>
+            </View>
           </View>
         </View>
         <ScrollView
-          contentContainerStyle={[styles.scrollContent, { paddingBottom: 32, paddingTop: 8 }]}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: 40, paddingTop: 12 }]}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={favoritesLoading} onRefresh={() => loadFavorites(authToken)} tintColor={c.primary} />}
         >
-          <View style={{ backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.border, paddingHorizontal: 16, paddingBottom: 4 }}>
-            {renderFavoritesVertical((fav) => openTherapistById(fav.id, fav), { showAll: true })}
-          </View>
+          {renderFavoritesVertical((fav) => openTherapistById(fav.id, fav), { showAll: true })}
         </ScrollView>
       </View>
     );
