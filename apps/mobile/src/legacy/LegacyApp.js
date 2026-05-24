@@ -1503,7 +1503,7 @@ export default function App() {
       </View>
 
       {/* Bottom nav */}
-      <View style={[styles.navbar, { backgroundColor: c.nav, borderColor: c.border }]}>
+      <View style={[styles.navbar, { backgroundColor: c.nav, borderColor: c.border, zIndex: 10 }]}>
         {tabs.map((tab) => {
           const active = tab.key === activeTab;
           return (
@@ -1561,7 +1561,7 @@ export default function App() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  appFrame: { flex: 1 },
+  appFrame: { flex: 1, overflow: 'hidden' },
   scrollContent: { padding: SPACE.xl, gap: SPACE.lg },
 
   hero: { paddingTop: SPACE.sm, paddingBottom: SPACE.xs, gap: SPACE.sm },
