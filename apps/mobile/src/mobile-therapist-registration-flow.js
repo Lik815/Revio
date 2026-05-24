@@ -173,7 +173,7 @@ export function TherapistRegistrationFlow({
     return (
       <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 20 }]}>
         <View style={[styles.infoCard, { backgroundColor: c.card, borderColor: c.border, alignItems: 'center', paddingVertical: 40 }]}>
-          <Text style={{ fontSize: 48, marginBottom: 16 }}>🎉</Text>
+          <Ionicons name="checkmark-circle" size={52} color={c.primary} style={{ marginBottom: 16 }} />
           <Text style={[styles.infoTitle, { color: c.text, textAlign: 'center' }]}>{t('regCompleteTitle')}</Text>
           <Text style={[styles.infoBody, { color: c.muted, textAlign: 'center', marginTop: 8 }]}>
             {__DEV__
@@ -391,7 +391,7 @@ export function TherapistRegistrationFlow({
             </View>
             {regIsFreelance === false && (
               <View style={[styles.noticeBox, { backgroundColor: '#FEF2F2', borderColor: c.error, marginTop: SPACE.md }]}>
-                <Text style={styles.noticeIcon}>⚠️</Text>
+                <Ionicons name="warning-outline" size={20} color={c.error} style={{ marginTop: 1, width: 24 }} />
                 <Text style={[styles.noticeBody, { color: c.error }]}>{t('freelanceCheckBlockedMsg')}</Text>
               </View>
             )}
@@ -468,7 +468,7 @@ export function TherapistRegistrationFlow({
               return (
                 <Pressable key={opt.key} onPress={() => toggleRegFort(opt.key)} style={styles.checkRow}>
                   <View style={[styles.checkbox, { borderColor: checked ? c.primary : c.border, backgroundColor: checked ? c.primary : 'transparent' }]}>
-                    {checked && <Text style={styles.checkmark}>✓</Text>}
+                    {checked && <Ionicons name="checkmark" size={12} color="#fff" />}
                   </View>
                   <Text style={[styles.checkLabel, { color: c.text }]}>{opt.label}</Text>
                 </Pressable>
@@ -611,7 +611,7 @@ export function TherapistRegistrationFlow({
             )}
 
             <View style={[styles.noticeBox, { backgroundColor: c.mutedBg, borderColor: c.border, marginBottom: SPACE.sm }]}>
-              <Text style={styles.noticeIcon}>📄</Text>
+              <Ionicons name="document-outline" size={20} color={c.muted} style={{ marginTop: 1, width: 24 }} />
               <View style={{ flex: 1, gap: 4 }}>
                 <Text style={[styles.noticeBody, { color: c.muted }]}>{t('registrationDocumentBody')}</Text>
                 <Text style={{ color: c.muted, fontSize: 12, lineHeight: 18 }}>{t('registrationDocumentSizeHint')}</Text>
@@ -690,7 +690,7 @@ export function TherapistRegistrationFlow({
               </View>
             ))}
             <View style={[styles.noticeBox, { backgroundColor: c.mutedBg, borderColor: c.border }]}>
-              <Text style={styles.noticeIcon}>ℹ️</Text>
+              <Ionicons name="information-circle-outline" size={20} color={c.muted} style={{ marginTop: 1, width: 24 }} />
               <Text style={[styles.noticeBody, { color: c.muted }]}>
                 {t('profileReviewNotice')}
               </Text>

@@ -349,7 +349,7 @@ export default function App() {
     // Optimistic update
     setFavorites(prev => exists ? prev.filter(f => f.id !== therapist.id) : [...prev, therapist]);
     if (!exists) showToast(t('favSaved').replace('{name}', therapist.fullName));
-    else showToast(`${therapist.fullName} ✕`);
+    else showToast(`${therapist.fullName} entfernt`);
     try {
       let res;
       if (exists) {
@@ -394,7 +394,7 @@ export default function App() {
       const next = exists ? prev.filter(f => f.id !== practice.id) : [...prev, practiceData];
       AsyncStorage.setItem('revio_fav_practices', JSON.stringify(next));
       if (!exists) showToast(t('favSaved').replace('{name}', practice.name));
-      else showToast(`${practice.name} ✕`);
+      else showToast(`${practice.name} entfernt`);
       return next;
     });
   };
@@ -1935,7 +1935,7 @@ export default function App() {
   const renderTherapyTabGuest = () => renderTherapyTabShell(
     therapyTabTitle,
     <View style={[styles.emptyState, { backgroundColor: c.card, borderColor: c.border }]}>
-      <Text style={styles.emptyIcon}>♡</Text>
+      <Ionicons name="heart-outline" size={32} color={c.muted} />
       <Text style={[styles.emptyTitle, { color: c.text }]}>{t('favoritesLoginRequired') ?? 'Einloggen für Favoriten'}</Text>
       <Text style={[styles.emptyBody, { color: c.muted }]}>{t('favoritesLoginRequiredBody') ?? 'Melde dich an, um Therapeuten als Favoriten zu speichern.'}</Text>
       <Pressable
@@ -2011,7 +2011,7 @@ export default function App() {
       return renderTherapyTabShell(
         t('favoritesTitle'),
         <View style={[styles.emptyState, { backgroundColor: c.card, borderColor: c.border }]}>
-          <Text style={styles.emptyIcon}>♡</Text>
+          <Ionicons name="heart-outline" size={32} color={c.muted} />
           <Text style={[styles.emptyTitle, { color: c.text }]}>{t('favoritesLoginRequired') ?? 'Einloggen für Favoriten'}</Text>
           <Text style={[styles.emptyBody, { color: c.muted }]}>{t('favoritesLoginRequiredBody') ?? 'Melde dich an, um Therapeuten als Favoriten zu speichern.'}</Text>
           <Pressable
@@ -2701,7 +2701,7 @@ export default function App() {
       <Modal visible={showPhotoPrompt} transparent animationType="fade" onRequestClose={() => setShowPhotoPrompt(false)}>
         <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 24 }} onPress={() => setShowPhotoPrompt(false)}>
           <Pressable style={{ backgroundColor: c.card, borderRadius: 20, padding: 28, width: '100%', alignItems: 'center', gap: 12 }} onPress={() => {}}>
-            <Text style={{ fontSize: 52 }}>📷</Text>
+            <Ionicons name="camera-outline" size={52} color={c.muted} />
             <Text style={{ fontSize: 20, fontWeight: '700', color: c.text, textAlign: 'center' }}>{t('addProfilePhoto')}</Text>
             <Text style={{ fontSize: 14, color: c.muted, textAlign: 'center', lineHeight: 20 }}>
               {t('photoTrustNotice')}

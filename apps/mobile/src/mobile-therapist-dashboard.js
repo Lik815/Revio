@@ -78,15 +78,6 @@ function parseComplianceDraft(rawValue) {
   catch { return normalizeComplianceDraft(null); }
 }
 
-const LANG_FLAGS = {
-  DE: '🇩🇪', EN: '🇬🇧', FR: '🇫🇷', ES: '🇪🇸', IT: '🇮🇹',
-  TR: '🇹🇷', AR: '🇸🇦', PL: '🇵🇱', RU: '🇷🇺', SR: '🇷🇸',
-  PT: '🇵🇹', NL: '🇳🇱', UK: '🇺🇦', HR: '🇭🇷', BS: '🇧🇦',
-  CS: '🇨🇿', SK: '🇸🇰', HU: '🇭🇺', RO: '🇷🇴', BG: '🇧🇬',
-  EL: '🇬🇷', SQ: '🇦🇱', FA: '🇮🇷', UR: '🇵🇰', HI: '🇮🇳',
-  ZH: '🇨🇳', JA: '🇯🇵', KO: '🇰🇷', VI: '🇻🇳', DA: '🇩🇰',
-  SV: '🇸🇪', FI: '🇫🇮',
-};
 
 function StatusMiniCard({ icon, label, value, color, c }) {
   return (
@@ -734,7 +725,7 @@ export function TherapistDashboardScreen({ c, t, styles, certificationOptions, o
               <View style={{ marginBottom: SPACE.sm }}>
                 {(therapistDocuments ?? []).map((doc) => (
                   <View key={doc.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: c.border }}>
-                    <Text style={{ fontSize: 15 }}>{doc.mimetype === 'application/pdf' ? '📄' : '🖼️'}</Text>
+                    <Ionicons name={doc.mimetype === 'application/pdf' ? 'document-outline' : 'image-outline'} size={16} color={c.muted} />
                     <Text style={{ flex: 1, fontSize: 13, color: c.text }} numberOfLines={1}>{doc.originalName}</Text>
                   </View>
                 ))}

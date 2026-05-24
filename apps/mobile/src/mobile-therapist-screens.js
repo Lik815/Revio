@@ -234,14 +234,20 @@ export function LoginScreen({ c, styles, t, onClose, bookingTargetTherapist, onB
             onPress={() => loginWithCredentials('demo.patient@revio.de', 'Demo1234!')}
             style={{ flex: 1, borderWidth: 1.5, borderColor: c.border, borderRadius: 12, paddingVertical: 12, alignItems: 'center', backgroundColor: c.card }}
           >
-            <Text style={{ fontSize: 13, fontWeight: '700', color: c.text }}>👤 Patient</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+              <Ionicons name="person-outline" size={14} color={c.text} />
+              <Text style={{ fontSize: 13, fontWeight: '700', color: c.text }}>Patient</Text>
+            </View>
             <Text style={{ fontSize: 11, color: c.muted, marginTop: 2 }}>Demo-Konto</Text>
           </Pressable>
           <Pressable
             onPress={() => loginWithCredentials('demo.physio@revio.de', 'Demo1234!')}
             style={{ flex: 1, borderWidth: 1.5, borderColor: c.border, borderRadius: 12, paddingVertical: 12, alignItems: 'center', backgroundColor: c.card }}
           >
-            <Text style={{ fontSize: 13, fontWeight: '700', color: c.text }}>🩺 Physiotherapeut</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+              <Ionicons name="medical-outline" size={14} color={c.text} />
+              <Text style={{ fontSize: 13, fontWeight: '700', color: c.text }}>Physiotherapeut</Text>
+            </View>
             <Text style={{ fontSize: 11, color: c.muted, marginTop: 2 }}>Demo-Konto</Text>
           </Pressable>
         </View>

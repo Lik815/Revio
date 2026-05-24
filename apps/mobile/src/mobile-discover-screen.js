@@ -398,7 +398,7 @@ export function DiscoverScreen(props) {
       return (
         <View style={{ flex: 1, backgroundColor: c.background, padding: 16, justifyContent: 'center' }}>
           <View style={[styles.emptyState, { backgroundColor: c.card, borderColor: c.border }]}>
-            <Text style={styles.emptyIcon}>🗺️</Text>
+            <Ionicons name="map-outline" size={32} color={c.muted} />
             <Text style={[styles.emptyTitle, { color: c.text }]}>Karte konnte nicht geladen werden</Text>
             <Text style={[styles.emptyBody, { color: c.muted }]}>
               {mapError?.message || 'Der Listenmodus funktioniert weiter.'}
@@ -521,7 +521,7 @@ export function DiscoverScreen(props) {
               <React.Fragment key={`marker-${th.id}`}>
                 <Marker coordinate={{ latitude: th._mapLat, longitude: th._mapLng }} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false} onPress={() => openTherapistById(th.id)}>
                   <View style={{ backgroundColor: th._mapType === 'home' ? c.success : c.primary, borderRadius: 16, paddingHorizontal: 9, paddingVertical: 4, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 3, shadowOffset: { width: 0, height: 1 }, elevation: 3 }}>
-                    <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>{th._mapType === 'home' ? '🏠 ' : ''}{(typeof th?.fullName === 'string' && th.fullName.trim() ? th.fullName.trim().split(/\s+/)[0] : 'Profil')}</Text>
+                    <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>{(typeof th?.fullName === 'string' && th.fullName.trim() ? th.fullName.trim().split(/\s+/)[0] : 'Profil')}</Text>
                   </View>
                 </Marker>
               </React.Fragment>
@@ -857,7 +857,7 @@ export function DiscoverScreen(props) {
 
       {viewMode === 'list' && !searchLoading && safeResults.length === 0 && searched && (
         <View style={[styles.emptyState, { backgroundColor: c.card, borderColor: c.border }]}>
-          <Text style={styles.emptyIcon}>🔍</Text>
+          <Ionicons name="search-outline" size={32} color={c.muted} />
           <Text style={[styles.emptyTitle, { color: c.text }]}>{t('noResults')}</Text>
           <Text style={[styles.emptyBody, { color: c.muted }]}>
             {userCoords

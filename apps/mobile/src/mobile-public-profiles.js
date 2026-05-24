@@ -131,12 +131,12 @@ export function PracticeProfileScreen(props) {
       </View>
 
       {[
-        practice?.address && { icon: '📍', label: practice.address, onPress: () => Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(practice.address)}`) },
-        practice?.phone && { icon: '📞', label: practice.phone, onPress: () => Linking.openURL(`tel:${practice.phone}`) },
-        practice?.hours && { icon: '🕐', label: practice.hours, onPress: null },
+        practice?.address && { icon: 'location-outline', label: practice.address, onPress: () => Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(practice.address)}`) },
+        practice?.phone && { icon: 'call-outline', label: practice.phone, onPress: () => Linking.openURL(`tel:${practice.phone}`) },
+        practice?.hours && { icon: 'time-outline', label: practice.hours, onPress: null },
       ].filter(Boolean).map((row) => (
         <Pressable key={row.label} onPress={row.onPress ?? undefined} style={[styles.detailRow, { backgroundColor: c.card, borderColor: c.border }]}>
-          <Text style={styles.detailIcon}>{row.icon}</Text>
+          <Ionicons name={row.icon} size={18} color={row.onPress ? c.primary : c.muted} />
           <Text style={[styles.detailText, { color: row.onPress ? c.primary : c.text }]}>{row.label}</Text>
         </Pressable>
       ))}

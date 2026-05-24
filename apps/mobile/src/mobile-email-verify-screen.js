@@ -18,14 +18,14 @@ export function EmailVerifyScreen({ status, error, onCancel, c, t, styles: share
         )}
         {status === 'success' && (
           <>
-            <Text style={{ fontSize: 40, marginBottom: 16 }}>✅</Text>
+            <Ionicons name="checkmark-circle" size={52} color={c.success ?? '#22c55e'} style={{ marginBottom: 16 }} />
             <Text style={[sharedStyles.infoTitle, { color: c.text, textAlign: 'center' }]}>{t('emailVerified')}</Text>
             <Text style={[sharedStyles.infoBody, { color: c.muted, textAlign: 'center', marginTop: 8 }]}>{t('autoLogin')}</Text>
           </>
         )}
         {status === 'error' && (
           <>
-            <Text style={{ fontSize: 40, marginBottom: 16 }}>❌</Text>
+            <Ionicons name="close-circle" size={52} color={c.error ?? '#ef4444'} style={{ marginBottom: 16 }} />
             <Text style={[sharedStyles.infoTitle, { color: c.text, textAlign: 'center' }]}>{t('confirmFailed')}</Text>
             <Text style={[sharedStyles.infoBody, { color: c.muted, textAlign: 'center', marginTop: 8 }]}>{softenErrorMessage(error)}</Text>
             <Pressable style={[sharedStyles.registerBtn, { backgroundColor: c.primary, marginTop: 24, paddingHorizontal: 32 }]} onPress={onCancel}>
