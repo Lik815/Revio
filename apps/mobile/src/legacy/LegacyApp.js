@@ -659,58 +659,6 @@ export default function App() {
     } catch { /* best-effort */ }
   };
 
-  const handleLoginWithCredentials = async (email, password) => {
-    setLoginEmail(email);
-    setLoginPassword(password);
-    setLoginError('');
-    setLoginNotice('');
-    setLoginLoading(true);
-    try {
-      const res = await fetch(`${getBaseUrl()}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        setLoginError(err.message ?? t('alertInvalidCredentials'));
-        return;
-      }
-      const data = await res.json();
-      const token = data.accessToken || data.token;
-      await AsyncStorage.setItem('revio_auth_token', token);
-      setAuthToken(token);
-      const profileRes = await fetch(`${getBaseUrl()}/auth/me`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (profileRes.ok) {
-        const profile = await profileRes.json();
-        loadFavorites(token);
-        if (profile.role === 'patient') {
-          await AsyncStorage.setItem('revio_account_type', 'patient');
-          setAccountType('patient');
-          setLoggedInPatient(profile);
-          loadMyAppointments(token);
-          registerPushToken(token);
-          setShowLogin(false);
-          setLoginEmail('');
-          setLoginPassword('');
-          return;
-        }
-        await AsyncStorage.setItem('revio_account_type', 'therapist');
-        setAccountType('therapist');
-        setLoggedInTherapist(normalizeTherapistProfile(profile));
-        loadIncomingBookings(token);
-      }
-      setShowLogin(false);
-      setLoginEmail('');
-      setLoginPassword('');
-    } catch {
-      setLoginError(t('alertConnectionError') + '. ' + t('alertConnectionErrorBody'));
-    } finally {
-      setLoginLoading(false);
-    }
-  };
 
   const handleLogin = async () => {
     setLoginError('');
@@ -1681,7 +1629,6 @@ export default function App() {
       setShowLogin={setShowLogin}
       styles={styles}
       t={t}
-      onDemoLogin={handleLoginWithCredentials}
     />
   );
 

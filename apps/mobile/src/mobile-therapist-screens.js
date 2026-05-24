@@ -231,14 +231,14 @@ export function LoginScreen({ c, styles, t, onClose, bookingTargetTherapist, onB
         </View>
         <View style={{ flexDirection: 'row', gap: 10 }}>
           <Pressable
-            onPress={() => onDemoLogin('demo.patient@revio.de', 'Demo1234!')}
+            onPress={() => loginWithCredentials('demo.patient@revio.de', 'Demo1234!')}
             style={{ flex: 1, borderWidth: 1.5, borderColor: c.border, borderRadius: 12, paddingVertical: 12, alignItems: 'center', backgroundColor: c.card }}
           >
             <Text style={{ fontSize: 13, fontWeight: '700', color: c.text }}>👤 Patient</Text>
             <Text style={{ fontSize: 11, color: c.muted, marginTop: 2 }}>Demo-Konto</Text>
           </Pressable>
           <Pressable
-            onPress={() => onDemoLogin('demo.physio@revio.de', 'Demo1234!')}
+            onPress={() => loginWithCredentials('demo.physio@revio.de', 'Demo1234!')}
             style={{ flex: 1, borderWidth: 1.5, borderColor: c.border, borderRadius: 12, paddingVertical: 12, alignItems: 'center', backgroundColor: c.card }}
           >
             <Text style={{ fontSize: 13, fontWeight: '700', color: c.text }}>🩺 Physiotherapeut</Text>

@@ -9,7 +9,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   COMPLIANCE_STATUS_VALUES, HEALTH_AUTHORITY_STATUS_VALUES,
   RADIUS, REG_STEPS, SPACE, TYPE,
-  fortbildungOptions, getBaseUrl, kassenartOptions,
+  fortbildungOptions, getBaseUrl, getLangLabel, kassenartOptions,
   languageOptions, regSpecOptions, TUNNEL_HEADERS, ICON_HIT_SLOP,
 } from './mobile-utils';
 import { ComplianceStatusStep } from './mobile-compliance-step';
