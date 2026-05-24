@@ -179,7 +179,6 @@ export function AppointmentDetail({
         </View>
       </View>
     </View>
-      </View>
       </ScrollView>
     </View>
   );
