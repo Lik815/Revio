@@ -484,6 +484,11 @@ export default function App() {
     setShowProfileSavedModal(true);
   };
 
+  const handlePatientProfileSaved = ({ firstName, lastName, phone }) => {
+    setLoggedInPatient(prev => prev ? { ...prev, firstName, lastName, phone } : prev);
+    openProfileSavedModal(t('profileSavedModalTitle') ?? 'Profil gespeichert', t('profileSavedModalBody') ?? 'Deine Änderungen wurden erfolgreich gespeichert.');
+  };
+
   const closeProfileSavedModal = () => {
     setShowProfileSavedModal(false);
   };
@@ -2174,7 +2179,7 @@ export default function App() {
         favorites={favorites}
         myAppointments={myAppointments}
         onOpenTherapist={openTherapistById}
-        onProfileSaved={openProfileSavedModal}
+        onProfileSaved={handlePatientProfileSaved}
       />
     </View>
   );
