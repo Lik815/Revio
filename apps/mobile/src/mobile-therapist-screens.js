@@ -10,40 +10,134 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Notifications from 'expo-notifications';
 import {
+  getBaseUrl,
+  normalizeTherapistProfile,
   RADIUS,
   regSpecOptions,
   softenErrorMessage,
+  TUNNEL_HEADERS,
   TYPE,
 } from './mobile-utils';
+import { useAuth } from './context/AuthContext';
+import { useTherapyData } from './context/TherapyContext';
 
-export function LoginScreen(props) {
-  const {
-    c,
-    forgotPasswordLoading,
-    handleLogin,
-    handleForgotPassword,
-    loginEmail,
-    loginError,
-    loginLoading,
-    loginNotice,
-    loginPassword,
-    setLoginEmail,
-    setLoginPassword,
-    setShowLogin,
-    styles,
-    t,
-    onDemoLogin,
-  } = props;
+export function LoginScreen({ c, styles, t, onClose, bookingTargetTherapist, onBookingReady }) {
+  const { loginAsTherapist, loginAsPatient } = useAuth();
+  const { loadFavorites, loadMyAppointments, loadIncomingBookings } = useTherapyData();
+
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+  const [loginNotice, setLoginNotice] = useState('');
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
+
+  const registerPushToken = async (token) => {
+    try {
+      const { status } = await Notifications.requestPermissionsAsync();
+      if (status !== 'granted') return;
+      const { data: expoPushToken } = await Notifications.getExpoPushTokenAsync();
+      await fetch(`${getBaseUrl()}/auth/push-token`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ expoPushToken }),
+      });
+    } catch { /* best-effort */ }
+  };
+
+  const loginWithCredentials = async (email, password) => {
+    setLoginError('');
+    setLoginNotice('');
+    setLoginLoading(true);
+    try {
+      const res = await fetch(`${getBaseUrl()}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setLoginError(err.message ?? t('alertInvalidCredentials'));
+        return;
+      }
+      const data = await res.json();
+      const token = data.accessToken || data.token;
+
+      const profileRes = await fetch(`${getBaseUrl()}/auth/me`, {
+        headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${token}` },
+      });
+      if (!profileRes.ok) {
+        setLoginError(t('alertInvalidCredentials'));
+        return;
+      }
+      const profile = await profileRes.json();
+
+      loadFavorites(token);
+      if (profile.role === 'patient') {
+        await loginAsPatient(token, profile);
+        loadMyAppointments(token);
+        registerPushToken(token);
+        onClose();
+        if (bookingTargetTherapist) onBookingReady?.();
+        return;
+      }
+      const therapistProfile = normalizeTherapistProfile(profile);
+      await loginAsTherapist(token, therapistProfile);
+      loadIncomingBookings(token);
+      registerPushToken(token);
+      if (!therapistProfile.photo) {
+        const dismissed = await AsyncStorage.getItem('revio_photo_prompt_dismissed');
+        if (!dismissed) {
+          // best-effort: photo prompt handled by LegacyApp via loggedInTherapist change
+        }
+      }
+      onClose();
+    } catch {
+      setLoginError(t('alertConnectionError') + '. ' + t('alertConnectionErrorBody'));
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
+  const handleLogin = () => loginWithCredentials(loginEmail, loginPassword);
+
+  const handleForgotPassword = async () => {
+    const email = loginEmail.trim();
+    setLoginError('');
+    setLoginNotice('');
+    if (!email) { setLoginError(t('forgotPasswordEmailMissing')); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setLoginError(t('forgotPasswordEmailInvalid')); return; }
+    setForgotPasswordLoading(true);
+    try {
+      const res = await fetch(`${getBaseUrl()}/auth/forgot-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...TUNNEL_HEADERS },
+        body: JSON.stringify({ email }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setLoginError(err.message ?? t('alertConnectionError'));
+        return;
+      }
+      setLoginNotice(t('forgotPasswordSent'));
+    } catch {
+      setLoginError(t('alertConnectionError') + '. ' + t('alertConnectionErrorBody'));
+    } finally {
+      setForgotPasswordLoading(false);
+    }
+  };
 
   return (
     <ScrollView
       contentContainerStyle={[styles.scrollContent, { paddingHorizontal: 20, paddingBottom: 40, flexGrow: 1 }]}
       keyboardShouldPersistTaps="handled"
     >
-      <Pressable onPress={() => setShowLogin(false)} style={styles.backBtn}>
+      <Pressable onPress={onClose} style={styles.backBtn}>
         <Text style={[styles.backBtnText, { color: c.primary }]}>‹ {t('backBtn')}</Text>
       </Pressable>
 

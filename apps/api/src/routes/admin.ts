@@ -24,7 +24,7 @@ type TherapistRow = {
   isFreelancer: boolean;
   languages: string; certifications: string; reviewStatus: string;
   serviceRadiusKm: number | null; kassenart: string;
-  isVisible: boolean; isPublished: boolean; onboardingStatus: string | null;
+  isVisible: boolean; isPublished: boolean;
   bookingMode?: string | null; nextFreeSlotAt?: Date | null;
   createdAt: Date; updatedAt: Date;
   links?: Array<{ id: string; status: string; practice: { id: string; name: string; city: string; address: string | null; phone: string | null; hours: string | null; lat: number; lng: number; reviewStatus: string; createdAt: Date; updatedAt: Date } }>;
@@ -43,12 +43,6 @@ function computeVisibility(t: TherapistRow) {
   if (!pubState.publicSearchEligible && pubState.complete === false) {
     blockingReasons.push('profile_incomplete');
   }
-
-  const requiresExplicitPublication =
-    t.onboardingStatus === 'manager_onboarding' ||
-    t.onboardingStatus === 'invited' ||
-    t.onboardingStatus === 'claimed';
-  if (requiresExplicitPublication && !t.isPublished) blockingReasons.push('publication_missing');
 
   // Deduplicate and remove internal 'not_approved' (handled by outer check)
   const uniqueReasons = [...new Set(blockingReasons.filter(r => r !== 'not_approved'))];
@@ -74,7 +68,6 @@ function mapTherapist(t: TherapistRow) {
     reviewStatus: t.reviewStatus,
     isVisible: t.isVisible,
     isPublished: t.isPublished,
-    onboardingStatus: t.onboardingStatus,
     createdAt: t.createdAt.toISOString(),
     links: t.links?.map((l) => ({ id: l.id, status: l.status, practice: mapPractice(l.practice) })),
     visibility: computeVisibility(t),
@@ -468,7 +461,7 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
 
       if (!pubState.publicSearchEligible) {
         let reason = 'publication_incomplete';
-        let detail = `Missing fields: ${pubState.missingFields.join(', ') || 'none'}; isVisible=${t.isVisible}; isPublished=${t.isPublished}; onboardingStatus=${t.onboardingStatus}`;
+        let detail = `Missing fields: ${pubState.missingFields.join(', ') || 'none'}; isVisible=${t.isVisible}; isPublished=${t.isPublished}`;
         issues.push({ therapistId: t.id, therapistName: t.fullName, email: t.email, reason, detail, linkedPractices });
         continue;
       }
@@ -686,18 +679,6 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
     const l = await fastify.prisma.therapistPracticeLink.update({ where: { id }, data: { status: 'DISPUTED' } }).catch(() => null);
     if (!l) return reply.notFound('Link not found');
     return { message: 'Link disputed.' };
-  });
-
-  // Managers
-  fastify.get('/managers', async () => {
-    const managers = await fastify.prisma.practiceManager.findMany({
-      include: {
-        assignments: { include: { practice: { select: { id: true, name: true, city: true, reviewStatus: true } } }, take: 1 },
-        therapist: { select: { id: true, fullName: true, email: true, reviewStatus: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-    return { managers: managers.map(m => ({ ...m, practice: m.assignments[0]?.practice ?? null })) };
   });
 
   // POST /admin/practices/geocode-all — geocode all practices with lat=0 lng=0

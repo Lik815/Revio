@@ -32,7 +32,6 @@ enum SuggestionType {
 
 enum Role {
   therapist
-  manager
   admin
   patient
 }
@@ -82,7 +81,6 @@ model User {
   createdAt              DateTime                @default(now())
   updatedAt              DateTime                @updatedAt
   therapistProfile       Therapist?              @relation("TherapistUser")
-  managerProfile         PracticeManager?
   favoriteTherapists     UserFavoriteTherapist[]
   bookingRequests        BookingRequest[]
   appFeedbacks           AppFeedback[]
@@ -114,8 +112,6 @@ model Therapist {
   sessionTokenExpiresAt     DateTime?
   photo                 String?
   expoPushToken         String?
-  invitedByPracticeId   String?
-  onboardingStatus      String       @default("none")
   visibilityPreference  String       @default("hidden")
   isPublished           Boolean      @default(false)
   bookingMode           BookingMode  @default(DIRECTORY_ONLY)
@@ -139,8 +135,6 @@ model Therapist {
   createdAt             DateTime     @default(now())
   updatedAt             DateTime     @updatedAt
   links                 TherapistPracticeLink[]
-  invitations           Invitation[]
-  managerAccount        PracticeManager? @relation("ManagerTherapist")
   documents             TherapistDocument[]
   bookingRequests       BookingRequest[]
   favoritedBy           UserFavoriteTherapist[]
@@ -158,41 +152,11 @@ model Practice {
   reviewStatus      ReviewStatus @default(PENDING_REVIEW)
   description       String?
   homeVisit         Boolean      @default(false)
-  inviteToken       String?      @unique
   logo              String?
   photos            String?
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
   links             TherapistPracticeLink[]
-  invitations       Invitation[]
-  assignments       ManagerPracticeAssignment[]
-}
-
-model PracticeManager {
-  id           String    @id @default(cuid())
-  email        String    @unique
-  userId       String?   @unique
-  user         User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
-  passwordHash String
-  sessionToken String?   @unique
-  practiceId   String?
-  therapistId  String?   @unique
-  therapist    Therapist? @relation("ManagerTherapist", fields: [therapistId], references: [id])
-  assignments  ManagerPracticeAssignment[]
-  createdAt    DateTime  @default(now())
-}
-
-model Invitation {
-  id          String    @id @default(cuid())
-  token       String    @unique
-  therapistId String
-  practiceId  String
-  email       String
-  expiresAt   DateTime
-  usedAt      DateTime?
-  createdAt   DateTime  @default(now())
-  therapist   Therapist @relation(fields: [therapistId], references: [id], onDelete: Cascade)
-  practice    Practice  @relation(fields: [practiceId], references: [id], onDelete: Cascade)
 }
 
 model SearchSuggestion {
@@ -297,25 +261,6 @@ model BookingRequest {
   @@index([patientUserId, status, createdAt])
 }
 
-model TherapistRemovalLog {
-  id          String   @id @default(cuid())
-  therapistId String
-  practiceId  String
-  managerId   String
-  createdAt   DateTime @default(now())
-}
-
-model PracticeDeletionLog {
-  id             String   @id @default(cuid())
-  practiceId     String
-  practiceName   String
-  managerId      String
-  reason         String
-  reasonDetail   String?
-  linkedTherapists Int    @default(0)
-  createdAt      DateTime @default(now())
-}
-
 model CertificationOption {
   id        String   @id @default(cuid())
   key       String   @unique
@@ -334,17 +279,6 @@ model AppSetting {
   value     String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-}
-
-model ManagerPracticeAssignment {
-  id         String          @id @default(cuid())
-  managerId  String
-  practiceId String
-  manager    PracticeManager @relation(fields: [managerId], references: [id], onDelete: Cascade)
-  practice   Practice        @relation(fields: [practiceId], references: [id], onDelete: Cascade)
-  createdAt  DateTime        @default(now())
-
-  @@unique([managerId, practiceId])
 }
 
 model EmailOtp {

@@ -46,6 +46,7 @@ export const translations = {
     tabFavorites: 'Favoriten',
     tabTherapy: 'Therapie',
     tabTherapist: 'Profil',
+    tabProfile: 'Profil',
     tabOptions: 'Optionen',
     favoritesTitle: 'Favoriten',
     favoritesEmpty: 'Noch keine Favoriten',
@@ -403,6 +404,11 @@ export const translations = {
     privacyLabel: 'Datenschutz',
     helpSupportSection: 'Hilfe & Support',
     legalSection: 'Rechtliches & Richtlinien',
+    accountSection: 'Konto',
+    changePasswordHint: 'Aktualisiere dein Passwort, um dein Konto zu schützen.',
+    logoutHint: 'Melde dich auf diesem Gerät von deinem Konto ab.',
+    deleteAccountHint: 'Dein Konto und alle Daten werden dauerhaft entfernt.',
+    deleteAccountDisabledHint: 'Diese Aktion ist momentan nicht verfügbar.',
 
     // --- Registration form ---
     createAccountTitle: 'Account erstellen',
@@ -577,6 +583,7 @@ export const translations = {
     tabFavorites: 'Favorites',
     tabTherapy: 'Therapy',
     tabTherapist: 'Profile',
+    tabProfile: 'Profile',
     tabOptions: 'Options',
     favoritesTitle: 'Favorites',
     favoritesEmpty: 'No favorites yet',
@@ -679,8 +686,6 @@ export const translations = {
     gpsLoading: 'Detecting location …',
     locationDivider: 'or enter a city',
     confirmLocation: 'Continue',
-
-    // --- Common buttons ---
     cancelBtn: 'Cancel',
     callBtn: 'Call',
     doneBtn: 'Done',
@@ -707,8 +712,6 @@ export const translations = {
     forgotPasswordSent: 'If an account exists, we sent you an email to reset your password.',
     nameLabel: 'Name',
     notificationsOption: 'Notifications',
-
-    // --- Alerts general ---
     alertError: 'Error',
     alertSuccess: 'Success',
     alertSaved: 'Saved',
@@ -756,15 +759,9 @@ export const translations = {
     documentFallback: 'Document',
     editProfileAction: 'Edit profile',
     laterBtn: 'Later',
-
-    // --- Phone / Call ---
     alertNoPhone: 'No phone number',
     alertNoPhoneBody: 'No phone number is stored for this therapist.',
-
-    // --- Favorites ---
     favSaved: '♥ {name} saved',
-
-    // --- Auth / Login ---
     alertInvalidCredentials: 'Invalid credentials',
     loginLoading: 'Logging in…',
     forTherapistsTitle: 'For freelance therapists',
@@ -773,8 +770,6 @@ export const translations = {
     registrationInfoBody: 'The app currently focuses on freelance physiotherapists. Your profile will be manually reviewed before publication — usually within 48 hours.',
     registrationInfoBodyDev: '\n\nDevelopment mode: approved immediately.',
     registerBtn: 'Register now',
-
-    // --- Registration steps ---
     regStep1Title: 'Create account',
     regStep1Body: 'Email and password',
     regStep2Title: 'Fill out profile',
@@ -794,8 +789,6 @@ export const translations = {
     searchCityPlaceholder: 'Search city',
     lastNamePlaceholder: 'Last name',
     alertVerifyFailed: 'Verification failed.',
-
-    // --- Profile ---
     alertProfileSaved: 'Your profile has been updated successfully.',
     alertAvatarSaved: 'Profile picture saved.',
     alertPhotoUploadFail: 'Photo could not be uploaded.',
@@ -811,8 +804,6 @@ export const translations = {
     editProfileBtn: 'Edit profile',
     searchVisibleLabel: 'Visible in search',
     visibleLabel: 'Visible',
-
-    // --- Documents ---
     documentsTitle: 'Certificates & Documents',
     documentsHint: 'PDF, photo or scan — only visible to admins',
     alertUploadedBody: '"{name}" was successfully submitted.',
@@ -825,16 +816,12 @@ export const translations = {
     registrationDocumentReplaceBtn: 'Replace document',
     registrationDocumentUploadFailedTitle: 'Account created, document missing',
     registrationDocumentUploadFailedBody: 'Your account was created, but the document could not be uploaded. Please upload it later from your profile.',
-
-    // --- Practice ---
     alertDeleteConnectionError: 'Connection error while deleting.',
     alertMissingFields: 'Missing information',
     alertMissingFieldsBody: 'Name and city are required fields.',
     creatingBtn: 'Creating…',
     newPracticeStep2: 'Overview & Confirmation',
     confirmNowBtn: 'Confirm now',
-
-    // --- Invite ---
     alertRequestSent: 'Request sent',
     alertRequestSentBody: 'Your connection request has been sent. The practice must confirm it.',
     alertRequestFail: 'Request could not be sent.',
@@ -843,27 +830,19 @@ export const translations = {
     alertInvalidInvite: 'Invalid invitation',
     alertInviteConnectionError: 'Connection error while validating the invitation.',
     alertProfileCreated: 'Profile created',
-
-    // --- Therapist load ---
     alertTherapistLoadFail: 'Could not load therapist',
     alertTherapistLoadFailBody: 'Please check if the API is reachable and try again.',
     alertTherapistLoadFailDetail: 'Therapist details could not be loaded. Please check the API connection of the Expo app.',
     alertFillRequired: 'Please fill in all required fields.',
     alertSearchFail: 'Search failed',
     searchingLabel: 'Searching…',
-
-    // --- Review status ---
     statusApproved: 'Approved',
     statusChangesRequested: 'Changes needed',
     statusInReview: 'Under review',
     reviewStatusLabel: 'Review status',
-
-    // --- Insurance types ---
     kasseGesetzlich: 'Statutory',
     kassePrivat: 'Private',
     kasseSelbstzahler: 'Self-pay',
-
-    // --- Dashboard ---
     languagesLabel: 'Languages',
     uploadingDoc: 'Uploading…',
     uploadDocBtn: 'Upload certificate',
@@ -883,15 +862,12 @@ export const translations = {
     specsExamplePlaceholder: 'Back, Sports, Neurology…',
     loadingLabel: 'Loading…',
     searchLanguagePlaceholder: 'Search language…',
-
     searchMultiSelect: 'Search + multi-select',
     noCertsFound: 'No matching qualification found.',
     noNearbyPractices: 'No therapists within {n} km',
     tryAnotherLocation: 'Try a different location or a larger radius.',
     noGeoData: 'No therapists with location data',
     noGeoDataBody: 'No home-visit coordinates are available for these results yet.',
-
-    // --- Public profiles ---
     aboutPractice: 'About the practice',
     noPublicProfiles: 'No public profiles currently',
     noPublicProfilesBody: 'This practice currently has no published therapists in the directory.',
@@ -908,8 +884,6 @@ export const translations = {
     serviceAreaLabel: 'Service area',
     serviceAreaValue: 'Up to {radius} km',
     writeEmail: 'Write email',
-
-    // --- Settings ---
     deviceSettings: 'Device settings',
     faqOption: 'FAQ',
     appFeedback: 'App feedback',
@@ -932,15 +906,17 @@ export const translations = {
     privacyLabel: 'Privacy',
     helpSupportSection: 'Help & Support',
     legalSection: 'Legal & Policies',
-
-    // --- Registration form ---
+    accountSection: 'Account',
+    changePasswordHint: 'Update your password to keep your account secure.',
+    logoutHint: 'Log out of your account on this device.',
+    deleteAccountHint: 'Your account and all associated data will be permanently removed.',
+    deleteAccountDisabledHint: 'This action is currently unavailable.',
     createAccountTitle: 'Create account',
     emailVerificationSubtitle: 'Confirm your email first. After that, choose how you want to register.',
     infoLabel: 'Info',
     alreadyHaveAccount: 'Already have an account?',
     termsCheckbox: 'I accept the terms and privacy policy',
     termsRequired: 'Please accept the terms and privacy policy.',
-    passwordsMismatch: 'Passwords do not match',
     personalDetailsTitle: 'Personal details',
     howDoYouWork: 'How do you work?',
     homeVisitDistance: 'How far do you travel?',
@@ -985,10 +961,7 @@ export const translations = {
     freelanceCheckNoSub: 'I am employed or a practice owner.',
     freelanceCheckBlockedMsg: 'Unfortunately, Revio is currently only for freelance physiotherapists. Registration is not available at this time.',
     homeVisitsLabel: 'Home visits',
-    yesLabel: 'Yes',
-    noLabel: 'No',
     radiusMissing: 'Radius missing',
-    specsLabel: 'Specializations',
     specsCommaSeparated: 'Specializations (comma-separated)',
     certificationsShort: 'Certifications',
     documentLabel: 'Document',
@@ -1002,12 +975,9 @@ export const translations = {
     regStepInfoText5: 'Optionally share where you stand with the tax office and health authority. This is only used to classify your profile.',
     regStepInfoText6: 'Please upload your professional certificate or license. The document is required for manual review of your profile.',
     regStepInfoText7: 'Review all details before submitting. Your profile will be manually reviewed after submission — usually within 48 hours.',
-
-    // --- Confirmation / Invite screens ---
     pleaseWait: 'Please wait a moment.',
     autoLogin: 'You will be logged in automatically.',
     confirmFailed: 'Confirmation failed',
-    backBtn: 'Back',
     inviteChecking: 'Checking invitation…',
     inviteCheckFailed: 'Invitation could not be verified',
     toAppBtn: 'Go to app',
@@ -1036,7 +1006,6 @@ export const translations = {
     locationExamplePlaceholder: 'e.g. Main Street 5, Munich',
     enterLastNameConfirm: 'Enter your last name to confirm deletion:',
     lastNameFallback: 'Last name',
-    // --- Remaining inline strings ---
     publiclyVisible: 'Publicly visible',
     notYetPublic: 'Not yet public',
     addLangPlaceholder: 'Add another language (optional)',
@@ -1045,7 +1014,6 @@ export const translations = {
     emailBeingVerified: 'Verifying email…',
     emailVerified: 'Email verified!',
     passwordMinLength: 'Password must be at least 6 characters long.',
-    passwordsMismatch: 'Passwords do not match.',
     accountActivationError: 'Error activating account.',
     connectionErrorRetry: 'Connection error. Please check your internet connection.',
     inviteSetPasswordInfo: '{name} created a profile for you. Set a password now to activate your account.',

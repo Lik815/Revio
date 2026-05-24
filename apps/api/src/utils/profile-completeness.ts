@@ -10,7 +10,6 @@ type TherapistLike = {
   reviewStatus?: string | null;
   isVisible?: boolean | null;
   isPublished?: boolean | null;
-  onboardingStatus?: string | null;
   homeVisit?: boolean | null;
   serviceRadiusKm?: number | null;
   kassenart?: string | null;
@@ -46,22 +45,15 @@ export function getTherapistPublicationState(
 ) {
   const reviewApproved = therapist.reviewStatus === 'APPROVED';
   const visible = therapist.isVisible === true;
-  const requiresExplicitPublication =
-    therapist.onboardingStatus === 'manager_onboarding' ||
-    therapist.onboardingStatus === 'invited' ||
-    therapist.onboardingStatus === 'claimed';
-  const publishedOk = !requiresExplicitPublication || therapist.isPublished === true;
-  const practiceCompletion = getTherapistProfileCompletion(therapist, { requireBio: requiresExplicitPublication });
+  const practiceCompletion = getTherapistProfileCompletion(therapist);
   const publicSearchEligible =
     reviewApproved &&
     visible &&
-    publishedOk &&
     practiceCompletion.complete;
 
   const blockingReasons: string[] = [];
   if (!reviewApproved) blockingReasons.push('not_approved');
   if (!visible) blockingReasons.push('manually_hidden');
-  if (requiresExplicitPublication && !therapist.isPublished) blockingReasons.push('publication_missing');
   if (!practiceCompletion.complete) {
     blockingReasons.push('profile_incomplete');
   }

@@ -70,7 +70,6 @@ afterEach(async () => {
   await prisma.appSetting.deleteMany();
   await prisma.appFeedback.deleteMany();
   await prisma.userFavoriteTherapist.deleteMany();
-  await prisma.practiceManager.deleteMany();
   await prisma.user.deleteMany();
   await prisma.bookingRequest.deleteMany();
   await prisma.therapistSlot.deleteMany();
@@ -725,7 +724,6 @@ describe('GET /practice-detail/:id', () => {
         reviewStatus: 'APPROVED',
         isVisible: true,
         isPublished: true,
-        onboardingStatus: 'claimed',
         links: {
           create: {
             practiceId: practice.id,
@@ -746,9 +744,7 @@ describe('GET /practice-detail/:id', () => {
         languages: 'de',
         certifications: '',
         reviewStatus: 'APPROVED',
-        isVisible: true,
-        isPublished: false,
-        onboardingStatus: 'claimed',
+        isVisible: false,
         links: {
           create: {
             practiceId: practice.id,
@@ -1427,81 +1423,6 @@ describe('Email verification', () => {
     const user = await prisma.user.findUnique({ where: { email } });
     expect(user?.emailVerifiedAt).not.toBeNull();
     expect(user?.requiresEmailVerification).toBe(false);
-  });
-});
-
-describe('Therapist-only auth scope', () => {
-  it('rejects legacy manager login via /auth/login', async () => {
-    const passwordHash = await hashPassword('manager-login-123');
-    await prisma.practiceManager.create({
-      data: {
-        email: 'manager-login@test.de',
-        passwordHash,
-      },
-    });
-
-    const res = await app.inject({
-      method: 'POST',
-      url: '/auth/login',
-      payload: { email: 'manager-login@test.de', password: 'manager-login-123' },
-    });
-
-    expect(res.statusCode).toBe(401);
-  });
-
-  it('rejects manager session tokens for therapist profile updates', async () => {
-    const therapistPasswordHash = await hashPassword('therapist-pass-123');
-    const therapistUser = await prisma.user.create({
-      data: {
-        email: 'therapist-scope@test.de',
-        passwordHash: therapistPasswordHash,
-        role: 'therapist',
-      },
-    });
-    const therapist = await prisma.therapist.create({
-      data: {
-        email: therapistUser.email,
-        userId: therapistUser.id,
-        fullName: 'Therapist Scope',
-        professionalTitle: 'Physiotherapeut',
-        city: 'Köln',
-        specializations: 'Rücken',
-        languages: 'de',
-        certifications: '',
-        passwordHash: therapistPasswordHash,
-      },
-    });
-
-    const managerPasswordHash = await hashPassword('manager-pass-123');
-    const managerUser = await prisma.user.create({
-      data: {
-        email: 'manager-scope@test.de',
-        passwordHash: managerPasswordHash,
-        role: 'manager',
-        sessionToken: 'manager-token',
-      },
-    });
-    await prisma.practiceManager.create({
-      data: {
-        email: managerUser.email,
-        userId: managerUser.id,
-        passwordHash: managerPasswordHash,
-        sessionToken: 'manager-token',
-        therapistId: therapist.id,
-      },
-    });
-
-    const res = await app.inject({
-      method: 'PATCH',
-      url: '/auth/me',
-      headers: { authorization: 'Bearer manager-token' },
-      payload: { bio: 'Neue Bio' },
-    });
-
-    expect(res.statusCode).toBe(401);
-
-    const therapistAfterPatch = await prisma.therapist.findUnique({ where: { id: therapist.id } });
-    expect(therapistAfterPatch?.bio).toBeNull();
   });
 });
 
@@ -2608,47 +2529,6 @@ describe('GET /notifications — routing metadata', () => {
     expect(notif.bookingId).toBe(booking.id);
   });
 
-  it('includes linkId and practiceId for JOIN_REQUEST notification', async () => {
-    const adminToken = 'notif-admin-token';
-    const adminUser = await prisma.user.create({
-      data: { email: 'notif-admin@test.de', passwordHash: 'h', role: 'therapist', sessionToken: adminToken },
-    });
-    const adminTherapist = await prisma.therapist.create({
-      data: {
-        email: 'notif-admin@test.de', fullName: 'Admin T', professionalTitle: 'PT',
-        city: 'Berlin', specializations: '', languages: 'de', certifications: '',
-        sessionToken: adminToken, userId: adminUser.id,
-      } as any,
-    });
-    const practice = await prisma.practice.create({
-      data: { name: 'Test Praxis', address: 'Str 1', city: 'Berlin', lat: 0, lng: 0 },
-    });
-    const manager = await prisma.practiceManager.create({
-      data: { email: 'notif-admin@test.de', passwordHash: 'h', sessionToken: 'mgr-token', therapistId: adminTherapist.id },
-    });
-    await (prisma as any).managerPracticeAssignment.create({
-      data: { managerId: manager.id, practiceId: practice.id },
-    });
-    const joiningTherapist = await prisma.therapist.create({
-      data: {
-        email: 'joiner@test.de', fullName: 'Joiner', professionalTitle: 'PT',
-        city: 'Berlin', specializations: '', languages: 'de', certifications: '',
-      } as any,
-    });
-    const link = await (prisma as any).therapistPracticeLink.create({
-      data: { therapistId: joiningTherapist.id, practiceId: practice.id, status: 'PROPOSED', initiatedBy: 'THERAPIST' },
-    });
-
-    const res = await app.inject({
-      method: 'GET', url: '/notifications',
-      headers: { authorization: `Bearer ${adminToken}` },
-    });
-    expect(res.statusCode).toBe(200);
-    const notif = res.json().notifications.find((n: any) => n.type === 'JOIN_REQUEST');
-    expect(notif).toBeDefined();
-    expect(notif.linkId).toBe(link.id);
-    expect(notif.practiceId).toBe(practice.id);
-  });
 });
 
 describe('Session token expiry', () => {

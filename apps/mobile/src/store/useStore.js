@@ -2,7 +2,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
-const DEFAULT_LOCALE = 'de';
 const DEFAULT_THEME_PREFERENCE = 'system';
 
 const INITIAL_AUTH_STATE = {
@@ -20,7 +19,6 @@ const INITIAL_FAVORITES_STATE = {
 };
 
 const INITIAL_UI_STATE = {
-  locale: DEFAULT_LOCALE,
   themePreference: DEFAULT_THEME_PREFERENCE,
 };
 
@@ -52,12 +50,6 @@ export const useAppStore = create(
       setThemePreference: (themePreference) => {
         set({
           themePreference: themePreference ?? DEFAULT_THEME_PREFERENCE,
-        });
-      },
-
-      setLocale: (locale) => {
-        set({
-          locale: locale ?? DEFAULT_LOCALE,
         });
       },
 
@@ -161,7 +153,6 @@ export const useAppStore = create(
         loggedInTherapist: state.loggedInTherapist,
         favorites: state.favorites,
         favoritesLastLoadedAt: state.favoritesLastLoadedAt,
-        locale: state.locale,
         themePreference: state.themePreference,
       }),
       onRehydrateStorage: () => (state) => {
@@ -175,7 +166,6 @@ export const appStoreSelectors = {
   authToken: (state) => state.authToken,
   accountType: (state) => state.accountType,
   isAuthenticated: (state) => Boolean(state.authToken),
-  locale: (state) => state.locale,
   themePreference: (state) => state.themePreference,
   favorites: (state) => state.favorites,
   loggedInPatient: (state) => state.loggedInPatient,

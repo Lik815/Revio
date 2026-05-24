@@ -4,6 +4,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { TAB_ROUTES } from './route-names';
 import { DiscoverTabScreen } from '../screens/discover/DiscoverScreen';
 import { TherapyTabScreen } from '../screens/therapy/TherapyScreen';
+import { FavoritesTabScreen } from '../screens/favorites/FavoritesScreen';
 import { ProfileTabScreen } from '../screens/profile/ProfileScreen';
 import { OptionsTabScreen } from '../screens/options/OptionsScreen';
 import { COLORS } from '../mobile-utils';
@@ -14,17 +15,19 @@ import { useColorScheme } from 'react-native';
 const Tab = createBottomTabNavigator();
 
 const TAB_ICON_BY_ROUTE = {
-  [TAB_ROUTES.DISCOVER]: 'search',
-  [TAB_ROUTES.THERAPY]: 'heart',
-  [TAB_ROUTES.PROFILE]: 'person',
-  [TAB_ROUTES.OPTIONS]: 'settings',
+  [TAB_ROUTES.DISCOVER]:   'search',
+  [TAB_ROUTES.THERAPY]:    'calendar',
+  [TAB_ROUTES.FAVORITES]:  'heart',
+  [TAB_ROUTES.PROFILE]:    'person',
+  [TAB_ROUTES.OPTIONS]:    'settings',
 };
 
 const TAB_TRANSLATION_KEYS = {
-  [TAB_ROUTES.DISCOVER]: 'tabSearch',
-  [TAB_ROUTES.THERAPY]: 'tabTherapy',
-  [TAB_ROUTES.PROFILE]: 'tabTherapist',
-  [TAB_ROUTES.OPTIONS]: 'tabOptions',
+  [TAB_ROUTES.DISCOVER]:   'tabSearch',
+  [TAB_ROUTES.THERAPY]:    'tabTherapy',
+  [TAB_ROUTES.FAVORITES]:  'tabFavorites',
+  [TAB_ROUTES.PROFILE]:    'tabProfile',
+  [TAB_ROUTES.OPTIONS]:    'tabOptions',
 };
 
 function usePalette() {
@@ -35,8 +38,7 @@ function usePalette() {
 }
 
 function useTranslations() {
-  const locale = useAppStore(appStoreSelectors.locale);
-  return translations[locale] ?? translations.de;
+  return translations.de;
 }
 
 export function AppTabs() {
@@ -69,6 +71,11 @@ export function AppTabs() {
         component={TherapyTabScreen}
         name={TAB_ROUTES.THERAPY}
         options={{ title: t[TAB_TRANSLATION_KEYS[TAB_ROUTES.THERAPY]] }}
+      />
+      <Tab.Screen
+        component={FavoritesTabScreen}
+        name={TAB_ROUTES.FAVORITES}
+        options={{ title: t[TAB_TRANSLATION_KEYS[TAB_ROUTES.FAVORITES]] }}
       />
       <Tab.Screen
         component={ProfileTabScreen}

@@ -204,13 +204,6 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
       where: {
         reviewStatus: 'APPROVED',
         isVisible: true,
-        OR: [
-          {
-            invitedByPracticeId: null,
-            onboardingStatus: { not: 'manager_onboarding' },
-          },
-          { isPublished: true },
-        ],
       },
       include: {
         links: {
@@ -452,13 +445,6 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
             therapist: {
               reviewStatus: 'APPROVED',
               isVisible: true,
-              OR: [
-                {
-                  invitedByPracticeId: null,
-                  onboardingStatus: { not: 'manager_onboarding' },
-                },
-                { isPublished: true },
-              ],
             },
           },
           include: {
@@ -471,7 +457,6 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
                 reviewStatus: true,
                 isVisible: true,
                 isPublished: true,
-                onboardingStatus: true,
               },
             },
           },

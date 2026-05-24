@@ -290,8 +290,7 @@ export default function App() {
     <HeartButton {...props} savedColor={c.saved} unsavedColor={props.unsavedColor ?? c.muted} />
   );
 
-  const [appLanguage, setAppLanguage] = useState('de'); // 'de' | 'en'
-  const t = (key) => translations[appLanguage]?.[key] ?? translations['de'][key];
+  const t = (key) => translations.de[key];
 
   const [activeTab, setActiveTab] = useState('discover');
   const [selectedPractice, setSelectedPractice] = useState(null);
@@ -493,7 +492,7 @@ export default function App() {
 
   // Email verification deep-link handler (revo://verify?token=xxx)
   const handleVerifyEmailLink = async (token) => {
-    setActiveTab('therapist');
+    setActiveTab('profile');
     setShowLogin(false);
     setShowRegister(false);
     setEmailVerifyError('');
@@ -591,7 +590,7 @@ export default function App() {
           setInviteClaimPassword('');
           setInviteClaimPasswordConfirm('');
           setInviteClaimError('');
-          setActiveTab('therapist');
+          setActiveTab('profile');
           setShowLogin(false);
           setShowRegister(false);
           setShowInviteClaim(true);
@@ -820,7 +819,7 @@ export default function App() {
 
     switch (type) {
       case 'NEW_BOOKING_REQUEST':
-        setActiveTab('favorites');
+        setActiveTab('therapy');
         setActiveFilterTherapist('pending');
         await loadIncomingBookings(authToken, { background: true });
         break;
@@ -828,7 +827,7 @@ export default function App() {
       case 'BOOKING_CONFIRMED':
       case 'BOOKING_DECLINED':
       case 'BOOKING_CANCELLED':
-        setActiveTab('favorites');
+        setActiveTab('therapy');
         if (authToken) {
           await loadMyAppointments(authToken, { background: true });
           if (bookingId) {
@@ -845,7 +844,7 @@ export default function App() {
       case 'PROFILE_CHANGES_REQUESTED':
       case 'PROFILE_REJECTED':
       case 'PROFILE_SUSPENDED':
-        setActiveTab('therapist');
+        setActiveTab('profile');
         break;
 
       case 'JOIN_REQUEST':
@@ -1398,18 +1397,16 @@ export default function App() {
     return () => sub.remove();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Load saved city + label + language from AsyncStorage on mount
+  // Load saved city + label from AsyncStorage on mount
   useEffect(() => {
     Promise.all([
       AsyncStorage.getItem('savedCity'),
       AsyncStorage.getItem('savedLocationLabel'),
-      AsyncStorage.getItem('appLanguage'),
       AsyncStorage.getItem('savedCoords'),
       AsyncStorage.getItem('themeMode'),
-    ]).then(([savedCity, savedLabel, savedLang, savedCoords, savedThemeMode]) => {
+    ]).then(([savedCity, savedLabel, savedCoords, savedThemeMode]) => {
       if (savedCity) setCity(savedCity);
       if (savedLabel) setLocationLabel(savedLabel);
-      if (savedLang === 'de' || savedLang === 'en') setAppLanguage(savedLang);
       if (savedThemeMode === 'light' || savedThemeMode === 'dark') setThemeMode(savedThemeMode);
       if (savedCoords) {
         try { setUserCoords(JSON.parse(savedCoords)); } catch {}
@@ -1418,13 +1415,13 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (activeTab === 'therapist' && authToken && loggedInTherapist) {
+    if (activeTab === 'profile' && authToken && loggedInTherapist) {
       loadMySlots(authToken, { background: slotsLastLoadedAt > 0 });
     }
   }, [activeTab, authToken, loggedInTherapist?.id]);
 
   useEffect(() => {
-    if (activeTab !== 'favorites' || !authToken) return;
+    if (activeTab !== 'therapy' || !authToken) return;
     refreshTherapyTab();
   }, [activeTab, authToken, accountType, loggedInTherapist?.id, loggedInPatient?.id]);
 
@@ -1652,7 +1649,7 @@ export default function App() {
             // Gewünschten Therapeuten merken — nach Login direkt buchen
             setBookingTargetTherapist(therapist);
             setSelectedTherapist(null);
-            setActiveTab('therapist');
+            setActiveTab('profile');
             setShowLogin(true);
             return;
           }
@@ -1710,7 +1707,7 @@ export default function App() {
     <TherapistDashboardScreen
       c={c} t={t} styles={styles}
       certificationOptions={certificationOptions}
-      onOpenTherapyTab={() => setActiveTab('favorites')}
+      onOpenTherapyTab={() => setActiveTab('therapy')}
       onAddSlot={handleAddSlot}
       onProfileSaved={openProfileSavedModal}
     />
@@ -1759,17 +1756,15 @@ export default function App() {
       accountType={accountType}
       themeMode={themeMode}
       setThemeMode={setThemeMode}
-      appLanguage={appLanguage}
-      setAppLanguage={setAppLanguage}
       notifications={notifications}
       dismissedNotifIds={dismissedNotifIds}
       onShowNotifications={() => setShowNotifications(true)}
-      onShowLogin={() => { setShowLogin(true); setActiveTab('therapist'); }}
+      onShowLogin={() => { setShowLogin(true); setActiveTab('profile'); }}
       onShowRegister={() => setShowRegister(true)}
       onShowFeedback={openFeedbackModal}
       onShowChangePassword={() => setShowChangePasswordModal(true)}
       onDeleteAccount={() => setShowDeleteAccountModal(true)}
-      onNavigateToProfile={() => setActiveTab('therapist')}
+      onNavigateToProfile={() => setActiveTab('profile')}
       onLogout={handleLogout}
       c={c} t={t} styles={styles}
     />
@@ -1923,7 +1918,7 @@ export default function App() {
       <Text style={[styles.emptyTitle, { color: c.text }]}>{t('favoritesLoginRequired') ?? 'Einloggen für Favoriten'}</Text>
       <Text style={[styles.emptyBody, { color: c.muted }]}>{t('favoritesLoginRequiredBody') ?? 'Melde dich an, um Therapeuten als Favoriten zu speichern.'}</Text>
       <Pressable
-        onPress={() => { setActiveTab('therapist'); setShowLogin(true); }}
+        onPress={() => { setActiveTab('profile'); setShowLogin(true); }}
         style={[styles.registerBtn, { backgroundColor: c.primary, marginTop: 16, paddingHorizontal: 32 }]}
       >
         <Text style={styles.registerBtnText}>{t('loginAction')}</Text>
@@ -1935,7 +1930,6 @@ export default function App() {
     <TherapyTabPatient
       myAppointments={myAppointments}
       myAppointmentsLoading={myAppointmentsLoading}
-      favorites={favorites}
       activeFilterPatient={activeFilterPatient}
       setActiveFilterPatient={setActiveFilterPatient}
       therapyRefreshing={therapyRefreshing}
@@ -1947,7 +1941,6 @@ export default function App() {
       onOpenTherapistById={openTherapistById}
       onSelectAppointment={setSelectedAppointment}
       c={c} t={t} styles={styles}
-      renderFavoritesVertical={renderFavoritesVertical}
       renderTherapyTabShell={renderTherapyTabShell}
       renderTherapySectionLoading={renderTherapySectionLoading}
     />
@@ -1960,7 +1953,6 @@ export default function App() {
       slotsLoading={slotsLoading}
       incomingBookings={incomingBookings}
       incomingBookingsLoading={incomingBookingsLoading}
-      favorites={favorites}
       deletingSlotIds={deletingSlotIds}
       activeFilterTherapist={activeFilterTherapist}
       setActiveFilterTherapist={setActiveFilterTherapist}
@@ -1980,24 +1972,55 @@ export default function App() {
       setShowSlotComposerModal={setShowSlotComposerModal}
       loggedInTherapist={loggedInTherapist}
       c={c} t={t} styles={styles}
-      renderFavoritesVertical={renderFavoritesVertical}
       renderTherapyTabShell={renderTherapyTabShell}
       renderTherapySectionLoading={renderTherapySectionLoading}
       renderTherapySectionEmpty={renderTherapySectionEmpty}
     />
   );
 
-  const renderTherapyTabManager = () => renderTherapyTabShell(
-    therapyTabTitle,
-    renderTherapySectionEmpty('Manager-Ansicht wird in einem nächsten Schritt erweitert.', null)
-  );
-
-  const renderFavorites = () => {
+  const renderTherapyTab = () => {
     if (!authToken) return renderTherapyTabGuest();
     if (accountType === 'patient') return renderTherapyTabPatient();
     if (accountType === 'therapist') return renderTherapyTabTherapist();
-    if (accountType === 'manager') return renderTherapyTabManager();
     return renderTherapyTabGuest();
+  };
+
+  const renderFavoritesTab = () => {
+    if (!authToken) {
+      return renderTherapyTabShell(
+        t('favoritesTitle'),
+        <View style={[styles.emptyState, { backgroundColor: c.card, borderColor: c.border }]}>
+          <Text style={styles.emptyIcon}>♡</Text>
+          <Text style={[styles.emptyTitle, { color: c.text }]}>{t('favoritesLoginRequired') ?? 'Einloggen für Favoriten'}</Text>
+          <Text style={[styles.emptyBody, { color: c.muted }]}>{t('favoritesLoginRequiredBody') ?? 'Melde dich an, um Therapeuten als Favoriten zu speichern.'}</Text>
+          <Pressable
+            onPress={() => { setActiveTab('profile'); setShowLogin(true); }}
+            style={[styles.registerBtn, { backgroundColor: c.primary, marginTop: 16, paddingHorizontal: 32 }]}
+          >
+            <Text style={styles.registerBtnText}>{t('loginAction')}</Text>
+          </Pressable>
+        </View>
+      );
+    }
+    return (
+      <View style={{ flex: 1 }}>
+        <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 10, backgroundColor: c.background }}>
+          <View style={[styles.header, { marginBottom: 0 }]}>
+            <Image source={require('../../assets/icon.png')} style={styles.logoMark} />
+            <Text style={[styles.headerTitle, { color: c.text, flex: 1 }]}>{t('favoritesTitle')}</Text>
+          </View>
+        </View>
+        <ScrollView
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: 32, paddingTop: 8 }]}
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={favoritesLoading} onRefresh={() => loadFavorites(authToken)} tintColor={c.primary} />}
+        >
+          <View style={{ backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.border, paddingHorizontal: 16, paddingBottom: 4 }}>
+            {renderFavoritesVertical((fav) => openTherapistById(fav.id, fav), { showAll: true })}
+          </View>
+        </ScrollView>
+      </View>
+    );
   };
 
   // ── Register flow ──────────────────────────────────────────────────────────
@@ -2049,7 +2072,7 @@ export default function App() {
             Alert.alert(
               t('alertProfileIncomplete'),
               t('alertProfileIncompleteBody').replace('{fields}', fields),
-              [{ text: t('editProfileAction'), onPress: () => setActiveTab('therapist') }, { text: t('laterBtn'), style: 'cancel' }]
+              [{ text: t('editProfileAction'), onPress: () => setActiveTab('profile') }, { text: t('laterBtn'), style: 'cancel' }]
             );
           }
         } else {
@@ -2110,10 +2133,11 @@ export default function App() {
   );
 
   const renderTab = () => {
-    if (activeTab === 'favorites' && selectedAppointment) return renderAppointmentDetail(selectedAppointment);
+    if (activeTab === 'therapy' && selectedAppointment) return renderAppointmentDetail(selectedAppointment);
     if (selectedTherapist) return renderTherapistProfile(selectedTherapist);
-    if (activeTab === 'favorites') return renderFavorites();
-    if (activeTab === 'therapist') {
+    if (activeTab === 'therapy') return renderTherapyTab();
+    if (activeTab === 'favorites') return renderFavoritesTab();
+    if (activeTab === 'profile') {
       if (loggedInPatient) return renderPatientDashboard();
       if (showEmailVerify) return renderEmailVerifyScreen();
       if (loggedInTherapist) return renderTherapistDashboard();
@@ -2198,7 +2222,7 @@ export default function App() {
                 setSelectedTherapist(null);
                 setSelectedAppointment(null);
                 loadMyAppointments(authToken);
-                setActiveTab('favorites');
+                setActiveTab('therapy');
               }}
               onClose={() => {
                 setShowBookingForm(false);
@@ -2634,7 +2658,7 @@ export default function App() {
               onPress={async () => {
                 setShowPhotoPrompt(false);
                 await AsyncStorage.setItem('revio_photo_prompt_dismissed', '1');
-                setActiveTab('therapist');
+                setActiveTab('profile');
               }}
               style={{ backgroundColor: c.primary, borderRadius: 12, paddingVertical: 14, paddingHorizontal: 32, width: '100%', alignItems: 'center', marginTop: 4 }}
             >
@@ -2674,7 +2698,7 @@ export default function App() {
       <View style={styles.appFrame}>
         {renderTab()}
         {/* ── Globale Notification-Glocke ─────────────────────────────────── */}
-        {authToken && !selectedTherapist && !showBookingForm && activeTab !== 'favorites' && (
+        {authToken && !selectedTherapist && !showBookingForm && activeTab !== 'therapy' && (
           <Pressable
             onPress={() => setShowNotifications(true)}
             style={{
@@ -2711,7 +2735,7 @@ export default function App() {
               onPress={() => {
                 setSelectedPractice(null);
                 setSelectedTherapist(null);
-                if (tab.key !== 'therapist') {
+                if (tab.key !== 'profile') {
                   setShowLogin(false);
                   setShowRegister(false);
                   setShowInviteClaim(false);
@@ -2736,7 +2760,7 @@ export default function App() {
                     size={22}
                     color={active ? c.primary : c.muted}
                   />
-                  {tab.key === 'therapist' && loggedInTherapist && notifications.filter((n) => !dismissedNotifIds.has(n.id)).length > 0 && (
+                  {tab.key === 'profile' && loggedInTherapist && notifications.filter((n) => !dismissedNotifIds.has(n.id)).length > 0 && (
                     <View style={{ position: 'absolute', top: -3, right: -5, backgroundColor: '#E53E3E', borderRadius: 6, minWidth: 12, height: 12, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 2 }}>
                       <Text style={{ color: '#fff', fontSize: 8, fontWeight: '800', lineHeight: 12 }}>
                         {notifications.filter((n) => !dismissedNotifIds.has(n.id)).length}

@@ -313,7 +313,6 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       reviewStatus: therapist.reviewStatus,
       visibilityPreference: therapist.visibilityPreference,
       isPublished: therapist.isPublished,
-      onboardingStatus: therapist.onboardingStatus,
       postalCode: therapist.postalCode ?? null,
       street: therapist.street ?? null,
       houseNumber: therapist.houseNumber ?? null,
@@ -458,16 +457,10 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       ...updateData,
     };
     const requiresExplicitPublication =
-      therapist.onboardingStatus === 'manager_onboarding' ||
-      therapist.onboardingStatus === 'invited' ||
-      therapist.onboardingStatus === 'claimed' ||
       therapist.visibilityPreference === 'visible';
     const completion = getTherapistProfileCompletion(nextTherapist, { requireBio: requiresExplicitPublication });
     if (therapist.visibilityPreference === 'visible') {
       updateData.isPublished = completion.complete;
-      if (!completion.complete && therapist.onboardingStatus === 'complete') {
-        updateData.onboardingStatus = 'claimed';
-      }
     }
 
     await fastify.prisma.therapist.update({
@@ -668,7 +661,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     const token = getToken(request);
     if (!token) { reply.unauthorized('Kein Token'); return null; }
 
-    // Primary lookup via User.sessionToken (patients, modern therapists, managers)
+    // Primary lookup via User.sessionToken (patients, modern therapists)
     let user = await fastify.prisma.user.findUnique({ where: { sessionToken: token } });
 
     // Fallback: legacy therapists may only have Therapist.sessionToken set

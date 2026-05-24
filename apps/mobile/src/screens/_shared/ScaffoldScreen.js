@@ -18,8 +18,7 @@ export function ScaffoldScreen({
   title,
 }) {
   const palette = usePalette();
-  const locale = useAppStore(appStoreSelectors.locale);
-  const t = translations[locale] ?? translations.de;
+  const t = translations.de;
 
   return (
     <View

@@ -11,12 +11,12 @@ import { TherapistTimeline } from './mobile-slot-composer';
 const shouldShowSectionLoading = (isLoading, lastLoadedAt) => isLoading && lastLoadedAt === 0;
 
 export function TherapyTabPatient({
-  myAppointments, myAppointmentsLoading, favorites,
+  myAppointments, myAppointmentsLoading,
   activeFilterPatient, setActiveFilterPatient,
   therapyRefreshing, appointmentsLastLoadedAt,
   notifications, dismissedNotifIds, onShowNotifications,
   onRefresh, onOpenTherapistById, onSelectAppointment,
-  renderFavoritesVertical, renderTherapyTabShell, renderTherapySectionLoading,
+  renderTherapyTabShell, renderTherapySectionLoading,
   c, t, styles,
 }) {
   const getDate = (a) => new Date(a.slot?.startsAt ?? a.confirmedSlotAt ?? 0);
@@ -49,8 +49,8 @@ export function TherapyTabPatient({
     return groups;
   };
 
-  const filteredKommend = activeFilterPatient === 'vergangen' || activeFilterPatient === 'favoriten' ? [] : kommend;
-  const filteredVergangen = activeFilterPatient === 'kommend' || activeFilterPatient === 'favoriten' ? [] : vergangen;
+  const filteredKommend = activeFilterPatient === 'vergangen' ? [] : kommend;
+  const filteredVergangen = activeFilterPatient === 'kommend' ? [] : vergangen;
 
   const msUntil = nextApt ? getDate(nextApt) - now : 0;
   const hoursUntil = Math.floor(msUntil / 3600000);
@@ -121,15 +121,6 @@ export function TherapyTabPatient({
             <Ionicons name="time-outline" size={14} color={c.warning ?? '#8A6000'} style={{ marginTop: 3, opacity: 0.7 }} />
             <Ionicons name="chevron-forward" size={10} color={c.warning ?? '#8A6000'} style={{ position: 'absolute', top: 8, right: 6, opacity: 0.5 }} />
           </Pressable>
-          <Pressable
-            onPress={() => setActiveFilterPatient(activeFilterPatient === 'favoriten' ? 'all' : 'favoriten')}
-            style={{ flex: 1, backgroundColor: '#FEF2F2', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 4, alignItems: 'center', borderWidth: activeFilterPatient === 'favoriten' ? 2 : 0, borderColor: c.error ?? '#ef4444' }}
-          >
-            <Text style={{ fontSize: 20, fontWeight: '800', color: c.error ?? '#ef4444' }}>{favorites.length}</Text>
-            <Text style={{ fontSize: 10, color: c.error ?? '#ef4444', fontWeight: '600', marginTop: 2, textAlign: 'center' }}>Favoriten</Text>
-            <Ionicons name="heart-outline" size={14} color={c.error ?? '#ef4444'} style={{ marginTop: 3, opacity: 0.7 }} />
-            <Ionicons name="chevron-forward" size={10} color={c.error ?? '#ef4444'} style={{ position: 'absolute', top: 8, right: 6, opacity: 0.5 }} />
-          </Pressable>
         </View>
 
         {/* ── Filter-Tabs ─────────────────────────────────────────── */}
@@ -139,7 +130,6 @@ export function TherapyTabPatient({
               { key: 'all', label: 'Alle' },
               { key: 'kommend', label: 'Kommend' },
               { key: 'vergangen', label: 'Vergangen' },
-              { key: 'favoriten', label: 'Favoriten' },
             ].map(({ key, label }) => {
               const active = activeFilterPatient === key;
               return (
@@ -155,61 +145,46 @@ export function TherapyTabPatient({
           </View>
         </ScrollView>
 
-        {/* ── Favoriten-Filter ────────────────────────────────────── */}
-        {activeFilterPatient === 'favoriten' ? (
-          <View style={{ backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.border, paddingHorizontal: 16, paddingBottom: 4 }}>
-            {renderFavoritesVertical((fav) => onOpenTherapist(fav), { showAll: true })}
+        {/* ── Timeline ──────────────────────────────────────────────── */}
+        {shouldShowSectionLoading(myAppointmentsLoading, appointmentsLastLoadedAt) ? (
+          renderTherapySectionLoading()
+        ) : myAppointments.length === 0 ? (
+          <View style={{ backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.border, paddingVertical: 32, paddingHorizontal: 20, alignItems: 'center', marginBottom: 12 }}>
+            <Ionicons name="calendar-outline" size={36} color={c.muted} style={{ marginBottom: 12 }} />
+            <Text style={{ fontSize: 16, fontWeight: '700', color: c.text, textAlign: 'center' }}>Noch keine Termine</Text>
+            <Text style={{ fontSize: 13, color: c.muted, textAlign: 'center', marginTop: 6, lineHeight: 20 }}>
+              Suche eine Therapeutin oder einen Therapeuten und buche deinen ersten Termin.
+            </Text>
           </View>
         ) : (
           <>
-            {/* ── Timeline ──────────────────────────────────────── */}
-            {shouldShowSectionLoading(myAppointmentsLoading, appointmentsLastLoadedAt) ? (
-              renderTherapySectionLoading()
-            ) : myAppointments.length === 0 ? (
-              <View style={{ backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.border, paddingVertical: 32, paddingHorizontal: 20, alignItems: 'center', marginBottom: 12 }}>
-                <Ionicons name="calendar-outline" size={36} color={c.muted} style={{ marginBottom: 12 }} />
-                <Text style={{ fontSize: 16, fontWeight: '700', color: c.text, textAlign: 'center' }}>Noch keine Termine</Text>
-                <Text style={{ fontSize: 13, color: c.muted, textAlign: 'center', marginTop: 6, lineHeight: 20 }}>
-                  Suche eine Therapeutin oder einen Therapeuten und buche deinen ersten Termin.
-                </Text>
+            {Object.entries(groupByDay(filteredKommend)).map(([day, apts]) => (
+              <View key={day} style={{ marginBottom: 12 }}>
+                <Text style={{ fontSize: 11, fontWeight: '700', letterSpacing: 0.5, color: c.muted, textTransform: 'uppercase', marginBottom: 8 }}>{day}</Text>
+                {apts.map(apt => (
+                  <PatientAppointmentCard key={apt.id} c={c} appointment={apt} onOpenDetail={() => onSelectAppointment(apt)} onViewTherapist={() => openTherapist(apt.therapist)} />
+                ))}
               </View>
-            ) : (
-              <>
-                {Object.entries(groupByDay(filteredKommend)).map(([day, apts]) => (
-                  <View key={day} style={{ marginBottom: 12 }}>
-                    <Text style={{ fontSize: 11, fontWeight: '700', letterSpacing: 0.5, color: c.muted, textTransform: 'uppercase', marginBottom: 8 }}>{day}</Text>
-                    {apts.map(apt => (
-                      <PatientAppointmentCard key={apt.id} c={c} appointment={apt} onOpenDetail={() => onSelectAppointment(apt)} onViewTherapist={() => openTherapist(apt.therapist)} />
-                    ))}
-                  </View>
-                ))}
-                {filteredVergangen.length > 0 && (
-                  <Text style={{ fontSize: 11, fontWeight: '700', letterSpacing: 0.5, color: c.muted, textTransform: 'uppercase', marginBottom: 8, marginTop: filteredKommend.length > 0 ? 8 : 0 }}>
-                    Vergangene Termine
-                  </Text>
-                )}
-                {Object.entries(groupByDay(filteredVergangen)).map(([day, apts]) => (
-                  <View key={day} style={{ marginBottom: 12 }}>
-                    <Text style={{ fontSize: 11, fontWeight: '700', letterSpacing: 0.5, color: c.muted, textTransform: 'uppercase', marginBottom: 8 }}>{day}</Text>
-                    {apts.map(apt => (
-                      <PatientAppointmentCard key={apt.id} c={c} appointment={apt} isPast onOpenDetail={() => onSelectAppointment(apt)} onViewTherapist={() => openTherapist(apt.therapist)} />
-                    ))}
-                  </View>
-                ))}
-                {filteredKommend.length === 0 && filteredVergangen.length === 0 && (
-                  <View style={{ backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.border, paddingVertical: 28, paddingHorizontal: 20, alignItems: 'center' }}>
-                    <Text style={{ fontSize: 14, fontWeight: '600', color: c.text, textAlign: 'center' }}>Keine Termine</Text>
-                    <Text style={{ fontSize: 13, color: c.muted, textAlign: 'center', marginTop: 4 }}>Für diesen Filter gibt es keine Einträge.</Text>
-                  </View>
-                )}
-              </>
+            ))}
+            {filteredVergangen.length > 0 && (
+              <Text style={{ fontSize: 11, fontWeight: '700', letterSpacing: 0.5, color: c.muted, textTransform: 'uppercase', marginBottom: 8, marginTop: filteredKommend.length > 0 ? 8 : 0 }}>
+                Vergangene Termine
+              </Text>
             )}
-
-            {/* ── Gespeicherte Therapeuten ────────────────────────── */}
-            <Text style={[styles.sectionLabel, { color: c.text, marginTop: 16, textTransform: 'uppercase', fontSize: 11, letterSpacing: 0.5 }]}>Gespeicherte Therapeuten</Text>
-            <View style={{ backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.border, paddingHorizontal: 16, paddingBottom: 4 }}>
-              {renderFavoritesVertical((fav) => onOpenTherapist(fav), { onShowAll: () => setActiveFilterPatient('favoriten') })}
-            </View>
+            {Object.entries(groupByDay(filteredVergangen)).map(([day, apts]) => (
+              <View key={day} style={{ marginBottom: 12 }}>
+                <Text style={{ fontSize: 11, fontWeight: '700', letterSpacing: 0.5, color: c.muted, textTransform: 'uppercase', marginBottom: 8 }}>{day}</Text>
+                {apts.map(apt => (
+                  <PatientAppointmentCard key={apt.id} c={c} appointment={apt} isPast onOpenDetail={() => onSelectAppointment(apt)} onViewTherapist={() => openTherapist(apt.therapist)} />
+                ))}
+              </View>
+            ))}
+            {filteredKommend.length === 0 && filteredVergangen.length === 0 && (
+              <View style={{ backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.border, paddingVertical: 28, paddingHorizontal: 20, alignItems: 'center' }}>
+                <Text style={{ fontSize: 14, fontWeight: '600', color: c.text, textAlign: 'center' }}>Keine Termine</Text>
+                <Text style={{ fontSize: 13, color: c.muted, textAlign: 'center', marginTop: 4 }}>Für diesen Filter gibt es keine Einträge.</Text>
+              </View>
+            )}
           </>
         )}
       </ScrollView>
@@ -219,13 +194,13 @@ export function TherapyTabPatient({
 
 export function TherapyTabTherapist({
   authToken, mySlots, slotsLoading, incomingBookings, incomingBookingsLoading,
-  favorites, deletingSlotIds, activeFilterTherapist, setActiveFilterTherapist,
+  deletingSlotIds, activeFilterTherapist, setActiveFilterTherapist,
   therapyRefreshing, slotsLastLoadedAt, incomingBookingsLastLoadedAt,
   notifications, dismissedNotifIds, onShowNotifications,
   onRefresh, onLoadMySlots, onLoadIncomingBookings, onOpenTherapistById,
   onCancelSlot, onTherapistCancelRequest, onSelectTherapistDetailBooking, setShowSlotComposerModal,
   loggedInTherapist,
-  renderFavoritesVertical, renderTherapyTabShell, renderTherapySectionLoading, renderTherapySectionEmpty,
+  renderTherapyTabShell, renderTherapySectionLoading, renderTherapySectionEmpty,
   c, t, styles,
 }) {
   const slotBookingEnabled = loggedInTherapist?.bookingMode === 'FIRST_APPOINTMENT_REQUEST';
@@ -260,7 +235,6 @@ export function TherapyTabTherapist({
     { key: 'all', label: 'Alle' },
     { key: 'booked', label: 'Gebucht' },
     { key: 'free', label: 'Frei' },
-    { key: 'favoriten', label: 'Favoriten' },
   ];
 
   const nextFreeSlot = [...freeSlots].sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt))[0];
@@ -312,7 +286,6 @@ export function TherapyTabTherapist({
               {[
                 { key: 'booked', label: 'Gebuchte Termine', value: bookedSlots.length, color: c.primary, icon: 'calendar-outline' },
                 { key: 'pending', label: 'Anfragen', value: pendingIncomingBookings.length, color: c.warning ?? '#B7791F', icon: 'person-outline' },
-                { key: 'favoriten', label: 'Favoriten', value: favorites.length, color: c.error ?? '#ef4444', icon: 'heart-outline' },
               ].map(({ key, label, value, color, icon }) => {
                 const active = activeFilterTherapist === key;
                 return (
@@ -361,26 +334,20 @@ export function TherapyTabTherapist({
               </View>
             </ScrollView>
 
-            {/* ── Timeline oder Favoriten ──────────────────────────── */}
-            {activeFilterTherapist === 'favoriten' ? (
-              <View style={{ backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.border, paddingHorizontal: 16, paddingBottom: 4 }}>
-                {renderFavoritesVertical((fav) => onOpenTherapistById(fav.id), { showAll: true })}
-              </View>
-            ) : (
-              <TherapistTimeline
-                c={c}
-                mySlots={mySlots}
-                incomingBookings={incomingBookings}
-                activeFilter={activeFilterTherapist}
-                deletingSlotIds={deletingSlotIds}
-                onCancelSlot={onCancelSlot}
-                onRespond={handleRespond}
-                onTherapistCancel={handleTherapistCancel}
-                onOpenDetail={handleOpenDetail}
-                slotsLoading={shouldShowSectionLoading(slotsLoading, slotsLastLoadedAt)}
-                incomingLoading={shouldShowSectionLoading(incomingBookingsLoading, incomingBookingsLastLoadedAt)}
-              />
-            )}
+            {/* ── Timeline ────────────────────────────────────────── */}
+            <TherapistTimeline
+              c={c}
+              mySlots={mySlots}
+              incomingBookings={incomingBookings}
+              activeFilter={activeFilterTherapist}
+              deletingSlotIds={deletingSlotIds}
+              onCancelSlot={onCancelSlot}
+              onRespond={handleRespond}
+              onTherapistCancel={handleTherapistCancel}
+              onOpenDetail={handleOpenDetail}
+              slotsLoading={shouldShowSectionLoading(slotsLoading, slotsLastLoadedAt)}
+              incomingLoading={shouldShowSectionLoading(incomingBookingsLoading, incomingBookingsLastLoadedAt)}
+            />
           </>
         ) : (
           <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
@@ -388,15 +355,6 @@ export function TherapyTabTherapist({
           </View>
         )}
 
-        {/* ── Gespeicherte Therapeuten ─────────────────────────────── */}
-        {activeFilterTherapist !== 'favoriten' && (
-          <>
-            <Text style={[styles.sectionLabel, { color: c.text, marginTop: 16, textTransform: 'uppercase', fontSize: 11, letterSpacing: 0.5 }]}>Gespeicherte Therapeuten</Text>
-            <View style={{ backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.border, paddingHorizontal: 16, paddingBottom: 4 }}>
-              {renderFavoritesVertical((fav) => onOpenTherapistById(fav.id), { onShowAll: () => setActiveFilterTherapist('favoriten') })}
-            </View>
-          </>
-        )}
       </ScrollView>
 
       {/* ── FAB ─────────────────────────────────────────────────────── */}

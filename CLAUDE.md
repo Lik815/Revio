@@ -1,323 +1,1130 @@
-# CLAUDE.md — Revio Technical Reference
+# CLAUDE.md — Revio Booking MVP Technical Reference
 
-> This file is the coding agent's primary reference. For product context, design, data model, and search logic, see the `docs/` folder.
+> Primary reference for coding agents working on Revio.
 >
-> | Document | Purpose |
-> |----------|---------|
-> | [`docs/product.md`](docs/product.md) | Purpose, MVP scope, user roles, non-goals, success criteria |
-> | [`docs/data-model.md`](docs/data-model.md) | Entities, fields, relationships, storage rules |
-> | [`docs/search-ranking.md`](docs/search-ranking.md) | Query processing, scoring, filters, suggestions |
-> | [`docs/design-system.md`](docs/design-system.md) | Brand, colors, typography, components, icons, splash |
+> This document replaces the older Discovery-first reference. Revio is now a Booking-MVP with patient registration, appointment booking, and freelance therapist self-registration.
+>
+> Treat this file as the product and architecture source of truth unless a more recent `docs/` file explicitly overrides it.
 
 ---
 
-## 1. System Agents & Modules
+## 0. Current Product Scope — Must Read First
 
-Revio uses logical "agents" — system modules with defined responsibilities. In MVP, agents are **deterministic product components**, not AI models.
+Revio is a Booking-MVP for helping patients find and book appointments with freelance therapists.
 
-### 1.1 Search & Matching Agent
+### Core MVP
 
-**Purpose:** Transform a patient search request into a relevant, ranked result set.
+The MVP includes:
 
-**Implementation:** `apps/api/src/routes/search.ts` + `src/utils/search-utils.ts`
+- Public therapist search
+- Map/radius-based therapist discovery
+- Patient registration and login
+- Patient appointment booking
+- Patient appointment overview
+- Booking status tracking
+- Appointment-related notifications
+- Patient favorites
+- Freelance therapist registration
+- Freelance therapist profile management
+- Freelance therapist availability / slot management
+- Manual therapist verification and moderation
+- Admin review workflows
 
-| | |
-|---|---|
-| **Inputs** | Problem query (free text), city, optional filters (language, homeVisit, specialization, kassenart) |
-| **Outputs** | Ranked `SearchTherapist[]` + deduplicated `SearchPractice[]` with lat/lng |
-| **State** | Stateless — no query persistence |
-| **Auth** | None (public endpoint) |
+### Explicitly out of MVP
 
-**Allowed:** Normalize text, map to specialization taxonomy, apply filters, score relevance, rank results, return structured data.
+Do not implement these features in the MVP:
 
-**Forbidden:** Diagnose conditions, infer medical urgency, store patient profiles, generate treatment plans, reward keyword stuffing.
+- Payments
+- Reviews
+- Medical records
+- AI diagnosis
+- AI treatment plans
+- Practice manager self-registration
+- Employed therapist self-registration as public providers
+- Multi-therapist practice administration
+- Insurance billing workflows
+- In-app chat
+- Video consultations
 
-**Failure cases:**
-- Empty query → Zod validation rejects (400)
-- No matching city → empty results (not an error)
-- Malformed filters → Zod rejects
+### Registration rule
 
-**Human review:** None per-query. Taxonomy and ranking logic reviewed periodically.
+Only two user types can self-register in the MVP:
 
----
+1. Patients
+2. Freelance therapists
 
-### 1.2 Map Agent
+Therapists who are not freelance must not be able to self-register as public providers in the MVP.
 
-**Purpose:** Render location-based display of practices and therapist-linked locations.
+### Product principle
 
-**Implementation:** Client-side (mobile app). Data from Search Agent.
+The MVP should stay narrow:
 
-| | |
-|---|---|
-| **Inputs** | Practice coordinates, search results, filter context |
-| **Outputs** | Map markers, preview cards, viewport-adjusted results |
-| **State** | Transient user-provided location (optional) |
-
-**Allowed:** Render markers, cluster at high density, open preview cards, reflect filters.
-
-**Forbidden:** Collect precise patient location without explicit action, store location trails, track in background.
-
-**Failure cases:**
-- `lat=0, lng=0` → practice not geocoded, skip or show warning
-- Location permission denied → fall back to manual city entry
-
-**Human review:** None. Practice locations validated before listing (by Verification Agent).
-
-**Status:** Planned feature (Kartenansicht). Currently list-only.
-
----
-
-### 1.3 Profile Agent
-
-**Purpose:** Manage structure, display, and lifecycle of therapist and practice profiles.
-
-**Implementation:** `apps/api/src/routes/auth.ts` (therapist profile), `src/routes/practice.ts` (practice profile), mobile `App.js` (rendering)
-
-| | |
-|---|---|
-| **Inputs** | Profile fields, media uploads, linked entities, verification status |
-| **Outputs** | Public profile pages (approved only), draft profiles (for therapist) |
-| **State** | Therapist record, Practice record, media assets |
-| **Auth** | Bearer token (therapist) |
-
-**Allowed:** Create draft profiles, update fields, connect to practice via Linking Agent, render after approval, track completeness for ranking.
-
-**Forbidden:** Auto-publish unverified profiles, rewrite claims into stronger promises, create fake associations, display non-approved profiles publicly.
-
-**Failure cases:**
-- Missing required fields → Zod validation rejects
-- Photo upload fails → error returned, photo field unchanged
-- Session token invalid → 401
-
-**Human review:** Yes. Public status depends on manual admin approval.
+1. Patients find suitable freelance therapists.
+2. Patients register and book appointments.
+3. Freelance therapists manage profile and availability.
+4. Admin verifies therapist legitimacy.
+5. The system avoids payments, reviews, medical records, and unnecessary health data.
 
 ---
 
-### 1.4 Registration Agent
+## 1. Architecture Status
 
-**Purpose:** Handle therapist sign-up and draft account creation.
+Revio is in a transition phase. Do not assume that every existing route, screen, model, or module is production-ready.
 
-**Implementation:** `apps/api/src/routes/register.ts`, mobile `App.js` (5-step wizard)
+Before changing code, verify:
 
-| | |
-|---|---|
-| **Inputs** | Email, password, personal info, languages, practice choice |
-| **Outputs** | Therapist record, draft profile, link entry, session token |
-| **State** | New Therapist row + optional Practice + TherapistPracticeLink |
-| **Auth** | None (public registration) |
+1. Whether the feature belongs to the Booking-MVP.
+2. Whether the API route is actually registered in `apps/api/src/app.ts`.
+3. Whether the mobile screen is active or only scaffold/migration code.
+4. Whether the database model is current or legacy.
+5. Whether the feature needs patient auth, therapist auth, admin auth, or no auth.
+6. Whether the feature could accidentally introduce payments, reviews, or medical data.
 
-**Registration Steps (Mobile):**
-1. Email + Password
-2. Personal Info (name, title, city, specializations)
-3. Languages
-4. Practice (new / existing / skip)
-5. Preview + Submit
+### Known transition risks
 
-**Allowed:** Create draft account, hash password, create practice, propose link, return session token.
+- The mobile app has historically contained too much state and business logic in a large legacy component.
+- API routes may exist as files without being registered.
+- Auth structures may exist in parallel, such as session-token auth and planned JWT/auth-v2 modules.
+- Database schema and code expectations may drift.
+- Some files may be planned migration scaffolds rather than active implementation.
+- Some UI flows may exist visually before the backend is fully aligned.
 
-**Forbidden:** Auto-approve professional legitimacy, publish before review, collect patient data.
+### Agent rule
 
-**Failure cases:**
-- Duplicate email → 409 Conflict
-- Missing required fields → Zod validation rejects
-- Geocoding fails → practice created with lat=0, lng=0 (best-effort)
-
-**Special behavior:** In development (`NODE_ENV !== 'production'`), therapists are auto-approved.
-
-**Human review:** Yes. Public listing requires manual approval.
-
----
-
-### 1.5 Verification Agent
-
-**Purpose:** Support internal trust workflows for reviewing therapist and practice legitimacy.
-
-**Implementation:** `apps/api/src/routes/admin.ts`, admin dashboard `app/(admin)/`
-
-| | |
-|---|---|
-| **Inputs** | Submitted profiles, practice data, admin decisions |
-| **Outputs** | ReviewStatus updates, cascade approve (therapist → practices + links) |
-| **State** | `reviewStatus` field on Therapist and Practice |
-| **Auth** | Admin token (`REVIO_ADMIN_TOKEN`) |
-
-**Review Checklist:**
-- Therapist appears to be a legitimate professional
-- Profile fields sufficiently complete
-- No misleading or unverifiable medical claims
-- Profile photo appropriate and professional
-- Practice location real and geocodable
-- Therapist-practice relationship plausible
-- Logo and photos meet content standards
-
-**Allowed:** Flag incomplete profiles, request edits, update review status, cascade approve.
-
-**Forbidden:** Fabricate credentials, auto-approve without review, silently edit credentials, publish non-approved.
-
-**Failure cases:**
-- Therapist not found → 404
-- Invalid status transition → should be validated (currently any transition allowed)
-
-**Human review:** Inherently human-dependent. Exists to structure the reviewer's workflow.
-
----
-
-### 1.6 Linking Agent
-
-**Purpose:** Manage therapist↔practice relationships and protect against false claims.
-
-**Implementation:** Registration flow (`register.ts`), practice routes (`practice.ts`), admin routes (`admin.ts`)
-
-| | |
-|---|---|
-| **Inputs** | Therapist ID, Practice ID, link request, review state |
-| **Outputs** | TherapistPracticeLink record with status lifecycle |
-| **State** | `TherapistPracticeLink` rows |
-
-**Status lifecycle:** `PROPOSED` → `CONFIRMED` / `DISPUTED` / `REJECTED`
-
-**Allowed:** Propose links, track status, flag duplicates/conflicts, route disputed to admin.
-
-**Forbidden:** Auto-confirm disputed ownership, merge profiles without admin review, display unconfirmed links publicly.
-
-**Dispute triggers (flag for manual review):**
-- Multiple therapists submit conflicting ownership claims for same practice
-- Practice address cannot be geocoded or validated
-- Claimed practice has no verifiable public record
-
-**Failure cases:**
-- Duplicate link → unique constraint violation (409)
-- Practice not found → 404
-- Cascade approve: link confirmation fails → logged, continues with other links
-
-**Human review:** Yes. Disputed, ambiguous, or first-time claims require admin review.
-
----
-
-### 1.7 Moderation Agent
-
-**Purpose:** Ensure profiles, photos, logos, and descriptions meet platform content standards.
-
-**Implementation:** Currently manual via admin dashboard. No automated moderation in MVP.
-
-| | |
-|---|---|
-| **Inputs** | Profile text, photos, logos, moderation rules |
-| **Outputs** | Content accepted / rejected / flagged |
-| **State** | Implicit in ReviewStatus |
-
-> **Relationship to Verification Agent:** Verification = professional legitimacy (is this a real physio?). Moderation = content quality (is this photo appropriate?). Same reviewer in MVP, but conceptually separate queues for future scaling.
-
-**Allowed:** Flag suspicious content, reject policy violations, route borderline cases to admin.
-
-**Forbidden:** Approve patient-identifiable imagery, allow deceptive claims, auto-approve without inspection.
-
-**Human review:** Yes. Borderline cases require admin judgment.
-
----
-
-### 1.8 Upload Service
-
-**Purpose:** Handle file uploads for profile photos.
-
-**Implementation:** `apps/api/src/routes/upload.ts`
-
-| | |
-|---|---|
-| **Inputs** | Multipart form-data with image file |
-| **Outputs** | `{ url: "/uploads/<uuid>.<ext>" }` + updates therapist.photo |
-| **State** | File on disk (`apps/api/uploads/`), URL in therapist record |
-| **Auth** | Bearer token (therapist) |
-
-**Constraints:**
-- Max file size: 5MB
-- Allowed types: JPEG, PNG, WebP
-- Files named with random UUID
-- For production: swap `fs.createWriteStream` for S3 `putObject`
-
-**Failure cases:**
-- No file in request → 400
-- Invalid file type → 400
-- File too large → 413 (handled by `@fastify/multipart`)
-- Disk write fails → 500
-
----
-
-### 1.9 Geocoding Service
-
-**Purpose:** Convert address + city to lat/lng coordinates.
-
-**Implementation:** `apps/api/src/utils/geocode.ts`
-
-| | |
-|---|---|
-| **Inputs** | Address string, city string |
-| **Outputs** | `{ lat, lng }` or `null` |
-| **Provider** | Nominatim (OpenStreetMap), no API key |
-
-**Best-effort:** Returns null on failure, never throws. Practice created with lat=0, lng=0 if geocoding fails.
-
-**Rate limit:** Nominatim allows max 1 req/sec. Batch endpoint (`POST /admin/practices/geocode-all`) uses 1.1s delay.
-
-**For production:** Replace with Google Geocoding API.
-
-**Called by:**
-- `POST /register/therapist` — geocodes new practice
-- `POST /practice` — geocodes new practice
-- `PATCH /my/practice` — re-geocodes if address or city changed
-- `POST /admin/practices/geocode-all` — batch geocodes all lat=0 practices
+Do not blindly extend legacy code. Prefer extracting services and clarifying active routes before adding new screens or new business logic.
 
 ---
 
 ## 2. Monorepo Layout
 
-```
+Expected structure:
+
+```txt
 Revio/
-├── package.json                 # Root scripts (pnpm -r)
-├── pnpm-workspace.yaml          # apps/* + packages/*
+├── package.json
+├── pnpm-workspace.yaml
 ├── apps/
 │   ├── api/                     # Fastify backend
-│   │   ├── prisma/schema.prisma # DB schema (SQLite)
-│   │   ├── prisma/seed.ts       # 100 therapists, 30 practices
-│   │   ├── prisma/prisma/dev.db # ⚠️ Nested path! See DB section
-│   │   ├── src/app.ts           # Fastify app builder
-│   │   ├── src/server.ts        # Entry point
-│   │   ├── src/env.ts           # Zod-validated env vars
-│   │   ├── src/routes/          # admin, auth, health, practice, register, search, upload
-│   │   ├── src/plugins/         # prisma, admin-auth
-│   │   ├── src/utils/           # geocode.ts (Nominatim)
-│   │   └── uploads/             # Photo uploads (gitignored)
+│   │   ├── prisma/schema.prisma
+│   │   ├── prisma/seed.ts
+│   │   ├── src/app.ts           # Fastify app builder and route registration
+│   │   ├── src/server.ts
+│   │   ├── src/env.ts
+│   │   ├── src/routes/
+│   │   ├── src/plugins/
+│   │   ├── src/utils/
+│   │   └── uploads/             # Local dev uploads only
 │   ├── admin/                   # Next.js admin dashboard
-│   │   └── app/(admin)/         # Route group — ALL pages live here
-│   └── mobile/
-│       └── src/App.js           # Single-file app (~3800 lines)
+│   ├── mobile/                  # Expo / React Native app
+│   └── site/                    # Marketing site, if present
 └── packages/
-    └── shared/src/index.ts      # Shared TypeScript types
+    └── shared/                  # Shared types and DTO contracts
 ```
 
-> **⚠️ Important:** There are legacy folders `AdminRevio/` and `revioApp/` at the root. These are **old copies** — ignore them. The active code is in `apps/`.
+### Legacy folders
 
-> **⚠️ DB path note:** Prisma resolves SQLite paths relative to `schema.prisma`, not the process CWD. The `DATABASE_URL="file:./prisma/prisma/dev.db"` in `.env` resolves to `apps/api/prisma/prisma/prisma/dev.db` (triple-nested). Do not be confused by this — the server, migrations, and seed all use this same path consistently.
+If root-level folders such as `AdminRevio/`, `revioApp/`, or similar old copies exist, do not use them unless the current project explicitly imports them.
+
+The active code should be confirmed from:
+
+- root `package.json`
+- `pnpm-workspace.yaml`
+- `apps/api/src/app.ts`
+- current mobile entry file
+- current admin entry file
 
 ---
 
-## 3. How to Run
+## 3. User Roles
 
-### Prerequisites
-- Node.js 20+
-- pnpm 10.6.3 (declared in root `package.json` → `packageManager`)
+### 3.1 Visitor
 
-### Environment Variables (API)
+A visitor is not logged in.
 
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `DATABASE_URL` | ✅ | — | SQLite path, e.g. `file:./prisma/prisma/dev.db` |
-| `REVIO_ADMIN_TOKEN` | ✅ | — | Bearer token for admin endpoints |
-| `PORT` | ❌ | `4000` | API port |
-| `REVIO_ADMIN_EMAIL` | ❌ | `admin@revio.de` | Admin login email |
-| `REVIO_ADMIN_PASSWORD` | ❌ | `admin123` | Admin login password |
+Allowed:
 
-### Start Commands
+- Search therapists
+- View public therapist profile previews
+- View map/list results
+- Open login or registration
+
+Forbidden:
+
+- Book appointments
+- Save persistent favorites
+- View appointment history
+- Access therapist dashboards
+
+### 3.2 Patient
+
+A patient is a registered user who can book appointments.
+
+Allowed:
+
+- Login/logout
+- Search therapists
+- View public therapist profiles
+- Save favorites
+- Book or request appointment slots
+- View upcoming appointments
+- View past appointments
+- Cancel appointments if allowed by booking policy
+- Receive appointment notifications
+- Edit basic account/profile information
+
+Forbidden:
+
+- Register as therapist from patient account without a separate therapist onboarding flow
+- Access therapist dashboards
+- Access other patients' bookings
+- Leave reviews in MVP
+- Make in-app payments in MVP
+- Store medical records in MVP
+
+### 3.3 Freelance Therapist
+
+A freelance therapist is a registered provider.
+
+Allowed:
+
+- Register as a freelance therapist
+- Login/logout
+- Create and edit own profile
+- Upload profile photo
+- Set specializations, languages, service area, kassenart, home visits, and contact data
+- Create and manage appointment slots
+- Confirm, reject, edit, or cancel appointment requests depending on booking model
+- View own bookings
+- Receive appointment notifications
+- Hide or show own profile if allowed
+
+Forbidden:
+
+- Register as an employed therapist for a practice in MVP
+- Create fake practice associations
+- Access other therapists' bookings
+- Access patient data outside booking context
+- Publish unverified profile publicly
+- Add reviews or payment features
+
+### 3.4 Admin / Reviewer
+
+An admin verifies and moderates platform content.
+
+Allowed:
+
+- Review therapist profiles
+- Approve, reject, suspend, or request changes
+- Review suspicious profiles or content
+- Check profile completeness
+- Review booking-related support cases if needed
+- Manage system-level safety and trust states
+
+Forbidden:
+
+- Fabricate credentials
+- Silently change professional claims into stronger claims
+- Approve unclear legitimacy without review
+- Access or export patient data without a clear operational reason
+
+---
+
+## 4. System Agents and Modules
+
+Revio uses logical agents. These are deterministic product modules, not AI agents.
+
+---
+
+### 4.1 Search & Matching Agent
+
+**Purpose:** Convert a patient search request into ranked therapist results.
+
+**Likely implementation:** `apps/api/src/routes/search.ts` and search utilities.
+
+| Field | Description |
+|---|---|
+| Inputs | Query, city/location, radius, language, specialization, kassenart, homeVisit |
+| Outputs | Ranked therapist results and related map data |
+| State | Stateless for anonymous search; no patient profile required |
+| Auth | None for public search |
+
+Allowed:
+
+- Normalize query text
+- Match patient problem terms to therapist specializations
+- Filter by location, language, kassenart, home visits, and availability
+- Return only public, approved, visible therapists
+- Return map coordinates only for public provider locations
+
+Forbidden:
+
+- Diagnose conditions
+- Infer urgency
+- Generate treatment plans
+- Store anonymous health search profiles
+- Reward keyword stuffing
+
+Failure cases:
+
+- Empty query can return default discovery or validation error depending on current API design
+- Unknown city returns empty results, not server error
+- Invalid filters return validation error
+
+---
+
+### 4.2 Map Agent
+
+**Purpose:** Display therapist/provider results geographically.
+
+| Field | Description |
+|---|---|
+| Inputs | Search result coordinates, patient-selected location, radius |
+| Outputs | Map markers, radius circle, list/map synchronization |
+| State | Transient search location |
+| Auth | None required for search |
+
+Allowed:
+
+- Show map pins
+- Show radius visualization
+- Sync selected list card and map marker
+- Fall back to manual city input if location permission is denied
+
+Forbidden:
+
+- Track location in background
+- Store patient location trails
+- Collect precise location without explicit user action
+- Show non-approved therapist locations publicly
+
+Implementation rule:
+
+If map code exists, verify whether it is active in the current mobile entry file. Do not rely on old documentation that says the map is only planned.
+
+---
+
+### 4.3 Patient Account Agent
+
+**Purpose:** Manage patient registration, login, profile basics, favorites, appointments, and notifications.
+
+| Field | Description |
+|---|---|
+| Inputs | Email, password, name, optional phone, selected appointment |
+| Outputs | Patient account, session token, favorites, bookings, notifications |
+| State | Patient record, auth session, appointment records, notification records |
+| Auth | Patient bearer token |
+
+Allowed:
+
+- Register patients
+- Login/logout patients
+- Store minimal patient profile data
+- Save favorite therapists
+- Show appointment history/status
+- Show appointment-related notifications
+
+Forbidden:
+
+- Store medical records
+- Store diagnosis data unless explicitly required by a narrow booking flow
+- Treat search or booking text as medical triage
+- Expose patient data to unrelated therapists
+- Implement reviews
+- Implement payments
+
+Data minimization:
+
+Patient registration should collect only data required for account and booking operations.
+
+Recommended fields:
+
+- email
+- password hash
+- name
+- phone number if needed for booking
+- createdAt / updatedAt
+- consent timestamps if applicable
+
+Avoid collecting:
+
+- diagnosis
+- insurance details
+- medical documents
+- detailed symptoms
+- therapy history
+
+---
+
+### 4.4 Freelance Therapist Account Agent
+
+**Purpose:** Manage freelance therapist registration and provider profile lifecycle.
+
+| Field | Description |
+|---|---|
+| Inputs | Email, password, name, title, city/service area, specializations, languages, contact data |
+| Outputs | Therapist account, draft profile, verification state, session token |
+| State | Therapist record, auth session, profile data |
+| Auth | Therapist bearer token |
+
+Allowed:
+
+- Register freelance therapists
+- Create draft provider profile
+- Edit own profile
+- Upload own profile photo
+- Manage own availability
+- Submit profile for review
+- Hide or show own profile if supported
+
+Forbidden:
+
+- Allow employed therapists to self-register as public providers in MVP
+- Auto-publish unverified providers
+- Create fake practice associations
+- Allow one therapist to manage another therapist's bookings
+- Add payments or reviews
+
+Registration copy rule:
+
+All registration UI must clearly say that provider registration is for freelance therapists.
+
+Suggested German UI copy:
+
+```txt
+Ich bin freiberufliche:r Therapeut:in und möchte Termine über Revio anbieten.
+```
+
+Avoid copy such as:
+
+```txt
+Praxis registrieren
+Therapeut:in im Team hinzufügen
+Mitarbeiterprofil erstellen
+```
+
+unless a verified post-MVP practice flow exists.
+
+---
+
+### 4.5 Booking Agent
+
+**Purpose:** Allow registered patients to book or request appointment slots with approved freelance therapists.
+
+| Field | Description |
+|---|---|
+| Inputs | Patient ID, therapist ID, slot ID, appointment time, booking action |
+| Outputs | Booking/appointment record, updated slot state, notifications |
+| State | Slots, bookings, appointment status, notification events |
+| Auth | Patient token for booking; therapist token for provider actions |
+
+Allowed:
+
+- Show available appointment slots
+- Let patients book or request appointments
+- Let therapists confirm or reject booking requests if request-based model is used
+- Let therapists cancel or update availability according to rules
+- Let patients cancel according to rules
+- Notify both sides about status changes
+
+Forbidden:
+
+- Process payments
+- Collect or show reviews
+- Store medical records
+- Double-book the same slot
+- Allow booking with unapproved therapists
+- Allow booking with hidden/inactive therapists
+- Allow therapist access to unrelated patient data
+- Let patients book in the past
+
+Core invariants:
+
+1. A slot can only be booked once.
+2. A booking must belong to exactly one patient and one therapist.
+3. A booking must reference a valid slot or a valid appointment time.
+4. Public booking is only possible with approved and visible freelance therapists.
+5. Booking status transitions must be explicit and validated.
+6. Patient contact data is visible only inside a valid booking context.
+7. Cancellations must update slot availability consistently.
+
+Recommended statuses:
+
+```ts
+type BookingStatus =
+  | "PENDING"
+  | "CONFIRMED"
+  | "REJECTED"
+  | "CANCELLED_BY_PATIENT"
+  | "CANCELLED_BY_THERAPIST"
+  | "COMPLETED"
+  | "NO_SHOW";
+```
+
+Use fewer statuses if the current implementation is simpler, but avoid ambiguous states.
+
+---
+
+### 4.6 Availability / Slot Agent
+
+**Purpose:** Manage therapist appointment availability.
+
+| Field | Description |
+|---|---|
+| Inputs | Therapist ID, date, start time, end time, duration, recurrence optional |
+| Outputs | Available slots |
+| State | Slot records |
+| Auth | Therapist token |
+
+Allowed:
+
+- Create slots
+- Edit slots
+- Delete unbooked slots
+- Mark slots as unavailable after booking
+- Validate time ranges
+- Prevent overlaps
+
+Forbidden:
+
+- Delete confirmed appointments silently
+- Create slots for another therapist
+- Create invalid or past slots
+- Create overlapping slots unless explicitly supported
+
+Recommended slot model:
+
+```ts
+type AppointmentSlot = {
+  id: string;
+  therapistId: string;
+  startsAt: string;
+  endsAt: string;
+  status: "AVAILABLE" | "BOOKED" | "BLOCKED" | "CANCELLED";
+  createdAt: string;
+  updatedAt: string;
+};
+```
+
+---
+
+### 4.7 Notification Agent
+
+**Purpose:** Notify patients and therapists about appointment-related events.
+
+| Field | Description |
+|---|---|
+| Inputs | Booking status changes, slot updates, admin decisions |
+| Outputs | In-app notification entries, optional email later |
+| State | Notification records |
+| Auth | Patient or therapist token |
+
+Allowed notification events:
+
+- Booking requested
+- Booking confirmed
+- Booking rejected
+- Booking cancelled
+- Appointment changed
+- Appointment reminder
+- Therapist profile approved/rejected
+- Required profile changes
+
+Forbidden:
+
+- Marketing notifications without explicit consent
+- Medical advice
+- Payment or review prompts in MVP
+- Notifications revealing patient information to unrelated users
+
+Implementation rule:
+
+Notifications must be created from backend state changes, not only from UI assumptions.
+
+---
+
+### 4.8 Profile Agent
+
+**Purpose:** Display and manage public provider profile data.
+
+| Field | Description |
+|---|---|
+| Inputs | Therapist profile fields, photo, services, languages, contact data, visibility |
+| Outputs | Public provider profile for approved therapists |
+| State | Therapist profile record, media references |
+| Auth | Therapist token for own profile; public read for approved profile |
+
+Allowed public fields:
+
+- Name
+- Photo
+- Professional title
+- City/service area
+- Specializations
+- Languages
+- Kassenart
+- Home visit availability
+- Contact options
+- Availability/booking entry point
+- Verification status
+
+Forbidden public fields:
+
+- Private admin notes
+- Internal review comments
+- Patient data
+- Unverified claims
+- Unapproved profile content
+
+Ranking signals may include:
+
+- Specialization match
+- Distance
+- Language match
+- Kassenart match
+- Home visit
+- Profile completeness
+- Verified status
+- Availability
+
+Do not rank by payments or reviews in MVP.
+
+---
+
+### 4.9 Verification and Moderation Agent
+
+**Purpose:** Ensure that freelance therapists are legitimate and profiles are safe to publish.
+
+| Field | Description |
+|---|---|
+| Inputs | Submitted therapist profiles, documents if added later, public claims |
+| Outputs | Review status changes |
+| State | Review status, admin notes, profile visibility |
+| Auth | Admin token |
+
+Allowed:
+
+- Approve profiles
+- Reject profiles
+- Request changes
+- Suspend profiles
+- Review profile photo and content
+- Check whether therapist appears to be a legitimate freelance professional
+
+Forbidden:
+
+- Auto-approve production providers
+- Fabricate credentials
+- Strengthen or rewrite professional claims without evidence
+- Publish non-approved profiles
+- Approve unclear profiles silently
+
+Recommended statuses:
+
+```ts
+type ReviewStatus =
+  | "DRAFT"
+  | "PENDING_REVIEW"
+  | "APPROVED"
+  | "REJECTED"
+  | "CHANGES_REQUESTED"
+  | "SUSPENDED";
+```
+
+---
+
+### 4.10 Upload Service
+
+**Purpose:** Handle profile photo uploads and future document uploads if explicitly added.
+
+| Field | Description |
+|---|---|
+| Inputs | Multipart image file |
+| Outputs | File URL |
+| State | Local file in dev or cloud object in production |
+| Auth | Therapist token for profile photo |
+
+Allowed:
+
+- JPEG, PNG, WebP profile images
+- Max file size limit
+- Randomized file names
+- Store URL in therapist profile
+
+Forbidden:
+
+- Public access to private documents
+- Uploading patient medical files in MVP
+- Executable files
+- Overwriting another user's media
+
+Production rule:
+
+Local filesystem uploads are acceptable only for local development. Production should use object storage such as S3-compatible storage with access controls.
+
+---
+
+### 4.11 Geocoding Service
+
+**Purpose:** Convert provider location or service area into coordinates for map/radius search.
+
+| Field | Description |
+|---|---|
+| Inputs | Address/city/service area |
+| Outputs | Latitude/longitude or null |
+| State | Coordinates on provider/location record |
+| Auth | Backend-only service call |
+
+Allowed:
+
+- Geocode provider service locations
+- Retry failed geocoding manually
+- Mark missing geocoding clearly
+
+Forbidden:
+
+- Store patient location trails
+- Use patient location for background tracking
+- Block therapist registration only because geocoding temporarily fails, unless location is required for listing
+
+If using Nominatim/OpenStreetMap, respect provider rate limits.
+
+---
+
+## 5. Data Model — Target MVP
+
+The exact Prisma schema must be checked in `apps/api/prisma/schema.prisma`.
+
+Target MVP entities:
+
+```txt
+User
+├── PatientProfile
+├── TherapistProfile
+├── Session / AuthToken
+├── Favorite
+├── AppointmentSlot
+├── Booking / Appointment
+└── Notification
+```
+
+If the current schema separates `Patient`, `Therapist`, and auth fields differently, do not add another duplicate auth structure without a migration plan.
+
+### Recommended single-source auth model
+
+Prefer one auth source:
+
+```ts
+type User = {
+  id: string;
+  email: string;
+  passwordHash: string;
+  role: "PATIENT" | "THERAPIST" | "ADMIN";
+  sessionToken?: string;
+  sessionExpiresAt?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+```
+
+If the current system uses `sessionToken` directly on `Therapist`, keep compatibility temporarily, but plan migration toward a single auth source.
+
+### PatientProfile
+
+```ts
+type PatientProfile = {
+  id: string;
+  userId: string;
+  name: string;
+  phone?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+```
+
+### TherapistProfile
+
+```ts
+type TherapistProfile = {
+  id: string;
+  userId: string;
+  name: string;
+  title?: string;
+  photo?: string;
+  city?: string;
+  serviceArea?: string;
+  lat?: number;
+  lng?: number;
+  specializations: string[];
+  languages: string[];
+  kassenart?: string[];
+  homeVisit?: boolean;
+  isFreelance: true;
+  isVisible: boolean;
+  reviewStatus: ReviewStatus;
+  description?: string;
+  phone?: string;
+  website?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+```
+
+MVP rule:
+
+`isFreelance` must be true for public self-registered provider accounts.
+
+### Booking / Appointment
+
+```ts
+type Booking = {
+  id: string;
+  patientId: string;
+  therapistId: string;
+  slotId?: string;
+  startsAt: string;
+  endsAt: string;
+  status: BookingStatus;
+  patientNote?: string;
+  cancellationReason?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+```
+
+Privacy rule:
+
+`patientNote` should be optional and minimal. Do not request diagnosis or medical history in MVP booking.
+
+### Favorite
+
+```ts
+type Favorite = {
+  id: string;
+  patientId: string;
+  therapistId: string;
+  createdAt: string;
+};
+```
+
+### Notification
+
+```ts
+type Notification = {
+  id: string;
+  userId: string;
+  type: string;
+  title: string;
+  body: string;
+  bookingId?: string;
+  readAt?: string;
+  createdAt: string;
+};
+```
+
+---
+
+## 6. API Architecture
+
+Always verify actual registration in `apps/api/src/app.ts`.
+
+Expected MVP route groups:
+
+| Area | Example prefix | Auth | Purpose |
+|---|---|---|---|
+| Health | `/health` | None | Health check |
+| Config | `/config` | None | App config, if used |
+| Search | `/search`, `/suggestions` | None | Public therapist discovery |
+| Patient Auth | `/auth/patient/*` or `/patient-auth/*` | None / Patient | Patient registration/login/me |
+| Therapist Auth | `/auth/therapist/*` or `/therapist-auth/*` | None / Therapist | Freelance therapist registration/login/me |
+| Profile | `/profile/*` or `/therapists/*` | Public / Therapist | Public and own provider profile |
+| Availability | `/slots/*` or `/availability/*` | Therapist | Slot management |
+| Booking | `/booking/*` or `/appointments/*` | Patient / Therapist | Booking and appointment workflow |
+| Favorites | `/favorites/*` | Patient | Save therapists |
+| Notifications | `/notifications/*` | Patient / Therapist | Appointment-related notifications |
+| Upload | `/upload/photo` | Therapist | Profile photo upload |
+| Admin | `/admin/*` | Admin | Verification and moderation |
+
+### Route inventory rule
+
+Before implementing or modifying a route:
+
+1. Open `apps/api/src/app.ts`.
+2. Confirm the route file is imported.
+3. Confirm the route is registered with the expected prefix.
+4. Confirm auth middleware is applied.
+5. Confirm frontend calls match the same prefix.
+6. Confirm tests exist or add tests.
+
+### Forbidden API additions
+
+Do not add these route groups in MVP:
+
+```txt
+/payments
+/reviews
+/medical-records
+/diagnosis
+/treatment-plans
+/practice-manager/self-register
+```
+
+---
+
+## 7. Auth and Security
+
+### Current risk
+
+Session-token auth may exist. Planned JWT/Auth-V2 code may also exist. Avoid creating a third auth system.
+
+### Short-term rule
+
+If session-token auth is active, harden it:
+
+- Add expiration if missing
+- Invalidate token on logout
+- Regenerate token after login
+- Store only hashed passwords
+- Avoid exposing tokens in logs
+- Validate role for every protected route
+
+### Role checks
+
+Every protected route must verify role:
+
+```txt
+Patient routes      -> PATIENT only
+Therapist routes    -> THERAPIST only
+Admin routes        -> ADMIN only
+Public search       -> no auth, but only approved visible therapists
+```
+
+### Booking security checklist
+
+For every booking mutation:
+
+- Patient is authenticated
+- Therapist exists
+- Therapist is approved
+- Therapist is visible/active
+- Therapist is freelance
+- Slot exists
+- Slot belongs to therapist
+- Slot is available
+- Slot is not in the past
+- Slot is not already booked
+- Status transition is valid
+- Notification is created after successful state change
+
+---
+
+## 8. Mobile App Architecture
+
+### Current principle
+
+The mobile app must support two logged-in roles:
+
+1. Patient
+2. Freelance therapist
+
+The app may also support a visitor state for public search.
+
+### Language rule
+
+The mobile app is German-only in the MVP.
+
+Allowed:
+
+- German UI copy
+- German validation and status messages
+- German onboarding, booking, profile, and settings flows
+
+Forbidden:
+
+- A bilingual German/English app UI in MVP
+- An in-app language switcher for the app interface
+- Maintaining parallel English UI copy for mobile MVP screens
+
+Important:
+
+This rule applies to the app interface language, not to therapist profile languages or patient-facing language filters. Therapist languages as profile/search data remain part of the MVP.
+
+### Expected main tabs
+
+The exact labels can differ, but the information architecture should remain clear.
+
+#### Visitor
+
+- Search / Entdecken
+- Login / Registrieren
+- Options
+
+#### Patient
+
+- Search / Entdecken
+- Favorites
+- Appointments / Termine
+- Profile
+- Options
+
+#### Freelance Therapist
+
+- Dashboard / Termine
+- Availability / Slots
+- Profile
+- Notifications
+- Options
+
+Avoid using one tab such as “Therapie” for too many meanings. If the tab contains booking status, call it “Termine” or similar.
+
+### Key mobile flows
+
+1. Visitor searches for therapist.
+2. Visitor opens therapist profile.
+3. Visitor is asked to register/login before booking.
+4. Patient registers or logs in.
+5. Patient books or requests a slot.
+6. Patient sees booking status.
+7. Patient receives notification.
+8. Freelance therapist registers.
+9. Freelance therapist completes profile.
+10. Admin approves therapist.
+11. Therapist creates appointment slots.
+12. Therapist confirms/rejects/manages bookings.
+
+### Legacy refactor rule
+
+If the app still uses a large legacy component, do not continue adding large new state blocks there.
+
+Preferred extraction order:
+
+1. `apiClient`
+2. `authSession`
+3. `patientService`
+4. `therapistService`
+5. `bookingService`
+6. `availabilityService`
+7. `favoritesService`
+8. `notificationService`
+9. screen-level components
+10. route/navigation composition
+
+---
+
+## 9. Admin Dashboard
+
+Admin is required because trust and manual verification are part of the product.
+
+Expected admin functions:
+
+- View pending freelance therapists
+- Approve/reject/request changes
+- Suspend therapist
+- Review profile content
+- View basic booking support context if required
+- Review system notifications/logs if implemented
+
+Not MVP admin functions:
+
+- Payment management
+- Review moderation
+- Practice owner management
+- Medical record access
+- Insurance billing
+
+Admin route group rule:
+
+If using Next.js App Router, avoid route conflicts. Keep admin pages inside the intended route group and verify actual structure before creating new pages.
+
+---
+
+## 10. Privacy and Data Minimization
+
+Revio handles appointment data. Even without medical records, appointment context can be sensitive.
+
+### Required principles
+
+- Collect only what is required.
+- Avoid medical free-text unless absolutely necessary.
+- Keep patient search anonymous until registration is needed for booking.
+- Restrict patient contact data to valid booking context.
+- Do not show patient details publicly.
+- Do not store diagnosis or treatment plans.
+- Do not use booking data for reviews or ranking.
+- Do not add tracking beyond what is necessary for app function.
+
+### Booking form rule
+
+The booking form should ask for minimal operational data.
+
+Allowed:
+
+- name
+- email from account
+- phone if required
+- selected appointment
+- short optional note
+
+Avoid:
+
+- diagnosis
+- medical history
+- uploaded reports
+- insurance documents
+- detailed symptoms
+- pain drawings
+- treatment goals
+
+---
+
+## 11. Testing Requirements
+
+### API tests
+
+Minimum test coverage for Booking-MVP:
+
+- patient registration
+- patient login
+- freelance therapist registration
+- reject non-freelance therapist registration
+- therapist profile update
+- admin therapist approval
+- public search shows only approved visible therapists
+- create appointment slot
+- prevent overlapping slots
+- patient booking
+- prevent double-booking
+- therapist confirms booking
+- therapist rejects booking
+- patient cancels booking
+- notification created after booking event
+- patient cannot access another patient booking
+- therapist cannot access another therapist booking
+- payments routes do not exist
+- reviews routes do not exist
+
+### Mobile tests / manual QA
+
+Minimum manual QA flows:
+
+- visitor can search without account
+- visitor must login/register before booking
+- patient can register
+- patient can book slot
+- patient can see appointment status
+- patient can save favorite
+- freelance therapist can register
+- therapist cannot publish without approval
+- therapist can create slot
+- therapist can manage booking request
+- dark mode remains readable
+- empty states are clear
+- no payment/review UI appears
+
+---
+
+## 12. Run Commands
+
+Verify these commands against the current repository.
 
 ```bash
 # Install dependencies
@@ -329,184 +1136,242 @@ pnpm db:generate
 # Run migrations
 pnpm db:migrate
 
-# Seed database (100 therapists, 30 practices)
+# Seed database
 pnpm db:seed
 
-# Start API only
-cd apps/api
-DATABASE_URL='file:./prisma/prisma/dev.db' REVIO_ADMIN_TOKEN='dev-admin-token' PORT=4000 npx tsx src/server.ts
+# Start API
+pnpm dev:api
 
-# Start Admin (separate terminal)
+# Start Admin
 pnpm dev:admin
 
-# Start Mobile (separate terminal)
+# Start Mobile
 pnpm dev:mobile
-```
 
-### Test Account
-- **Email:** `test@revio.de`
-- **Password:** `password`
-
----
-
-## 4. Database
-
-- **ORM:** Prisma with SQLite (production will move to PostgreSQL)
-- **DB file:** `apps/api/prisma/prisma/prisma/dev.db` (note the triple-nested path — Prisma resolves SQLite paths relative to `schema.prisma`, so `file:./prisma/prisma/dev.db` in `.env` becomes `prisma/` + `prisma/prisma/dev.db`)
-- **Schema:** `apps/api/prisma/schema.prisma`
-- **Full data model:** See [`docs/data-model.md`](docs/data-model.md)
-
-### Key Models
-
-| Model | Purpose |
-|-------|---------|
-| `Therapist` | Registered physiotherapists with profile, auth, review status |
-| `Practice` | Physiotherapy practices with address, geocoded lat/lng |
-| `TherapistPracticeLink` | Many-to-many: therapist ↔ practice (with status lifecycle) |
-| `SearchSuggestion` | Autocomplete entries for search |
-
-### Status Enums
-- **ReviewStatus:** `DRAFT` → `PENDING_REVIEW` → `APPROVED` / `REJECTED` / `CHANGES_REQUESTED` / `SUSPENDED`
-- **LinkStatus:** `PROPOSED` → `CONFIRMED` / `DISPUTED` / `REJECTED`
-
-### Important Fields
-- `specializations`, `languages`, `certifications`, `kassenart`, `availability` are stored as **comma-separated strings** in the DB, but exposed as **arrays** in the API/types.
-- `lat`/`lng` on Practice: geocoded via Nominatim (OpenStreetMap). Default `0` means "not geocoded yet".
-- `isVisible`: therapists can hide themselves from search results.
-- `photo`: URL path like `/uploads/<uuid>.jpg` (served by `@fastify/static`).
-
----
-
-## 5. API Architecture
-
-### Route Files (`src/routes/`)
-
-| File | Prefix | Auth | Purpose |
-|------|--------|------|---------|
-| `health.ts` | `/health` | None | Health check |
-| `search.ts` | `/search`, `/suggestions` | None | Public search for patients |
-| `register.ts` | `/register/therapist` | None | Therapist registration |
-| `auth.ts` | `/auth/*` | Bearer token | Login, profile, PATCH /auth/me |
-| `practice.ts` | `/practice`, `/my/practice` | Bearer token | Practice CRUD for therapists |
-| `practice-auth.ts` | `/practice-auth/*` | Practice token | Practice-specific auth |
-| `admin.ts` | `/admin/*` | Admin token | Review, approve, reject, manage |
-| `upload.ts` | `/upload/photo` | Bearer token | Multipart photo upload |
-
-### Plugins
-- **`prisma.ts`** — Decorates Fastify with `app.prisma` (PrismaClient)
-- **`admin-auth.ts`** — Decorates with `app.verifyAdmin` hook (checks `REVIO_ADMIN_TOKEN`)
-
-### Key Patterns
-- Auth: `request.headers.authorization` → `Bearer <sessionToken>` → lookup `Therapist` by `sessionToken`
-- Admin: `Authorization: Bearer <REVIO_ADMIN_TOKEN>` (simple token, no JWT)
-- Validation: Zod schemas inline in route handlers
-- Geocoding: `src/utils/geocode.ts` calls Nominatim with 1s delay between requests
-
----
-
-## 6. Admin Dashboard
-
-- **Framework:** Next.js 15 with App Router
-- **Route Group:** All pages under `app/(admin)/` — do NOT create pages at `app/` level (causes route conflicts)
-- **Layout:** Sidebar navigation (`components/sidebar.tsx`) + Page Shell (`components/page-shell.tsx`)
-- **API calls:** `lib/api.ts` fetches from `http://localhost:4000` with admin token
-- **Server Actions:** `lib/actions.ts` for approve/reject/suspend
-
-### Pages
-| Route | File | Purpose |
-|-------|------|---------|
-| `/` | `(admin)/page.tsx` | Dashboard overview |
-| `/therapists` | `(admin)/therapists/page.tsx` | Therapist list & review |
-| `/practices` | `(admin)/practices/page.tsx` | Practice list & review |
-| `/links` | `(admin)/links/page.tsx` | Therapist↔Practice links |
-| `/profiles` | `(admin)/profiles/page.tsx` | Detailed profile view |
-| `/login` | `login/page.tsx` | Admin login (outside route group) |
-
----
-
-## 7. Mobile App
-
-- **Framework:** Expo 51 / React Native
-- **Structure:** Single file `src/App.js` (~3800 lines) — all screens, navigation, state in one file
-- **Navigation:** Custom bottom tab bar (Entdecken, Favoriten, Profil, Optionen)
-- **Auth:** AsyncStorage for session token persistence
-- **Icons:** `Ionicons` from `@expo/vector-icons`
-- **API URL:** `EXPO_PUBLIC_API_URL` env var, falls back to `http://localhost:4000`
-
-### Key Flows
-1. **Search:** Patient searches by name/city/specialization → API `/search` → result list
-2. **Registration:** 5-step wizard: Email+Password → Personal Info → Languages → Practice (new/existing/skip) → Preview+Submit
-3. **Profile Edit:** Logged-in therapist edits bio, specializations, languages, kassenart, availability, homeVisit, isVisible
-4. **Photo Upload:** `expo-image-picker` → FormData → `POST /upload/photo` → URL stored in DB
-
----
-
-## 8. Testing
-
-```bash
-# Run all tests
+# Run tests
 pnpm test
 
-# Run API tests only
-cd apps/api && pnpm test
-
-# TypeScript check all packages
+# Typecheck
 pnpm typecheck
 ```
 
-- **Test framework:** Vitest
-- **Test file:** `apps/api/test/app.test.ts` (33 tests)
-- **Setup:** `apps/api/test/setup.ts` — creates test DB, runs migrations
-- **Test DB:** `apps/api/prisma/prisma/test.db`
+If `pnpm` is not available, check the `packageManager` field in root `package.json`.
 
 ---
 
-## 9. Common Pitfalls
+## 13. Environment Variables
 
-1. **DB path is triple-nested:** Prisma resolves SQLite paths relative to `schema.prisma`. With `DATABASE_URL="file:./prisma/prisma/dev.db"` and schema at `apps/api/prisma/`, the actual DB file is `apps/api/prisma/prisma/prisma/dev.db`. The `.env` value is correct — don't change it.
-2. **Admin routing:** Never create `page.tsx` files directly in `apps/admin/app/` — use the `(admin)` route group
-3. **pnpm not in PATH:** If `pnpm` command fails, the binary is at `/Users/vucenovic/Library/pnpm/.tools/pnpm/10.6.3_tmp_7687_0/bin/pnpm`
-4. **workspace:* protocol:** Don't use `npm install` — it can't resolve `workspace:*`. Always use `pnpm`.
-5. **Mobile is a single file:** `App.js` is ~3800 lines. Use grep/search to find specific sections rather than reading the whole file.
-6. **Comma-separated fields:** `specializations`, `languages` etc. are stored as comma-separated strings in SQLite. The API splits/joins them. Don't store arrays directly.
-7. **Auto-approve in dev:** `register.ts` auto-approves therapists in development mode (`NODE_ENV !== 'production'`).
-8. **Geocoding rate limit:** Nominatim allows max 1 request/second. The `geocode-all` admin endpoint adds 1.1s delays between requests.
+Verify exact names in `apps/api/src/env.ts`.
 
----
+Expected variables may include:
 
-## 10. Code Style
+| Variable | Purpose |
+|---|---|
+| `DATABASE_URL` | Database connection |
+| `REVIO_ADMIN_TOKEN` | Admin API auth |
+| `PORT` | API port |
+| `EXPO_PUBLIC_API_URL` | Mobile API URL |
+| `INTERNAL_API_URL` | Admin/server-side API URL |
+| `NEXT_PUBLIC_API_URL` | Browser API URL for admin/site |
+| `RESEND_API_KEY` | Email provider, if email is enabled |
 
-- **TypeScript** for API and Admin, **JavaScript** for Mobile (App.js)
-- **ES Modules** (`"type": "module"` in API package.json)
-- **Zod** for all API input validation (inline schemas in route handlers)
-- **No ORM abstraction layer** — Prisma calls directly in route handlers
-- **Functional components** with hooks in React/React Native
-- **Dark/Light theme** support in Mobile via `useColorScheme()` + custom color map
+Never hardcode secrets in source code.
 
 ---
 
-## 11. Current Roadmap
+## 14. Code Style and Implementation Rules
 
-See `todo.md` for the full list. Key remaining items:
-- [ ] Nachweis-Upload (optional certificate upload)
-- [ ] Kartenansicht (Google Maps / Apple Maps integration)
-- [ ] Push-Benachrichtigungen (Expo push notifications)
-- [ ] E-Mail-Benachrichtigungen (admin actions → email to therapist)
-- [ ] PostgreSQL migration (replace SQLite for production)
-- [ ] Production deployment (Docker + Railway/Render/Vercel/EAS)
+### General
 
-Future agents (post-MVP) are documented in [`docs/product.md`](docs/product.md) § 10.
+- Prefer small services over large screen-level logic.
+- Keep shared DTO types in `packages/shared` where practical.
+- Use Zod validation on API input.
+- Keep role-based auth explicit.
+- Keep booking logic backend-owned.
+- Keep UI derived from backend state.
+- Add tests for every booking status transition.
+
+### Backend
+
+- Validate request bodies.
+- Validate auth role.
+- Validate ownership.
+- Use transactions for booking mutations.
+- Use database constraints for unique booking/slot rules if possible.
+- Do not rely only on frontend checks.
+
+### Mobile
+
+- Avoid duplicate mapping logic.
+- Avoid duplicating therapist field transformation across list, profile, and booking.
+- Keep API calls in services.
+- Keep UI components role-specific where needed.
+- Make empty states clear.
+
+### Admin
+
+- Keep verification actions explicit.
+- Show enough information for review, but avoid unnecessary patient data exposure.
+- Log or track review decisions where possible.
 
 ---
 
-## 12. Related Documents
+## 15. File Cleanup Rules
 
-| Document | Purpose |
-|----------|---------|
-| [`docs/product.md`](docs/product.md) | Purpose, MVP scope, user roles, non-goals, workflows, success criteria |
-| [`docs/data-model.md`](docs/data-model.md) | All entities, fields, relationships, storage rules |
-| [`docs/search-ranking.md`](docs/search-ranking.md) | Query processing, scoring tiers, filters, suggestions, map interaction |
-| [`docs/design-system.md`](docs/design-system.md) | Brand, colors, typography, components, icons, splash screen |
-| [`todo.md`](todo.md) | Current roadmap and completed items |
-| [`history.md`](history.md) | Archived project history, including the removed legacy `structure.md` content |
-| [`revioApp/agents.md`](revioApp/agents.md) | Original full agent specification (superseded by docs/) |
+Do not delete files only because they are not currently imported.
+
+Classify files first:
+
+```txt
+ACTIVE            Used by current app/API/admin.
+PLANNED           Intended for Booking-MVP but not wired yet.
+MIGRATION_SCAFFOLD New architecture scaffold, not active yet.
+LEGACY            Old implementation still needed for compatibility.
+DEPRECATED        Safe to remove after verification.
+UNKNOWN           Needs manual inspection.
+```
+
+Before deletion:
+
+1. Search imports.
+2. Check route registration.
+3. Check package scripts.
+4. Check tests.
+5. Check mobile entry file.
+6. Check admin routes.
+7. Confirm feature scope.
+8. Move to archive or delete only after clear decision.
+
+---
+
+## 16. MVP Roadmap
+
+### A1 — Scope lock
+
+Booking, patient accounts, appointments, slots, favorites, and notifications are core MVP.
+
+Payments and reviews are excluded.
+
+### A2 — Route inventory
+
+Create a table of every backend route file:
+
+```txt
+file | registered? | prefix | auth | used by frontend? | keep/remove/plan
+```
+
+### A3 — Data model alignment
+
+Unify or clearly separate:
+
+- User
+- PatientProfile
+- TherapistProfile
+- Session/Auth
+- AppointmentSlot
+- Booking
+- Notification
+- Favorite
+
+Avoid duplicate auth fields and duplicate profile models.
+
+### A4 — Booking safety
+
+Implement or verify:
+
+- no double-booking
+- valid slot ownership
+- status transitions
+- patient/therapist role checks
+- notification creation
+- cancellation behavior
+
+### A5 — Legacy mobile extraction
+
+Extract services first, then screens.
+
+Suggested service order:
+
+1. API client
+2. Auth
+3. Search
+4. Booking
+5. Availability
+6. Notifications
+7. Favorites
+8. Profile
+
+### A6 — UI simplification
+
+Clarify role-specific navigation:
+
+- Patient: Search, Favorites, Termine, Profil, Optionen
+- Therapist: Termine, Slots, Profil, Benachrichtigungen, Optionen
+
+Remove or hide payments/reviews UI if present.
+
+---
+
+## 17. Definition of Done for Booking-MVP
+
+The MVP is ready when:
+
+- Patients can register and log in.
+- Freelance therapists can register and log in.
+- Non-freelance provider self-registration is blocked or not offered.
+- Admin can approve therapist profiles.
+- Public search shows approved visible therapists.
+- Patients can view therapist profiles.
+- Therapists can create available slots.
+- Patients can book or request available slots.
+- Double-booking is impossible.
+- Patients can see appointment status.
+- Therapists can manage booking requests.
+- Notifications are created for relevant booking events.
+- Payments are absent.
+- Reviews are absent.
+- Medical records are absent.
+- Basic privacy and consent copy exists.
+- Main API flows have tests.
+- Main mobile flows pass manual QA.
+
+---
+
+## 18. Current Non-Negotiables
+
+1. Revio is Booking-MVP, not Discovery-only.
+2. Patients can register.
+3. Patients can book appointments.
+4. Only freelance therapists can self-register as providers.
+5. No payments in MVP.
+6. No reviews in MVP.
+7. No medical records in MVP.
+8. No AI diagnosis or AI treatment plans in MVP.
+9. Public provider profiles require approval.
+10. Booking logic must be protected against double-booking.
+11. Patient data must stay minimal and access-controlled.
+12. Do not add large new logic to legacy mobile code without extraction plan.
+13. The mobile app UI is German-only in the MVP.
+
+---
+
+## 19. Suggested First Ticket
+
+Title:
+
+```txt
+Freeze Booking-MVP architecture and align active routes
+```
+
+Tasks:
+
+1. Confirm current mobile entry file and active screens.
+2. Confirm registered API routes in `apps/api/src/app.ts`.
+3. Create route inventory.
+4. Confirm active Prisma models.
+5. Decide final route names for patient auth, therapist auth, booking, slots, favorites, notifications.
+6. Remove or hide payments/reviews UI if present.
+7. Add tests for patient registration and booking.
+8. Add tests that payments/reviews routes do not exist.
+9. Update `docs/product.md`, `docs/data-model.md`, and `docs/search-ranking.md` to match this scope.
+10. Keep this `CLAUDE.md` in sync after each architectural decision.

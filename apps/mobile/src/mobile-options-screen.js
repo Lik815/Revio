@@ -1,12 +1,12 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import React from 'react';
-import { Image, Pressable, ScrollView, Switch, Text, View } from 'react-native';
+import { Image, Linking, Pressable, ScrollView, Switch, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { SPACE } from './mobile-utils';
+import { SPACE, getBaseUrl } from './mobile-utils';
 
 export function OptionsScreen({
   loggedInTherapist, loggedInPatient, accountType,
   themeMode, setThemeMode,
-  appLanguage, setAppLanguage,
   notifications, dismissedNotifIds,
   onShowNotifications, onShowLogin, onShowRegister,
   onShowFeedback, onShowChangePassword, onDeleteAccount, onLogout,
@@ -14,21 +14,49 @@ export function OptionsScreen({
   c, t, styles,
 }) {
 const renderOptions = () => {
+  const isLoggedIn = Boolean(loggedInTherapist || loggedInPatient);
+  const canDeleteAccount = typeof onDeleteAccount === 'function';
+
   const SectionHeader = ({ title }) => (
-    <Text style={{ fontSize: 11, fontWeight: '700', color: c.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginTop: 20, marginBottom: 6, paddingHorizontal: 4 }}>{title}</Text>
+    <Text style={{ fontSize: 11, fontWeight: '700', color: c.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginTop: 24, marginBottom: 8, paddingHorizontal: 4 }}>{title}</Text>
   );
-  const OptionRow = ({ label, value, onPress, icon, valueColor, last }) => (
-    <Pressable
-      onPress={onPress}
-      style={[styles.optionRow, { backgroundColor: c.card, borderColor: c.border, marginBottom: last ? 0 : 1, borderRadius: 0 }]}
-    >
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-        {icon ? <Ionicons name={icon} size={18} color={c.muted} /> : null}
-        <Text style={[styles.optionLabel, { color: c.text }]}>{label}</Text>
-      </View>
-      <Text style={[styles.optionValue, { color: valueColor ?? c.muted }]}>{value} ›</Text>
-    </Pressable>
-  );
+  const OptionRow = ({ label, value, onPress, icon, valueColor, subtitle, tint = 'default', disabled = false, last = false }) => {
+    const destructive = tint === 'destructive';
+    const iconColor = destructive ? c.error : c.muted;
+    const labelColor = disabled ? c.muted : destructive ? c.error : c.text;
+    const subtitleColor = disabled ? c.muted : destructive ? c.error : c.muted;
+    const trailingColor = disabled ? c.muted : (valueColor ?? (destructive ? c.error : c.muted));
+
+    return (
+      <Pressable
+        disabled={disabled}
+        onPress={onPress}
+        style={[
+          styles.optionRow,
+          {
+            backgroundColor: destructive ? c.errorBg : c.card,
+            borderColor: c.border,
+            marginBottom: last ? 0 : 1,
+            borderRadius: 0,
+            opacity: disabled ? 0.6 : 1,
+          },
+        ]}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, paddingRight: 12 }}>
+          {icon ? <Ionicons name={icon} size={18} color={iconColor} /> : null}
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.optionLabel, { color: labelColor }]}>{label}</Text>
+            {subtitle ? (
+              <Text style={{ fontSize: 12, lineHeight: 17, color: subtitleColor, marginTop: 2 }}>
+                {subtitle}
+              </Text>
+            ) : null}
+          </View>
+        </View>
+        <Text style={[styles.optionValue, { color: trailingColor }]}>{value ? `${value} ›` : '›'}</Text>
+      </Pressable>
+    );
+  };
   const OptionGroup = ({ children }) => (
     <View style={{ borderRadius: 14, overflow: 'hidden', borderWidth: 1, borderColor: c.border }}>{children}</View>
   );
@@ -51,7 +79,7 @@ const renderOptions = () => {
           <>
             <SectionHeader title="Mein Profil" />
             <OptionGroup>
-              <Pressable onPress={() => setActiveTab('therapist')} style={[styles.optionRow, { backgroundColor: c.card, borderColor: 'transparent' }]}>
+              <Pressable onPress={onNavigateToProfile} style={[styles.optionRow, { backgroundColor: c.card, borderColor: 'transparent' }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
                   <View style={{ width: 44, height: 44, borderRadius: 999, backgroundColor: c.mutedBg, overflow: 'hidden', justifyContent: 'center', alignItems: 'center' }}>
                     {loggedInTherapist.photo
@@ -76,7 +104,7 @@ const renderOptions = () => {
           <>
             <SectionHeader title="Mein Profil" />
             <OptionGroup>
-              <Pressable onPress={() => setActiveTab('therapist')} style={[styles.optionRow, { backgroundColor: c.card, borderColor: 'transparent' }]}>
+              <Pressable onPress={onNavigateToProfile} style={[styles.optionRow, { backgroundColor: c.card, borderColor: 'transparent' }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
                   <View style={{ width: 44, height: 44, borderRadius: 999, backgroundColor: c.primary, alignItems: 'center', justifyContent: 'center' }}>
                     <Text style={{ fontSize: 16, fontWeight: '700', color: '#fff' }}>{((loggedInPatient.firstName?.[0] ?? '') + (loggedInPatient.lastName?.[0] ?? '')).toUpperCase() || '?'}</Text>
@@ -107,21 +135,7 @@ const renderOptions = () => {
         {/* ── App-Einstellungen ── */}
         <SectionHeader title="App-Einstellungen" />
         <OptionGroup>
-          <View style={[styles.optionRow, { backgroundColor: c.card, borderColor: 'transparent' }]}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <Ionicons name="language-outline" size={18} color={c.muted} />
-              <Text style={[styles.optionLabel, { color: c.text }]}>{t('languageOption')}</Text>
-            </View>
-            <View style={styles.themeToggleRow}>
-              {[{ key: 'de', label: 'DE' }, { key: 'en', label: 'EN' }].map(({ key, label }) => (
-                <Pressable key={key} onPress={() => { setAppLanguage(key); AsyncStorage.setItem('appLanguage', key); }}
-                  style={[styles.themeBtn, appLanguage === key ? { backgroundColor: c.primary, borderColor: c.primary } : { backgroundColor: c.mutedBg, borderColor: c.border }]}>
-                  <Text style={[styles.themeBtnText, { color: appLanguage === key ? '#FFFFFF' : c.muted }]}>{label}</Text>
-                </Pressable>
-              ))}
-            </View>
-          </View>
-          <Pressable onPress={() => onShowNotifications()} style={[styles.optionRow, { backgroundColor: c.card, borderColor: 'transparent', borderTopWidth: 1, borderTopColor: c.border }]}>
+          <Pressable onPress={() => onShowNotifications()} style={[styles.optionRow, { backgroundColor: c.card, borderColor: 'transparent' }]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
               <Ionicons name="notifications-outline" size={18} color={c.muted} />
               <Text style={[styles.optionLabel, { color: c.text }]}>{t('notificationsOption')}</Text>
@@ -172,42 +186,42 @@ const renderOptions = () => {
         {/* ── Rechtliches ── */}
         <SectionHeader title={t('legalSection')} />
         <OptionGroup>
-          <Pressable style={[styles.optionRow, { backgroundColor: c.card, borderColor: 'transparent' }]}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <Ionicons name="document-text-outline" size={18} color={c.muted} />
-              <Text style={[styles.optionLabel, { color: c.text }]}>{t('termsLabel')}</Text>
-            </View>
-            <Text style={[styles.optionValue, { color: c.muted }]}>›</Text>
-          </Pressable>
-          <Pressable style={[styles.optionRow, { backgroundColor: c.card, borderColor: 'transparent', borderTopWidth: 1, borderTopColor: c.border }]}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <Ionicons name="shield-outline" size={18} color={c.muted} />
-              <Text style={[styles.optionLabel, { color: c.text }]}>{t('privacyLabel')}</Text>
-            </View>
-            <Text style={[styles.optionValue, { color: c.muted }]}>›</Text>
-          </Pressable>
+          <OptionRow label={t('termsLabel')} icon="document-text-outline" />
+          <OptionRow label={t('privacyLabel')} icon="shield-outline" last />
         </OptionGroup>
 
-        {/* ── App-Version & Logout ── */}
-        <Text style={{ fontSize: 12, color: c.muted, textAlign: 'center', marginTop: 20 }}>Version 0.1.0 MVP</Text>
-
-        {(loggedInTherapist || loggedInPatient) && (
-          <View style={{ gap: 10, marginTop: 16 }}>
-            <Pressable
-              onPress={() => { onShowChangePassword(); }}
-              style={{ borderRadius: 12, paddingVertical: 14, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, borderWidth: 1.5, borderColor: c.border, backgroundColor: c.card }}>
-              <Ionicons name="key-outline" size={18} color={c.muted} />
-              <Text style={{ color: c.text, fontSize: 16, fontWeight: '600' }}>{t('changePassword')}</Text>
-            </Pressable>
-            <Pressable onPress={onLogout}
-              style={{ borderRadius: 12, paddingVertical: 14, alignItems: 'center', borderWidth: 1.5, borderColor: c.border, backgroundColor: c.card }}>
-              <Text style={{ color: c.text, fontSize: 16, fontWeight: '600' }}>{t('logoutBtn')}</Text>
-            </Pressable>
-            <Pressable onPress={onDeleteAccount} style={{ borderRadius: 12, paddingVertical: 14, alignItems: 'center' }}>
-              <Text style={{ color: c.muted, fontSize: 14 }}>{t('deleteAccount')}</Text>
-            </Pressable>
-          </View>
+        {isLoggedIn && (
+          <>
+            <SectionHeader title={t('accountSection')} />
+            <OptionGroup>
+              <OptionRow
+                label={t('changePassword')}
+                subtitle={t('changePasswordHint')}
+                icon="key-outline"
+                onPress={onShowChangePassword}
+                valueColor={c.primary}
+              />
+              <OptionRow
+                label={t('logoutBtn')}
+                subtitle={t('logoutHint')}
+                icon="log-out-outline"
+                onPress={onLogout}
+              />
+              <OptionRow
+                label={t('deleteAccount')}
+                subtitle={canDeleteAccount ? t('deleteAccountHint') : t('deleteAccountDisabledHint')}
+                icon="trash-outline"
+                onPress={onDeleteAccount}
+                tint="destructive"
+                disabled={!canDeleteAccount}
+                value={canDeleteAccount ? undefined : t('comingSoon')}
+                last
+              />
+            </OptionGroup>
+          </>
         )}
+
+        <Text style={{ fontSize: 12, color: c.muted, textAlign: 'center', marginTop: 28 }}>Version 0.1.0 MVP</Text>
       </ScrollView>
     </View>
   );
