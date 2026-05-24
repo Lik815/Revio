@@ -68,14 +68,14 @@ export function AppTabs() {
         options={{ title: t[TAB_TRANSLATION_KEYS[TAB_ROUTES.DISCOVER]] }}
       />
       <Tab.Screen
-        component={TherapyTabScreen}
-        name={TAB_ROUTES.THERAPY}
-        options={{ title: t[TAB_TRANSLATION_KEYS[TAB_ROUTES.THERAPY]] }}
-      />
-      <Tab.Screen
         component={FavoritesTabScreen}
         name={TAB_ROUTES.FAVORITES}
         options={{ title: t[TAB_TRANSLATION_KEYS[TAB_ROUTES.FAVORITES]] }}
+      />
+      <Tab.Screen
+        component={TherapyTabScreen}
+        name={TAB_ROUTES.THERAPY}
+        options={{ title: t[TAB_TRANSLATION_KEYS[TAB_ROUTES.THERAPY]] }}
       />
       <Tab.Screen
         component={ProfileTabScreen}

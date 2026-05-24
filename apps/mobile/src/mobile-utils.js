@@ -108,8 +108,8 @@ const TYPE = {
 
 const tabs = [
   { key: 'discover',   labelKey: 'tabSearch',     icon: 'search'    },
-  { key: 'therapy',    labelKey: 'tabTherapy',     icon: 'calendar'  },
   { key: 'favorites',  labelKey: 'tabFavorites',   icon: 'heart'     },
+  { key: 'therapy',    labelKey: 'tabTherapy',     icon: 'calendar'  },
   { key: 'profile',    labelKey: 'tabProfile',     icon: 'person'    },
   { key: 'options',    labelKey: 'tabOptions',     icon: 'settings'  },
 ];
