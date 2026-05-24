@@ -1731,6 +1731,7 @@ export default function App() {
         setShowRoleSelect(false);
       }}
       onShowLogin={() => { setShowRoleSelect(false); setShowSignup(false); setShowPatientName(false); setShowLogin(true); }}
+      onSelectTherapist={() => { setShowRoleSelect(false); setShowSignup(false); setShowPatientName(false); setShowRegister(true); }}
       c={c} t={t} styles={styles}
     />
   );

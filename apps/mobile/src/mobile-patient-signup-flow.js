@@ -11,6 +11,7 @@ export function PatientSignupFlow({
   onClose,
   onSignedUp,
   onShowLogin,
+  onSelectTherapist,
   c, t, styles,
 }) {
   const [showSignup, setShowSignup] = useState(false);
@@ -84,23 +85,11 @@ const handlePatientNameSubmit = async () => {
       setPatientRegError(err.message ?? t('alertConnectionError'));
       return;
     }
-    // Auto-login with the session token returned by registration
     const data = await res.json().catch(() => ({}));
     if (data.token) {
       await AsyncStorage.setItem('revio_auth_token', data.token);
       await AsyncStorage.setItem('revio_account_type', 'patient');
-      setAuthToken(data.token);
-      setAccountType('patient');
-      setLoggedInPatient({
-        id: data.userId,
-        email,
-        role: 'patient',
-        firstName,
-        lastName,
-        phone: null,
-      });
-      loadFavorites(data.token);
-      loadMyAppointments(data.token);
+      onSignedUp?.(data.token);
     }
     setShowSignup(false);
     resetSignupState();
@@ -127,7 +116,7 @@ const renderRoleSelect = () => (
     <View style={{ gap: 12 }}>
       {/* Patient — filled/primary */}
       <Pressable
-        onPress={() => { setShowRoleSelect(false); setShowEmailVerify(false); setEmailVerifyStatus('idle'); setShowPatientName(true); }}
+        onPress={() => { setShowRoleSelect(false); setShowPatientName(true); }}
         style={({ pressed }) => [{
           backgroundColor: c.primary,
           borderRadius: 16,
@@ -151,13 +140,7 @@ const renderRoleSelect = () => (
       {/* Therapeut — outlined */}
       <Pressable
         onPress={() => {
-          resetRegState();
-          setShowRoleSelect(false);
-          setRegEmail(signupEmail);
-          setRegPassword(signupPassword);
-          setRegPasswordConfirm(signupPassword);
-          setRegEmailVerified(true);
-          setShowRegister(true);
+          onSelectTherapist?.();
           resetSignupState();
         }}
         style={({ pressed }) => [{
