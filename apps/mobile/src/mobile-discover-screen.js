@@ -757,82 +757,100 @@ export function DiscoverScreen(props) {
             style={[styles.resultCard, { backgroundColor: c.card, borderColor: c.border }]}
             onPress={() => openTherapistById(therapist.id)}
           >
-            {/* ── Header: Avatar · Name · Herz · Chevron ── */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              {therapist.photo ? (
-                <Image source={{ uri: therapist.photo }} style={{ width: 56, height: 56, borderRadius: 28 }} />
-              ) : (
-                <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: c.primaryBg, alignItems: 'center', justifyContent: 'center' }}>
-                  <Text style={{ fontSize: 18, fontWeight: '700', color: c.primary }}>{initials}</Text>
-                </View>
-              )}
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.cardName, { color: c.text }]} numberOfLines={1}>{therapist.fullName}</Text>
-                <Text style={[styles.cardTitle, { color: mutedText }]} numberOfLines={1}>{therapist.professionalTitle}</Text>
+            {/* ── Header: Avatar · Name · Titel · Herz · Chevron ── */}
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12 }}>
+              {/* Avatar mit Verfügbarkeits-Dot */}
+              <View>
+                {therapist.photo ? (
+                  <Image source={{ uri: therapist.photo }} style={{ width: 52, height: 52, borderRadius: 26 }} />
+                ) : (
+                  <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: c.primaryBg, alignItems: 'center', justifyContent: 'center' }}>
+                    <Text style={{ fontSize: 17, fontWeight: '700', color: c.primary }}>{initials}</Text>
+                  </View>
+                )}
+                {therapist.requestable ? (
+                  <View style={{ position: 'absolute', bottom: 1, right: 1, width: 12, height: 12, borderRadius: 6, backgroundColor: c.success, borderWidth: 2, borderColor: c.card }} />
+                ) : null}
               </View>
-              <Pressable
-                onPress={(e) => { e.stopPropagation?.(); toggleFavorite(therapist); }}
-                hitSlop={iconHitSlop}
-                style={{ padding: 4 }}
-              >
-                <Ionicons
-                  name={isFavorite(therapist.id) ? 'heart' : 'heart-outline'}
-                  size={20}
-                  color={isFavorite(therapist.id) ? '#E53935' : c.muted}
-                />
-              </Pressable>
-              <Ionicons name="chevron-forward" size={16} color={c.muted} />
-            </View>
 
-            {/* ── Meta-Zeile: 3 kompakte Infos ── */}
-            <View style={{ flexDirection: 'row', gap: 16, marginTop: 12, flexWrap: 'wrap' }}>
-              {therapist.homeVisit ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                  <Ionicons name="home-outline" size={13} color={c.success} />
-                  <Text style={{ fontSize: 13, color: c.success, fontWeight: '500' }}>Hausbesuch</Text>
-                </View>
-              ) : null}
-              {therapist.requestable ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                  <Ionicons name="calendar-outline" size={13} color={c.primary} />
-                  <Text style={{ fontSize: 13, color: c.primary, fontWeight: '500' }}>Direkt buchbar</Text>
-                </View>
-              ) : null}
-              {spec ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                  <Ionicons name="person-outline" size={13} color={mutedText} />
-                  <Text style={{ fontSize: 13, color: mutedText }} numberOfLines={1}>{spec}</Text>
-                </View>
-              ) : null}
-            </View>
-
-            {/* ── Footer: Ort · Distanz  /  Nächster Termin ── */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: c.border }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, flex: 1 }}>
-                <Ionicons name="location-outline" size={13} color={mutedText} />
-                <Text style={{ fontSize: 13, color: mutedText }} numberOfLines={1}>
-                  {therapist.city ?? '—'}{therapist.distKm != null ? ` · ${formatDist(therapist.distKm)}` : ''}
-                </Text>
+              {/* Name + Berufstitel */}
+              <View style={{ flex: 1, paddingTop: 2 }}>
+                <Text style={{ fontSize: 16, fontWeight: '700', color: c.text, lineHeight: 22 }} numberOfLines={1}>{therapist.fullName}</Text>
+                <Text style={{ fontSize: 13, color: mutedText, lineHeight: 18, marginTop: 1 }} numberOfLines={1}>{therapist.professionalTitle}</Text>
               </View>
-              {nextSlot ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 1 }}>
-                  <Ionicons name="calendar-outline" size={13} color={c.success} />
-                  <Text style={{ fontSize: 13, color: c.success, fontWeight: '500' }} numberOfLines={1}>{nextSlot}</Text>
-                </View>
-              ) : null}
+
+              {/* Sekundäre Aktionen */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, paddingTop: 2 }}>
+                <Pressable
+                  onPress={(e) => { e.stopPropagation?.(); toggleFavorite(therapist); }}
+                  hitSlop={iconHitSlop}
+                  style={{ padding: 4 }}
+                >
+                  <Ionicons
+                    name={isFavorite(therapist.id) ? 'heart' : 'heart-outline'}
+                    size={18}
+                    color={isFavorite(therapist.id) ? '#E53935' : c.muted}
+                  />
+                </Pressable>
+                <Ionicons name="chevron-forward" size={14} color={c.muted} style={{ opacity: 0.45 }} />
+              </View>
             </View>
 
-            {/* ── Telefon (optional) ── */}
-            {therapist.phone ? (
-              <Pressable
-                onPress={(e) => { e.stopPropagation?.(); callPhone(therapist.phone); }}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 }}
-                hitSlop={6}
-              >
-                <Ionicons name="call-outline" size={13} color={mutedText} />
-                <Text style={{ fontSize: 13, color: mutedText }} numberOfLines={1}>{therapist.phone}</Text>
-              </Pressable>
+            {/* ── Status-Badge ── */}
+            {therapist.requestable ? (
+              <View style={{ marginTop: 10 }}>
+                <View style={{ alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: c.successBg, borderRadius: RADIUS.full, paddingHorizontal: 10, paddingVertical: 4 }}>
+                  <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: c.success }} />
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: c.success, letterSpacing: 0.1 }}>Direkt buchbar</Text>
+                </View>
+              </View>
             ) : null}
+
+            {/* ── Eigenschaften (max. 2) ── */}
+            {(therapist.homeVisit || spec) ? (
+              <View style={{ marginTop: 12, gap: 7 }}>
+                {therapist.homeVisit ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+                    <Ionicons name="home-outline" size={14} color={mutedText} />
+                    <Text style={{ fontSize: 14, color: c.text }}>Hausbesuch möglich</Text>
+                  </View>
+                ) : null}
+                {spec ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+                    <Ionicons name="medical-outline" size={14} color={mutedText} />
+                    <Text style={{ fontSize: 14, color: c.text }} numberOfLines={1}>{spec}</Text>
+                  </View>
+                ) : null}
+              </View>
+            ) : null}
+
+            {/* ── Footer: Standort · Nächster Termin · Telefon ── */}
+            <View style={{ marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: c.border, gap: 6 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, flex: 1 }}>
+                  <Ionicons name="location-outline" size={13} color={mutedText} />
+                  <Text style={{ fontSize: 13, color: mutedText }} numberOfLines={1}>
+                    {therapist.city ?? '—'}{therapist.distKm != null ? ` · ${formatDist(therapist.distKm)}` : ''}
+                  </Text>
+                </View>
+                {nextSlot ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1 }}>
+                    <Ionicons name="calendar-outline" size={13} color={c.success} />
+                    <Text style={{ fontSize: 13, color: c.success, fontWeight: '500' }} numberOfLines={1}>{nextSlot}</Text>
+                  </View>
+                ) : null}
+              </View>
+              {therapist.phone ? (
+                <Pressable
+                  onPress={(e) => { e.stopPropagation?.(); callPhone(therapist.phone); }}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}
+                  hitSlop={6}
+                >
+                  <Ionicons name="call-outline" size={13} color={mutedText} />
+                  <Text style={{ fontSize: 13, color: mutedText }} numberOfLines={1}>{therapist.phone}</Text>
+                </Pressable>
+              ) : null}
+            </View>
           </Pressable>
         );
       })}
