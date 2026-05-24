@@ -388,6 +388,23 @@ Registration copy rule:
 
 All registration UI must clearly say that provider registration is for freelance therapists.
 
+General UI copy rule:
+
+Do not use emojis anywhere in the app UI.
+
+This includes, but is not limited to:
+
+- Screen titles
+- Buttons
+- Empty states
+- Success or error messages
+- Badges
+- Notifications
+- Onboarding text
+- Marketing-like decorative labels inside the product UI
+
+Use clear German copy, visual hierarchy, spacing, color, and iconography instead of emojis.
+
 Suggested German UI copy:
 
 ```txt
@@ -1352,6 +1369,7 @@ The MVP is ready when:
 11. Patient data must stay minimal and access-controlled.
 12. Do not add large new logic to legacy mobile code without extraction plan.
 13. The mobile app UI is German-only in the MVP.
+14. Do not use emojis anywhere in the app UI.
 
 ---
 

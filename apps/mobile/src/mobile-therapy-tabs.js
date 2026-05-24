@@ -16,7 +16,6 @@ export function TherapyTabPatient({
   therapyRefreshing, appointmentsLastLoadedAt,
   notifications, dismissedNotifIds, onShowNotifications,
   onRefresh, onOpenTherapistById, onSelectAppointment,
-  renderTherapyTabShell, renderTherapySectionLoading,
   c, t, styles,
 }) {
   const getDate = (a) => new Date(a.slot?.startsAt ?? a.confirmedSlotAt ?? 0);
@@ -160,7 +159,9 @@ export function TherapyTabPatient({
 
         {/* ── Timeline ──────────────────────────────────────────────── */}
         {shouldShowSectionLoading(myAppointmentsLoading, appointmentsLastLoadedAt) ? (
-          renderTherapySectionLoading()
+          <View style={[styles.emptyState, { backgroundColor: c.card, borderColor: c.border, paddingVertical: 20 }]}>
+            <ActivityIndicator color={c.primary} />
+          </View>
         ) : myAppointments.length === 0 ? (
           <View style={{ backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.border, paddingVertical: 32, paddingHorizontal: 20, alignItems: 'center', marginBottom: 12 }}>
             <Ionicons name="calendar-outline" size={36} color={c.muted} style={{ marginBottom: 12 }} />
@@ -213,7 +214,6 @@ export function TherapyTabTherapist({
   onRefresh, onLoadMySlots, onLoadIncomingBookings, onOpenTherapistById,
   onCancelSlot, onTherapistCancelRequest, onSelectTherapistDetailBooking, setShowSlotComposerModal,
   loggedInTherapist,
-  renderTherapyTabShell, renderTherapySectionLoading, renderTherapySectionEmpty,
   c, t, styles,
 }) {
   const slotBookingEnabled = loggedInTherapist?.bookingMode === 'FIRST_APPOINTMENT_REQUEST';
@@ -345,7 +345,10 @@ export function TherapyTabTherapist({
           </>
         ) : (
           <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
-            {renderTherapySectionEmpty('Terminanfragen sind noch nicht aktiviert.', 'Aktiviere Terminanfragen in deinem Profil, um Slots anzulegen.')}
+            <View style={[styles.emptyState, { backgroundColor: c.card, borderColor: c.border, paddingVertical: 20 }]}>
+              <Text style={[styles.emptyTitle, { color: c.text }]}>Terminanfragen sind noch nicht aktiviert.</Text>
+              <Text style={[styles.emptyBody, { color: c.muted }]}>Aktiviere Terminanfragen in deinem Profil, um Slots anzulegen.</Text>
+            </View>
           </View>
         )}
 

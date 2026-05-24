@@ -3,15 +3,15 @@ import {
   Image, Linking, Pressable, ScrollView, Text, View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { resolveMediaUrl, SHADOW } from './mobile-utils';
+import { resolveMediaUrl, SHADOW, SPACE } from './mobile-utils';
 import { STATUS_COLORS } from './mobile-booking';
+import { TabHeader } from './components/TabHeader';
 
 export function AppointmentDetail({
   appointment,
   onBack,
   onOpenTherapist,
   onCancelRequest,
-  renderTherapyTabShell,
   c, t, styles,
 }) {
   const appointment_data = appointment;
@@ -42,8 +42,13 @@ export function AppointmentDetail({
       ? 'time-outline'
       : 'close-circle-outline';
 
-  return renderTherapyTabShell(
-    'Termin',
+  return (
+    <View style={{ flex: 1 }}>
+      <TabHeader c={c} title="Termin" />
+      <ScrollView
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: 20, paddingTop: SPACE.sm }]}
+        showsVerticalScrollIndicator={false}
+      >
     <View style={{ gap: 14 }}>
       <Pressable
         onPress={() => onBack()}
@@ -173,6 +178,9 @@ export function AppointmentDetail({
           ) : null}
         </View>
       </View>
-    </View>,
+    </View>
+      </View>
+      </ScrollView>
+    </View>
   );
 }
