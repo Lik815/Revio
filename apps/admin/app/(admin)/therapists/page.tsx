@@ -2,7 +2,15 @@ import Link from 'next/link';
 import { PageShell } from '../../../components/page-shell';
 import { TherapistActions } from '../../../components/action-buttons';
 import { DeadlineTimer } from '../../../components/deadline-timer';
+import { AdminEmptyState } from '../../../components/admin-empty-state';
+import { AdminNotice } from '../../../components/admin-notice';
+import { AdminSectionCard } from '../../../components/admin-section-card';
+import { AdminStatusBadge } from '../../../components/admin-status-badge';
+import { AdminSummaryCard } from '../../../components/admin-summary-card';
+import { AdminToolbar } from '../../../components/admin-toolbar';
 import { api } from '../../../lib/api';
+import { formatDate } from '../../../lib/format';
+import { getReviewPriority, getVisibilityBlockers, getVisibilityMeta } from '../../../lib/visibility';
 import {
   approveTherapist,
   rejectTherapist,
@@ -12,101 +20,20 @@ import {
 
 type SearchParams = Promise<{ status?: string; q?: string; city?: string }>;
 
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
-}
-
-function summarizeReasons(reasons: string[]) {
-  if (reasons.length === 0) return null;
-  const [first, ...rest] = reasons;
-  return rest.length > 0 ? `${first} +${rest.length}` : first;
-}
-
-function humanizeReason(reason: string) {
-  return blockingReasonLabel[reason] ?? reason.replace(/_/g, ' ');
-}
-
-function getVisibilityMeta(t: {
-  reviewStatus: string;
-  isVisible: boolean;
-  visibility: { visibilityState: string; blockingReasons: string[] };
+function getQueueCopy({
+  overdueCount,
+  incompleteCount,
+}: {
+  overdueCount: number;
+  incompleteCount: number;
 }) {
-  if (t.reviewStatus !== 'APPROVED') {
-    return 'Wird nach Freigabe sichtbar.';
+  if (overdueCount > 0) {
+    return `${overdueCount} Profile liegen über dem 48h-Ziel und sollten zuerst geprüft werden.`;
   }
-  if (!t.isVisible) {
-    return 'Manuell ausgeblendet.';
+  if (incompleteCount > 0) {
+    return `${incompleteCount} Profile haben erkennbare Lücken und brauchen wahrscheinlich Rückfragen.`;
   }
-  if (t.visibility.visibilityState === 'visible') {
-    return 'Sichtbar in der Suche.';
-  }
-  const reasons = t.visibility.blockingReasons.map(humanizeReason);
-  return summarizeReasons(reasons) ?? 'Noch nicht sichtbar.';
-}
-
-const statusLabel: Record<string, string> = {
-  PENDING_REVIEW: 'Ausstehend',
-  APPROVED: 'Freigegeben',
-  REJECTED: 'Abgelehnt',
-  CHANGES_REQUESTED: 'Änderungen',
-  SUSPENDED: 'Gesperrt',
-  DRAFT: 'Entwurf',
-};
-
-const blockingReasonLabel: Record<string, string> = {
-  profile_incomplete: 'Profil unvollständig',
-  manually_hidden: 'Manuell versteckt',
-  publication_missing: 'Freigabe fehlt',
-  no_home_visit: 'Kein Hausbesuch',
-  no_service_radius: 'Kein Einzugsgebiet',
-  no_kassenart: 'Keine Kassenart',
-};
-
-const statusPriority: Record<string, number> = {
-  PENDING_REVIEW: 0,
-  CHANGES_REQUESTED: 1,
-  DRAFT: 2,
-  REJECTED: 3,
-  SUSPENDED: 4,
-  APPROVED: 5,
-};
-
-function missingProfileCount(t: {
-  bio?: string | null;
-  specializations?: string[];
-  languages?: string[];
-}) {
-  let count = 0;
-  if (!t.bio?.trim()) count++;
-  if (!t.specializations?.length) count++;
-  if (!t.languages?.length) count++;
-  return count;
-}
-
-function getReviewPriority(t: {
-  reviewStatus: string;
-  createdAt: string;
-  bio?: string | null;
-  specializations?: string[];
-  languages?: string[];
-}) {
-  const ageHours = (Date.now() - new Date(t.createdAt).getTime()) / (1000 * 60 * 60);
-  const missingCount = missingProfileCount(t);
-  const overdue = t.reviewStatus === 'PENDING_REVIEW' && ageHours >= 48;
-  const label = overdue
-    ? 'Über SLA'
-    : t.reviewStatus === 'PENDING_REVIEW'
-      ? 'Review offen'
-      : t.reviewStatus === 'CHANGES_REQUESTED'
-        ? 'Nachfassen'
-        : t.reviewStatus === 'DRAFT'
-          ? 'Unvollständig'
-          : t.reviewStatus === 'APPROVED'
-            ? 'Stabil'
-            : 'Beobachten';
-
-  const weight = (statusPriority[t.reviewStatus] ?? 9) * 1000 - ageHours + missingCount * 10 - (overdue ? 500 : 0);
-  return { overdue, missingCount, label, weight };
+  return 'Keine akuten Eskalationen. Die Queue kann regulär abgearbeitet werden.';
 }
 
 export default async function TherapistsPage({ searchParams }: { searchParams: SearchParams }) {
@@ -117,166 +44,225 @@ export default async function TherapistsPage({ searchParams }: { searchParams: S
   const q = (params.q ?? '').toLowerCase();
   const city = (params.city ?? '').toLowerCase();
 
-  const filtered = therapists.filter((t) => {
-    const matchesStatus = statusFilter === 'ALL' || t.reviewStatus === statusFilter;
-    const matchesQuery = !q || [t.fullName, t.professionalTitle, t.city, t.specializations.join(' ')].join(' ').toLowerCase().includes(q);
-    const matchesCity = !city || t.city.toLowerCase().includes(city);
-    return matchesStatus && matchesQuery && matchesCity;
-  }).sort((a, b) => getReviewPriority(a).weight - getReviewPriority(b).weight);
+  const filtered = therapists
+    .filter((therapist) => {
+      const matchesStatus = statusFilter === 'ALL' || therapist.reviewStatus === statusFilter;
+      const matchesQuery = !q || [therapist.fullName, therapist.professionalTitle, therapist.city, therapist.specializations.join(' ')]
+        .join(' ')
+        .toLowerCase()
+        .includes(q);
+      const matchesCity = !city || therapist.city.toLowerCase().includes(city);
+      return matchesStatus && matchesQuery && matchesCity;
+    })
+    .sort((a, b) => getReviewPriority(a).weight - getReviewPriority(b).weight);
 
-  const pendingCount = filtered.filter((t) => t.reviewStatus === 'PENDING_REVIEW').length;
-  const overdueCount = filtered.filter((t) => getReviewPriority(t).overdue).length;
-  const incompleteCount = filtered.filter((t) => getReviewPriority(t).missingCount > 0 && t.reviewStatus !== 'APPROVED').length;
+  const pendingCount = filtered.filter((therapist) => therapist.reviewStatus === 'PENDING_REVIEW').length;
+  const overdueCount = filtered.filter((therapist) => getReviewPriority(therapist).overdue).length;
+  const incompleteCount = filtered.filter((therapist) => getReviewPriority(therapist).missingCount > 0 && therapist.reviewStatus !== 'APPROVED').length;
+  const visibleCount = filtered.filter((therapist) => therapist.reviewStatus === 'APPROVED' && therapist.visibility.visibilityState === 'visible' && therapist.isVisible).length;
+  const activeFilters = [params.q, params.city, statusFilter !== 'ALL' ? statusFilter : ''].filter(Boolean).length;
 
   return (
     <PageShell
       title="Therapeut:innen"
-      description="Review, Öffentlichkeit und die nächste sinnvolle Entscheidung."
+      description="Review-Queue, Sichtbarkeit und die nächste sinnvolle Entscheidung in einer Arbeitsansicht."
       eyebrow="Reviews"
-      actions={<div className="hero-pill">{filtered.length} Ergebnisse</div>}
+      actions={<div className="hero-pill">{filtered.length} Profile in der Ansicht</div>}
     >
       <div className="review-summary-grid">
-        <article className="review-summary-card">
-          <div className="kicker">Offen</div>
-          <strong>{pendingCount}</strong>
-          <span>Warten auf Review</span>
-        </article>
-        <article className="review-summary-card review-summary-card--warning">
-          <div className="kicker">Überfällig</div>
-          <strong>{overdueCount}</strong>
-          <span>Länger als 48 Stunden offen</span>
-        </article>
-        <article className="review-summary-card">
-          <div className="kicker">Mit Lücken</div>
-          <strong>{incompleteCount}</strong>
-          <span>Brauchen Rückfragen</span>
-        </article>
+        <AdminSummaryCard
+          kicker="Offen"
+          value={pendingCount}
+          label="Warten auf Review"
+          href="/therapists?status=PENDING_REVIEW"
+        />
+        <AdminSummaryCard
+          kicker="Überfällig"
+          value={overdueCount}
+          label="Länger als 48 Stunden offen"
+          tone="warning"
+          href="/therapists?status=PENDING_REVIEW"
+        />
+        <AdminSummaryCard
+          kicker="Mit Lücken"
+          value={incompleteCount}
+          label="Brauchen Rückfragen"
+          tone="danger"
+          href="/therapists?status=CHANGES_REQUESTED"
+        />
+        <AdminSummaryCard
+          kicker="Öffentlich"
+          value={visibleCount}
+          label="Sichtbar in der Suche"
+          tone="success"
+          href="/therapists?status=APPROVED"
+        />
       </div>
 
-      <form className="toolbar" action="/therapists">
-        <input name="q" defaultValue={params.q ?? ''} className="toolbar-input" placeholder="Name, Stadt oder Spezialisierung" />
-        <input name="city" defaultValue={params.city ?? ''} className="toolbar-input toolbar-input--sm" placeholder="Stadt" />
-        <select name="status" defaultValue={statusFilter} className="toolbar-select">
-          <option value="ALL">Alle Status</option>
-          <option value="PENDING_REVIEW">Ausstehend</option>
-          <option value="APPROVED">Freigegeben</option>
-          <option value="CHANGES_REQUESTED">Änderungen</option>
-          <option value="REJECTED">Abgelehnt</option>
-          <option value="SUSPENDED">Gesperrt</option>
-        </select>
-        <button className="primary-btn" type="submit">Filtern</button>
-      </form>
+      <AdminNotice title="Queue-Einschätzung" tone={overdueCount > 0 ? 'warning' : 'default'}>
+        {getQueueCopy({ overdueCount, incompleteCount })}
+      </AdminNotice>
+
+      <AdminSectionCard
+        eyebrow="Filter"
+        title="Arbeitsliste eingrenzen"
+        description="Suche nach Person, Stadt oder Spezialisierung und fokussiere die Queue auf den nächsten sinnvollen Review-Schritt."
+        actions={activeFilters > 0 ? <Link href="/therapists" className="secondary-btn secondary-btn--compact">Filter zurücksetzen</Link> : null}
+      >
+        <AdminToolbar>
+          <form className="toolbar" action="/therapists">
+            <input name="q" defaultValue={params.q ?? ''} className="toolbar-input" placeholder="Name, Stadt oder Spezialisierung" />
+            <input name="city" defaultValue={params.city ?? ''} className="toolbar-input toolbar-input--sm" placeholder="Stadt" />
+            <select name="status" defaultValue={statusFilter} className="toolbar-select">
+              <option value="ALL">Alle Status</option>
+              <option value="PENDING_REVIEW">Ausstehend</option>
+              <option value="APPROVED">Freigegeben</option>
+              <option value="CHANGES_REQUESTED">Änderungen</option>
+              <option value="REJECTED">Abgelehnt</option>
+              <option value="SUSPENDED">Gesperrt</option>
+              <option value="DRAFT">Entwurf</option>
+            </select>
+            <button className="primary-btn" type="submit">Anwenden</button>
+          </form>
+        </AdminToolbar>
+      </AdminSectionCard>
 
       {filtered.length === 0 ? (
-        <div className="empty-state empty-state--compact">
-          <div className="empty-illustration">🗂️</div>
-          <strong>Keine Therapeut:innen für diese Filter</strong>
-          <p>Versuche einen anderen Status, entferne Suchbegriffe oder prüfe die Warteschlange ohne Standortfilter.</p>
-        </div>
+        <AdminEmptyState
+          icon="🗂️"
+          title="Keine Therapeut:innen für diese Filter"
+          description="Versuche einen anderen Status, entferne Suchbegriffe oder prüfe die gesamte Queue ohne Stadtfilter."
+          compact
+          action={<Link href="/therapists" className="secondary-btn secondary-btn--compact">Alle Profile anzeigen</Link>}
+        />
       ) : (
-      <>
-      <p className="table-note">Die Liste zeigt nur die Kernsignale. Fachdetails liegen auf der Detailseite.</p>
-      <table className="table table--elevated focus-table">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Profil</th>
-            <th>Review</th>
-            <th>Öffentlich</th>
-            <th>Aktionen</th>
-          </tr>
-        </thead>
-        <tbody>
-          {filtered.map((t) => (
-            (() => {
-              const priority = getReviewPriority(t);
-              const publicVisibilityBadge =
-                t.reviewStatus === 'APPROVED' && t.isVisible
-                  ? { label: 'Öffentlich', className: 'badge badge--APPROVED' }
-                  : t.reviewStatus === 'APPROVED' && !t.isVisible
-                    ? { label: 'Versteckt', className: 'badge badge--PENDING_REVIEW' }
-                    : { label: 'Noch nicht', className: 'badge badge--DRAFT' };
-              const isApprovedButNotVisible = t.reviewStatus === 'APPROVED' && t.visibility.visibilityState !== 'visible';
-              const blockerReasons = (
-                t.visibility.blockingReasons.length > 0
-                  ? t.visibility.blockingReasons
-                  : isApprovedButNotVisible
-                    ? ['manually_hidden']
-                    : []
-              ).map((reason) => blockingReasonLabel[reason] ?? reason);
-              return (
-              <tr key={t.id}>
-                <td data-label="Name">
-                  <div className="entity-cell">
-                    <div className="entity-avatar">{t.fullName.slice(0, 1)}</div>
-                    <div>
-                      <Link href={`/therapists/${t.id}`} style={{ fontWeight: 600 }}>{t.fullName}</Link>
-                      <div className="entity-meta">{t.email}</div>
-                    </div>
-                  </div>
-                </td>
-                <td data-label="Überblick">
-                    <div className="priority-stack">
-                      <strong style={{ fontSize: 14 }}>{t.city}</strong>
-                      <span className="entity-meta">{t.professionalTitle}</span>
-                      <div className="tag-list">
-                      {t.specializations.slice(0, 2).map((spec) => <span key={spec} className="tag">{spec}</span>)}
-                      {t.specializations.length > 2 && <span className="tag">+{t.specializations.length - 2}</span>}
-                    </div>
-                    {t.gender && <span className="badge">{t.gender === 'female' ? 'Therapeutin' : 'Therapeut'}</span>}
-                    <span className="entity-meta">Eingereicht {formatDate(t.createdAt)}</span>
-                  </div>
-                </td>
-                <td data-label="Review">
-                  <div className="priority-stack">
-                    <span className={`badge badge--${t.reviewStatus}`}>
-                      {statusLabel[t.reviewStatus] ?? t.reviewStatus}
-                    </span>
-                    {priority.overdue ? (
-                      <span className="entity-meta">Seit über 48 Stunden offen</span>
-                    ) : t.reviewStatus === 'PENDING_REVIEW' ? (
-                      <DeadlineTimer createdAt={t.createdAt} status={t.reviewStatus} />
-                    ) : priority.missingCount > 0 && t.reviewStatus !== 'APPROVED' ? (
-                      <span className="entity-meta">Profil braucht Ergänzungen</span>
-                    ) : t.reviewStatus === 'APPROVED' ? (
-                      <span className="entity-meta">Kein offener Review</span>
-                    ) : null}
-                  </div>
-                </td>
-                <td data-label="Öffentlich">
-                  <div className="priority-stack">
-                    <span className={publicVisibilityBadge.className}>
-                      {publicVisibilityBadge.label}
-                    </span>
-                    <span className="entity-meta" title={blockerReasons.join(', ')}>
-                      {getVisibilityMeta(t)}
-                    </span>
-                    {(t as any).bookingMode === 'FIRST_APPOINTMENT_REQUEST' ? (
-                      (t as any).requestability?.requestable
-                        ? <span className="badge badge--APPROVED" style={{ marginTop: 2 }}>Anfragbar</span>
-                        : <span className="badge badge--DRAFT" title={(t as any).requestability?.blockingReasons?.join(', ')} style={{ marginTop: 2 }}>Anfragbar (blockiert)</span>
-                    ) : null}
-                  </div>
-                </td>
-                <td data-label="Aktionen">
-                  <TherapistActions
-                    id={t.id}
-                    status={t.reviewStatus}
-                    actions={{
-                      approve: approveTherapist,
-                      reject: rejectTherapist,
-                      requestChanges: requestChangesTherapist,
-                      suspend: suspendTherapist,
-                    }}
-                  />
-                </td>
+        <AdminSectionCard
+          eyebrow="Queue"
+          title="Review-Arbeitsliste"
+          description="Die Liste ist nach Dringlichkeit sortiert. Sie zeigt zuerst überfällige Reviews, dann Profile mit Rückfragen oder fehlenden Angaben."
+          actions={<div className="hero-pill">{activeFilters > 0 ? `${activeFilters} aktive Filter` : 'Keine aktiven Filter'}</div>}
+        >
+          <p className="table-note table-note--spacious">
+            Öffne die Detailseite, wenn du Fachangaben, Dokumente oder Sichtbarkeitsgründe im Kontext prüfen möchtest.
+          </p>
+          <table className="table table--elevated focus-table">
+            <thead>
+              <tr>
+                <th>Person</th>
+                <th>Review</th>
+                <th>Öffentlichkeit</th>
+                <th>Nächster Schritt</th>
+                <th>Aktionen</th>
               </tr>
-            );
-            })()
-          ))}
-        </tbody>
-      </table>
-      </>
+            </thead>
+            <tbody>
+              {filtered.map((therapist) => {
+                const priority = getReviewPriority(therapist);
+                const blockers = getVisibilityBlockers(therapist);
+                const blockerSummary = blockers.length > 0 ? blockers[0] : null;
+                const publicVisibilityBadge =
+                  therapist.reviewStatus === 'APPROVED' && therapist.isVisible
+                    ? { label: 'Öffentlich', status: 'APPROVED' }
+                    : therapist.reviewStatus === 'APPROVED' && !therapist.isVisible
+                      ? { label: 'Versteckt', status: 'PENDING_REVIEW' }
+                      : { label: 'Noch nicht', status: 'DRAFT' };
+
+                return (
+                  <tr key={therapist.id}>
+                    <td data-label="Person">
+                      <div className="entity-cell entity-cell--top">
+                        <div className="entity-avatar">{therapist.fullName.slice(0, 1)}</div>
+                        <div className="entity-block">
+                          <Link href={`/therapists/${therapist.id}`} className="entity-link">
+                            {therapist.fullName}
+                          </Link>
+                          <div className="entity-meta">{therapist.email}</div>
+                          <div className="entity-meta">
+                            {therapist.professionalTitle} · {therapist.city}
+                          </div>
+                          <div className="tag-list">
+                            {therapist.specializations.slice(0, 2).map((spec) => <span key={spec} className="tag">{spec}</span>)}
+                            {therapist.specializations.length > 2 ? <span className="tag">+{therapist.specializations.length - 2}</span> : null}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td data-label="Review">
+                      <div className="priority-stack">
+                        <div className="cluster-row">
+                          <AdminStatusBadge status={therapist.reviewStatus} />
+                          <span className={`priority-pill${priority.overdue ? ' priority-pill--warning' : ''}`}>
+                            {priority.label}
+                          </span>
+                        </div>
+                        {priority.overdue ? (
+                          <span className="entity-meta entity-meta--strong">Seit über 48 Stunden offen</span>
+                        ) : therapist.reviewStatus === 'PENDING_REVIEW' ? (
+                          <DeadlineTimer createdAt={therapist.createdAt} status={therapist.reviewStatus} />
+                        ) : priority.missingCount > 0 && therapist.reviewStatus !== 'APPROVED' ? (
+                          <span className="entity-meta entity-meta--strong">{priority.missingCount} Kernfelder unvollständig</span>
+                        ) : (
+                          <span className="entity-meta">Eingereicht {formatDate(therapist.createdAt)}</span>
+                        )}
+                      </div>
+                    </td>
+                    <td data-label="Öffentlichkeit">
+                      <div className="priority-stack">
+                        <AdminStatusBadge status={publicVisibilityBadge.status} label={publicVisibilityBadge.label} />
+                        <span className="entity-meta" title={blockers.join(', ')}>
+                          {getVisibilityMeta(therapist)}
+                        </span>
+                        {blockerSummary ? (
+                          <span className="entity-meta entity-meta--strong">{blockerSummary}</span>
+                        ) : null}
+                      </div>
+                    </td>
+                    <td data-label="Nächster Schritt">
+                      <div className="priority-stack">
+                        <strong className="table-strong">
+                          {priority.overdue
+                            ? 'Jetzt prüfen'
+                            : therapist.reviewStatus === 'CHANGES_REQUESTED'
+                              ? 'Rückmeldung nachhalten'
+                              : therapist.reviewStatus === 'APPROVED' && blockers.length > 0
+                                ? 'Sichtbarkeitsblocker lösen'
+                                : therapist.reviewStatus === 'DRAFT'
+                                  ? 'Profil ergänzen lassen'
+                                  : therapist.reviewStatus === 'APPROVED'
+                                    ? 'Nur beobachten'
+                                    : 'Review abschließen'}
+                        </strong>
+                        <span className="entity-meta">
+                          {priority.overdue
+                            ? 'SLA gerissen, Entscheidung priorisieren.'
+                            : therapist.reviewStatus === 'CHANGES_REQUESTED'
+                              ? 'Prüfen, ob Rückfragen beantwortet wurden.'
+                              : therapist.reviewStatus === 'APPROVED' && blockers.length > 0
+                                ? 'Profil ist freigegeben, aber noch nicht sauber öffentlich.'
+                                : therapist.reviewStatus === 'APPROVED'
+                                  ? 'Kein akuter Handlungsbedarf.'
+                                  : 'Details aufrufen und Freigabe-Entscheidung treffen.'}
+                        </span>
+                      </div>
+                    </td>
+                    <td data-label="Aktionen">
+                      <TherapistActions
+                        id={therapist.id}
+                        status={therapist.reviewStatus}
+                        actions={{
+                          approve: approveTherapist,
+                          reject: rejectTherapist,
+                          requestChanges: requestChangesTherapist,
+                          suspend: suspendTherapist,
+                        }}
+                      />
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </AdminSectionCard>
       )}
     </PageShell>
   );
