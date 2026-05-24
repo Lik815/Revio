@@ -306,7 +306,7 @@ export function TherapistDashboardScreen({ c, t, styles, certificationOptions, o
   ];
 
   return (
-    <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 40, paddingTop: 60 }]}>
+    <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 40, paddingTop: 12 }]}>
 
       {/* ── Header ───────────────────────────────────────────────────── */}
       <View style={{ backgroundColor: c.card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: c.border, padding: SPACE.lg, marginBottom: SPACE.md }}>

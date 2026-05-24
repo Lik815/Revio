@@ -1651,13 +1651,32 @@ export default function App() {
   };
 
   const renderTherapistDashboard = () => (
-    <TherapistDashboardScreen
-      c={c} t={t} styles={styles}
-      certificationOptions={certificationOptions}
-      onOpenTherapyTab={() => setActiveTab('therapy')}
-      onAddSlot={handleAddSlot}
-      onProfileSaved={openProfileSavedModal}
-    />
+    <View style={{ flex: 1 }}>
+      <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 10, backgroundColor: c.background }}>
+        <View style={[styles.header, { marginBottom: 0 }]}>
+          <Image source={require('../../assets/icon.png')} style={styles.logoMark} />
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.headerTitle, { color: c.text }]}>Mein Profil</Text>
+          </View>
+          <Pressable
+            onPress={() => setShowNotifications(true)}
+            style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: c.card, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' }}
+          >
+            <Ionicons name="notifications-outline" size={18} color={c.text} />
+            {notifications.filter(n => !dismissedNotifIds.has(n.id)).length > 0 && (
+              <View style={{ position: 'absolute', top: 3, right: 3, width: 8, height: 8, borderRadius: 4, backgroundColor: c.error }} />
+            )}
+          </Pressable>
+        </View>
+      </View>
+      <TherapistDashboardScreen
+        c={c} t={t} styles={styles}
+        certificationOptions={certificationOptions}
+        onOpenTherapyTab={() => setActiveTab('therapy')}
+        onAddSlot={handleAddSlot}
+        onProfileSaved={openProfileSavedModal}
+      />
+    </View>
   );
 
   // ── Patient registration ──────────────────────────────────────────────────
@@ -2001,15 +2020,24 @@ export default function App() {
     }
     return (
       <View style={{ flex: 1 }}>
-        <View style={{ paddingHorizontal: 20, paddingTop: 14, paddingBottom: 6, backgroundColor: c.background }}>
-          <View style={[styles.header, { marginBottom: 0, alignItems: 'center' }]}>
+        <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 10, backgroundColor: c.background }}>
+          <View style={[styles.header, { marginBottom: 0 }]}>
             <Image source={require('../../assets/icon.png')} style={styles.logoMark} />
             <View style={{ flex: 1 }}>
               <Text style={[styles.headerTitle, { color: c.text }]}>{t('favoritesTitle')}</Text>
-              <Text style={{ fontSize: 13, color: c.muted, marginTop: 4 }}>
+              <Text style={[styles.headerSub, { color: c.muted }]}>
                 {favorites.length} gespeicherte {favorites.length === 1 ? 'Therapeut:in' : 'Therapeut:innen'}
               </Text>
             </View>
+            <Pressable
+              onPress={() => setShowNotifications(true)}
+              style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: c.card, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' }}
+            >
+              <Ionicons name="notifications-outline" size={18} color={c.text} />
+              {notifications.filter(n => !dismissedNotifIds.has(n.id)).length > 0 && (
+                <View style={{ position: 'absolute', top: 3, right: 3, width: 8, height: 8, borderRadius: 4, backgroundColor: c.error }} />
+              )}
+            </Pressable>
           </View>
         </View>
         <ScrollView
@@ -2121,15 +2149,34 @@ export default function App() {
   // ── Layout ────────────────────────────────────────────────────────────────
 
   const renderPatientDashboard = () => (
-    <PatientDashboardScreen
-      c={c} t={t} styles={styles}
-      loggedInPatient={loggedInPatient}
-      authToken={authToken}
-      favorites={favorites}
-      myAppointments={myAppointments}
-      onOpenTherapist={openTherapistById}
-      onProfileSaved={openProfileSavedModal}
-    />
+    <View style={{ flex: 1 }}>
+      <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 10, backgroundColor: c.background }}>
+        <View style={[styles.header, { marginBottom: 0 }]}>
+          <Image source={require('../../assets/icon.png')} style={styles.logoMark} />
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.headerTitle, { color: c.text }]}>Mein Profil</Text>
+          </View>
+          <Pressable
+            onPress={() => setShowNotifications(true)}
+            style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: c.card, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' }}
+          >
+            <Ionicons name="notifications-outline" size={18} color={c.text} />
+            {notifications.filter(n => !dismissedNotifIds.has(n.id)).length > 0 && (
+              <View style={{ position: 'absolute', top: 3, right: 3, width: 8, height: 8, borderRadius: 4, backgroundColor: c.error }} />
+            )}
+          </Pressable>
+        </View>
+      </View>
+      <PatientDashboardScreen
+        c={c} t={t} styles={styles}
+        loggedInPatient={loggedInPatient}
+        authToken={authToken}
+        favorites={favorites}
+        myAppointments={myAppointments}
+        onOpenTherapist={openTherapistById}
+        onProfileSaved={openProfileSavedModal}
+      />
+    </View>
   );
 
   const renderTab = () => {

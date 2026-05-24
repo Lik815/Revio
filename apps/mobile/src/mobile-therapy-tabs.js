@@ -84,44 +84,57 @@ export function TherapyTabPatient({
         {nextApt ? (
           <Pressable
             onPress={() => onSelectAppointment(nextApt)}
-            style={{ backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.border, padding: 16, marginBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 14 }}
+            style={{ backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.border, padding: 16, marginBottom: 12 }}
           >
-            <View style={{ width: 48, height: 48, borderRadius: 12, backgroundColor: c.successBg ?? '#EAF4F1', alignItems: 'center', justifyContent: 'center' }}>
-              <Ionicons name="calendar-outline" size={24} color={c.success ?? '#5A9E8E'} />
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+              <View style={{ width: 48, height: 48, borderRadius: 12, backgroundColor: c.successBg ?? '#EAF4F1', alignItems: 'center', justifyContent: 'center' }}>
+                <Ionicons name="calendar-outline" size={24} color={c.success ?? '#5A9E8E'} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 11, fontWeight: '600', color: c.muted, textTransform: 'uppercase', letterSpacing: 0.4 }}>Nächster Termin</Text>
+                <Text style={{ fontSize: 17, fontWeight: '800', color: c.text, marginTop: 2 }}>
+                  {new Date(getDate(nextApt)).toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'long' })}{', '}
+                  {new Date(getDate(nextApt)).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
+                </Text>
+                {countdown && <Text style={{ fontSize: 12, color: c.success ?? '#5A9E8E', marginTop: 2 }}>{countdown}</Text>}
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={c.muted} />
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 11, fontWeight: '600', color: c.muted, textTransform: 'uppercase', letterSpacing: 0.4 }}>Nächster Termin</Text>
-              <Text style={{ fontSize: 18, fontWeight: '800', color: c.text, marginTop: 2 }}>
-                {new Date(getDate(nextApt)).toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'long' })}{', '}
-                {new Date(getDate(nextApt)).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
-              </Text>
-              {countdown && <Text style={{ fontSize: 12, color: c.success ?? '#5A9E8E', marginTop: 2 }}>{countdown}</Text>}
+            {/* ── Stats-Zeile ── */}
+            <View style={{ flexDirection: 'row', gap: 16, marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: c.border }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                <Ionicons name="calendar-outline" size={12} color={c.primary} />
+                <Text style={{ fontSize: 12, fontWeight: '600', color: c.primary }}>{kommend.length} kommend</Text>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                <Ionicons name="time-outline" size={12} color={c.muted} />
+                <Text style={{ fontSize: 12, fontWeight: '500', color: c.muted }}>{vergangen.length} vergangen</Text>
+              </View>
             </View>
-            <Ionicons name="chevron-forward" size={18} color={c.muted} />
           </Pressable>
-        ) : null}
-
-        {/* ── KPI-Karten ──────────────────────────────────────────── */}
-        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
-          <Pressable
-            onPress={() => setActiveFilterPatient(activeFilterPatient === 'kommend' ? 'all' : 'kommend')}
-            style={{ flex: 1, backgroundColor: c.primaryBg, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 4, alignItems: 'center', borderWidth: activeFilterPatient === 'kommend' ? 2 : 0, borderColor: c.primary }}
-          >
-            <Text style={{ fontSize: 20, fontWeight: '800', color: c.primary }}>{kommend.length}</Text>
-            <Text style={{ fontSize: 10, color: c.primary, fontWeight: '600', marginTop: 2, textAlign: 'center' }}>Gebuchte Termine</Text>
-            <Ionicons name="calendar-outline" size={14} color={c.primary} style={{ marginTop: 3, opacity: 0.7 }} />
-            <Ionicons name="chevron-forward" size={10} color={c.primary} style={{ position: 'absolute', top: 8, right: 6, opacity: 0.5 }} />
-          </Pressable>
-          <Pressable
-            onPress={() => setActiveFilterPatient(activeFilterPatient === 'vergangen' ? 'all' : 'vergangen')}
-            style={{ flex: 1, backgroundColor: c.warningBg ?? '#FEF5DC', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 4, alignItems: 'center', borderWidth: activeFilterPatient === 'vergangen' ? 2 : 0, borderColor: c.warning ?? '#8A6000' }}
-          >
-            <Text style={{ fontSize: 20, fontWeight: '800', color: c.warning ?? '#8A6000' }}>{vergangen.length}</Text>
-            <Text style={{ fontSize: 10, color: c.warning ?? '#8A6000', fontWeight: '600', marginTop: 2, textAlign: 'center' }}>Vergangene Termine</Text>
-            <Ionicons name="time-outline" size={14} color={c.warning ?? '#8A6000'} style={{ marginTop: 3, opacity: 0.7 }} />
-            <Ionicons name="chevron-forward" size={10} color={c.warning ?? '#8A6000'} style={{ position: 'absolute', top: 8, right: 6, opacity: 0.5 }} />
-          </Pressable>
-        </View>
+        ) : (
+          <View style={{ backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.border, padding: 16, marginBottom: 12 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+              <View style={{ width: 48, height: 48, borderRadius: 12, backgroundColor: c.mutedBg ?? '#F4F4F4', alignItems: 'center', justifyContent: 'center' }}>
+                <Ionicons name="calendar-outline" size={24} color={c.muted} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 11, fontWeight: '600', color: c.muted, textTransform: 'uppercase', letterSpacing: 0.4 }}>Nächster Termin</Text>
+                <Text style={{ fontSize: 15, fontWeight: '700', color: c.text, marginTop: 2 }}>Kein bevorstehender Termin</Text>
+              </View>
+            </View>
+            <View style={{ flexDirection: 'row', gap: 16, marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: c.border }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                <Ionicons name="calendar-outline" size={12} color={c.primary} />
+                <Text style={{ fontSize: 12, fontWeight: '600', color: c.primary }}>{kommend.length} kommend</Text>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                <Ionicons name="time-outline" size={12} color={c.muted} />
+                <Text style={{ fontSize: 12, fontWeight: '500', color: c.muted }}>{vergangen.length} vergangen</Text>
+              </View>
+            </View>
+          </View>
+        )}
 
         {/* ── Filter-Tabs ─────────────────────────────────────────── */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
@@ -235,6 +248,7 @@ export function TherapyTabTherapist({
     { key: 'all', label: 'Alle' },
     { key: 'booked', label: 'Gebucht' },
     { key: 'free', label: 'Frei' },
+    { key: 'pending', label: 'Anfragen' },
   ];
 
   const nextFreeSlot = [...freeSlots].sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt))[0];
@@ -268,53 +282,33 @@ export function TherapyTabTherapist({
             {/* ── Hero ────────────────────────────────────────────── */}
             <Pressable
               onPress={() => setActiveFilterTherapist('free')}
-              style={{ backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.border, padding: 16, marginBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 14 }}
+              style={{ backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.border, padding: 16, marginBottom: 12 }}
             >
-              <View style={{ width: 48, height: 48, borderRadius: 12, backgroundColor: c.successBg ?? '#EAF4F1', alignItems: 'center', justifyContent: 'center' }}>
-                <Ionicons name="time-outline" size={24} color={c.success ?? '#5A9E8E'} />
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+                <View style={{ width: 48, height: 48, borderRadius: 12, backgroundColor: c.successBg ?? '#EAF4F1', alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons name="time-outline" size={24} color={c.success ?? '#5A9E8E'} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 11, fontWeight: '600', color: c.muted, textTransform: 'uppercase', letterSpacing: 0.4 }}>Freie Termine heute</Text>
+                  <Text style={{ fontSize: 20, fontWeight: '800', color: c.text, marginTop: 2 }}>{freeSlots.length} freie Termine</Text>
+                  {nextFreeSlotTime && <Text style={{ fontSize: 12, color: c.muted, marginTop: 2 }}>Nächster Slot: {nextFreeSlotTime} Uhr</Text>}
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={c.muted} />
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 11, fontWeight: '600', color: c.muted, textTransform: 'uppercase', letterSpacing: 0.4 }}>Freie Termine heute</Text>
-                <Text style={{ fontSize: 20, fontWeight: '800', color: c.text, marginTop: 2 }}>{freeSlots.length} freie Termine</Text>
-                {nextFreeSlotTime && <Text style={{ fontSize: 12, color: c.muted, marginTop: 2 }}>Nächster Slot: {nextFreeSlotTime} Uhr</Text>}
+              {/* ── Stats-Zeile ── */}
+              <View style={{ flexDirection: 'row', gap: 16, marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: c.border }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                  <Ionicons name="calendar-outline" size={12} color={c.primary} />
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: c.primary }}>{bookedSlots.length} gebucht</Text>
+                </View>
+                {pendingIncomingBookings.length > 0 && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                    <Ionicons name="person-outline" size={12} color={c.warning ?? '#B7791F'} />
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: c.warning ?? '#B7791F' }}>{pendingIncomingBookings.length} Anfragen</Text>
+                  </View>
+                )}
               </View>
-              <Ionicons name="chevron-forward" size={18} color={c.muted} />
             </Pressable>
-
-            {/* ── KPI-Karten ──────────────────────────────────────── */}
-            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
-              {[
-                { key: 'booked', label: 'Gebuchte Termine', value: bookedSlots.length, color: c.primary, icon: 'calendar-outline' },
-                { key: 'pending', label: 'Anfragen', value: pendingIncomingBookings.length, color: c.warning ?? '#B7791F', icon: 'person-outline' },
-              ].map(({ key, label, value, color, icon }) => {
-                const active = activeFilterTherapist === key;
-                return (
-                  <Pressable
-                    key={key}
-                    onPress={() => setActiveFilterTherapist(active ? 'all' : key)}
-                    style={{
-                      flex: 1,
-                      backgroundColor: c.card,
-                      borderRadius: 14,
-                      paddingVertical: 16,
-                      paddingHorizontal: 4,
-                      alignItems: 'center',
-                      borderWidth: active ? 1.6 : 1.25,
-                      borderColor: color,
-                      shadowColor: color,
-                      shadowOpacity: active ? 0.10 : 0.04,
-                      shadowRadius: active ? 8 : 4,
-                      shadowOffset: { width: 0, height: 2 },
-                      elevation: active ? 2 : 1,
-                    }}
-                  >
-                    <Text style={{ fontSize: 20, fontWeight: '800', color }}>{value}</Text>
-                    <Text style={{ fontSize: 10, color, fontWeight: '600', marginTop: 2, textAlign: 'center' }}>{label}</Text>
-                    <Ionicons name={icon} size={15} color={color} style={{ marginTop: 8 }} />
-                  </Pressable>
-                );
-              })}
-            </View>
 
             {/* ── Segment-Filterleiste ────────────────────────────── */}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>

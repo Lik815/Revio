@@ -74,7 +74,7 @@ export function PatientDashboardScreen({
 
   return (
     <ScrollView
-      contentContainerStyle={[styles.scrollContent, { paddingHorizontal: 16, paddingBottom: 40, paddingTop: 60 }]}
+      contentContainerStyle={[styles.scrollContent, { paddingHorizontal: 16, paddingBottom: 40, paddingTop: 12 }]}
       showsVerticalScrollIndicator={false}
     >
       {/* ── Profilkopf ──────────────────────────────────────────────── */}
