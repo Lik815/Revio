@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import {
   ActivityIndicator,
-  Animated,
   Alert,
   Image,
   Linking,
@@ -38,6 +37,7 @@ import {
 import { HeartButton } from '../components/HeartButton';
 import { MobileBottomNav } from '../components/MobileBottomNav';
 import { NotificationBell } from '../components/NotificationBell';
+import { ToastOverlay } from '../components/ToastOverlay';
 import { SkeletonCard } from '../components/SkeletonCard';
 import { TabHeader } from '../components/TabHeader';
 import { useTheme } from '../hooks/use-theme';
@@ -851,10 +851,32 @@ export default function App() {
     await AsyncStorage.setItem('revio_photo_prompt_dismissed', '1');
   };
 
-  const renderTab = () => {
-    const hasBadge = notifications.filter(n => !dismissedNotifIds.has(n.id)).length > 0;
+  const handleTherapistRegistered = async (token) => {
+    await AsyncStorage.setItem('revio_auth_token', token);
+    await AsyncStorage.setItem('revio_account_type', 'therapist');
+    setAuthToken(token);
+    setAccountType('therapist');
+    const profileRes = await fetch(`${getBaseUrl()}/auth/me`, { headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${token}` } });
+    if (profileRes.ok) setLoggedInTherapist(normalizeTherapistProfile(await profileRes.json()));
+    loadFavorites(token);
+    loadIncomingBookings(token);
+    setShowRegister(false);
+  };
 
-    if (activeTab === 'therapy' && selectedAppointment) {
+  const handlePatientSignedUp = async (token) => {
+    await AsyncStorage.setItem('revio_auth_token', token);
+    await AsyncStorage.setItem('revio_account_type', 'patient');
+    setAuthToken(token);
+    setAccountType('patient');
+    const profileRes = await fetch(`${getBaseUrl()}/auth/me`, { headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${token}` } });
+    if (profileRes.ok) setLoggedInPatient(await profileRes.json());
+    loadFavorites(token);
+    loadMyAppointments(token);
+    setShowPatientSignup(false);
+  };
+
+  const renderTherapyTab = () => {
+    if (selectedAppointment) {
       return (
         <AppointmentDetail
           appointment={selectedAppointment}
@@ -865,7 +887,239 @@ export default function App() {
         />
       );
     }
+    if (accountType === 'patient') {
+      return (
+        <TherapyTabPatient
+          myAppointments={myAppointments}
+          myAppointmentsLoading={myAppointmentsLoading}
+          activeFilterPatient={activeFilterPatient}
+          setActiveFilterPatient={setActiveFilterPatient}
+          therapyRefreshing={therapyRefreshing}
+          appointmentsLastLoadedAt={appointmentsLastLoadedAt}
+          notifications={notifications}
+          dismissedNotifIds={dismissedNotifIds}
+          onShowNotifications={() => setShowNotifications(true)}
+          onRefresh={handleTherapyRefresh}
+          onOpenTherapistById={openTherapistById}
+          onSelectAppointment={setSelectedAppointment}
+          c={c} t={t} styles={styles}
+        />
+      );
+    }
+    if (accountType === 'therapist') {
+      return (
+        <TherapyTabTherapist
+          authToken={authToken}
+          mySlots={mySlots}
+          slotsLoading={slotsLoading}
+          incomingBookings={incomingBookings}
+          incomingBookingsLoading={incomingBookingsLoading}
+          deletingSlotIds={deletingSlotIds}
+          activeFilterTherapist={activeFilterTherapist}
+          setActiveFilterTherapist={setActiveFilterTherapist}
+          therapyRefreshing={therapyRefreshing}
+          slotsLastLoadedAt={slotsLastLoadedAt}
+          incomingBookingsLastLoadedAt={incomingBookingsLastLoadedAt}
+          onRefresh={handleTherapyRefresh}
+          onLoadMySlots={loadMySlots}
+          onLoadIncomingBookings={loadIncomingBookings}
+          onOpenTherapistById={openTherapistById}
+          notifications={notifications}
+          dismissedNotifIds={dismissedNotifIds}
+          onShowNotifications={() => setShowNotifications(true)}
+          onCancelSlot={handleCancelSlot}
+          onTherapistCancelRequest={(bookingId) => { setTherapistCancelBookingId(bookingId); setShowTherapistCancelModal(true); }}
+          onSelectTherapistDetailBooking={setTherapistDetailBooking}
+          setShowSlotComposerModal={setShowSlotComposerModal}
+          loggedInTherapist={loggedInTherapist}
+          c={c} t={t} styles={styles}
+        />
+      );
+    }
+    return (
+      <View style={{ flex: 1 }}>
+        <TabHeader c={c} title="Meine Termine" />
+        <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 20, paddingTop: SPACE.sm }]} showsVerticalScrollIndicator={false}>
+          <View style={[styles.emptyState, { backgroundColor: c.card, borderColor: c.border }]}>
+            <Ionicons name="calendar-outline" size={32} color={c.muted} />
+            <Text style={[styles.emptyTitle, { color: c.text }]}>{t('therapyLoginRequired') ?? 'Hier kannst du deine Termine sehen'}</Text>
+            <Text style={[styles.emptyBody, { color: c.muted }]}>{t('therapyLoginRequiredBody') ?? 'Dafür musst du dich registrieren oder anmelden.'}</Text>
+            <Pressable onPress={() => { setActiveTab('profile'); setShowLogin(true); }} style={[styles.registerBtn, { backgroundColor: c.primary, marginTop: 16, paddingHorizontal: 32 }]}>
+              <Text style={styles.registerBtnText}>{t('loginAction')}</Text>
+            </Pressable>
+          </View>
+        </ScrollView>
+      </View>
+    );
+  };
 
+  const renderFavoritesTab = () => (
+    <FavoritesTab
+      authToken={authToken}
+      favorites={favorites}
+      favoritesLoading={favoritesLoading}
+      favoritesLastLoadedAt={favoritesLastLoadedAt}
+      loadFavorites={loadFavorites}
+      toggleFavorite={toggleFavorite}
+      openTherapistById={openTherapistById}
+      notifications={notifications}
+      dismissedNotifIds={dismissedNotifIds}
+      setShowNotifications={setShowNotifications}
+      setActiveTab={setActiveTab}
+      setShowLogin={setShowLogin}
+      styles={styles}
+      c={c} t={t}
+    />
+  );
+
+  const renderProfileTab = () => {
+    const hasBadge = notifications.filter(n => !dismissedNotifIds.has(n.id)).length > 0;
+    if (loggedInPatient) {
+      return (
+        <View style={{ flex: 1 }}>
+          <TabHeader c={c} title="Mein Profil" onBellPress={() => setShowNotifications(true)} hasBadge={hasBadge} />
+          <PatientDashboardScreen c={c} t={t} styles={styles} loggedInPatient={loggedInPatient} authToken={authToken} favorites={favorites} myAppointments={myAppointments} onOpenTherapist={openTherapistById} onProfileSaved={handlePatientProfileSaved} />
+        </View>
+      );
+    }
+    if (showEmailVerify) {
+      return (
+        <EmailVerifyScreen
+          status={emailVerifyStatus}
+          error={emailVerifyError}
+          onCancel={() => { setShowEmailVerify(false); setEmailVerifyStatus('idle'); setEmailVerifyError(''); }}
+          c={c} t={t} styles={styles}
+        />
+      );
+    }
+    if (loggedInTherapist) {
+      return (
+        <View style={{ flex: 1 }}>
+          <TabHeader c={c} title="Mein Profil" onBellPress={() => setShowNotifications(true)} hasBadge={hasBadge} />
+          <TherapistDashboardScreen c={c} t={t} styles={styles} certificationOptions={certificationOptions} onOpenTherapyTab={() => setActiveTab('therapy')} onAddSlot={handleAddSlot} onProfileSaved={openProfileSavedModal} />
+        </View>
+      );
+    }
+    return (
+      <View style={{ flex: 1 }}>
+        <TabHeader c={c} wordmark />
+        <View style={{ flex: 1 }}>
+          {showLogin ? (
+            <LoginScreen c={c} onClose={() => setShowLogin(false)} styles={styles} t={t} />
+          ) : showRegister ? (
+            <TherapistRegistrationFlow
+              visible={showRegister}
+              onClose={() => setShowRegister(false)}
+              onRegistered={handleTherapistRegistered}
+              c={c} t={t} styles={styles}
+            />
+          ) : showPatientSignup ? (
+            <PatientSignupFlow
+              visible={showPatientSignup}
+              onClose={() => setShowPatientSignup(false)}
+              onSignedUp={handlePatientSignedUp}
+              onShowLogin={() => { setShowPatientSignup(false); setShowLogin(true); }}
+              onSelectTherapist={() => { setShowPatientSignup(false); setShowRegister(true); }}
+              c={c} t={t} styles={styles}
+            />
+          ) : (
+            <TherapistLandingScreen
+              __DEV__={__DEV__}
+              c={c}
+              setShowLogin={setShowLogin}
+              setShowSignup={openSignupFlow}
+              styles={styles}
+              t={t}
+            />
+          )}
+        </View>
+      </View>
+    );
+  };
+
+  const renderOptionsTab = () => (
+    <OptionsScreen
+      loggedInTherapist={loggedInTherapist}
+      loggedInPatient={loggedInPatient}
+      accountType={accountType}
+      themeMode={themeMode}
+      setThemeMode={setThemeMode}
+      notifications={notifications}
+      dismissedNotifIds={dismissedNotifIds}
+      onShowNotifications={() => setShowNotifications(true)}
+      onShowLogin={() => { setShowLogin(true); setActiveTab('profile'); }}
+      onShowRegister={() => setShowRegister(true)}
+      onShowFeedback={openFeedbackModal}
+      onShowChangePassword={() => setShowChangePasswordModal(true)}
+      onDeleteAccount={() => setShowDeleteAccountModal(true)}
+      onNavigateToProfile={() => setActiveTab('profile')}
+      onLogout={handleLogout}
+      c={c} t={t} styles={styles}
+    />
+  );
+
+  const renderDiscoverTab = () => (
+    <DiscoverScreen
+      HeartButton={ThemedHeartButton}
+      SkeletonCard={SkeletonCard}
+      acSuggestions={acSuggestions}
+      activeChip={activeChip}
+      activeFilterCount={activeFilterCount}
+      authToken={authToken}
+      c={c}
+      callPhone={(phone) => callPhone(phone, t)}
+      certificationOptions={certificationOptions}
+      city={city}
+      discoverScrollRef={discoverScrollRef}
+      dismissedNotifIds={dismissedNotifIds}
+      fortbildungen={fortbildungen}
+      gender={gender}
+      getMapRegion={getMapRegion}
+      homeVisit={homeVisit}
+      isFavorite={isFavorite}
+      kassenart={kassenart}
+      locationLabel={locationLabel}
+      mapScrollEnabled={mapScrollEnabled}
+      mapTherapists={mapTherapists}
+      notifications={notifications}
+      openTherapistById={openTherapistById}
+      query={query}
+      requestableOnly={requestableOnly}
+      results={results}
+      runSearch={runSearch}
+      runSearchWith={runSearchWith}
+      searched={searched}
+      searchLoading={searchLoading}
+      searchRadius={searchRadius}
+      selectChip={selectChip}
+      selectSuggestion={selectSuggestion}
+      setActiveChip={setActiveChip}
+      setFortbildungen={setFortbildungen}
+      setGender={setGender}
+      setHomeVisit={setHomeVisit}
+      setKassenart={setKassenart}
+      setLocationSheetCity={setLocationSheetCity}
+      setMapScrollEnabled={setMapScrollEnabled}
+      setQuery={setQuery}
+      setRequestableOnly={setRequestableOnly}
+      setShowAutocomplete={setShowAutocomplete}
+      setShowFilters={setShowFilters}
+      setShowLocationSheet={setShowLocationSheet}
+      setShowNotifications={setShowNotifications}
+      setSearchRadius={setSearchRadius}
+      setViewMode={setViewMode}
+      showAutocomplete={showAutocomplete}
+      showFilters={showFilters}
+      styles={styles}
+      t={t}
+      toggleFavorite={toggleFavorite}
+      toggleFortbildung={toggleFortbildung}
+      userCoords={userCoords}
+      viewMode={viewMode}
+    />
+  );
+
+  const renderTab = () => {
     if (selectedTherapist) {
       return (
         <TherapistProfileScreen
@@ -899,267 +1153,11 @@ export default function App() {
         />
       );
     }
-
-    if (activeTab === 'therapy') {
-      if (accountType === 'patient') {
-        return (
-          <TherapyTabPatient
-            myAppointments={myAppointments}
-            myAppointmentsLoading={myAppointmentsLoading}
-            activeFilterPatient={activeFilterPatient}
-            setActiveFilterPatient={setActiveFilterPatient}
-            therapyRefreshing={therapyRefreshing}
-            appointmentsLastLoadedAt={appointmentsLastLoadedAt}
-            notifications={notifications}
-            dismissedNotifIds={dismissedNotifIds}
-            onShowNotifications={() => setShowNotifications(true)}
-            onRefresh={handleTherapyRefresh}
-            onOpenTherapistById={openTherapistById}
-            onSelectAppointment={setSelectedAppointment}
-            c={c} t={t} styles={styles}
-          />
-        );
-      }
-      if (accountType === 'therapist') {
-        return (
-          <TherapyTabTherapist
-            authToken={authToken}
-            mySlots={mySlots}
-            slotsLoading={slotsLoading}
-            incomingBookings={incomingBookings}
-            incomingBookingsLoading={incomingBookingsLoading}
-            deletingSlotIds={deletingSlotIds}
-            activeFilterTherapist={activeFilterTherapist}
-            setActiveFilterTherapist={setActiveFilterTherapist}
-            therapyRefreshing={therapyRefreshing}
-            slotsLastLoadedAt={slotsLastLoadedAt}
-            incomingBookingsLastLoadedAt={incomingBookingsLastLoadedAt}
-            onRefresh={handleTherapyRefresh}
-            onLoadMySlots={loadMySlots}
-            onLoadIncomingBookings={loadIncomingBookings}
-            onOpenTherapistById={openTherapistById}
-            notifications={notifications}
-            dismissedNotifIds={dismissedNotifIds}
-            onShowNotifications={() => setShowNotifications(true)}
-            onCancelSlot={handleCancelSlot}
-            onTherapistCancelRequest={(bookingId) => { setTherapistCancelBookingId(bookingId); setShowTherapistCancelModal(true); }}
-            onSelectTherapistDetailBooking={setTherapistDetailBooking}
-            setShowSlotComposerModal={setShowSlotComposerModal}
-            loggedInTherapist={loggedInTherapist}
-            c={c} t={t} styles={styles}
-          />
-        );
-      }
-      return (
-        <View style={{ flex: 1 }}>
-          <TabHeader c={c} title="Meine Termine" />
-          <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 20, paddingTop: SPACE.sm }]} showsVerticalScrollIndicator={false}>
-            <View style={[styles.emptyState, { backgroundColor: c.card, borderColor: c.border }]}>
-              <Ionicons name="calendar-outline" size={32} color={c.muted} />
-              <Text style={[styles.emptyTitle, { color: c.text }]}>{t('therapyLoginRequired') ?? 'Hier kannst du deine Termine sehen'}</Text>
-              <Text style={[styles.emptyBody, { color: c.muted }]}>{t('therapyLoginRequiredBody') ?? 'Dafür musst du dich registrieren oder anmelden.'}</Text>
-              <Pressable onPress={() => { setActiveTab('profile'); setShowLogin(true); }} style={[styles.registerBtn, { backgroundColor: c.primary, marginTop: 16, paddingHorizontal: 32 }]}>
-                <Text style={styles.registerBtnText}>{t('loginAction')}</Text>
-              </Pressable>
-            </View>
-          </ScrollView>
-        </View>
-      );
-    }
-
-    if (activeTab === 'favorites') {
-      return (
-        <FavoritesTab
-          authToken={authToken}
-          favorites={favorites}
-          favoritesLoading={favoritesLoading}
-          favoritesLastLoadedAt={favoritesLastLoadedAt}
-          loadFavorites={loadFavorites}
-          toggleFavorite={toggleFavorite}
-          openTherapistById={openTherapistById}
-          notifications={notifications}
-          dismissedNotifIds={dismissedNotifIds}
-          setShowNotifications={setShowNotifications}
-          setActiveTab={setActiveTab}
-          setShowLogin={setShowLogin}
-          styles={styles}
-          c={c} t={t}
-        />
-      );
-    }
-
-    if (activeTab === 'profile') {
-      if (loggedInPatient) {
-        return (
-          <View style={{ flex: 1 }}>
-            <TabHeader c={c} title="Mein Profil" onBellPress={() => setShowNotifications(true)} hasBadge={hasBadge} />
-            <PatientDashboardScreen c={c} t={t} styles={styles} loggedInPatient={loggedInPatient} authToken={authToken} favorites={favorites} myAppointments={myAppointments} onOpenTherapist={openTherapistById} onProfileSaved={handlePatientProfileSaved} />
-          </View>
-        );
-      }
-      if (showEmailVerify) {
-        return (
-          <EmailVerifyScreen
-            status={emailVerifyStatus}
-            error={emailVerifyError}
-            onCancel={() => { setShowEmailVerify(false); setEmailVerifyStatus('idle'); setEmailVerifyError(''); }}
-            c={c} t={t} styles={styles}
-          />
-        );
-      }
-      if (loggedInTherapist) {
-        return (
-          <View style={{ flex: 1 }}>
-            <TabHeader c={c} title="Mein Profil" onBellPress={() => setShowNotifications(true)} hasBadge={hasBadge} />
-            <TherapistDashboardScreen c={c} t={t} styles={styles} certificationOptions={certificationOptions} onOpenTherapyTab={() => setActiveTab('therapy')} onAddSlot={handleAddSlot} onProfileSaved={openProfileSavedModal} />
-          </View>
-        );
-      }
-      return (
-        <View style={{ flex: 1 }}>
-          <TabHeader c={c} wordmark />
-          <View style={{ flex: 1 }}>
-            {showLogin ? (
-              <LoginScreen
-                c={c}
-                onClose={() => setShowLogin(false)}
-                styles={styles}
-                t={t}
-              />
-            ) : showRegister ? (
-              <TherapistRegistrationFlow
-                visible={showRegister}
-                onClose={() => setShowRegister(false)}
-                onRegistered={async (token) => {
-                  await AsyncStorage.setItem('revio_auth_token', token);
-                  await AsyncStorage.setItem('revio_account_type', 'therapist');
-                  setAuthToken(token);
-                  setAccountType('therapist');
-                  const profileRes = await fetch(`${getBaseUrl()}/auth/me`, { headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${token}` } });
-                  if (profileRes.ok) setLoggedInTherapist(normalizeTherapistProfile(await profileRes.json()));
-                  loadFavorites(token);
-                  loadIncomingBookings(token);
-                  setShowRegister(false);
-                }}
-                c={c} t={t} styles={styles}
-              />
-            ) : showPatientSignup ? (
-              <PatientSignupFlow
-                visible={showPatientSignup}
-                onClose={() => setShowPatientSignup(false)}
-                onSignedUp={async (token) => {
-                  await AsyncStorage.setItem('revio_auth_token', token);
-                  await AsyncStorage.setItem('revio_account_type', 'patient');
-                  setAuthToken(token);
-                  setAccountType('patient');
-                  const profileRes = await fetch(`${getBaseUrl()}/auth/me`, { headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${token}` } });
-                  if (profileRes.ok) setLoggedInPatient(await profileRes.json());
-                  loadFavorites(token);
-                  loadMyAppointments(token);
-                  setShowPatientSignup(false);
-                }}
-                onShowLogin={() => { setShowPatientSignup(false); setShowLogin(true); }}
-                onSelectTherapist={() => { setShowPatientSignup(false); setShowRegister(true); }}
-                c={c} t={t} styles={styles}
-              />
-            ) : (
-              <TherapistLandingScreen
-                __DEV__={__DEV__}
-                c={c}
-                setShowLogin={setShowLogin}
-                setShowSignup={openSignupFlow}
-                styles={styles}
-                t={t}
-              />
-            )}
-          </View>
-        </View>
-      );
-    }
-
-    if (activeTab === 'options') {
-      return (
-        <OptionsScreen
-          loggedInTherapist={loggedInTherapist}
-          loggedInPatient={loggedInPatient}
-          accountType={accountType}
-          themeMode={themeMode}
-          setThemeMode={setThemeMode}
-          notifications={notifications}
-          dismissedNotifIds={dismissedNotifIds}
-          onShowNotifications={() => setShowNotifications(true)}
-          onShowLogin={() => { setShowLogin(true); setActiveTab('profile'); }}
-          onShowRegister={() => setShowRegister(true)}
-          onShowFeedback={openFeedbackModal}
-          onShowChangePassword={() => setShowChangePasswordModal(true)}
-          onDeleteAccount={() => setShowDeleteAccountModal(true)}
-          onNavigateToProfile={() => setActiveTab('profile')}
-          onLogout={handleLogout}
-          c={c} t={t} styles={styles}
-        />
-      );
-    }
-
-    return (
-      <DiscoverScreen
-        HeartButton={ThemedHeartButton}
-        SkeletonCard={SkeletonCard}
-        acSuggestions={acSuggestions}
-        activeChip={activeChip}
-        activeFilterCount={activeFilterCount}
-        authToken={authToken}
-        c={c}
-        callPhone={(phone) => callPhone(phone, t)}
-        certificationOptions={certificationOptions}
-        city={city}
-        discoverScrollRef={discoverScrollRef}
-        dismissedNotifIds={dismissedNotifIds}
-        fortbildungen={fortbildungen}
-        gender={gender}
-        getMapRegion={getMapRegion}
-        homeVisit={homeVisit}
-        isFavorite={isFavorite}
-        kassenart={kassenart}
-        locationLabel={locationLabel}
-        mapScrollEnabled={mapScrollEnabled}
-        mapTherapists={mapTherapists}
-        notifications={notifications}
-        openTherapistById={openTherapistById}
-        query={query}
-        requestableOnly={requestableOnly}
-        results={results}
-        runSearch={runSearch}
-        runSearchWith={runSearchWith}
-        searched={searched}
-        searchLoading={searchLoading}
-        searchRadius={searchRadius}
-        selectChip={selectChip}
-        selectSuggestion={selectSuggestion}
-        setActiveChip={setActiveChip}
-        setFortbildungen={setFortbildungen}
-        setGender={setGender}
-        setHomeVisit={setHomeVisit}
-        setKassenart={setKassenart}
-        setLocationSheetCity={setLocationSheetCity}
-        setMapScrollEnabled={setMapScrollEnabled}
-        setQuery={setQuery}
-        setRequestableOnly={setRequestableOnly}
-        setShowAutocomplete={setShowAutocomplete}
-        setShowFilters={setShowFilters}
-        setShowLocationSheet={setShowLocationSheet}
-        setShowNotifications={setShowNotifications}
-        setSearchRadius={setSearchRadius}
-        setViewMode={setViewMode}
-        showAutocomplete={showAutocomplete}
-        showFilters={showFilters}
-        styles={styles}
-        t={t}
-        toggleFavorite={toggleFavorite}
-        toggleFortbildung={toggleFortbildung}
-        userCoords={userCoords}
-        viewMode={viewMode}
-      />
-    );
+    if (activeTab === 'therapy') return renderTherapyTab();
+    if (activeTab === 'favorites') return renderFavoritesTab();
+    if (activeTab === 'profile') return renderProfileTab();
+    if (activeTab === 'options') return renderOptionsTab();
+    return renderDiscoverTab();
   };
 
   return (
@@ -1167,36 +1165,7 @@ export default function App() {
       <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
 
       {/* ── Favoriten-Toast ──────────────────────────────────────────────────── */}
-      {toastMsg && (
-        <Animated.View
-          style={{
-            position: 'absolute',
-            top: 52,
-            left: 16,
-            right: 16,
-            zIndex: 9999,
-            transform: [{ translateY: toastAnim }],
-          }}
-          pointerEvents="none"
-        >
-          <View style={{
-            backgroundColor: c.text,
-            borderRadius: 14,
-            paddingVertical: 12,
-            paddingHorizontal: 16,
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 10,
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.18,
-            shadowRadius: 12,
-            elevation: 8,
-          }}>
-            <Text style={{ color: c.background, fontSize: 14, fontWeight: '600', flex: 1 }}>{toastMsg}</Text>
-          </View>
-        </Animated.View>
-      )}
+      <ToastOverlay message={toastMsg} anim={toastAnim} c={c} />
 
       {/* ── Notification Sheet ──────────────────────────────────────────────── */}
       <ResetPasswordModal
