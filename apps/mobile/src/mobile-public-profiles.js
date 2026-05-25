@@ -85,7 +85,7 @@ export function PracticeProfileScreen(props) {
   const [practiceLogoError, setPracticeLogoError] = React.useState(false);
 
   return (
-    <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 20 }]}>
+    <ScrollView style={{ flex: 1 }} contentContainerStyle={[styles.scrollContent, { paddingBottom: 20 }]}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <Pressable onPress={() => setSelectedPractice(null)} style={styles.backBtn}>
           <Text style={[styles.backBtnText, { color: c.primary }]}>‹ {t('backBtn')}</Text>
@@ -293,7 +293,7 @@ export function TherapistProfileScreen(props) {
   }, [selectedSlotId, visibleSlotsForSelectedDate]);
 
   return (
-    <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 20 }]}>
+    <ScrollView style={{ flex: 1 }} contentContainerStyle={[styles.scrollContent, { paddingBottom: 20 }]}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <Pressable onPress={() => setSelectedTherapist(null)} style={styles.backBtn}>
           <Text style={[styles.backBtnText, { color: c.primary }]}>‹ {t('backBtn')}</Text>

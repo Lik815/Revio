@@ -73,7 +73,7 @@ import { AppointmentDetail } from '../mobile-appointment-detail';
 import { OptionsScreen } from '../mobile-options-screen';
 import { useAuth } from '../context/AuthContext';
 import { useTherapyData } from '../context/TherapyContext';
-import { NotificationsSheet } from '../mobile-notifications-sheet';
+import { NotificationSheet } from '../modals/NotificationSheet';
 import { ReviewNotificationModal } from '../mobile-review-notification-modal';
 import { VisibilityModal } from '../mobile-visibility-modal';
 import { ProfileSavedModal } from '../mobile-profile-saved-modal';
@@ -1347,7 +1347,7 @@ export default function App() {
         c={c} t={t}
       />
 
-      <NotificationsSheet
+      <NotificationSheet
         visible={showNotifications}
         onClose={() => setShowNotifications(false)}
         notifications={notifications}

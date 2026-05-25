@@ -134,6 +134,7 @@ export function LoginScreen({ c, styles, t, onClose, bookingTargetTherapist, onB
 
   return (
     <ScrollView
+      style={{ flex: 1 }}
       contentContainerStyle={[styles.scrollContent, { paddingHorizontal: 20, paddingBottom: 40, flexGrow: 1 }]}
       keyboardShouldPersistTaps="handled"
     >
@@ -358,6 +359,7 @@ export function SignupScreen(props) {
 
   return (
     <ScrollView
+      style={{ flex: 1 }}
       contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 24, paddingTop: 16, paddingBottom: 40 }}
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}

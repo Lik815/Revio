@@ -74,6 +74,7 @@ export function PatientDashboardScreen({
 
   return (
     <ScrollView
+      style={{ flex: 1 }}
       contentContainerStyle={[styles.scrollContent, { paddingHorizontal: 16, paddingBottom: 40, paddingTop: 12 }]}
       showsVerticalScrollIndicator={false}
     >
