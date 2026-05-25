@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import * as Notifications from 'expo-notifications';
 import {
   ActivityIndicator,
   Animated,
@@ -332,12 +331,7 @@ export default function App() {
   const [bookingTargetTherapist, setBookingTargetTherapist] = useState(null);
   const blockTherapistEnrichRef = useRef(false);
   const [showLogin, setShowLogin] = useState(false);
-  const [loginEmail, setLoginEmail] = useState('');
-  const [loginPassword, setLoginPassword] = useState('');
-  const [loginError, setLoginError] = useState('');
-  const [loginNotice, setLoginNotice] = useState('');
-  const [loginLoading, setLoginLoading] = useState(false);
-  const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false);
+
   const [activeFilterTherapist, setActiveFilterTherapist] = useState('all');
   const [activeFilterPatient, setActiveFilterPatient] = useState('all');
   const [showArchivedApts, setShowArchivedApts] = useState(false);
@@ -507,119 +501,7 @@ export default function App() {
 
 
 
-  const registerPushToken = async (token) => {
-    try {
-      const { status } = await Notifications.requestPermissionsAsync();
-      if (status !== 'granted') return;
-      const { data: expoPushToken } = await Notifications.getExpoPushTokenAsync();
-      await fetch(`${getBaseUrl()}/auth/push-token`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ expoPushToken }),
-      });
-    } catch { /* best-effort */ }
-  };
 
-
-  const handleLogin = async () => {
-    setLoginError('');
-    setLoginNotice('');
-    setLoginLoading(true);
-    try {
-      const res = await fetch(`${getBaseUrl()}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: loginEmail, password: loginPassword }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        setLoginError(err.message ?? t('alertInvalidCredentials'));
-        return;
-      }
-      const data = await res.json();
-      // Auth V2 returns accessToken, legacy returns token
-      const token = data.accessToken || data.token;
-      await AsyncStorage.setItem('revio_auth_token', token);
-      setAuthToken(token);
-
-      const profileRes = await fetch(`${getBaseUrl()}/auth/me`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (profileRes.ok) {
-        const profile = await profileRes.json();
-        loadFavorites(token);
-        if (profile.role === 'patient') {
-          await AsyncStorage.setItem('revio_account_type', 'patient');
-          setAccountType('patient');
-          setLoggedInPatient(profile);
-          loadMyAppointments(token);
-          registerPushToken(token);
-          setShowLogin(false);
-          setLoginEmail('');
-          setLoginPassword('');
-          // Nach Login direkt zum Booking wenn ein Therapeut vorgemerkt war
-          if (bookingTargetTherapist) {
-            loadAvailableSlots(bookingTargetTherapist.id).then(() => setShowBookingForm(true));
-          }
-          return;
-        }
-        // Therapist account
-        await AsyncStorage.setItem('revio_account_type', 'therapist');
-        setAccountType('therapist');
-        const therapistProfile = normalizeTherapistProfile(profile);
-        setLoggedInTherapist(therapistProfile);
-        loadIncomingBookings(token);
-        registerPushToken(token);
-        if (!therapistProfile.photo) {
-          const dismissed = await AsyncStorage.getItem('revio_photo_prompt_dismissed');
-          if (!dismissed) setShowPhotoPrompt(true);
-        }
-      }
-      setShowLogin(false);
-      setLoginEmail('');
-      setLoginPassword('');
-    } catch {
-      setLoginError(t('alertConnectionError') + '. ' + t('alertConnectionErrorBody'));
-    } finally {
-      setLoginLoading(false);
-    }
-  };
-
-  const handleForgotPassword = async () => {
-    const email = loginEmail.trim();
-    setLoginError('');
-    setLoginNotice('');
-
-    if (!email) {
-      setLoginError(t('forgotPasswordEmailMissing'));
-      return;
-    }
-
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setLoginError(t('forgotPasswordEmailInvalid'));
-      return;
-    }
-
-    setForgotPasswordLoading(true);
-    try {
-      const res = await fetch(`${getBaseUrl()}/auth/forgot-password`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...TUNNEL_HEADERS },
-        body: JSON.stringify({ email }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        setLoginError(err.message ?? t('alertConnectionError'));
-        return;
-      }
-
-      setLoginNotice(t('forgotPasswordSent'));
-    } catch {
-      setLoginError(t('alertConnectionError') + '. ' + t('alertConnectionErrorBody'));
-    } finally {
-      setForgotPasswordLoading(false);
-    }
-  };
 
   const handleNotificationPress = async (notification) => {
     setShowNotifications(false);
@@ -1112,17 +994,7 @@ export default function App() {
             {showLogin ? (
               <LoginScreen
                 c={c}
-                forgotPasswordLoading={forgotPasswordLoading}
-                handleLogin={handleLogin}
-                handleForgotPassword={handleForgotPassword}
-                loginEmail={loginEmail}
-                loginError={loginError}
-                loginLoading={loginLoading}
-                loginNotice={loginNotice}
-                loginPassword={loginPassword}
-                setLoginEmail={setLoginEmail}
-                setLoginPassword={setLoginPassword}
-                setShowLogin={setShowLogin}
+                onClose={() => setShowLogin(false)}
                 styles={styles}
                 t={t}
               />
