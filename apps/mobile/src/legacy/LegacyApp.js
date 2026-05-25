@@ -1327,7 +1327,7 @@ export default function App() {
         <View style={styles.appFrame}>
           {renderTab()}
           {/* ── Globale Notification-Glocke ───────────────────────────────── */}
-          {authToken && !selectedTherapist && !showBookingForm && activeTab !== 'therapy' && (
+          {authToken && !selectedTherapist && !showBookingForm && activeTab === 'discover' && (
             <NotificationBell
               onPress={() => setShowNotifications(true)}
               badgeCount={notifications.filter((n) => !dismissedNotifIds.has(n.id)).length}
