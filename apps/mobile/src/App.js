@@ -5,6 +5,7 @@ import { COLORS } from './mobile-utils';
 import { AuthProvider } from './context/AuthContext';
 import { TherapyProvider } from './context/TherapyContext';
 import { AuthBridge } from './context/AuthBridge';
+import { DeepLinkHandler } from './context/DeepLinkHandler';
 
 const ENABLE_NEW_APP_SHELL = process.env.EXPO_PUBLIC_ENABLE_NEW_APP_SHELL === '1';
 
@@ -110,6 +111,7 @@ export default function App() {
       <AuthProvider>
         <TherapyProvider>
           <AuthBridge />
+          <DeepLinkHandler />
           <StatusBar style={statusBarStyle} />
           <RootNavigator />
         </TherapyProvider>
