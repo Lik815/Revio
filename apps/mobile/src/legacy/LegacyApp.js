@@ -17,7 +17,6 @@ import {
   View,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import * as DocumentPicker from 'expo-document-picker';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -233,9 +232,7 @@ export default function App() {
 
   // Registration state
   const [showRegister, setShowRegister] = useState(false);
-  const [showRoleSelect, setShowRoleSelect] = useState(false);
-  const [showSignup, setShowSignup] = useState(false);
-  const [showPatientName, setShowPatientName] = useState(false);
+  const [showPatientSignup, setShowPatientSignup] = useState(false);
 
 
   // Auth — from AuthContext
@@ -365,7 +362,7 @@ export default function App() {
   const openSignupFlow = () => {
     setShowLogin(false);
     setShowRegister(false);
-    setShowRoleSelect(true);
+    setShowPatientSignup(true);
   };
 
   const openProfileSavedModal = (title, body) => {
@@ -598,21 +595,6 @@ export default function App() {
     setShowDeleteAccountModal(true);
   };
 
-
-  const handlePickRegistrationDocument = async () => {
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'],
-        copyToCacheDirectory: true,
-      });
-      if (result.canceled || !result.assets?.[0]) return;
-      const asset = result.assets[0];
-      if (!validateDocumentSize(asset, t)) return;
-      setRegDocument(asset);
-    } catch {
-      Alert.alert(t('alertConnectionError'), t('alertConnectionErrorBody'));
-    }
-  };
 
   // GPS: request on demand only
   const handleGetLocation = async () => {
@@ -949,8 +931,8 @@ export default function App() {
           <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 20, paddingTop: SPACE.sm }]} showsVerticalScrollIndicator={false}>
             <View style={[styles.emptyState, { backgroundColor: c.card, borderColor: c.border }]}>
               <Ionicons name="calendar-outline" size={32} color={c.muted} />
-              <Text style={[styles.emptyTitle, { color: c.text }]}>{t('favoritesLoginRequired') ?? 'Einloggen erforderlich'}</Text>
-              <Text style={[styles.emptyBody, { color: c.muted }]}>Melde dich an, um deine Termine zu sehen.</Text>
+              <Text style={[styles.emptyTitle, { color: c.text }]}>{t('therapyLoginRequired') ?? 'Hier kannst du deine Termine sehen'}</Text>
+              <Text style={[styles.emptyBody, { color: c.muted }]}>{t('therapyLoginRequiredBody') ?? 'Dafür musst du dich registrieren oder anmelden.'}</Text>
               <Pressable onPress={() => { setActiveTab('profile'); setShowLogin(true); }} style={[styles.registerBtn, { backgroundColor: c.primary, marginTop: 16, paddingHorizontal: 32 }]}>
                 <Text style={styles.registerBtnText}>{t('loginAction')}</Text>
               </Pressable>
@@ -1036,10 +1018,10 @@ export default function App() {
                 }}
                 c={c} t={t} styles={styles}
               />
-            ) : (showRoleSelect || showSignup || showPatientName) ? (
+            ) : showPatientSignup ? (
               <PatientSignupFlow
-                visible={showRoleSelect || showSignup || showPatientName}
-                onClose={() => { setShowRoleSelect(false); setShowSignup(false); setShowPatientName(false); }}
+                visible={showPatientSignup}
+                onClose={() => setShowPatientSignup(false)}
                 onSignedUp={async (token) => {
                   await AsyncStorage.setItem('revio_auth_token', token);
                   await AsyncStorage.setItem('revio_account_type', 'patient');
@@ -1049,10 +1031,10 @@ export default function App() {
                   if (profileRes.ok) setLoggedInPatient(await profileRes.json());
                   loadFavorites(token);
                   loadMyAppointments(token);
-                  setShowRoleSelect(false);
+                  setShowPatientSignup(false);
                 }}
-                onShowLogin={() => { setShowRoleSelect(false); setShowSignup(false); setShowPatientName(false); setShowLogin(true); }}
-                onSelectTherapist={() => { setShowRoleSelect(false); setShowSignup(false); setShowPatientName(false); setShowRegister(true); }}
+                onShowLogin={() => { setShowPatientSignup(false); setShowLogin(true); }}
+                onSelectTherapist={() => { setShowPatientSignup(false); setShowRegister(true); }}
                 c={c} t={t} styles={styles}
               />
             ) : (
