@@ -570,7 +570,7 @@ export function useSearch({ t }) {
     results, setResults,
     searchLoading,
     allApiTherapists,
-    searched,
+    searched, setSearched,
     viewMode, setViewMode,
     mapScrollEnabled, setMapScrollEnabled,
     // Autocomplete
