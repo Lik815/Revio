@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { COLORS } from './mobile-utils';
 import { AuthProvider } from './context/AuthContext';
 import { TherapyProvider } from './context/TherapyContext';
+import { AuthBridge } from './context/AuthBridge';
 
 const ENABLE_NEW_APP_SHELL = process.env.EXPO_PUBLIC_ENABLE_NEW_APP_SHELL === '1';
 
@@ -106,10 +107,13 @@ export default function App() {
     const { RootNavigator } = require('./navigation/RootNavigator');
 
     return (
-      <>
-        <StatusBar style={statusBarStyle} />
-        <RootNavigator />
-      </>
+      <AuthProvider>
+        <TherapyProvider>
+          <AuthBridge />
+          <StatusBar style={statusBarStyle} />
+          <RootNavigator />
+        </TherapyProvider>
+      </AuthProvider>
     );
   } catch (error) {
     if (__DEV__) {

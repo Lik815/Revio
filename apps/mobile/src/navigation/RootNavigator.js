@@ -42,16 +42,20 @@ export function RootNavigator() {
   return (
     <NavigationContainer theme={navigationTheme}>
       <Stack.Navigator
-        initialRouteName={isAuthenticated ? ROOT_ROUTES.MAIN_TABS : ROOT_ROUTES.AUTH}
         screenOptions={{
           headerShown: false,
           contentStyle: { backgroundColor: palette.background },
         }}
       >
-        <Stack.Screen component={AuthScreen} name={ROOT_ROUTES.AUTH} />
-        <Stack.Screen component={AppTabs} name={ROOT_ROUTES.MAIN_TABS} />
-        <Stack.Screen component={TherapistProfileScreen} name={ROOT_ROUTES.THERAPIST_PROFILE} />
-        <Stack.Screen component={PracticeProfileScreen} name={ROOT_ROUTES.PRACTICE_PROFILE} />
+        {isAuthenticated ? (
+          <>
+            <Stack.Screen component={AppTabs} name={ROOT_ROUTES.MAIN_TABS} />
+            <Stack.Screen component={TherapistProfileScreen} name={ROOT_ROUTES.THERAPIST_PROFILE} />
+            <Stack.Screen component={PracticeProfileScreen} name={ROOT_ROUTES.PRACTICE_PROFILE} />
+          </>
+        ) : (
+          <Stack.Screen component={AuthScreen} name={ROOT_ROUTES.AUTH} />
+        )}
       </Stack.Navigator>
     </NavigationContainer>
   );
