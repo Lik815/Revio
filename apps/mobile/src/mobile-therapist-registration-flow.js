@@ -142,6 +142,21 @@ export function TherapistRegistrationFlow({
     }, Platform.OS === 'ios' ? 140 : 220);
   };
 
+  const handlePickRegistrationDocument = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['application/pdf', 'image/*'],
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled) return;
+      const asset = result.assets?.[0];
+      if (asset) setRegDocument(asset);
+    } catch {
+      if (Platform.OS === 'web') alert(t('documentPickError') ?? 'Dokument konnte nicht geladen werden.');
+      else Alert.alert(t('alertError') ?? 'Fehler', t('documentPickError') ?? 'Dokument konnte nicht geladen werden.');
+    }
+  };
+
   useEffect(() => {
     let active = true;
     AsyncStorage.getItem(REGISTRATION_COMPLIANCE_DRAFT_KEY)
