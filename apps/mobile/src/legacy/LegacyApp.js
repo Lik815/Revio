@@ -37,6 +37,7 @@ import {
 } from '../mobile-utils';
 import { HeartButton } from '../components/HeartButton';
 import { MobileBottomNav } from '../components/MobileBottomNav';
+import { NotificationBell } from '../components/NotificationBell';
 import { SkeletonCard } from '../components/SkeletonCard';
 import { TabHeader } from '../components/TabHeader';
 import { useTheme } from '../hooks/use-theme';
@@ -1353,29 +1354,11 @@ export default function App() {
           {renderTab()}
           {/* ── Globale Notification-Glocke ───────────────────────────────── */}
           {authToken && !selectedTherapist && !showBookingForm && activeTab !== 'therapy' && (
-            <Pressable
+            <NotificationBell
               onPress={() => setShowNotifications(true)}
-              style={{
-                position: 'absolute',
-                top: 12,
-                right: 16,
-                width: 40,
-                height: 40,
-                borderRadius: 20,
-                backgroundColor: c.card,
-                borderWidth: 1,
-                borderColor: c.border,
-                alignItems: 'center',
-                justifyContent: 'center',
-                zIndex: 1000,
-                elevation: 10,
-              }}
-            >
-              <Ionicons name="notifications-outline" size={18} color={c.text} />
-              {notifications.filter((n) => !dismissedNotifIds.has(n.id)).length > 0 && (
-                <View style={{ position: 'absolute', top: 3, right: 3, width: 8, height: 8, borderRadius: 4, backgroundColor: c.error }} />
-              )}
-            </Pressable>
+              badgeCount={notifications.filter((n) => !dismissedNotifIds.has(n.id)).length}
+              c={c}
+            />
           )}
         </View>
 
