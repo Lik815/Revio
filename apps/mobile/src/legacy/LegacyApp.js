@@ -37,6 +37,7 @@ import {
   tabs,
 } from '../mobile-utils';
 import { HeartButton } from '../components/HeartButton';
+import { MobileBottomNav } from '../components/MobileBottomNav';
 import { SkeletonCard } from '../components/SkeletonCard';
 import { TabHeader } from '../components/TabHeader';
 import { useTheme } from '../hooks/use-theme';
@@ -823,6 +824,26 @@ export default function App() {
       c={c} t={t} styles={styles}
     />
   );
+  const handleBottomTabPress = (tabKey) => {
+    setSelectedPractice(null);
+    setSelectedTherapist(null);
+    if (tabKey !== 'profile') {
+      setShowLogin(false);
+      setShowRegister(false);
+      setShowInviteClaim(false);
+    }
+    if (tabKey === 'discover') {
+      setQuery('');
+      setActiveChip(null);
+      setResults([]);
+      setSearched(false);
+      setShowAutocomplete(false);
+      setShowFilters(false);
+      setViewMode('list');
+    }
+    setActiveTab(tabKey);
+  };
+
   const renderTab = () => {
     const hasBadge = notifications.filter(n => !dismissedNotifIds.has(n.id)).length > 0;
 
@@ -1377,56 +1398,15 @@ export default function App() {
         </View>
 
         {/* Bottom nav */}
-        <View style={[styles.navbar, { backgroundColor: c.nav, borderColor: c.border }]}>
-          {tabs.map((tab) => {
-            const active = tab.key === activeTab;
-            return (
-              <Pressable
-                key={tab.key}
-                onPress={() => {
-                  setSelectedPractice(null);
-                  setSelectedTherapist(null);
-                  if (tab.key !== 'profile') {
-                    setShowLogin(false);
-                    setShowRegister(false);
-                    setShowInviteClaim(false);
-                  }
-                  if (tab.key === 'discover') {
-                    setQuery('');
-                    setActiveChip(null);
-                    setResults([]);
-                    setSearched(false);
-                    setShowAutocomplete(false);
-                    setShowFilters(false);
-                    setViewMode('list');
-                  }
-                  setActiveTab(tab.key);
-                }}
-                style={styles.navItem}
-              >
-                <View style={[styles.navPill, active && { backgroundColor: c.primaryBg }]}>
-                  <View style={{ position: 'relative' }}>
-                    <Ionicons
-                      name={active ? tab.icon : `${tab.icon}-outline`}
-                      size={22}
-                      color={active ? c.primary : c.muted}
-                    />
-                    {tab.key === 'profile' && loggedInTherapist && notifications.filter((n) => !dismissedNotifIds.has(n.id)).length > 0 && (
-                      <View style={{ position: 'absolute', top: -3, right: -5, backgroundColor: '#E53E3E', borderRadius: 6, minWidth: 12, height: 12, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 2 }}>
-                        <Text style={{ color: '#fff', fontSize: 8, fontWeight: '800', lineHeight: 12 }}>
-                          {notifications.filter((n) => !dismissedNotifIds.has(n.id)).length}
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-                </View>
-                <Text style={[styles.navLabel, { color: active ? c.primary : c.muted }]}>
-                  {t(tab.labelKey)}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
+        <MobileBottomNav
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabPress={handleBottomTabPress}
+          c={c}
+          t={t}
+          badgeCount={notifications.filter((n) => !dismissedNotifIds.has(n.id)).length}
+          showBadge={!!loggedInTherapist}
+        />
       </View>
     </SafeAreaView>
   );
@@ -1957,32 +1937,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   themeBtnText: { ...TYPE.meta, fontWeight: '600' },
-
-  navbar: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 1000,
-    elevation: 20,
-    borderTopWidth: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingVertical: 8,
-    paddingHorizontal: 8,
-  },
-  navItem: { alignItems: 'center', gap: 4, flex: 1, paddingVertical: 10, minHeight: 44 },
-  navPill: {
-    borderRadius: RADIUS.full,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    minHeight: 38,
-    minWidth: 54,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  navIcon: { fontSize: 18, fontWeight: '700' },
-  navLabel: { fontSize: 12, fontWeight: '600', letterSpacing: 0.2 },
 
   regProgressRow: { flexDirection: 'row', gap: 4, marginBottom: 4 },
   regProgressBar: { height: 4, borderRadius: 2, flex: 1 },
