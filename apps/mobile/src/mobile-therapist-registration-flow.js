@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   ActivityIndicator, Alert, KeyboardAvoidingView, Linking, Platform,
-  Pressable, ScrollView, Text, TextInput, View,
+  Pressable, ScrollView, Switch, Text, TextInput, View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
