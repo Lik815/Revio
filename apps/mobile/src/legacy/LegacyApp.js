@@ -111,6 +111,7 @@ function isValidEmail(value) {
 const ICON_HIT_SLOP = { top: 10, bottom: 10, left: 10, right: 10 };
 const COMPLIANCE_STATUS_VALUES = ['yes', 'no', 'in_progress'];
 const HEALTH_AUTHORITY_STATUS_VALUES = ['yes', 'no', 'in_progress', 'unknown'];
+const BOTTOM_NAV_HEIGHT = 86;
 
 
 // ─── App ──────────────────────────────────────────────────────────────────────
@@ -1472,86 +1473,88 @@ export default function App() {
         c={c} t={t}
       />
 
-      <View style={styles.appFrame}>
-        {renderTab()}
-        {/* ── Globale Notification-Glocke ─────────────────────────────────── */}
-        {authToken && !selectedTherapist && !showBookingForm && activeTab !== 'therapy' && (
-          <Pressable
-            onPress={() => setShowNotifications(true)}
-            style={{
-              position: 'absolute',
-              top: 12,
-              right: 16,
-              width: 40,
-              height: 40,
-              borderRadius: 20,
-              backgroundColor: c.card,
-              borderWidth: 1,
-              borderColor: c.border,
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 1000,
-              elevation: 10,
-            }}
-          >
-            <Ionicons name="notifications-outline" size={18} color={c.text} />
-            {notifications.filter((n) => !dismissedNotifIds.has(n.id)).length > 0 && (
-              <View style={{ position: 'absolute', top: 3, right: 3, width: 8, height: 8, borderRadius: 4, backgroundColor: c.error }} />
-            )}
-          </Pressable>
-        )}
-      </View>
-
-      {/* Bottom nav */}
-      <View style={[styles.navbar, { backgroundColor: c.nav, borderColor: c.border, zIndex: 10 }]}>
-        {tabs.map((tab) => {
-          const active = tab.key === activeTab;
-          return (
+      <View style={styles.rootLayout}>
+        <View style={styles.appFrame}>
+          {renderTab()}
+          {/* ── Globale Notification-Glocke ───────────────────────────────── */}
+          {authToken && !selectedTherapist && !showBookingForm && activeTab !== 'therapy' && (
             <Pressable
-              key={tab.key}
-              onPress={() => {
-                setSelectedPractice(null);
-                setSelectedTherapist(null);
-                if (tab.key !== 'profile') {
-                  setShowLogin(false);
-                  setShowRegister(false);
-                  setShowInviteClaim(false);
-                }
-                if (tab.key === 'discover') {
-                  setQuery('');
-                  setActiveChip(null);
-                  setResults([]);
-                  setSearched(false);
-                  setShowAutocomplete(false);
-                  setShowFilters(false);
-                  setViewMode('list');
-                }
-                setActiveTab(tab.key);
+              onPress={() => setShowNotifications(true)}
+              style={{
+                position: 'absolute',
+                top: 12,
+                right: 16,
+                width: 40,
+                height: 40,
+                borderRadius: 20,
+                backgroundColor: c.card,
+                borderWidth: 1,
+                borderColor: c.border,
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 1000,
+                elevation: 10,
               }}
-              style={styles.navItem}
             >
-              <View style={[styles.navPill, active && { backgroundColor: c.primaryBg }]}>
-                <View style={{ position: 'relative' }}>
-                  <Ionicons
-                    name={active ? tab.icon : `${tab.icon}-outline`}
-                    size={22}
-                    color={active ? c.primary : c.muted}
-                  />
-                  {tab.key === 'profile' && loggedInTherapist && notifications.filter((n) => !dismissedNotifIds.has(n.id)).length > 0 && (
-                    <View style={{ position: 'absolute', top: -3, right: -5, backgroundColor: '#E53E3E', borderRadius: 6, minWidth: 12, height: 12, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 2 }}>
-                      <Text style={{ color: '#fff', fontSize: 8, fontWeight: '800', lineHeight: 12 }}>
-                        {notifications.filter((n) => !dismissedNotifIds.has(n.id)).length}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              </View>
-              <Text style={[styles.navLabel, { color: active ? c.primary : c.muted }]}>
-                {t(tab.labelKey)}
-              </Text>
+              <Ionicons name="notifications-outline" size={18} color={c.text} />
+              {notifications.filter((n) => !dismissedNotifIds.has(n.id)).length > 0 && (
+                <View style={{ position: 'absolute', top: 3, right: 3, width: 8, height: 8, borderRadius: 4, backgroundColor: c.error }} />
+              )}
             </Pressable>
-          );
-        })}
+          )}
+        </View>
+
+        {/* Bottom nav */}
+        <View style={[styles.navbar, { backgroundColor: c.nav, borderColor: c.border }]}>
+          {tabs.map((tab) => {
+            const active = tab.key === activeTab;
+            return (
+              <Pressable
+                key={tab.key}
+                onPress={() => {
+                  setSelectedPractice(null);
+                  setSelectedTherapist(null);
+                  if (tab.key !== 'profile') {
+                    setShowLogin(false);
+                    setShowRegister(false);
+                    setShowInviteClaim(false);
+                  }
+                  if (tab.key === 'discover') {
+                    setQuery('');
+                    setActiveChip(null);
+                    setResults([]);
+                    setSearched(false);
+                    setShowAutocomplete(false);
+                    setShowFilters(false);
+                    setViewMode('list');
+                  }
+                  setActiveTab(tab.key);
+                }}
+                style={styles.navItem}
+              >
+                <View style={[styles.navPill, active && { backgroundColor: c.primaryBg }]}>
+                  <View style={{ position: 'relative' }}>
+                    <Ionicons
+                      name={active ? tab.icon : `${tab.icon}-outline`}
+                      size={22}
+                      color={active ? c.primary : c.muted}
+                    />
+                    {tab.key === 'profile' && loggedInTherapist && notifications.filter((n) => !dismissedNotifIds.has(n.id)).length > 0 && (
+                      <View style={{ position: 'absolute', top: -3, right: -5, backgroundColor: '#E53E3E', borderRadius: 6, minWidth: 12, height: 12, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 2 }}>
+                        <Text style={{ color: '#fff', fontSize: 8, fontWeight: '800', lineHeight: 12 }}>
+                          {notifications.filter((n) => !dismissedNotifIds.has(n.id)).length}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+                <Text style={[styles.navLabel, { color: active ? c.primary : c.muted }]}>
+                  {t(tab.labelKey)}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
       </View>
     </SafeAreaView>
   );
@@ -1561,7 +1564,8 @@ export default function App() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  appFrame: { flex: 1, overflow: 'hidden' },
+  rootLayout: { flex: 1, position: 'relative' },
+  appFrame: { flex: 1, overflow: 'hidden', paddingBottom: BOTTOM_NAV_HEIGHT },
   scrollContent: { padding: SPACE.xl, gap: SPACE.lg },
 
   hero: { paddingTop: SPACE.sm, paddingBottom: SPACE.xs, gap: SPACE.sm },
@@ -2083,6 +2087,12 @@ const styles = StyleSheet.create({
   themeBtnText: { ...TYPE.meta, fontWeight: '600' },
 
   navbar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1000,
+    elevation: 20,
     borderTopWidth: 1,
     flexDirection: 'row',
     justifyContent: 'space-around',
