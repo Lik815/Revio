@@ -116,7 +116,7 @@ const renderRoleSelect = () => (
     <View style={{ gap: 12 }}>
       {/* Patient — filled/primary */}
       <Pressable
-        onPress={() => { setShowRoleSelect(false); setShowPatientName(true); }}
+        onPress={() => { setShowRoleSelect(false); setShowSignup(true); }}
         style={({ pressed }) => [{
           backgroundColor: c.primary,
           borderRadius: 16,
@@ -369,7 +369,7 @@ const renderSignup = () => (
                 if (!res.ok) { setSignupOtpError(data.message ?? 'Falscher Code.'); return; }
                 setSignupEmailVerified(true);
                 setShowSignup(false);
-                setShowRoleSelect(true);
+                setShowPatientName(true);
               } catch { setSignupOtpError('Verbindungsfehler.'); }
               finally { setSignupOtpLoading(false); }
             }}
