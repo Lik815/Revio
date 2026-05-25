@@ -827,6 +827,30 @@ export default function App() {
     setActiveTab(tabKey);
   };
 
+  const handleTherapistCancelConfirm = async () => {
+    setShowTherapistCancelModal(false);
+    setTherapistDetailBooking(null);
+    if (!therapistCancelBookingId) { setTherapistCancelBookingId(null); return; }
+    const res = await fetch(`${getBaseUrl()}/bookings/${therapistCancelBookingId}/therapist-cancel`, {
+      method: 'PATCH',
+      headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
+    });
+    if (res.ok) { loadIncomingBookings(authToken); loadMySlots(authToken); }
+    else Alert.alert('Fehler', 'Stornierung fehlgeschlagen. Bitte erneut versuchen.');
+    setTherapistCancelBookingId(null);
+  };
+
+  const handlePhotoPromptGoToProfile = async () => {
+    setShowPhotoPrompt(false);
+    await AsyncStorage.setItem('revio_photo_prompt_dismissed', '1');
+    setActiveTab('profile');
+  };
+
+  const handlePhotoPromptDismiss = async () => {
+    setShowPhotoPrompt(false);
+    await AsyncStorage.setItem('revio_photo_prompt_dismissed', '1');
+  };
+
   const renderTab = () => {
     const hasBadge = notifications.filter(n => !dismissedNotifIds.has(n.id)).length > 0;
 
@@ -1279,18 +1303,7 @@ export default function App() {
       <TherapistCancelModal
         visible={showTherapistCancelModal}
         onClose={() => { setShowTherapistCancelModal(false); setTherapistDetailBooking(null); setTherapistCancelBookingId(null); }}
-        onConfirm={async () => {
-          setShowTherapistCancelModal(false);
-          setTherapistDetailBooking(null);
-          if (!therapistCancelBookingId) { setTherapistCancelBookingId(null); return; }
-          const res = await fetch(`${getBaseUrl()}/bookings/${therapistCancelBookingId}/therapist-cancel`, {
-            method: 'PATCH',
-            headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
-          });
-          if (res.ok) { loadIncomingBookings(authToken); loadMySlots(authToken); }
-          else Alert.alert('Fehler', 'Stornierung fehlgeschlagen. Bitte erneut versuchen.');
-          setTherapistCancelBookingId(null);
-        }}
+        onConfirm={handleTherapistCancelConfirm}
         booking={therapistDetailBooking}
         c={c}
       />
@@ -1319,15 +1332,8 @@ export default function App() {
 
       <PhotoPromptModal
         visible={showPhotoPrompt}
-        onGoToProfile={async () => {
-          setShowPhotoPrompt(false);
-          await AsyncStorage.setItem('revio_photo_prompt_dismissed', '1');
-          setActiveTab('profile');
-        }}
-        onDismiss={async () => {
-          setShowPhotoPrompt(false);
-          await AsyncStorage.setItem('revio_photo_prompt_dismissed', '1');
-        }}
+        onGoToProfile={handlePhotoPromptGoToProfile}
+        onDismiss={handlePhotoPromptDismiss}
         c={c} t={t}
       />
 
