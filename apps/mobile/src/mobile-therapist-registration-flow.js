@@ -15,6 +15,13 @@ import {
 import { ComplianceStatusStep } from './mobile-compliance-step';
 
 const FREELANCE_HELP_URL = 'https://my-revio.de/blog/freiberuflich-als-physiotherapeut-starten';
+
+function formatDocumentSize(bytes) {
+  if (!bytes || bytes === 0) return '';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 const REGISTRATION_COMPLIANCE_DRAFT_KEY = 'revio_registration_compliance_draft';
 
 function normalizeComplianceValue(value, allowedValues) {
