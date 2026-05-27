@@ -44,6 +44,8 @@ function parseComplianceDraft(rawValue) {
   }
 }
 
+const certificationOptions = (fortbildungOptions ?? []).map((o) => ({ key: o.key, label: o.label }));
+
 export function TherapistRegistrationFlow({
   visible,
   onClose,
