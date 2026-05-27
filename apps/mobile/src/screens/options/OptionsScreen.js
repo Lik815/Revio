@@ -52,6 +52,22 @@ export function OptionsTabScreen() {
     navigation.navigate(TAB_ROUTES.PROFILE);
   };
 
+  const handleNotificationPress = (notification) => {
+    setShowNotifications(false);
+    const type = notification?.type;
+    if (
+      type === 'NEW_BOOKING_REQUEST' || type === 'BOOKING_CONFIRMED' ||
+      type === 'BOOKING_DECLINED' || type === 'BOOKING_CANCELLED'
+    ) {
+      navigation.navigate(ROOT_ROUTES.MAIN_TABS, { screen: TAB_ROUTES.THERAPY });
+    } else if (
+      type === 'PROFILE_APPROVED' || type === 'PROFILE_CHANGES_REQUESTED' ||
+      type === 'PROFILE_REJECTED' || type === 'PROFILE_SUSPENDED'
+    ) {
+      navigation.navigate(ROOT_ROUTES.MAIN_TABS, { screen: TAB_ROUTES.PROFILE });
+    }
+  };
+
   return (
     <>
       <OptionsScreen
@@ -82,7 +98,7 @@ export function OptionsTabScreen() {
         dismissedNotifIds={dismissedNotifIds}
         dismissNotification={dismissNotification}
         dismissAllNotifications={dismissAllNotifications}
-        onPressNotification={() => setShowNotifications(false)}
+        onPressNotification={handleNotificationPress}
         c={c}
         t={t}
       />

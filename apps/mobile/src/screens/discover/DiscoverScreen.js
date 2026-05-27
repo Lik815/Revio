@@ -8,7 +8,7 @@ import { useNotificationPolling } from '../../hooks/use-notification-polling';
 import { useToast } from '../../hooks/use-toast';
 import { useSearch } from '../../hooks/use-search';
 import { translations } from '../../mobile-translations';
-import { ROOT_ROUTES } from '../../navigation/route-names';
+import { ROOT_ROUTES, TAB_ROUTES } from '../../navigation/route-names';
 import { HeartButton } from '../../components/HeartButton';
 import { SkeletonCard } from '../../components/SkeletonCard';
 import { ToastOverlay } from '../../components/ToastOverlay';
@@ -55,6 +55,22 @@ export function DiscoverTabScreen() {
 
   const openTherapistById = (id, fallback = null) => {
     navigation.navigate(ROOT_ROUTES.THERAPIST_PROFILE, { therapistId: id, therapist: fallback });
+  };
+
+  const handleNotificationPress = (notification) => {
+    setShowNotifications(false);
+    const type = notification?.type;
+    if (
+      type === 'NEW_BOOKING_REQUEST' || type === 'BOOKING_CONFIRMED' ||
+      type === 'BOOKING_DECLINED' || type === 'BOOKING_CANCELLED'
+    ) {
+      navigation.navigate(ROOT_ROUTES.MAIN_TABS, { screen: TAB_ROUTES.THERAPY });
+    } else if (
+      type === 'PROFILE_APPROVED' || type === 'PROFILE_CHANGES_REQUESTED' ||
+      type === 'PROFILE_REJECTED' || type === 'PROFILE_SUSPENDED'
+    ) {
+      navigation.navigate(ROOT_ROUTES.MAIN_TABS, { screen: TAB_ROUTES.PROFILE });
+    }
   };
 
   return (
@@ -125,7 +141,7 @@ export function DiscoverTabScreen() {
         dismissedNotifIds={dismissedNotifIds}
         dismissNotification={dismissNotification}
         dismissAllNotifications={dismissAllNotifications}
-        onPressNotification={() => setShowNotifications(false)}
+        onPressNotification={handleNotificationPress}
         c={c}
         t={t}
       />

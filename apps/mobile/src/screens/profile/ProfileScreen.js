@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { appStoreSelectors, useAppStore } from '../../store/useStore';
 import { useTheme } from '../../hooks/use-theme';
 import { useNotificationPolling } from '../../hooks/use-notification-polling';
@@ -14,6 +15,8 @@ import { TabHeader } from '../../components/TabHeader';
 import { ToastOverlay } from '../../components/ToastOverlay';
 import { NotificationSheet } from '../../modals/NotificationSheet';
 import { ProfileSavedModal } from '../../mobile-profile-saved-modal';
+import { ReviewNotificationModal } from '../../mobile-review-notification-modal';
+import { PhotoPromptModal } from '../../mobile-photo-prompt-modal';
 import { TherapistDashboardScreen } from '../../mobile-therapist-dashboard';
 import { PatientDashboardScreen } from '../../mobile-patient-dashboard';
 import { useTherapyData } from '../../context/TherapyContext';
@@ -46,7 +49,38 @@ export function ProfileTabScreen() {
     notifications, dismissedNotifIds,
     showNotifications, setShowNotifications,
     dismissNotification, dismissAllNotifications,
+    showReviewNotificationModal, reviewNotification, markReviewNotificationSeen,
   } = useNotificationPolling({ authToken, accountType });
+
+  const [showPhotoPrompt, setShowPhotoPrompt] = useState(false);
+
+  useEffect(() => {
+    if (!loggedInTherapist || loggedInTherapist.photo) return;
+    AsyncStorage.getItem('revio_photo_prompt_dismissed').then((v) => {
+      if (!v) setTimeout(() => setShowPhotoPrompt(true), 2800);
+    });
+  }, [loggedInTherapist?.id]);
+
+  const handlePhotoPromptDismiss = async () => {
+    setShowPhotoPrompt(false);
+    await AsyncStorage.setItem('revio_photo_prompt_dismissed', '1');
+  };
+
+  const handlePhotoPromptGoToProfile = async () => {
+    setShowPhotoPrompt(false);
+    await AsyncStorage.setItem('revio_photo_prompt_dismissed', '1');
+  };
+
+  const handleNotificationPress = (notification) => {
+    setShowNotifications(false);
+    const type = notification?.type;
+    if (
+      type === 'NEW_BOOKING_REQUEST' || type === 'BOOKING_CONFIRMED' ||
+      type === 'BOOKING_DECLINED' || type === 'BOOKING_CANCELLED'
+    ) {
+      navigation.navigate(ROOT_ROUTES.MAIN_TABS, { screen: TAB_ROUTES.THERAPY });
+    }
+  };
 
   const [profileSavedTitle, setProfileSavedTitle] = useState('');
   const [profileSavedBody, setProfileSavedBody] = useState('');
@@ -101,7 +135,7 @@ export function ProfileTabScreen() {
           dismissedNotifIds={dismissedNotifIds}
           dismissNotification={dismissNotification}
           dismissAllNotifications={dismissAllNotifications}
-          onPressNotification={() => setShowNotifications(false)}
+          onPressNotification={handleNotificationPress}
           c={c} t={t}
         />
         <ProfileSavedModal
@@ -110,6 +144,12 @@ export function ProfileTabScreen() {
           title={profileSavedTitle}
           body={profileSavedBody}
           c={c}
+        />
+        <ReviewNotificationModal
+          visible={showReviewNotificationModal}
+          notification={reviewNotification}
+          onDone={markReviewNotificationSeen}
+          c={c} t={t}
         />
         <ToastOverlay message={toastMsg} anim={toastAnim} c={c} />
       </>
@@ -136,7 +176,7 @@ export function ProfileTabScreen() {
           dismissedNotifIds={dismissedNotifIds}
           dismissNotification={dismissNotification}
           dismissAllNotifications={dismissAllNotifications}
-          onPressNotification={() => setShowNotifications(false)}
+          onPressNotification={handleNotificationPress}
           c={c} t={t}
         />
         <ProfileSavedModal
@@ -145,6 +185,18 @@ export function ProfileTabScreen() {
           title={profileSavedTitle}
           body={profileSavedBody}
           c={c}
+        />
+        <ReviewNotificationModal
+          visible={showReviewNotificationModal}
+          notification={reviewNotification}
+          onDone={markReviewNotificationSeen}
+          c={c} t={t}
+        />
+        <PhotoPromptModal
+          visible={showPhotoPrompt}
+          onGoToProfile={handlePhotoPromptGoToProfile}
+          onDismiss={handlePhotoPromptDismiss}
+          c={c} t={t}
         />
         <ToastOverlay message={toastMsg} anim={toastAnim} c={c} />
       </>

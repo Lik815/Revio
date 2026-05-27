@@ -68,6 +68,17 @@ export function TherapyTabScreen() {
     navigation.navigate(ROOT_ROUTES.THERAPIST_PROFILE, { therapistId: id, therapist: fallback });
   };
 
+  const handleNotificationPress = async (notification) => {
+    setShowNotifications(false);
+    const type = notification?.type;
+    if (type === 'NEW_BOOKING_REQUEST') {
+      setActiveFilterTherapist('pending');
+      if (authToken) loadIncomingBookings(authToken, { background: true });
+    } else if (type === 'BOOKING_CONFIRMED' || type === 'BOOKING_DECLINED' || type === 'BOOKING_CANCELLED') {
+      if (authToken) await loadMyAppointments(authToken, { background: true });
+    }
+  };
+
   const handleAddSlot = async (slot) => {
     if (!authToken) return;
     try {
@@ -165,7 +176,7 @@ export function TherapyTabScreen() {
           dismissedNotifIds={dismissedNotifIds}
           dismissNotification={dismissNotification}
           dismissAllNotifications={dismissAllNotifications}
-          onPressNotification={() => setShowNotifications(false)}
+          onPressNotification={handleNotificationPress}
           c={c} t={t}
         />
       </>
@@ -208,7 +219,7 @@ export function TherapyTabScreen() {
           dismissedNotifIds={dismissedNotifIds}
           dismissNotification={dismissNotification}
           dismissAllNotifications={dismissAllNotifications}
-          onPressNotification={() => setShowNotifications(false)}
+          onPressNotification={handleNotificationPress}
           c={c} t={t}
         />
         <TherapistCancelModal

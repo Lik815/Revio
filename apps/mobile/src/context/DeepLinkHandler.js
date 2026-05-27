@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, View } from 'react-native';
+import { Alert, Modal, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useDeepLinks } from '../hooks/use-deep-links';
 import { useAuth } from './AuthContext';
@@ -10,6 +10,7 @@ import { getBaseUrl, normalizeTherapistProfile, TUNNEL_HEADERS } from '../mobile
 import { EmailVerifyScreen } from '../mobile-email-verify-screen';
 import { InviteClaimScreen } from '../mobile-invite-claim-screen';
 import { ResetPasswordModal } from '../mobile-reset-password-modal';
+import { VisibilityModal } from '../mobile-visibility-modal';
 
 const t = (key) => translations.de[key] ?? key;
 
@@ -23,6 +24,9 @@ export function DeepLinkHandler() {
   const [inviteLoading, setInviteLoading] = useState(false);
   const [inviteError, setInviteError] = useState('');
   const [inviteData, setInviteData] = useState(null);
+  const [showVisibilityModal, setShowVisibilityModal] = useState(false);
+  const [visibilityLoading, setVisibilityLoading] = useState(false);
+  const [claimedToken, setClaimedToken] = useState(null);
 
   useEffect(() => {
     if (!deepLink) return;
@@ -100,7 +104,59 @@ export function DeepLinkHandler() {
     }
   };
 
-  if (!deepLink) return null;
+  const handleInviteClaimed = async (token) => {
+    setClaimedToken(token);
+    await AsyncStorage.setItem('revio_auth_token', token);
+    const profileRes = await fetch(`${getBaseUrl()}/auth/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (profileRes.ok) {
+      const profile = await profileRes.json();
+      await loginAsTherapist(token, normalizeTherapistProfile(profile));
+    }
+    clear();
+    setShowVisibilityModal(true);
+  };
+
+  const handleVisibilityChoice = async (preference) => {
+    const token = claimedToken;
+    if (!token) { setShowVisibilityModal(false); return; }
+    setVisibilityLoading(true);
+    try {
+      const res = await fetch(`${getBaseUrl()}/invite/visibility`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ visibilityPreference: preference }),
+      });
+      const data = await res.json().catch(() => ({}));
+      setShowVisibilityModal(false);
+      setClaimedToken(null);
+      if (res.ok && preference === 'visible' && !data.isPublished && data.missingFields?.length > 0) {
+        Alert.alert(
+          t('alertProfileIncomplete'),
+          t('alertProfileIncompleteBody').replace('{fields}', data.missingFields.join(', ')),
+        );
+      }
+    } catch {
+      setShowVisibilityModal(false);
+    } finally {
+      setVisibilityLoading(false);
+    }
+  };
+
+  if (!deepLink && !showVisibilityModal) return null;
+
+  if (showVisibilityModal) {
+    return (
+      <VisibilityModal
+        visible
+        onClose={() => { setShowVisibilityModal(false); setClaimedToken(null); }}
+        onChoice={handleVisibilityChoice}
+        loading={visibilityLoading}
+        c={c} t={t}
+      />
+    );
+  }
 
   if (deepLink.type === 'verify-email') {
     return (
@@ -141,7 +197,7 @@ export function DeepLinkHandler() {
             claimData={inviteData}
             token={deepLink.token}
             onClose={clear}
-            onClaimed={clear}
+            onClaimed={handleInviteClaimed}
             c={c}
             t={t}
             styles={appStyles}
