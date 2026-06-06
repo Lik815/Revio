@@ -7,8 +7,6 @@ import { AuthBridge } from './context/AuthBridge';
 import { TherapyProvider } from './context/TherapyContext';
 import { RootNavigator } from './navigation/RootNavigator';
 
-const ENABLE_NEW_SHELL = process.env.EXPO_PUBLIC_ENABLE_NEW_APP_SHELL === '1';
-
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -66,21 +64,13 @@ export default function App() {
   const bootScheme = useColorScheme();
   const statusBarStyle = bootScheme === 'dark' ? 'light' : 'dark';
 
-  const LegacyApp = require('./legacy/LegacyApp').default;
-
   return (
     <ErrorBoundary>
       <AuthProvider>
         <TherapyProvider>
           <StatusBar style={statusBarStyle} />
-          {ENABLE_NEW_SHELL ? (
-            <>
-              <AuthBridge />
-              <RootNavigator />
-            </>
-          ) : (
-            <LegacyApp />
-          )}
+          <AuthBridge />
+          <RootNavigator />
         </TherapyProvider>
       </AuthProvider>
     </ErrorBoundary>
