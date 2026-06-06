@@ -1,7 +1,7 @@
 import React from 'react';
 import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { useColorScheme } from 'react-native';
+import { ActivityIndicator, View, useColorScheme } from 'react-native';
 import { AppTabs } from './AppTabs';
 import { ROOT_ROUTES } from './route-names';
 import { AuthScreen } from '../screens/auth/AuthScreen';
@@ -9,9 +9,18 @@ import { TherapistProfileScreen } from '../screens/public/TherapistProfileScreen
 import { PracticeProfileScreen } from '../screens/public/PracticeProfileScreen';
 import { COLORS } from '../mobile-utils';
 import { appStoreSelectors, useAppStore } from '../store/useStore';
-import { BootLoading } from '../App';
 
 const Stack = createNativeStackNavigator();
+
+function BootLoading() {
+  const scheme = useColorScheme();
+  const palette = COLORS[scheme === 'dark' ? 'dark' : 'light'];
+  return (
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.background }}>
+      <ActivityIndicator color={palette.primary} size="large" />
+    </View>
+  );
+}
 
 function buildNavigationTheme(palette, mode) {
   const baseTheme = mode === 'dark' ? DarkTheme : DefaultTheme;
