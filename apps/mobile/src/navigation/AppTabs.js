@@ -7,10 +7,8 @@ import { TherapyTabScreen } from '../screens/therapy/TherapyScreen';
 import { FavoritesTabScreen } from '../screens/favorites/FavoritesScreen';
 import { ProfileTabScreen } from '../screens/profile/ProfileScreen';
 import { OptionsTabScreen } from '../screens/options/OptionsScreen';
-import { COLORS } from '../utils/app-utils';
 import { translations } from '../i18n/translations';
-import { appStoreSelectors, useAppStore } from '../store/useStore';
-import { useColorScheme } from 'react-native';
+import { useTheme } from '../hooks/use-theme';
 
 const Tab = createBottomTabNavigator();
 
@@ -30,30 +28,19 @@ const TAB_TRANSLATION_KEYS = {
   [TAB_ROUTES.OPTIONS]:    'tabOptions',
 };
 
-function usePalette() {
-  const systemScheme = useColorScheme();
-  const themePreference = useAppStore(appStoreSelectors.themePreference);
-  const mode = themePreference === 'system' ? systemScheme : themePreference;
-  return COLORS[mode === 'dark' ? 'dark' : 'light'];
-}
-
-function useTranslations() {
-  return translations.de;
-}
-
 export function AppTabs() {
-  const palette = usePalette();
-  const t = useTranslations();
+  const { c } = useTheme();
+  const t = translations.de;
 
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarActiveTintColor: palette.primary,
-        tabBarInactiveTintColor: palette.textMuted ?? palette.muted,
+        tabBarActiveTintColor: c.primary,
+        tabBarInactiveTintColor: c.textMuted ?? c.muted,
         tabBarStyle: {
-          backgroundColor: palette.nav,
-          borderTopColor: palette.border,
+          backgroundColor: c.nav,
+          borderTopColor: c.border,
         },
         tabBarIcon: ({ color, size, focused }) => {
           const baseIcon = TAB_ICON_BY_ROUTE[route.name] ?? 'ellipse';

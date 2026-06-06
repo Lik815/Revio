@@ -143,7 +143,7 @@ export function ProfileTabScreen() {
           onClose={() => setShowProfileSaved(false)}
           title={profileSavedTitle}
           body={profileSavedBody}
-          c={c}
+          c={c} t={t}
         />
         <ReviewNotificationModal
           visible={showReviewNotificationModal}
@@ -184,7 +184,7 @@ export function ProfileTabScreen() {
           onClose={() => setShowProfileSaved(false)}
           title={profileSavedTitle}
           body={profileSavedBody}
-          c={c}
+          c={c} t={t}
         />
         <ReviewNotificationModal
           visible={showReviewNotificationModal}
