@@ -3,6 +3,24 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getBaseUrl, TUNNEL_HEADERS, normalizeTherapistProfile } from '../mobile-utils';
 
 const AuthContext = createContext(null);
+const AUTH_TOKEN_KEY = 'revio_auth_token';
+const AUTH_ACCOUNT_TYPE_KEY = 'revio_account_type';
+const STORE_PERSIST_KEY = 'revio-mobile-store';
+
+function readPersistedStoreSession(rawValue) {
+  if (!rawValue || typeof rawValue !== 'string') return { authToken: null, accountType: null };
+
+  try {
+    const parsed = JSON.parse(rawValue);
+    const state = parsed?.state ?? parsed;
+    return {
+      authToken: typeof state?.authToken === 'string' && state.authToken.trim() ? state.authToken : null,
+      accountType: typeof state?.accountType === 'string' && state.accountType.trim() ? state.accountType : null,
+    };
+  } catch {
+    return { authToken: null, accountType: null };
+  }
+}
 
 export function AuthProvider({ children }) {
   const [authToken, setAuthToken] = useState(null);
@@ -13,40 +31,88 @@ export function AuthProvider({ children }) {
 
   // Restore session from storage on boot
   useEffect(() => {
-    AsyncStorage.multiGet(['revio_auth_token', 'revio_account_type']).then(([[, token], [, type]]) => {
-      if (!token) { setBootReady(true); return; }
-      setAuthToken(token);
-      setAccountType(type ?? null);
+    let cancelled = false;
 
-      fetch(`${getBaseUrl()}/auth/me`, {
-        headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${token}` },
-      })
-        .then(async r => {
-          if (!r.ok) {
-            // Session invalid/expired — clear stored credentials
-            await AsyncStorage.multiRemove(['revio_auth_token', 'revio_account_type']);
-            setAuthToken(null);
-            setAccountType(null);
-            return null;
+    const restoreSession = async () => {
+      try {
+        const entries = await AsyncStorage.multiGet([
+          AUTH_TOKEN_KEY,
+          AUTH_ACCOUNT_TYPE_KEY,
+          STORE_PERSIST_KEY,
+        ]);
+
+        const map = Object.fromEntries(entries);
+        const rawToken = map[AUTH_TOKEN_KEY] ?? null;
+        const rawAccountType = map[AUTH_ACCOUNT_TYPE_KEY] ?? null;
+        const persisted = readPersistedStoreSession(map[STORE_PERSIST_KEY]);
+
+        const resolvedToken = rawToken || persisted.authToken;
+        const resolvedAccountType = rawAccountType || persisted.accountType || null;
+
+        if (!resolvedToken) {
+          if (!cancelled) setBootReady(true);
+          return;
+        }
+
+        // Backfill legacy raw keys from the persisted store if needed.
+        if (!rawToken) {
+          await AsyncStorage.setItem(AUTH_TOKEN_KEY, resolvedToken);
+        }
+        if (!rawAccountType && resolvedAccountType) {
+          await AsyncStorage.setItem(AUTH_ACCOUNT_TYPE_KEY, resolvedAccountType);
+        }
+
+        if (cancelled) return;
+
+        setAuthToken(resolvedToken);
+        setAccountType(resolvedAccountType);
+
+        try {
+          const response = await fetch(`${getBaseUrl()}/auth/me`, {
+            headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${resolvedToken}` },
+          });
+
+          if (!response.ok) {
+            await AsyncStorage.multiRemove([AUTH_TOKEN_KEY, AUTH_ACCOUNT_TYPE_KEY]);
+            if (!cancelled) {
+              setAuthToken(null);
+              setAccountType(null);
+              setLoggedInPatient(null);
+              setLoggedInTherapist(null);
+            }
+            return;
           }
-          return r.json();
-        })
-        .then(profile => {
-          if (!profile) return;
+
+          const profile = await response.json();
+          if (cancelled || !profile) return;
+
           if (profile.role === 'patient') {
             setLoggedInPatient(profile);
+            setLoggedInTherapist(null);
           } else {
             setLoggedInTherapist(normalizeTherapistProfile(profile));
+            setLoggedInPatient(null);
           }
-        })
-        .catch(() => {})
-        .finally(() => setBootReady(true));
-    }).catch(() => setBootReady(true));
+        } catch {
+          // Keep resolved token in memory so existing sessions are not dropped on transient boot errors.
+        } finally {
+          if (!cancelled) setBootReady(true);
+        }
+      } catch {
+        if (!cancelled) setBootReady(true);
+      }
+    };
+
+    restoreSession();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const loginAsTherapist = async (token, therapist) => {
-    await AsyncStorage.setItem('revio_auth_token', token);
-    await AsyncStorage.setItem('revio_account_type', 'therapist');
+    await AsyncStorage.setItem(AUTH_TOKEN_KEY, token);
+    await AsyncStorage.setItem(AUTH_ACCOUNT_TYPE_KEY, 'therapist');
     setAuthToken(token);
     setAccountType('therapist');
     setLoggedInTherapist(therapist ? normalizeTherapistProfile(therapist) : null);
@@ -54,8 +120,8 @@ export function AuthProvider({ children }) {
   };
 
   const loginAsPatient = async (token, patient) => {
-    await AsyncStorage.setItem('revio_auth_token', token);
-    await AsyncStorage.setItem('revio_account_type', 'patient');
+    await AsyncStorage.setItem(AUTH_TOKEN_KEY, token);
+    await AsyncStorage.setItem(AUTH_ACCOUNT_TYPE_KEY, 'patient');
     setAuthToken(token);
     setAccountType('patient');
     setLoggedInPatient(patient ?? null);
@@ -63,7 +129,7 @@ export function AuthProvider({ children }) {
   };
 
   const logout = async () => {
-    await AsyncStorage.multiRemove(['revio_auth_token', 'revio_account_type']);
+    await AsyncStorage.multiRemove([AUTH_TOKEN_KEY, AUTH_ACCOUNT_TYPE_KEY]);
     setAuthToken(null);
     setAccountType(null);
     setLoggedInTherapist(null);

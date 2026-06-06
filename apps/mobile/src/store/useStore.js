@@ -49,6 +49,12 @@ export const useAppStore = create(
         });
       },
 
+      setAuthHydrated: (authHydrated) => {
+        set({
+          authHydrated: Boolean(authHydrated),
+        });
+      },
+
       signIn: ({ authToken, accountType, loggedInPatient = null, loggedInTherapist = null }) => {
         set({
           authHydrated: true,
@@ -151,7 +157,11 @@ export const useAppStore = create(
         favoritesLastLoadedAt: state.favoritesLastLoadedAt,
         themePreference: state.themePreference,
       }),
-      onRehydrateStorage: () => () => {},
+      onRehydrateStorage: () => (state, error) => {
+        if (!error) {
+          state?.setAuthHydrated?.(true);
+        }
+      },
     },
   ),
 );
