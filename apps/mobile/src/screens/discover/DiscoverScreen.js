@@ -46,7 +46,7 @@ export function DiscoverTabScreen() {
     dismissNotification, dismissAllNotifications,
   } = useNotificationPolling({ authToken, accountType });
 
-  const search = useSearch();
+  const search = useSearch({ t });
   const discoverScrollRef = useRef(null);
 
   const ThemedHeartButton = (props) => (
