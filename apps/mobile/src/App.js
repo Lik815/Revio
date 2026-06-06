@@ -1,44 +1,11 @@
 import React from 'react';
-import { ActivityIndicator, ScrollView, Text, View, useColorScheme } from 'react-native';
+import { ActivityIndicator, Text, View, useColorScheme } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { COLORS } from './mobile-utils';
 import { AuthProvider } from './context/AuthContext';
 import { TherapyProvider } from './context/TherapyContext';
 import { AuthBridge } from './context/AuthBridge';
 import { DeepLinkHandler } from './context/DeepLinkHandler';
-
-const ENABLE_NEW_APP_SHELL = process.env.EXPO_PUBLIC_ENABLE_NEW_APP_SHELL === '1';
-
-class ErrorBoundary extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { error: null };
-  }
-  static getDerivedStateFromError(error) {
-    return { error };
-  }
-  render() {
-    if (this.state.error) {
-      const palette = COLORS['light'];
-      return (
-        <View style={{ flex: 1, backgroundColor: palette.background, padding: 24, paddingTop: 60 }}>
-          <Text style={{ color: palette.error, fontSize: 18, fontWeight: '700', marginBottom: 12 }}>
-            App-Fehler
-          </Text>
-          <ScrollView>
-            <Text style={{ color: palette.text, fontSize: 13, fontFamily: 'monospace', lineHeight: 20 }}>
-              {this.state.error?.message ?? 'Unbekannter Fehler'}
-            </Text>
-            <Text style={{ color: palette.textMuted, fontSize: 11, marginTop: 12, lineHeight: 18 }}>
-              {this.state.error?.stack ?? ''}
-            </Text>
-          </ScrollView>
-        </View>
-      );
-    }
-    return this.props.children;
-  }
-}
 
 function BootError({ error }) {
   const systemScheme = useColorScheme();
@@ -88,20 +55,6 @@ function BootLoading() {
 export default function App() {
   const bootScheme = useColorScheme();
   const statusBarStyle = bootScheme === 'dark' ? 'light' : 'dark';
-
-  if (!ENABLE_NEW_APP_SHELL) {
-    const LegacyApp = require('./legacy/LegacyApp').default;
-    return (
-      <ErrorBoundary>
-        <AuthProvider>
-          <TherapyProvider>
-            <StatusBar style={statusBarStyle} />
-            <LegacyApp />
-          </TherapyProvider>
-        </AuthProvider>
-      </ErrorBoundary>
-    );
-  }
 
   try {
     require('react-native-gesture-handler');
