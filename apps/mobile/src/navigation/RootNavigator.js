@@ -9,6 +9,7 @@ import { TherapistProfileScreen } from '../screens/public/TherapistProfileScreen
 import { PracticeProfileScreen } from '../screens/public/PracticeProfileScreen';
 import { COLORS } from '../mobile-utils';
 import { appStoreSelectors, useAppStore } from '../store/useStore';
+import { BootLoading } from '../App';
 
 const Stack = createNativeStackNavigator();
 
@@ -32,12 +33,15 @@ export function RootNavigator() {
   const systemScheme = useColorScheme();
   const themePreference = useAppStore(appStoreSelectors.themePreference);
   const isAuthenticated = useAppStore(appStoreSelectors.isAuthenticated);
+  const authHydrated = useAppStore(appStoreSelectors.authHydrated);
   const mode = themePreference === 'system' ? systemScheme : themePreference;
   const palette = COLORS[mode === 'dark' ? 'dark' : 'light'];
   const navigationTheme = React.useMemo(
     () => buildNavigationTheme(palette, mode === 'dark' ? 'dark' : 'light'),
     [mode, palette],
   );
+
+  if (!authHydrated) return <BootLoading />;
 
   return (
     <NavigationContainer theme={navigationTheme}>

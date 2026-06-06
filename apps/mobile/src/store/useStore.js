@@ -166,6 +166,7 @@ export const appStoreSelectors = {
   authToken: (state) => state.authToken,
   accountType: (state) => state.accountType,
   isAuthenticated: (state) => Boolean(state.authToken),
+  authHydrated: (state) => state.authHydrated,
   themePreference: (state) => state.themePreference,
   favorites: (state) => state.favorites,
   loggedInPatient: (state) => state.loggedInPatient,
