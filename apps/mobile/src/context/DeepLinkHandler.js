@@ -7,10 +7,10 @@ import { useTheme } from '../hooks/use-theme';
 import { appStyles } from '../styles/app-styles';
 import { translations } from '../i18n/translations';
 import { getBaseUrl, normalizeTherapistProfile, TUNNEL_HEADERS } from '../utils/app-utils';
-import { EmailVerifyScreen } from '../mobile-email-verify-screen';
-import { InviteClaimScreen } from '../mobile-invite-claim-screen';
-import { ResetPasswordModal } from '../mobile-reset-password-modal';
-import { VisibilityModal } from '../mobile-visibility-modal';
+import { EmailVerifyScreen } from '../_archive/screens/mobile-email-verify-screen';
+import { InviteClaimScreen } from '../_archive/screens/mobile-invite-claim-screen';
+import { ResetPasswordModal } from '../_archive/screens/mobile-reset-password-modal';
+import { VisibilityModal } from '../_archive/screens/mobile-visibility-modal';
 
 const t = (key) => translations.de[key] ?? key;
 

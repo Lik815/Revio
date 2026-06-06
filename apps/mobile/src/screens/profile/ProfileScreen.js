@@ -14,11 +14,11 @@ import { fortbildungOptions, getBaseUrl, TUNNEL_HEADERS } from '../../utils/app-
 import { TabHeader } from '../../components/TabHeader';
 import { ToastOverlay } from '../../components/ToastOverlay';
 import { NotificationSheet } from '../../modals/NotificationSheet';
-import { ProfileSavedModal } from '../../mobile-profile-saved-modal';
-import { ReviewNotificationModal } from '../../mobile-review-notification-modal';
-import { PhotoPromptModal } from '../../mobile-photo-prompt-modal';
-import { TherapistDashboardScreen } from '../../mobile-therapist-dashboard';
-import { PatientDashboardScreen } from '../../mobile-patient-dashboard';
+import { ProfileSavedModal } from '../../_archive/screens/mobile-profile-saved-modal';
+import { ReviewNotificationModal } from '../../_archive/screens/mobile-review-notification-modal';
+import { PhotoPromptModal } from '../../_archive/screens/mobile-photo-prompt-modal';
+import { TherapistDashboardScreen } from '../../_archive/screens/mobile-therapist-dashboard';
+import { PatientDashboardScreen } from '../../_archive/screens/mobile-patient-dashboard';
 import { useTherapyData } from '../../context/TherapyContext';
 import { useAuth } from '../../context/AuthContext';
 

@@ -14,7 +14,7 @@ import { SkeletonCard } from '../../components/SkeletonCard';
 import { ToastOverlay } from '../../components/ToastOverlay';
 import { NotificationSheet } from '../../modals/NotificationSheet';
 import { appStyles } from '../../styles/app-styles';
-import { DiscoverScreen } from '../../mobile-discover-screen';
+import { DiscoverScreen } from '../../_archive/screens/mobile-discover-screen';
 
 const t = (key) => translations.de[key] ?? key;
 

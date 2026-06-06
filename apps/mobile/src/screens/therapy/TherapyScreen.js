@@ -11,12 +11,12 @@ import { ROOT_ROUTES } from '../../navigation/route-names';
 import { SPACE, getBaseUrl, TUNNEL_HEADERS } from '../../utils/app-utils';
 import { TabHeader } from '../../components/TabHeader';
 import { NotificationSheet } from '../../modals/NotificationSheet';
-import { TherapyTabPatient, TherapyTabTherapist } from '../../mobile-therapy-tabs';
-import { AppointmentDetail } from '../../mobile-appointment-detail';
-import { CancelAppointmentModal } from '../../mobile-cancel-appointment-modal';
-import { TherapistCancelModal } from '../../mobile-therapist-cancel-modal';
-import { SlotComposerModal } from '../../mobile-slot-composer-modal';
-import { SlotCreatedModal } from '../../mobile-slot-created-modal';
+import { TherapyTabPatient, TherapyTabTherapist } from '../../_archive/screens/mobile-therapy-tabs';
+import { AppointmentDetail } from '../../_archive/screens/mobile-appointment-detail';
+import { CancelAppointmentModal } from '../../_archive/screens/mobile-cancel-appointment-modal';
+import { TherapistCancelModal } from '../../_archive/screens/mobile-therapist-cancel-modal';
+import { SlotComposerModal } from '../../_archive/screens/mobile-slot-composer-modal';
+import { SlotCreatedModal } from '../../_archive/screens/mobile-slot-created-modal';
 import { useTherapyData } from '../../context/TherapyContext';
 
 const t = (key) => translations.de[key] ?? key;
