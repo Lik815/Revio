@@ -11,7 +11,7 @@ import {
   RADIUS, REG_STEPS, SPACE, TYPE,
   fortbildungOptions, getBaseUrl, getLangLabel, kassenartOptions,
   languageOptions, regSpecOptions, TUNNEL_HEADERS, ICON_HIT_SLOP,
-} from './utils/app-utils';
+} from '../../utils/app-utils';
 import { ComplianceStatusStep } from './mobile-compliance-step';
 
 const FREELANCE_HELP_URL = 'https://my-revio.de/blog/freiberuflich-als-physiotherapeut-starten';

@@ -20,9 +20,9 @@ import {
   softenErrorMessage,
   TUNNEL_HEADERS,
   TYPE,
-} from './utils/app-utils';
-import { useAuth } from './context/AuthContext';
-import { useTherapyData } from './context/TherapyContext';
+} from '../../utils/app-utils';
+import { useAuth } from '../../context/AuthContext';
+import { useTherapyData } from '../../context/TherapyContext';
 
 export function LoginScreen({ c, styles, t, onClose, bookingTargetTherapist, onBookingReady }) {
   const { loginAsTherapist, loginAsPatient } = useAuth();

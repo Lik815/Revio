@@ -1,6 +1,6 @@
 import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { softenErrorMessage } from './utils/app-utils';
+import { softenErrorMessage } from '../../utils/app-utils';
 
 export function EmailVerifyScreen({ status, error, onCancel, c, t, styles: sharedStyles }) {
   return (

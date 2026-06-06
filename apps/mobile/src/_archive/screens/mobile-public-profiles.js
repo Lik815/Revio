@@ -22,7 +22,7 @@ import {
   resolveMediaUrl,
   softenErrorMessage,
   TYPE,
-} from './utils/app-utils';
+} from '../../utils/app-utils';
 
 const webNavigator = typeof globalThis !== 'undefined' ? globalThis.navigator : undefined;
 const webAlert = typeof globalThis !== 'undefined' ? globalThis.alert : undefined;

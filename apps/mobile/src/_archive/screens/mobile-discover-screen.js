@@ -20,7 +20,7 @@ import {
   RADIUS,
   SPACE,
   TYPE,
-} from './utils/app-utils';
+} from '../../utils/app-utils';
 
 function formatNextSlot(isoString) {
   if (!isoString) return null;
@@ -50,7 +50,7 @@ function formatNextSlot(isoString) {
 function loadMapComponents() {
   try {
     const mapModule = Platform.OS === 'web'
-      ? require('./MapStub')
+      ? require('../../MapStub')
       : require('react-native-maps');
 
     return {
@@ -420,7 +420,7 @@ export function DiscoverScreen(props) {
         <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 10, backgroundColor: c.background, zIndex: 10, gap: SPACE.sm }}>
           <View style={[styles.header, { justifyContent: 'space-between', marginBottom: 0 }]}>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Image source={require('../assets/icon.png')} style={styles.logoMark} />
+              <Image source={require('../../../assets/icon.png')} style={styles.logoMark} />
               <Text style={[styles.brandName, { color: c.text }]}>evio</Text>
             </View>
             <View style={{ width: 40 }} />
@@ -591,7 +591,7 @@ export function DiscoverScreen(props) {
       <View style={{ backgroundColor: c.background, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 10, zIndex: 10, gap: SPACE.sm }}>
         <View style={[styles.header, { justifyContent: 'space-between' }]}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Image source={require('../assets/icon.png')} style={styles.logoMark} />
+            <Image source={require('../../../assets/icon.png')} style={styles.logoMark} />
             <Text style={[styles.brandName, { color: c.text }]}>evio</Text>
           </View>
           <View style={{ width: 40 }} />

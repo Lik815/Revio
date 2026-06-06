@@ -4,7 +4,7 @@ import {
   StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { RADIUS, TYPE, getBaseUrl, TUNNEL_HEADERS } from './utils/app-utils';
+import { RADIUS, TYPE, getBaseUrl, TUNNEL_HEADERS } from '../../utils/app-utils';
 
 const ICON_HIT_SLOP = { top: 10, bottom: 10, left: 10, right: 10 };
 

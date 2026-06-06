@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Image, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { getBaseUrl, normalizeTherapistProfile, softenErrorMessage } from './utils/app-utils';
+import { getBaseUrl, normalizeTherapistProfile, softenErrorMessage } from '../../utils/app-utils';
 
 const ICON_HIT_SLOP = { top: 10, bottom: 10, left: 10, right: 10 };
 
@@ -72,7 +72,7 @@ export function InviteClaimScreen({
   return (
     <ScrollView contentContainerStyle={[sharedStyles.scrollContent, { paddingBottom: 40 }]} keyboardShouldPersistTaps="handled">
       <View style={[sharedStyles.infoCard, { backgroundColor: c.card, borderColor: c.border, marginTop: 20, alignItems: 'center' }]}>
-        <Image source={require('../assets/icon.png')} style={{ width: 56, height: 56, borderRadius: 16 }} />
+        <Image source={require('../../../assets/icon.png')} style={{ width: 56, height: 56, borderRadius: 16 }} />
         <Text style={[sharedStyles.infoTitle, { color: c.text, textAlign: 'center', marginTop: 8 }]}>{t('youWereInvited')}</Text>
         <Text style={[sharedStyles.infoBody, { color: c.muted, textAlign: 'center' }]}>
           {t('inviteSetPasswordInfo').replace('{name}', invitePractice.name)}

@@ -9,7 +9,7 @@ import {
   RADIUS,
   SPACE,
   TYPE,
-} from './utils/app-utils';
+} from '../../utils/app-utils';
 
 const TAX_OPTIONS = ['yes', 'no', 'in_progress'];
 const HEALTH_OPTIONS = ['yes', 'no', 'in_progress', 'unknown'];

@@ -4,7 +4,7 @@ import {
   Text, View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { SPACE, formatDayHeader, getBaseUrl, TUNNEL_HEADERS } from './utils/app-utils';
+import { SPACE, formatDayHeader, getBaseUrl, TUNNEL_HEADERS } from '../../utils/app-utils';
 import { PatientAppointmentCard, TherapistBookingCard, STATUS_COLORS } from './mobile-booking';
 import { TherapistTimeline } from './mobile-slot-composer';
 
@@ -63,7 +63,7 @@ export function TherapyTabPatient({
       {/* ── Header ─────────────────────────────────────────────────── */}
       <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 10, backgroundColor: c.background }}>
         <View style={[styles.header, { marginBottom: 0 }]}>
-          <Image source={require('../assets/icon.png')} style={styles.logoMark} />
+          <Image source={require('../../../assets/icon.png')} style={styles.logoMark} />
           <Text style={[styles.headerTitle, { color: c.text, flex: 1 }]}>Meine Termine</Text>
           <Pressable onPress={() => onShowNotifications()} style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: c.card, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' }}>
             <Ionicons name="notifications-outline" size={18} color={c.text} />
@@ -261,7 +261,7 @@ export function TherapyTabTherapist({
       {/* ── Header ─────────────────────────────────────────────────── */}
       <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 10, backgroundColor: c.background }}>
         <View style={[styles.header, { marginBottom: 0 }]}>
-          <Image source={require('../assets/icon.png')} style={styles.logoMark} />
+          <Image source={require('../../../assets/icon.png')} style={styles.logoMark} />
           <Text style={[styles.headerTitle, { color: c.text, flex: 1 }]}>{'Meine Termine'}</Text>
           <Pressable onPress={() => onShowNotifications()} style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: c.card, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' }}>
             <Ionicons name="notifications-outline" size={18} color={c.text} />

@@ -27,12 +27,12 @@ import {
   TUNNEL_HEADERS,
   normalizeTherapistProfile,
   normalizeLanguageCodes,
-} from './utils/app-utils';
+} from '../../utils/app-utils';
 import {
   ComplianceStatusStep,
   getComplianceStatusLabel,
 } from './mobile-compliance-step';
-import { useAuth } from './context/AuthContext';
+import { useAuth } from '../../context/AuthContext';
 
 const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024;
 

@@ -1,7 +1,7 @@
 import React from 'react';
 import { ActivityIndicator, Image, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { TabHeader } from './components/TabHeader';
+import { TabHeader } from '../../components/TabHeader';
 
 const ICON_HIT_SLOP = { top: 10, bottom: 10, left: 10, right: 10 };
 const shouldShowSectionLoading = (isLoading, lastLoadedAt) => isLoading && lastLoadedAt === 0;
