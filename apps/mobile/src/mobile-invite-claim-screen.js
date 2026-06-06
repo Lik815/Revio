@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Image, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { getBaseUrl, normalizeTherapistProfile, softenErrorMessage } from './mobile-utils';
+import { getBaseUrl, normalizeTherapistProfile, softenErrorMessage } from './utils/app-utils';
 
 const ICON_HIT_SLOP = { top: 10, bottom: 10, left: 10, right: 10 };
 

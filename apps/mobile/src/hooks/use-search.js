@@ -8,7 +8,7 @@ import {
   getBaseUrl,
   haversine,
   mapApiTherapist,
-} from '../mobile-utils';
+} from '../utils/app-utils';
 
 const webNavigator = typeof globalThis !== 'undefined' ? globalThis.navigator : undefined;
 

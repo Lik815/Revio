@@ -1,7 +1,7 @@
 import React from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, Text, View } from 'react-native';
-import { RADIUS } from '../mobile-utils';
+import { RADIUS } from '../utils/app-utils';
 
 /**
  * Props:

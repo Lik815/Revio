@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getBaseUrl } from '../mobile-utils';
+import { getBaseUrl } from '../utils/app-utils';
 
 const NotifContext = createContext(null);
 

@@ -3,7 +3,7 @@ import {
   Image, Linking, Pressable, ScrollView, Text, View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { resolveMediaUrl, SHADOW, SPACE } from './mobile-utils';
+import { resolveMediaUrl, SHADOW, SPACE } from './utils/app-utils';
 import { STATUS_COLORS } from './mobile-booking';
 import { TabHeader } from './components/TabHeader';
 

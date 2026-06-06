@@ -32,7 +32,7 @@ import {
   normalizeTherapistProfile,
   softenErrorMessage,
   tabs,
-} from '../mobile-utils';
+} from '../utils/app-utils';
 import { HeartButton } from '../components/HeartButton';
 import { MobileBottomNav } from '../components/MobileBottomNav';
 import { NotificationBell } from '../components/NotificationBell';
@@ -57,7 +57,7 @@ import {
 } from '../mobile-therapist-dashboard';
 import {
   } from '../mobile-compliance-step';
-import { translations } from '../mobile-translations';
+import { translations } from '../i18n/translations';
 import { PatientDashboardScreen } from '../mobile-patient-dashboard';
 import { BookingRequestForm } from '../mobile-booking';
 import { TherapistRegistrationFlow } from '../mobile-therapist-registration-flow';

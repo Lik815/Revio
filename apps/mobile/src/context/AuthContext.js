@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getBaseUrl, TUNNEL_HEADERS, normalizeTherapistProfile } from '../mobile-utils';
+import { getBaseUrl, TUNNEL_HEADERS, normalizeTherapistProfile } from '../utils/app-utils';
 
 const AuthContext = createContext(null);
 const AUTH_TOKEN_KEY = 'revio_auth_token';

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getBaseUrl } from '../mobile-utils';
+import { getBaseUrl } from '../utils/app-utils';
 
 const REVIEW_NOTIFICATION_TYPES = new Set([
   'PROFILE_APPROVED',

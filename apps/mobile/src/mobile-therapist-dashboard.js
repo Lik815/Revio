@@ -27,7 +27,7 @@ import {
   TUNNEL_HEADERS,
   normalizeTherapistProfile,
   normalizeLanguageCodes,
-} from './mobile-utils';
+} from './utils/app-utils';
 import {
   ComplianceStatusStep,
   getComplianceStatusLabel,

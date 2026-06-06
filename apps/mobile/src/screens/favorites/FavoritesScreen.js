@@ -6,7 +6,7 @@ import { useFavorites } from '../../hooks/use-favorites';
 import { useNotificationPolling } from '../../hooks/use-notification-polling';
 import { useToast } from '../../hooks/use-toast';
 import { appStyles } from '../../styles/app-styles';
-import { translations } from '../../mobile-translations';
+import { translations } from '../../i18n/translations';
 import { ROOT_ROUTES, TAB_ROUTES } from '../../navigation/route-names';
 import { FavoritesTab } from '../../mobile-favorites-tab';
 import { NotificationSheet } from '../../modals/NotificationSheet';

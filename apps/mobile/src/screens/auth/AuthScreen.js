@@ -2,13 +2,13 @@ import React, { useState } from 'react';
 import { View } from 'react-native';
 import { useTheme } from '../../hooks/use-theme';
 import { appStyles } from '../../styles/app-styles';
-import { translations } from '../../mobile-translations';
+import { translations } from '../../i18n/translations';
 import { LoginScreen, TherapistLandingScreen } from '../../mobile-therapist-screens';
 import { PatientSignupFlow } from '../../mobile-patient-signup-flow';
 import { TherapistRegistrationFlow } from '../../mobile-therapist-registration-flow';
 import { useAuth } from '../../context/AuthContext';
 import { useTherapyData } from '../../context/TherapyContext';
-import { getBaseUrl, normalizeTherapistProfile, TUNNEL_HEADERS } from '../../mobile-utils';
+import { getBaseUrl, normalizeTherapistProfile, TUNNEL_HEADERS } from '../../utils/app-utils';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const t = (key) => translations.de[key] ?? key;

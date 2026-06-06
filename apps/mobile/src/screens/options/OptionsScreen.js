@@ -4,7 +4,7 @@ import { appStoreSelectors, useAppStore } from '../../store/useStore';
 import { useTheme } from '../../hooks/use-theme';
 import { useNotificationPolling } from '../../hooks/use-notification-polling';
 import { appStyles } from '../../styles/app-styles';
-import { translations } from '../../mobile-translations';
+import { translations } from '../../i18n/translations';
 import { ROOT_ROUTES, TAB_ROUTES } from '../../navigation/route-names';
 import { OptionsScreen } from '../../mobile-options-screen';
 import { FeedbackModal } from '../../mobile-feedback-modal';

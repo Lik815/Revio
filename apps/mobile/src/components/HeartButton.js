@@ -1,7 +1,7 @@
 import React from 'react';
 import { Animated, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS } from '../mobile-utils';
+import { COLORS } from '../utils/app-utils';
 
 const DEFAULT_HIT_SLOP = { top: 10, bottom: 10, left: 10, right: 10 };
 

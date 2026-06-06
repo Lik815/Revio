@@ -10,7 +10,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { getBaseUrl, RADIUS, SHADOW, SPACE, TYPE, resolveMediaUrl } from './mobile-utils';
+import { getBaseUrl, RADIUS, SHADOW, SPACE, TYPE, resolveMediaUrl } from './utils/app-utils';
 
 function TherapistAvatar({ therapist, size = 40, c }) {
   const [imgError, setImgError] = useState(false);

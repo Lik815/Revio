@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import React from 'react';
 import { Image, Linking, Pressable, ScrollView, Switch, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { SPACE, getBaseUrl } from './mobile-utils';
+import { SPACE, getBaseUrl } from './utils/app-utils';
 
 export function OptionsScreen({
   loggedInTherapist, loggedInPatient, accountType,

@@ -4,7 +4,7 @@ import {
   Text, View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { SPACE, formatDayHeader, getBaseUrl, TUNNEL_HEADERS } from './mobile-utils';
+import { SPACE, formatDayHeader, getBaseUrl, TUNNEL_HEADERS } from './utils/app-utils';
 import { PatientAppointmentCard, TherapistBookingCard, STATUS_COLORS } from './mobile-booking';
 import { TherapistTimeline } from './mobile-slot-composer';
 

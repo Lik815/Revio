@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { getBaseUrl, TUNNEL_HEADERS } from '../mobile-utils';
+import { getBaseUrl, TUNNEL_HEADERS } from '../utils/app-utils';
 
 export function useFavorites({ authToken, showToast, t }) {
   const [favorites, setFavorites] = useState([]);

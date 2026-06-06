@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
-import { getBaseUrl, TUNNEL_HEADERS } from '../mobile-utils';
+import { getBaseUrl, TUNNEL_HEADERS } from '../utils/app-utils';
 
 const TherapyContext = createContext(null);
 

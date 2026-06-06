@@ -20,7 +20,7 @@ import {
   RADIUS,
   SPACE,
   TYPE,
-} from './mobile-utils';
+} from './utils/app-utils';
 
 function formatNextSlot(isoString) {
   if (!isoString) return null;

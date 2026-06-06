@@ -20,7 +20,7 @@ import {
   softenErrorMessage,
   TUNNEL_HEADERS,
   TYPE,
-} from './mobile-utils';
+} from './utils/app-utils';
 import { useAuth } from './context/AuthContext';
 import { useTherapyData } from './context/TherapyContext';
 

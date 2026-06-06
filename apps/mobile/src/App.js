@@ -1,7 +1,7 @@
 import React from 'react';
 import { ActivityIndicator, ScrollView, Text, View, useColorScheme } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { COLORS } from './mobile-utils';
+import { COLORS } from './utils/app-utils';
 import { AuthProvider } from './context/AuthContext';
 import { AuthBridge } from './context/AuthBridge';
 import { TherapyProvider } from './context/TherapyContext';

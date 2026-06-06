@@ -8,7 +8,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { getBaseUrl, RADIUS, SHADOW, SPACE, TUNNEL_HEADERS, TYPE } from './mobile-utils';
+import { getBaseUrl, RADIUS, SHADOW, SPACE, TUNNEL_HEADERS, TYPE } from './utils/app-utils';
 
 export function PatientDashboardScreen({
   c, loggedInPatient, styles, t, authToken, onProfileSaved,

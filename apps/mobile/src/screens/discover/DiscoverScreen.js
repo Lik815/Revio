@@ -7,7 +7,7 @@ import { useFavorites } from '../../hooks/use-favorites';
 import { useNotificationPolling } from '../../hooks/use-notification-polling';
 import { useToast } from '../../hooks/use-toast';
 import { useSearch } from '../../hooks/use-search';
-import { translations } from '../../mobile-translations';
+import { translations } from '../../i18n/translations';
 import { ROOT_ROUTES, TAB_ROUTES } from '../../navigation/route-names';
 import { HeartButton } from '../../components/HeartButton';
 import { SkeletonCard } from '../../components/SkeletonCard';

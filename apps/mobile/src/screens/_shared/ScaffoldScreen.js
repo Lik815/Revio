@@ -1,7 +1,7 @@
 import React from 'react';
 import { Pressable, Text, View, useColorScheme } from 'react-native';
-import { COLORS, RADIUS, SHADOW, SPACE, TYPE } from '../../mobile-utils';
-import { translations } from '../../mobile-translations';
+import { COLORS, RADIUS, SHADOW, SPACE, TYPE } from '../../utils/app-utils';
+import { translations } from '../../i18n/translations';
 import { appStoreSelectors, useAppStore } from '../../store/useStore';
 
 function usePalette() {

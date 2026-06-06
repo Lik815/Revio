@@ -1,6 +1,6 @@
 import React from 'react';
 import { View } from 'react-native';
-import { RADIUS } from '../mobile-utils';
+import { RADIUS } from '../utils/app-utils';
 
 export function SkeletonCard({ C }) {
   return (

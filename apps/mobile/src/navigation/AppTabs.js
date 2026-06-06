@@ -7,8 +7,8 @@ import { TherapyTabScreen } from '../screens/therapy/TherapyScreen';
 import { FavoritesTabScreen } from '../screens/favorites/FavoritesScreen';
 import { ProfileTabScreen } from '../screens/profile/ProfileScreen';
 import { OptionsTabScreen } from '../screens/options/OptionsScreen';
-import { COLORS } from '../mobile-utils';
-import { translations } from '../mobile-translations';
+import { COLORS } from '../utils/app-utils';
+import { translations } from '../i18n/translations';
 import { appStoreSelectors, useAppStore } from '../store/useStore';
 import { useColorScheme } from 'react-native';
 

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   ActivityIndicator, Modal, Pressable, StyleSheet, Text, TextInput, View,
 } from 'react-native';
-import { RADIUS, TYPE, getBaseUrl, TUNNEL_HEADERS } from './mobile-utils';
+import { RADIUS, TYPE, getBaseUrl, TUNNEL_HEADERS } from './utils/app-utils';
 
 export function ChangePasswordModal({ visible, onClose, authToken, c, t }) {
   const [current, setCurrent] = useState('');

@@ -9,7 +9,7 @@ import {
   View,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getBaseUrl, TUNNEL_HEADERS } from '../mobile-utils';
+import { getBaseUrl, TUNNEL_HEADERS } from '../utils/app-utils';
 
 const AUTH_TOKEN_KEY = 'revio_auth_token';
 const AUTH_ACCOUNT_TYPE_KEY = 'revio_account_type';

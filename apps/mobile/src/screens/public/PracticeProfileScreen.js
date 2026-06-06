@@ -4,9 +4,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useTheme } from '../../hooks/use-theme';
 import { appStyles } from '../../styles/app-styles';
-import { translations } from '../../mobile-translations';
+import { translations } from '../../i18n/translations';
 import { ROOT_ROUTES } from '../../navigation/route-names';
-import { getBaseUrl, mapApiTherapist, softenErrorMessage, TUNNEL_HEADERS } from '../../mobile-utils';
+import { getBaseUrl, mapApiTherapist, softenErrorMessage, TUNNEL_HEADERS } from '../../utils/app-utils';
 import { PracticeProfileScreen as PracticeProfileContent } from '../../mobile-public-profiles';
 
 const t = (key) => translations.de[key] ?? key;

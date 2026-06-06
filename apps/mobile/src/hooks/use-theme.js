@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useColorScheme } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { COLORS } from '../mobile-utils';
+import { COLORS } from '../utils/app-utils';
 
 export function useTheme() {
   const systemScheme = useColorScheme();

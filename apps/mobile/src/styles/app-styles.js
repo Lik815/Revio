@@ -1,5 +1,5 @@
 import { StyleSheet } from 'react-native';
-import { COLORS, RADIUS, SHADOW, SPACE, TYPE } from '../mobile-utils';
+import { COLORS, RADIUS, SHADOW, SPACE, TYPE } from '../utils/app-utils';
 
 const BOTTOM_NAV_HEIGHT = 86;
 

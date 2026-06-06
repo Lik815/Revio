@@ -7,7 +7,7 @@ import { ROOT_ROUTES } from './route-names';
 import { AuthScreen } from '../screens/auth/AuthScreen';
 import { TherapistProfileScreen } from '../screens/public/TherapistProfileScreen';
 import { PracticeProfileScreen } from '../screens/public/PracticeProfileScreen';
-import { COLORS } from '../mobile-utils';
+import { COLORS } from '../utils/app-utils';
 import { appStoreSelectors, useAppStore } from '../store/useStore';
 import { useAuth } from '../context/AuthContext';
 
