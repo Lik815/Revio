@@ -10,9 +10,10 @@ export function OptionsScreen({
   notifications, dismissedNotifIds,
   onShowNotifications, onShowLogin, onShowRegister,
   onShowFeedback, onShowChangePassword, onDeleteAccount, onLogout,
-  onNavigateToProfile,
+  onNavigateToProfile, onShowDebug,
   c, t, styles,
 }) {
+  const [debugTapCount, setDebugTapCount] = React.useState(0);
 const renderOptions = () => {
   const isLoggedIn = Boolean(loggedInTherapist || loggedInPatient);
   const canDeleteAccount = typeof onDeleteAccount === 'function';
@@ -221,7 +222,21 @@ const renderOptions = () => {
           </>
         )}
 
-        <Text style={{ fontSize: 12, color: c.muted, textAlign: 'center', marginTop: 28 }}>Version 0.1.0 MVP</Text>
+        <Pressable
+          onPress={() => {
+            const next = debugTapCount + 1;
+            setDebugTapCount(next);
+            if (next >= 5) {
+              setDebugTapCount(0);
+              if (typeof onShowDebug === 'function') onShowDebug();
+            }
+          }}
+          hitSlop={12}
+        >
+          <Text style={{ fontSize: 12, color: c.muted, textAlign: 'center', marginTop: 28 }}>
+            Version 0.1.0 MVP{debugTapCount > 0 && debugTapCount < 5 ? ` (${debugTapCount}/5)` : ''}
+          </Text>
+        </Pressable>
       </ScrollView>
     </View>
   );

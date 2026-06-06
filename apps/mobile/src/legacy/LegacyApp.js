@@ -71,6 +71,7 @@ import { InviteClaimScreen } from '../mobile-invite-claim-screen';
 import { TherapyTabPatient, TherapyTabTherapist } from '../mobile-therapy-tabs';
 import { AppointmentDetail } from '../mobile-appointment-detail';
 import { OptionsScreen } from '../mobile-options-screen';
+import { AuthDebugScreen } from '../screens/AuthDebugScreen';
 import { useAuth } from '../context/AuthContext';
 import { useTherapyData } from '../context/TherapyContext';
 import { NotificationSheet } from '../modals/NotificationSheet';
@@ -241,6 +242,7 @@ export default function App() {
     loggedInTherapist, setLoggedInTherapist,
     loggedInPatient, setLoggedInPatient,
     accountType, setAccountType,
+    bootReady,
     loginAsTherapist, loginAsPatient, logout: logoutFromContext,
   } = useAuth();
   // Therapy data — from TherapyContext
@@ -622,6 +624,7 @@ export default function App() {
   };
 
   const discoverScrollRef = React.useRef(null);
+  const [showDebugScreen, setShowDebugScreen] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const openFeedbackModal = () => setShowFeedbackModal(true);
   const closeFeedbackModal = () => setShowFeedbackModal(false);
@@ -1053,6 +1056,7 @@ export default function App() {
       onDeleteAccount={() => setShowDeleteAccountModal(true)}
       onNavigateToProfile={() => setActiveTab('profile')}
       onLogout={handleLogout}
+      onShowDebug={() => setShowDebugScreen(true)}
       c={c} t={t} styles={styles}
     />
   );
@@ -1311,6 +1315,13 @@ export default function App() {
         onClose={() => setShowChangePasswordModal(false)}
         authToken={authToken}
         c={c} t={t}
+      />
+
+      <AuthDebugScreen
+        visible={showDebugScreen}
+        onClose={() => setShowDebugScreen(false)}
+        authContext={{ authToken, accountType, bootReady, loggedInPatient, loggedInTherapist }}
+        c={c}
       />
 
       {/* ── Konto löschen Modal ──────────────────────────────────────────────── */}
