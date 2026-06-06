@@ -4,7 +4,6 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { ActivityIndicator, View } from 'react-native';
 import { AppTabs } from './AppTabs';
 import { ROOT_ROUTES } from './route-names';
-import { AuthScreen } from '../screens/auth/AuthScreen';
 import { TherapistProfileScreen } from '../screens/public/TherapistProfileScreen';
 import { PracticeProfileScreen } from '../screens/public/PracticeProfileScreen';
 import { useTheme } from '../hooks/use-theme';
@@ -44,8 +43,7 @@ export function RootNavigator() {
     [scheme, palette],
   );
 
-  const { bootReady, authToken } = useAuth();
-  const isAuthenticated = Boolean(authToken);
+  const { bootReady } = useAuth();
 
   if (!bootReady) return <BootLoading />;
 
@@ -57,15 +55,9 @@ export function RootNavigator() {
           contentStyle: { backgroundColor: palette.background },
         }}
       >
-        {isAuthenticated ? (
-          <>
-            <Stack.Screen component={AppTabs} name={ROOT_ROUTES.MAIN_TABS} />
-            <Stack.Screen component={TherapistProfileScreen} name={ROOT_ROUTES.THERAPIST_PROFILE} />
-            <Stack.Screen component={PracticeProfileScreen} name={ROOT_ROUTES.PRACTICE_PROFILE} />
-          </>
-        ) : (
-          <Stack.Screen component={AuthScreen} name={ROOT_ROUTES.AUTH} />
-        )}
+        <Stack.Screen component={AppTabs} name={ROOT_ROUTES.MAIN_TABS} />
+        <Stack.Screen component={TherapistProfileScreen} name={ROOT_ROUTES.THERAPIST_PROFILE} />
+        <Stack.Screen component={PracticeProfileScreen} name={ROOT_ROUTES.PRACTICE_PROFILE} />
       </Stack.Navigator>
     </NavigationContainer>
   );

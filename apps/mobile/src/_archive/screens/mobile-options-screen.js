@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import React from 'react';
 import { Image, Linking, Pressable, ScrollView, Switch, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SPACE, getBaseUrl } from '../../utils/app-utils';
 
 export function OptionsScreen({
@@ -13,6 +14,7 @@ export function OptionsScreen({
   onNavigateToProfile, onShowDebug,
   c, t, styles,
 }) {
+  const insets = useSafeAreaInsets();
   const [debugTapCount, setDebugTapCount] = React.useState(0);
 const renderOptions = () => {
   const isLoggedIn = Boolean(loggedInTherapist || loggedInPatient);
@@ -64,7 +66,7 @@ const renderOptions = () => {
 
   return (
     <View style={{ flex: 1 }}>
-      <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 10, backgroundColor: c.background }}>
+      <View style={{ paddingHorizontal: 16, paddingTop: insets.top + 8, paddingBottom: 10, backgroundColor: c.background }}>
         <View style={[styles.header, { marginBottom: 0 }]}>
           <Image source={require('../../../assets/icon.png')} style={styles.logoMark} />
           <View style={{ flex: 1 }}>

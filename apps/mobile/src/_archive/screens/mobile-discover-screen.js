@@ -590,7 +590,7 @@ export function DiscoverScreen(props) {
   return (
     <View style={{ flex: 1, backgroundColor: c.background }}>
       {/* Sticky header — logo, search, chips, location, filters */}
-      <View style={{ backgroundColor: c.background, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 10, zIndex: 10, gap: SPACE.sm }}>
+      <View style={{ backgroundColor: c.background, paddingHorizontal: 16, paddingTop: insets.top + 8, paddingBottom: 10, zIndex: 10, gap: SPACE.sm }}>
         <View style={[styles.header, { justifyContent: 'space-between' }]}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <Image source={require('../../../assets/icon.png')} style={styles.logoMark} />

@@ -4,6 +4,7 @@ import {
   Text, View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SPACE, formatDayHeader, getBaseUrl, TUNNEL_HEADERS } from '../../utils/app-utils';
 import { PatientAppointmentCard, TherapistBookingCard, STATUS_COLORS } from './mobile-booking';
 import { TherapistTimeline } from './mobile-slot-composer';
@@ -18,6 +19,7 @@ export function TherapyTabPatient({
   onRefresh, onOpenTherapistById, onSelectAppointment,
   c, t, styles,
 }) {
+  const insets = useSafeAreaInsets();
   const getDate = (a) => new Date(a.slot?.startsAt ?? a.confirmedSlotAt ?? 0);
   const now = new Date();
 
@@ -61,7 +63,7 @@ export function TherapyTabPatient({
   return (
     <View style={{ flex: 1 }}>
       {/* ── Header ─────────────────────────────────────────────────── */}
-      <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 10, backgroundColor: c.background }}>
+      <View style={{ paddingHorizontal: 16, paddingTop: insets.top + 8, paddingBottom: 10, backgroundColor: c.background }}>
         <View style={[styles.header, { marginBottom: 0 }]}>
           <Image source={require('../../../assets/icon.png')} style={styles.logoMark} />
           <Text style={[styles.headerTitle, { color: c.text, flex: 1 }]}>Meine Termine</Text>
@@ -216,6 +218,7 @@ export function TherapyTabTherapist({
   loggedInTherapist,
   c, t, styles,
 }) {
+  const insets = useSafeAreaInsets();
   const slotBookingEnabled = loggedInTherapist?.bookingMode === 'FIRST_APPOINTMENT_REQUEST';
   const pendingIncomingBookings = incomingBookings.filter((r) => r.status === 'PENDING');
   const freeSlots = mySlots.filter(s => s.status === 'AVAILABLE');
@@ -259,7 +262,7 @@ export function TherapyTabTherapist({
   return (
     <View style={{ flex: 1 }}>
       {/* ── Header ─────────────────────────────────────────────────── */}
-      <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 10, backgroundColor: c.background }}>
+      <View style={{ paddingHorizontal: 16, paddingTop: insets.top + 8, paddingBottom: 10, backgroundColor: c.background }}>
         <View style={[styles.header, { marginBottom: 0 }]}>
           <Image source={require('../../../assets/icon.png')} style={styles.logoMark} />
           <Text style={[styles.headerTitle, { color: c.text, flex: 1 }]}>{'Meine Termine'}</Text>

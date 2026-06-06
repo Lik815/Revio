@@ -21,6 +21,7 @@ import { TherapistDashboardScreen } from '../../_archive/screens/mobile-therapis
 import { PatientDashboardScreen } from '../../_archive/screens/mobile-patient-dashboard';
 import { useTherapyData } from '../../context/TherapyContext';
 import { useAuth } from '../../context/AuthContext';
+import { AuthScreen } from '../auth/AuthScreen';
 
 const t = (key) => translations.de[key] ?? key;
 
@@ -203,9 +204,5 @@ export function ProfileTabScreen() {
     );
   }
 
-  return (
-    <View style={{ flex: 1 }}>
-      <TabHeader c={c} wordmark />
-    </View>
-  );
+  return <AuthScreen />;
 }

@@ -88,6 +88,7 @@ export function TherapyTabScreen() {
         body: JSON.stringify({ slots: [slot] }),
       });
       if (res.ok) {
+        setShowSlotComposer(false);
         setCreatedSlot(slot);
         setShowSlotCreated(true);
       }
