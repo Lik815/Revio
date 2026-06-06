@@ -1,6 +1,7 @@
 import React from 'react';
 import { Image, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, RADIUS, SPACE, TYPE } from '../utils/app-utils';
 
 const styles = {
@@ -52,8 +53,9 @@ const styles = {
  *   hasBadge       — if true, shows the red badge dot on the bell
  */
 export function TabHeader({ c, title, sub, wordmark = false, onBellPress, hasBadge = false }) {
+  const insets = useSafeAreaInsets();
   return (
-    <View style={[styles.wrapper, { backgroundColor: c.background }]}>
+    <View style={[styles.wrapper, { backgroundColor: c.background, paddingTop: insets.top + 8 }]}>
       <View style={styles.row}>
         <Image source={require('../../assets/icon.png')} style={styles.logoMark} />
 

@@ -1,6 +1,7 @@
 import React from 'react';
 import { ActivityIndicator, ScrollView, Text, View, useColorScheme } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { COLORS } from './utils/app-utils';
 import { AuthProvider } from './context/AuthContext';
 import { AuthBridge } from './context/AuthBridge';
@@ -65,15 +66,17 @@ export default function App() {
   const statusBarStyle = bootScheme === 'dark' ? 'light' : 'dark';
 
   return (
-    <ErrorBoundary>
-      <AuthProvider>
-        <TherapyProvider>
-          <StatusBar style={statusBarStyle} />
-          <AuthBridge />
-          <RootNavigator />
-        </TherapyProvider>
-      </AuthProvider>
-    </ErrorBoundary>
+    <SafeAreaProvider>
+      <ErrorBoundary>
+        <AuthProvider>
+          <TherapyProvider>
+            <StatusBar style={statusBarStyle} />
+            <AuthBridge />
+            <RootNavigator />
+          </TherapyProvider>
+        </AuthProvider>
+      </ErrorBoundary>
+    </SafeAreaProvider>
   );
 }
 

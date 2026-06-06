@@ -12,6 +12,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   formatDist,
   getSearchMatchLabel,
@@ -129,6 +130,7 @@ export function DiscoverScreen(props) {
     dismissedNotifIds,
   } = props;
 
+  const insets = useSafeAreaInsets();
   const visibleNotifCount = notifications.filter((n) => !dismissedNotifIds?.has(n.id)).length;
 
   const safeResults = Array.isArray(results) ? results : [];
@@ -417,7 +419,7 @@ export function DiscoverScreen(props) {
     return (
       <View style={{ flex: 1, backgroundColor: c.background }}>
         {/* Fixed header + search bar */}
-        <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 10, backgroundColor: c.background, zIndex: 10, gap: SPACE.sm }}>
+        <View style={{ paddingHorizontal: 16, paddingTop: insets.top + 8, paddingBottom: 10, backgroundColor: c.background, zIndex: 10, gap: SPACE.sm }}>
           <View style={[styles.header, { justifyContent: 'space-between', marginBottom: 0 }]}>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <Image source={require('../../../assets/icon.png')} style={styles.logoMark} />
