@@ -7,18 +7,16 @@ import { ROOT_ROUTES } from './route-names';
 import { AuthScreen } from '../screens/auth/AuthScreen';
 import { TherapistProfileScreen } from '../screens/public/TherapistProfileScreen';
 import { PracticeProfileScreen } from '../screens/public/PracticeProfileScreen';
-import { COLORS } from '../utils/app-utils';
 import { useTheme } from '../hooks/use-theme';
 import { useAuth } from '../context/AuthContext';
 
 const Stack = createNativeStackNavigator();
 
 function BootLoading() {
-  const scheme = useColorScheme();
-  const palette = COLORS[scheme === 'dark' ? 'dark' : 'light'];
+  const { c } = useTheme();
   return (
-    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.background }}>
-      <ActivityIndicator color={palette.primary} size="large" />
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: c.background }}>
+      <ActivityIndicator color={c.primary} size="large" />
     </View>
   );
 }
