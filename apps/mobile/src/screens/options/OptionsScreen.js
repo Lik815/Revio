@@ -11,6 +11,8 @@ import { FeedbackModal } from '../../mobile-feedback-modal';
 import { ChangePasswordModal } from '../../mobile-change-password-modal';
 import { DeleteAccountModal } from '../../mobile-delete-account-modal';
 import { NotificationSheet } from '../../modals/NotificationSheet';
+import { AuthDebugScreen } from '../AuthDebugScreen';
+import { useAuth } from '../../context/AuthContext';
 
 const t = (key) => translations.de[key] ?? key;
 
@@ -34,16 +36,21 @@ export function OptionsTabScreen() {
     dismissAllNotifications,
   } = useNotificationPolling({ authToken, accountType });
 
+  const { logout: logoutFromContext, authToken: ctxAuthToken, accountType: ctxAccountType, bootReady, loggedInPatient: ctxPatient, loggedInTherapist: ctxTherapist } = useAuth();
+
   const [showFeedback, setShowFeedback] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [showDeleteAccount, setShowDeleteAccount] = useState(false);
+  const [showDebug, setShowDebug] = useState(false);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await logoutFromContext();
     signOut();
     navigation.navigate(ROOT_ROUTES.AUTH);
   };
 
   const handleDeleteAccountConfirmed = async () => {
+    await logoutFromContext();
     signOut();
     navigation.navigate(ROOT_ROUTES.AUTH);
   };
@@ -86,6 +93,7 @@ export function OptionsTabScreen() {
         onDeleteAccount={() => setShowDeleteAccount(true)}
         onLogout={handleLogout}
         onNavigateToProfile={handleNavigateToProfile}
+        onShowDebug={() => setShowDebug(true)}
         c={c}
         t={t}
         styles={appStyles}
@@ -128,6 +136,13 @@ export function OptionsTabScreen() {
         loggedInPatient={loggedInPatient}
         c={c}
         t={t}
+      />
+
+      <AuthDebugScreen
+        visible={showDebug}
+        onClose={() => setShowDebug(false)}
+        authContext={{ authToken: ctxAuthToken, accountType: ctxAccountType, bootReady, loggedInPatient: ctxPatient, loggedInTherapist: ctxTherapist }}
+        c={c}
       />
     </>
   );
