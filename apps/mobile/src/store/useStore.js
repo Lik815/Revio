@@ -43,10 +43,6 @@ export const useAppStore = create(
       ...INITIAL_FAVORITES_STATE,
       ...INITIAL_UI_STATE,
 
-      markHydrated: () => {
-        set({ authHydrated: true });
-      },
-
       setThemePreference: (themePreference) => {
         set({
           themePreference: themePreference ?? DEFAULT_THEME_PREFERENCE,
@@ -155,9 +151,7 @@ export const useAppStore = create(
         favoritesLastLoadedAt: state.favoritesLastLoadedAt,
         themePreference: state.themePreference,
       }),
-      onRehydrateStorage: () => (state) => {
-        state?.markHydrated?.();
-      },
+      onRehydrateStorage: () => () => {},
     },
   ),
 );
