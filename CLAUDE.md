@@ -70,6 +70,7 @@ Registration rule:
 - Do not introduce payments, reviews, or medical-data features while working on MVP code.
 - Keep app UI German-only unless the active code clearly supports another language strategy.
 - Do not use emojis in app UI copy.
+- Mobile screens that render their own header (outside React Navigation's header bar) must use the shared `BackButton` component (`apps/mobile/src/components/BackButton.js`) for back/cancel controls — it owns the safe-area top offset. Never also add `paddingTop: insets.top` to the surrounding container; pick exactly one (see the component's doc comment for the shared-row exception via `topInset={false}`).
 
 ## 5. Testing Expectations
 

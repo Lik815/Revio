@@ -4,7 +4,6 @@ import {
   Pressable, ScrollView, Switch, Text, TextInput, View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as DocumentPicker from 'expo-document-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
@@ -14,6 +13,7 @@ import {
   languageOptions, regSpecOptions, TUNNEL_HEADERS, ICON_HIT_SLOP,
 } from '../../utils/app-utils';
 import { ComplianceStatusStep } from './mobile-compliance-step';
+import { BackButton } from '../../components/BackButton';
 
 const FREELANCE_HELP_URL = 'https://my-revio.de/blog/freiberuflich-als-physiotherapeut-starten';
 
@@ -53,7 +53,6 @@ export function TherapistRegistrationFlow({
   onRegistered,
   c, t, styles,
 }) {
-  const insets = useSafeAreaInsets();
   const [regStep, setRegStep] = useState(1);
   const [regSubmitted, setRegSubmitted] = useState(false);
   const [regLoading, setRegLoading] = useState(false);
@@ -740,13 +739,15 @@ export function TherapistRegistrationFlow({
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
     <ScrollView
       ref={registerScrollRef}
-      contentContainerStyle={[styles.scrollContent, { paddingHorizontal: 20, paddingTop: insets.top + 16, paddingBottom: 56, gap: SPACE.sm }]}
+      contentContainerStyle={[styles.scrollContent, { paddingHorizontal: 20, paddingTop: 0, paddingBottom: 56, gap: SPACE.sm }]}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
       automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
     >
-      <Pressable
+      <BackButton
+        c={c}
+        label={t('backBtn')}
         onPress={() => {
           if (regStep === 1) {
             resetRegState();
@@ -756,10 +757,7 @@ export function TherapistRegistrationFlow({
             setShowRegStepInfo(false);
           }
         }}
-        style={styles.backBtn}
-      >
-        <Text style={[styles.backBtnText, { color: c.primary }]}>‹ {t('backBtn')}</Text>
-      </Pressable>
+      />
 
       {/* Header */}
       <View style={{ marginBottom: 2 }}>

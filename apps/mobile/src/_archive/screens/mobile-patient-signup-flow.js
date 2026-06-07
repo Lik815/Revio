@@ -3,7 +3,7 @@ import {
   ActivityIndicator, Pressable, ScrollView, Text, TextInput, View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BackButton } from '../../components/BackButton';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getBaseUrl, ICON_HIT_SLOP, TUNNEL_HEADERS } from '../../utils/app-utils';
 
@@ -15,7 +15,6 @@ export function PatientSignupFlow({
   onSelectTherapist,
   c, t, styles,
 }) {
-  const insets = useSafeAreaInsets();
   const [showSignup, setShowSignup] = useState(false);
   const [showRoleSelect, setShowRoleSelect] = useState(true);
   const [showPatientName, setShowPatientName] = useState(false);
@@ -104,12 +103,7 @@ const handlePatientNameSubmit = async () => {
 
 const renderRoleSelect = () => (
   <View style={{ flex: 1, paddingHorizontal: 20 }}>
-    <Pressable
-      onPress={() => { setShowRoleSelect(false); setShowSignup(true); }}
-      style={{ paddingTop: insets.top + 16, paddingBottom: 4, alignSelf: 'flex-start' }}
-    >
-      <Text style={{ fontSize: 15, color: c.primary }}>‹ {t('backBtn')}</Text>
-    </Pressable>
+    <BackButton c={c} label={t('backBtn')} onPress={() => { setShowRoleSelect(false); setShowSignup(true); }} />
     <View style={{ paddingTop: 8, paddingBottom: 20 }}>
       <Text style={{ fontSize: 22, fontWeight: '800', color: c.text }}>{t('registerRoleTitle')}</Text>
       <Text style={{ fontSize: 14, color: c.muted, marginTop: 4 }}>{t('registerRoleBody')}</Text>
@@ -223,7 +217,9 @@ const renderPatientName = () => (
 const renderSignup = () => (
   <ScrollView contentContainerStyle={[styles.scrollContent, { paddingHorizontal: 24, paddingBottom: 40 }]} keyboardShouldPersistTaps="handled">
     {/* Back / cancel */}
-    <Pressable
+    <BackButton
+      c={c}
+      label={t('backBtn')}
       onPress={() => {
         if (signupOtpSent) {
           setSignupOtpSent(false);
@@ -236,10 +232,7 @@ const renderSignup = () => (
           resetSignupState();
         }
       }}
-      style={{ paddingTop: insets.top + 16, paddingBottom: 4, alignSelf: 'flex-start' }}
-    >
-      <Text style={{ fontSize: 15, color: c.primary }}>‹ {t('backBtn')}</Text>
-    </Pressable>
+    />
 
     <View style={{ paddingTop: 8, paddingBottom: 20 }}>
       <Text style={{ fontSize: 26, fontWeight: '800', color: c.text }}>

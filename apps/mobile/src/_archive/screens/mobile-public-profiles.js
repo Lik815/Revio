@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BackButton } from '../../components/BackButton';
 import {
   ActivityIndicator,
   Clipboard,
@@ -84,13 +85,12 @@ export function PracticeProfileScreen(props) {
   const practicePhotos = Array.isArray(practice?.photos) ? practice.photos.filter(Boolean) : [];
   const iconHitSlop = { top: 10, bottom: 10, left: 10, right: 10 };
   const [practiceLogoError, setPracticeLogoError] = React.useState(false);
+  const insets = useSafeAreaInsets();
 
   return (
     <ScrollView style={{ flex: 1 }} contentContainerStyle={[styles.scrollContent, { paddingBottom: 20 }]}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Pressable onPress={() => setSelectedPractice(null)} style={styles.backBtn}>
-          <Text style={[styles.backBtnText, { color: c.primary }]}>‹ {t('backBtn')}</Text>
-        </Pressable>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: insets.top + 12 }}>
+        <BackButton c={c} label={t('backBtn')} onPress={() => setSelectedPractice(null)} topInset={false} style={{ paddingTop: 0 }} />
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           <Pressable onPress={() => toggleFavoritePractice(practice)} hitSlop={iconHitSlop} style={{ paddingHorizontal: 10, paddingVertical: 10 }}>
             <Ionicons name={isPracticeFavorite(practice?.id) ? 'heart' : 'heart-outline'} size={22} color={isPracticeFavorite(practice?.id) ? c.saved : c.muted} />
@@ -298,10 +298,8 @@ export function TherapistProfileScreen(props) {
   return (
     <View style={{ flex: 1 }}>
     <ScrollView style={{ flex: 1 }} contentContainerStyle={[styles.scrollContent, { paddingBottom: 100 }]}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Pressable onPress={() => setSelectedTherapist(null)} style={styles.backBtn}>
-          <Text style={[styles.backBtnText, { color: c.primary }]}>‹ {t('backBtn')}</Text>
-        </Pressable>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: insets.top + 12 }}>
+        <BackButton c={c} label={t('backBtn')} onPress={() => setSelectedTherapist(null)} topInset={false} style={{ paddingTop: 0 }} />
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           <HeartButton isSaved={isFavorite(th.id)} onToggle={() => toggleFavorite(th)} unsavedColor={c.muted} hitSlop={iconHitSlop} style={{ paddingHorizontal: 10, paddingVertical: 10 }} />
           <Pressable
