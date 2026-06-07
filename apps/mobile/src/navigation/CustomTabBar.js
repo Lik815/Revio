@@ -80,7 +80,12 @@ export function CustomTabBar({ state, descriptors, navigation }) {
               style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
             >
               <View style={{ width: PILL_SIZE, height: PILL_SIZE, alignItems: 'center', justifyContent: 'center' }}>
-                <Ionicons name={iconName} size={focused ? 24 : 20} color={focused ? '#FFFFFF' : (c.textMuted ?? c.muted)} />
+                <Ionicons
+                  name={iconName}
+                  size={focused ? 24 : 20}
+                  color={focused ? '#FFFFFF' : (c.textMuted ?? c.muted)}
+                  style={{ includeFontPadding: false, textAlignVertical: 'center', textAlign: 'center' }}
+                />
               </View>
               {!focused && (
                 <Text numberOfLines={1} style={{ fontSize: 11, color: c.textMuted ?? c.muted, marginTop: -SPACE.xs }}>{label}</Text>
