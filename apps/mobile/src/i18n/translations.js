@@ -23,7 +23,7 @@ export const translations = {
     landingFeature3Title: 'Geprüfte Profile',
     landingFeature3Body: 'Alle Therapeuten werden manuell verifiziert.',
     heroTitle: 'Den richtigen Physio\nfür dein Problem finden.',
-    heroSub: 'Freiberufliche Physiotherapeut:innen in deiner Nähe — nach Beschwerde suchen, nicht nach Name.',
+    heroSub: 'Freiberufliche Physiotherapeut:innen in deiner Nähe – finde die passende Expertise für dein Anliegen.',
     searchPlaceholder: 'Wobei brauchst du Hilfe?',
     searchBtn: 'Suchen',
     resultsLabel: 'Ergebnis',
