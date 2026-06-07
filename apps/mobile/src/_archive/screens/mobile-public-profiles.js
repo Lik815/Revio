@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   ActivityIndicator,
   Clipboard,
@@ -227,6 +228,7 @@ export function TherapistProfileScreen(props) {
 
   // Merge availableSlots into th for the booking section
   const thWithSlots = availableSlots !== undefined ? { ...th, availableSlots } : th;
+  const insets = useSafeAreaInsets();
 
   const [showLoginHint, setShowLoginHint] = useState(false);
   const [showBookingModal, setShowBookingModal] = useState(false);
@@ -250,6 +252,7 @@ export function TherapistProfileScreen(props) {
   const bookingSlots = Array.isArray(thWithSlots?.availableSlots)
     ? [...thWithSlots.availableSlots].sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt))
     : [];
+  const hasOnlineBooking = canOpenBookingModal && bookingSlots.length > 0;
   const slotGroups = bookingSlots.reduce((acc, slot) => {
     const dayKey = getSlotDayKey(slot.startsAt);
     if (!dayKey) return acc;
@@ -293,7 +296,8 @@ export function TherapistProfileScreen(props) {
   }, [selectedSlotId, visibleSlotsForSelectedDate]);
 
   return (
-    <ScrollView style={{ flex: 1 }} contentContainerStyle={[styles.scrollContent, { paddingBottom: 20 }]}>
+    <View style={{ flex: 1 }}>
+    <ScrollView style={{ flex: 1 }} contentContainerStyle={[styles.scrollContent, { paddingBottom: 100 }]}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <Pressable onPress={() => setSelectedTherapist(null)} style={styles.backBtn}>
           <Text style={[styles.backBtnText, { color: c.primary }]}>‹ {t('backBtn')}</Text>
@@ -486,17 +490,6 @@ export function TherapistProfileScreen(props) {
       </View>
 
 
-      {/* 4. CTA: Freie Termine ansehen */}
-      {canOpenBookingModal ? (
-        <Pressable
-          style={{ backgroundColor: c.primary, borderRadius: 14, paddingVertical: 16, marginHorizontal: 0, marginBottom: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 }}
-          onPress={() => setShowBookingModal(true)}
-        >
-          <Ionicons name="calendar-outline" size={20} color="#fff" />
-          <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>Freie Termine ansehen</Text>
-        </Pressable>
-      ) : null}
-
       <Modal visible={showBookingModal} transparent animationType="slide" onRequestClose={() => setShowBookingModal(false)}>
         <Pressable
           style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' }}
@@ -655,5 +648,23 @@ export function TherapistProfileScreen(props) {
         </Pressable>
       </Modal>
     </ScrollView>
+
+    {/* Fixed booking bar above the bottom navigation */}
+    <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: insets.bottom + 12, backgroundColor: c.background, borderTopWidth: 1, borderTopColor: c.border }}>
+      {hasOnlineBooking ? (
+        <Pressable
+          style={{ backgroundColor: c.primary, borderRadius: 14, paddingVertical: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 }}
+          onPress={() => setShowBookingModal(true)}
+        >
+          <Ionicons name="calendar-outline" size={20} color="#fff" />
+          <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>Freie Termine ansehen</Text>
+        </Pressable>
+      ) : (
+        <View style={{ borderRadius: 14, paddingVertical: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: c.mutedBg ?? c.card, borderWidth: 1, borderColor: c.border }}>
+          <Text style={{ color: c.muted, fontSize: 15, fontWeight: '600' }}>Keine freien Termine online</Text>
+        </View>
+      )}
+    </View>
+    </View>
   );
 }
