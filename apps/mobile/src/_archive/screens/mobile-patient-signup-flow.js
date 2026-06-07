@@ -103,7 +103,7 @@ const handlePatientNameSubmit = async () => {
 
 const renderRoleSelect = () => (
   <View style={{ flex: 1, paddingHorizontal: 20 }}>
-    <BackButton c={c} label={t('backBtn')} onPress={() => { setShowRoleSelect(false); setShowSignup(true); }} />
+    <BackButton c={c} label={t('backBtn')} onPress={() => { resetSignupState(); onClose(); }} />
     <View style={{ paddingTop: 8, paddingBottom: 20 }}>
       <Text style={{ fontSize: 22, fontWeight: '800', color: c.text }}>{t('registerRoleTitle')}</Text>
       <Text style={{ fontSize: 14, color: c.muted, marginTop: 4 }}>{t('registerRoleBody')}</Text>
