@@ -1,4 +1,3 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import React from 'react';
 import { Image, Linking, Pressable, ScrollView, Switch, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -151,7 +150,7 @@ const renderOptions = () => {
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACE.sm }}>
               <Text style={[styles.optionValue, { color: c.muted }]}>{themeMode === 'dark' ? t('themeDark') : t('themeLight')}</Text>
-              <Switch value={themeMode === 'dark'} onValueChange={(v) => { const m = v ? 'dark' : 'light'; setThemeMode(m); AsyncStorage.setItem('themeMode', m); }}
+              <Switch value={themeMode === 'dark'} onValueChange={(v) => setThemeMode(v ? 'dark' : 'light')}
                 trackColor={{ false: c.border, true: c.primary }} ios_backgroundColor={c.border} thumbColor="#FFFFFF" />
             </View>
           </View>

@@ -3,6 +3,7 @@ import { ActivityIndicator, ScrollView, Text, View, useColorScheme } from 'react
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { COLORS } from './utils/app-utils';
+import { ThemeProvider } from './hooks/use-theme';
 import { AuthProvider } from './context/AuthContext';
 import { AuthBridge } from './context/AuthBridge';
 import { TherapyProvider } from './context/TherapyContext';
@@ -68,13 +69,15 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <ErrorBoundary>
-        <AuthProvider>
-          <TherapyProvider>
-            <StatusBar style={statusBarStyle} />
-            <AuthBridge />
-            <RootNavigator />
-          </TherapyProvider>
-        </AuthProvider>
+        <ThemeProvider>
+          <AuthProvider>
+            <TherapyProvider>
+              <StatusBar style={statusBarStyle} />
+              <AuthBridge />
+              <RootNavigator />
+            </TherapyProvider>
+          </AuthProvider>
+        </ThemeProvider>
       </ErrorBoundary>
     </SafeAreaProvider>
   );
