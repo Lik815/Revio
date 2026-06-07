@@ -47,16 +47,17 @@ export function CustomTabBar({ state, descriptors, navigation }) {
             pointerEvents="none"
             style={{
               position: 'absolute',
-              top: '50%',
-              marginTop: -PILL_SIZE / 2,
+              top: 0,
+              bottom: 0,
               left: 0,
               width: PILL_SIZE,
-              height: PILL_SIZE,
-              borderRadius: RADIUS.md,
-              backgroundColor: c.primary,
+              alignItems: 'center',
+              justifyContent: 'center',
               transform: [{ translateX: pillX }],
             }}
-          />
+          >
+            <View style={{ width: PILL_SIZE, height: PILL_SIZE, borderRadius: RADIUS.md, backgroundColor: c.primary }} />
+          </Animated.View>
         )}
 
         {state.routes.map((route, index) => {
