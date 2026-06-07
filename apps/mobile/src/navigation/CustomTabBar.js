@@ -48,20 +48,15 @@ export function CustomTabBar({ state, descriptors, navigation }) {
           >
             <View
               style={{
-                flexDirection: 'row',
                 alignItems: 'center',
-                gap: SPACE.xs / 2,
-                maxWidth: '100%',
-                borderRadius: RADIUS.md,
-                paddingVertical: SPACE.xs,
-                paddingHorizontal: focused ? SPACE.sm : SPACE.xs,
+                justifyContent: 'center',
+                borderRadius: RADIUS.full,
+                paddingVertical: focused ? SPACE.sm : SPACE.xs,
+                paddingHorizontal: focused ? SPACE.md : SPACE.xs,
                 backgroundColor: focused ? c.primary : 'transparent',
               }}
             >
               <Ionicons name={iconName} size={20} color={focused ? '#FFFFFF' : (c.textMuted ?? c.muted)} />
-              {focused && (
-                <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: '700', color: '#FFFFFF', flexShrink: 1 }}>{label}</Text>
-              )}
             </View>
             {!focused && (
               <Text numberOfLines={1} style={{ fontSize: 11, color: c.textMuted ?? c.muted, marginTop: SPACE.xs / 2 }}>{label}</Text>
