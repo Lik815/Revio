@@ -3,8 +3,6 @@ import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { AppTabs } from './AppTabs';
 import { ROOT_ROUTES } from './route-names';
-import { TherapistProfileScreen } from '../screens/public/TherapistProfileScreen';
-import { PracticeProfileScreen } from '../screens/public/PracticeProfileScreen';
 import { useTheme } from '../hooks/use-theme';
 
 const Stack = createNativeStackNavigator();
@@ -41,8 +39,6 @@ export function RootNavigator() {
         }}
       >
         <Stack.Screen component={AppTabs} name={ROOT_ROUTES.MAIN_TABS} />
-        <Stack.Screen component={TherapistProfileScreen} name={ROOT_ROUTES.THERAPIST_PROFILE} />
-        <Stack.Screen component={PracticeProfileScreen} name={ROOT_ROUTES.PRACTICE_PROFILE} />
       </Stack.Navigator>
     </NavigationContainer>
   );

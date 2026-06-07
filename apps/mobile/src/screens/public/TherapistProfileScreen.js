@@ -80,6 +80,10 @@ export function TherapistProfileScreen() {
     }
   };
 
+  useEffect(() => {
+    if (therapist?.bookingMode === 'FIRST_APPOINTMENT_REQUEST') loadAvailableSlots(therapist.id);
+  }, [therapist?.id, therapist?.bookingMode]);
+
   const handleBookingRequest = (th) => {
     if (!authToken) {
       navigation.navigate(ROOT_ROUTES.MAIN_TABS, { screen: TAB_ROUTES.PROFILE });
