@@ -50,20 +50,21 @@ export function CustomTabBar({ state, descriptors, navigation }) {
               style={{
                 flexDirection: 'row',
                 alignItems: 'center',
-                gap: SPACE.xs,
+                gap: SPACE.xs / 2,
+                maxWidth: '100%',
                 borderRadius: RADIUS.md,
-                paddingVertical: SPACE.xs + 2,
-                paddingHorizontal: focused ? SPACE.md : SPACE.xs,
+                paddingVertical: SPACE.xs,
+                paddingHorizontal: focused ? SPACE.sm : SPACE.xs,
                 backgroundColor: focused ? c.primary : 'transparent',
               }}
             >
-              <Ionicons name={iconName} size={22} color={focused ? '#FFFFFF' : (c.textMuted ?? c.muted)} />
+              <Ionicons name={iconName} size={20} color={focused ? '#FFFFFF' : (c.textMuted ?? c.muted)} />
               {focused && (
-                <Text style={{ fontSize: 13, fontWeight: '700', color: '#FFFFFF' }}>{label}</Text>
+                <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: '700', color: '#FFFFFF', flexShrink: 1 }}>{label}</Text>
               )}
             </View>
             {!focused && (
-              <Text style={{ fontSize: 11, color: c.textMuted ?? c.muted, marginTop: SPACE.xs / 2 }}>{label}</Text>
+              <Text numberOfLines={1} style={{ fontSize: 11, color: c.textMuted ?? c.muted, marginTop: SPACE.xs / 2 }}>{label}</Text>
             )}
           </Pressable>
         );
