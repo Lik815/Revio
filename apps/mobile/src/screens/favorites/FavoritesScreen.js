@@ -78,7 +78,7 @@ export function FavoritesTabScreen() {
         dismissedNotifIds={dismissedNotifIds}
         setShowNotifications={setShowNotifications}
         setActiveTab={() => {}}
-        setShowLogin={() => navigation.navigate(ROOT_ROUTES.AUTH)}
+        setShowLogin={() => navigation.navigate(ROOT_ROUTES.MAIN_TABS, { screen: TAB_ROUTES.PROFILE })}
         styles={appStyles}
         c={c}
         t={t}

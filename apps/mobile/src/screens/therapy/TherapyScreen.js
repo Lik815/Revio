@@ -7,7 +7,7 @@ import { useTheme } from '../../hooks/use-theme';
 import { useNotificationPolling } from '../../hooks/use-notification-polling';
 import { appStyles } from '../../styles/app-styles';
 import { translations } from '../../i18n/translations';
-import { ROOT_ROUTES } from '../../navigation/route-names';
+import { ROOT_ROUTES, TAB_ROUTES } from '../../navigation/route-names';
 import { SPACE, getBaseUrl, TUNNEL_HEADERS } from '../../utils/app-utils';
 import { TabHeader } from '../../components/TabHeader';
 import { NotificationSheet } from '../../modals/NotificationSheet';
@@ -262,7 +262,7 @@ export function TherapyTabScreen() {
             {t('therapyLoginRequiredBody') ?? 'Dafür musst du dich registrieren oder anmelden.'}
           </Text>
           <Pressable
-            onPress={() => navigation.navigate(ROOT_ROUTES.AUTH)}
+            onPress={() => navigation.navigate(ROOT_ROUTES.MAIN_TABS, { screen: TAB_ROUTES.PROFILE })}
             style={[appStyles.registerBtn, { backgroundColor: c.primary, marginTop: 16, paddingHorizontal: 32 }]}
           >
             <Text style={appStyles.registerBtnText}>{t('loginAction')}</Text>

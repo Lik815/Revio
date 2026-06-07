@@ -46,13 +46,13 @@ export function OptionsTabScreen() {
   const handleLogout = async () => {
     await logoutFromContext();
     signOut();
-    navigation.navigate(ROOT_ROUTES.AUTH);
+    navigation.navigate(ROOT_ROUTES.MAIN_TABS, { screen: TAB_ROUTES.PROFILE });
   };
 
   const handleDeleteAccountConfirmed = async () => {
     await logoutFromContext();
     signOut();
-    navigation.navigate(ROOT_ROUTES.AUTH);
+    navigation.navigate(ROOT_ROUTES.MAIN_TABS, { screen: TAB_ROUTES.PROFILE });
   };
 
   const handleNavigateToProfile = () => {
@@ -86,8 +86,8 @@ export function OptionsTabScreen() {
         notifications={notifications}
         dismissedNotifIds={dismissedNotifIds}
         onShowNotifications={() => setShowNotifications(true)}
-        onShowLogin={() => navigation.navigate(ROOT_ROUTES.AUTH)}
-        onShowRegister={() => navigation.navigate(ROOT_ROUTES.AUTH)}
+        onShowLogin={() => navigation.navigate(ROOT_ROUTES.MAIN_TABS, { screen: TAB_ROUTES.PROFILE })}
+        onShowRegister={() => navigation.navigate(ROOT_ROUTES.MAIN_TABS, { screen: TAB_ROUTES.PROFILE })}
         onShowFeedback={() => setShowFeedback(true)}
         onShowChangePassword={() => setShowChangePassword(true)}
         onDeleteAccount={() => setShowDeleteAccount(true)}
