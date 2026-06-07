@@ -77,7 +77,7 @@ export function CustomTabBar({ state, descriptors, navigation }) {
               accessibilityRole="button"
               accessibilityState={focused ? { selected: true } : {}}
               onPress={onPress}
-              style={{ flex: 1, alignItems: 'center' }}
+              style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
             >
               <View style={{ width: PILL_SIZE, height: PILL_SIZE, alignItems: 'center', justifyContent: 'center' }}>
                 <Ionicons name={iconName} size={focused ? 24 : 20} color={focused ? '#FFFFFF' : (c.textMuted ?? c.muted)} />
