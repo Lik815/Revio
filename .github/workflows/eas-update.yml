@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - 'apps/mobile/**'
+  workflow_dispatch: {}
 
 jobs:
   update:
@@ -37,4 +38,5 @@ jobs:
           COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
         run: |
           MESSAGE=$(printf '%s' "$COMMIT_MESSAGE" | head -n 1)
+          MESSAGE=${MESSAGE:-"Manual update"}
           eas update --branch main --message "$MESSAGE" --non-interactive
