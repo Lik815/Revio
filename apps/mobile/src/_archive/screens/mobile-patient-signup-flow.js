@@ -238,7 +238,7 @@ const renderSignup = () => (
       }}
       style={{ paddingTop: insets.top + 16, paddingBottom: 4, alignSelf: 'flex-start' }}
     >
-      <Text style={{ fontSize: 15, color: c.primary }}>‹ {signupOtpSent ? t('backBtn') : t('cancelBtn')}</Text>
+      <Text style={{ fontSize: 15, color: c.primary }}>‹ {t('backBtn')}</Text>
     </Pressable>
 
     <View style={{ paddingTop: 8, paddingBottom: 20 }}>

@@ -8,7 +8,7 @@ import { useNotificationPolling } from '../../hooks/use-notification-polling';
 import { appStyles } from '../../styles/app-styles';
 import { translations } from '../../i18n/translations';
 import { ROOT_ROUTES, TAB_ROUTES } from '../../navigation/route-names';
-import { SPACE, getBaseUrl, TUNNEL_HEADERS } from '../../utils/app-utils';
+import { getBaseUrl, TUNNEL_HEADERS } from '../../utils/app-utils';
 import { TabHeader } from '../../components/TabHeader';
 import { NotificationSheet } from '../../modals/NotificationSheet';
 import { TherapyTabPatient, TherapyTabTherapist } from '../../_archive/screens/mobile-therapy-tabs';
@@ -250,7 +250,7 @@ export function TherapyTabScreen() {
     <View style={{ flex: 1 }}>
       <TabHeader c={c} title="Meine Termine" />
       <ScrollView
-        contentContainerStyle={[appStyles.scrollContent, { paddingBottom: 20, paddingTop: SPACE.sm }]}
+        contentContainerStyle={[appStyles.scrollContent, { paddingBottom: 20 }]}
         showsVerticalScrollIndicator={false}
       >
         <View style={[appStyles.emptyState, { backgroundColor: c.card, borderColor: c.border }]}>

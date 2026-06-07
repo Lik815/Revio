@@ -749,9 +749,8 @@ export function TherapistRegistrationFlow({
       <Pressable
         onPress={() => {
           if (regStep === 1) {
-            setShowRegister(false);
             resetRegState();
-            setShowRoleSelect(true);
+            onClose();
           } else {
             setRegStep(s => s - 1);
             setShowRegStepInfo(false);
@@ -759,7 +758,7 @@ export function TherapistRegistrationFlow({
         }}
         style={styles.backBtn}
       >
-        <Text style={[styles.backBtnText, { color: c.primary }]}>‹ {regStep === 1 ? t('cancelBtn') : t('backBtn')}</Text>
+        <Text style={[styles.backBtnText, { color: c.primary }]}>‹ {t('backBtn')}</Text>
       </Pressable>
 
       {/* Header */}
