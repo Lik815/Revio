@@ -3,6 +3,7 @@ import {
   ActivityIndicator, Pressable, ScrollView, Text, TextInput, View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getBaseUrl, ICON_HIT_SLOP, TUNNEL_HEADERS } from '../../utils/app-utils';
 
@@ -14,6 +15,7 @@ export function PatientSignupFlow({
   onSelectTherapist,
   c, t, styles,
 }) {
+  const insets = useSafeAreaInsets();
   const [showSignup, setShowSignup] = useState(false);
   const [showRoleSelect, setShowRoleSelect] = useState(true);
   const [showPatientName, setShowPatientName] = useState(false);
@@ -104,7 +106,7 @@ const renderRoleSelect = () => (
   <View style={{ flex: 1, paddingHorizontal: 20 }}>
     <Pressable
       onPress={() => { setShowRoleSelect(false); setShowSignup(true); }}
-      style={{ paddingTop: 16, paddingBottom: 4, alignSelf: 'flex-start' }}
+      style={{ paddingTop: insets.top + 16, paddingBottom: 4, alignSelf: 'flex-start' }}
     >
       <Text style={{ fontSize: 15, color: c.primary }}>‹ {t('backBtn')}</Text>
     </Pressable>
@@ -234,7 +236,7 @@ const renderSignup = () => (
           resetSignupState();
         }
       }}
-      style={{ paddingTop: 16, paddingBottom: 4, alignSelf: 'flex-start' }}
+      style={{ paddingTop: insets.top + 16, paddingBottom: 4, alignSelf: 'flex-start' }}
     >
       <Text style={{ fontSize: 15, color: c.primary }}>‹ {signupOtpSent ? t('backBtn') : t('cancelBtn')}</Text>
     </Pressable>

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Image,
   Modal,
@@ -25,6 +26,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useTherapyData } from '../../context/TherapyContext';
 
 export function LoginScreen({ c, styles, t, onClose, bookingTargetTherapist, onBookingReady }) {
+  const insets = useSafeAreaInsets();
   const { loginAsTherapist, loginAsPatient } = useAuth();
   const { loadFavorites, loadMyAppointments, loadIncomingBookings } = useTherapyData();
 
@@ -135,7 +137,7 @@ export function LoginScreen({ c, styles, t, onClose, bookingTargetTherapist, onB
   return (
     <ScrollView
       style={{ flex: 1 }}
-      contentContainerStyle={[styles.scrollContent, { paddingHorizontal: 20, paddingBottom: 40, flexGrow: 1 }]}
+      contentContainerStyle={[styles.scrollContent, { paddingHorizontal: 20, paddingTop: insets.top + 16, paddingBottom: 40, flexGrow: 1 }]}
       keyboardShouldPersistTaps="handled"
     >
       <Pressable onPress={onClose} style={styles.backBtn}>

@@ -4,6 +4,7 @@ import {
   Pressable, ScrollView, Switch, Text, TextInput, View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as DocumentPicker from 'expo-document-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
@@ -52,6 +53,7 @@ export function TherapistRegistrationFlow({
   onRegistered,
   c, t, styles,
 }) {
+  const insets = useSafeAreaInsets();
   const [regStep, setRegStep] = useState(1);
   const [regSubmitted, setRegSubmitted] = useState(false);
   const [regLoading, setRegLoading] = useState(false);
@@ -738,7 +740,7 @@ export function TherapistRegistrationFlow({
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
     <ScrollView
       ref={registerScrollRef}
-      contentContainerStyle={[styles.scrollContent, { paddingHorizontal: 20, paddingBottom: 56, gap: SPACE.sm }]}
+      contentContainerStyle={[styles.scrollContent, { paddingHorizontal: 20, paddingTop: insets.top + 16, paddingBottom: 56, gap: SPACE.sm }]}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}

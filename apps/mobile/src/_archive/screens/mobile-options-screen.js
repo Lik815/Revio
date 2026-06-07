@@ -126,16 +126,18 @@ const renderOptions = () => {
         {/* ── App-Einstellungen ── */}
         <SectionHeader title="App-Einstellungen" />
         <OptionGroup>
-          <Pressable onPress={() => onShowNotifications()} style={[styles.optionRow, { backgroundColor: c.card, borderColor: 'transparent' }]}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <Ionicons name="notifications-outline" size={18} color={c.muted} />
-              <Text style={[styles.optionLabel, { color: c.text }]}>{t('notificationsOption')}</Text>
-            </View>
-            <Text style={[styles.optionValue, { color: notifications.filter((n) => !dismissedNotifIds.has(n.id)).length > 0 ? c.primary : c.muted }]}>
-              {notifications.filter((n) => !dismissedNotifIds.has(n.id)).length > 0 ? `${notifications.filter((n) => !dismissedNotifIds.has(n.id)).length} ›` : '›'}
-            </Text>
-          </Pressable>
-          <Pressable onPress={() => Linking.openSettings()} style={[styles.optionRow, { backgroundColor: c.card, borderColor: 'transparent', borderTopWidth: 1, borderTopColor: c.border }]}>
+          {isLoggedIn && (
+            <Pressable onPress={() => onShowNotifications()} style={[styles.optionRow, { backgroundColor: c.card, borderColor: 'transparent' }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <Ionicons name="notifications-outline" size={18} color={c.muted} />
+                <Text style={[styles.optionLabel, { color: c.text }]}>{t('notificationsOption')}</Text>
+              </View>
+              <Text style={[styles.optionValue, { color: notifications.filter((n) => !dismissedNotifIds.has(n.id)).length > 0 ? c.primary : c.muted }]}>
+                {notifications.filter((n) => !dismissedNotifIds.has(n.id)).length > 0 ? `${notifications.filter((n) => !dismissedNotifIds.has(n.id)).length} ›` : '›'}
+              </Text>
+            </Pressable>
+          )}
+          <Pressable onPress={() => Linking.openSettings()} style={[styles.optionRow, { backgroundColor: c.card, borderColor: 'transparent', borderTopWidth: isLoggedIn ? 1 : 0, borderTopColor: c.border }]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
               <Ionicons name="phone-portrait-outline" size={18} color={c.muted} />
               <Text style={[styles.optionLabel, { color: c.text }]}>{t('deviceSettings')}</Text>
