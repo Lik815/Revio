@@ -33,4 +33,8 @@ jobs:
 
       - name: Publish EAS Update
         working-directory: apps/mobile
-        run: eas update --branch main --message "${{ github.event.head_commit.message }}" --non-interactive
+        env:
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          MESSAGE=$(printf '%s' "$COMMIT_MESSAGE" | head -n 1)
+          eas update --branch main --message "$MESSAGE" --non-interactive
