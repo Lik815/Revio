@@ -64,6 +64,7 @@ Registration rule:
 
 - Do not assume a route is active because a file exists. Confirm it is registered in `apps/api/src/app.ts`.
 - Do not blindly extend large legacy mobile files. Prefer extracting screens, services, hooks, or helpers first.
+- When developing the React/React Native apps, respect the existing structure (screens, components, hooks, context, navigation, styles). Place new code in the matching folder instead of growing one file or bypassing established patterns.
 - Keep patient data minimal and access-controlled.
 - Public provider visibility requires approval or another explicit trust gate verified in active code.
 - Do not introduce payments, reviews, or medical-data features while working on MVP code.

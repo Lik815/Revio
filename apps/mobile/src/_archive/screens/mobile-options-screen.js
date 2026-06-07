@@ -123,18 +123,6 @@ const renderOptions = () => {
           </>
         )}
 
-        {!loggedInTherapist && !loggedInPatient && (
-          <>
-            <SectionHeader title="Mein Profil" />
-            <OptionGroup>
-              <Pressable onPress={() => { onNavigateToProfile(); onShowLogin(); }} style={[styles.optionRow, { backgroundColor: c.card, borderColor: 'transparent' }]}>
-                <Text style={[styles.optionLabel, { color: c.muted }]}>{t('notLoggedIn')}</Text>
-                <Text style={[styles.optionValue, { color: c.primary }]}>{t('loginAction')} ›</Text>
-              </Pressable>
-            </OptionGroup>
-          </>
-        )}
-
         {/* ── App-Einstellungen ── */}
         <SectionHeader title="App-Einstellungen" />
         <OptionGroup>
@@ -192,6 +180,22 @@ const renderOptions = () => {
           <OptionRow label={t('termsLabel')} icon="document-text-outline" />
           <OptionRow label={t('privacyLabel')} icon="shield-outline" last />
         </OptionGroup>
+
+        {!isLoggedIn && (
+          <>
+            <SectionHeader title={t('accountSection')} />
+            <OptionGroup>
+              <OptionRow
+                label={t('loginAction')}
+                subtitle={t('notLoggedIn')}
+                icon="log-in-outline"
+                onPress={onShowLogin}
+                valueColor={c.primary}
+                last
+              />
+            </OptionGroup>
+          </>
+        )}
 
         {isLoggedIn && (
           <>
