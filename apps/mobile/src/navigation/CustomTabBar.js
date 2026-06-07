@@ -52,7 +52,7 @@ export function CustomTabBar({ state, descriptors, navigation }) {
               left: 0,
               width: PILL_SIZE,
               height: PILL_SIZE,
-              borderRadius: RADIUS.full,
+              borderRadius: RADIUS.md,
               backgroundColor: c.primary,
               transform: [{ translateX: pillX }],
             }}
@@ -80,7 +80,7 @@ export function CustomTabBar({ state, descriptors, navigation }) {
               style={{ flex: 1, alignItems: 'center' }}
             >
               <View style={{ width: PILL_SIZE, height: PILL_SIZE, alignItems: 'center', justifyContent: 'center' }}>
-                <Ionicons name={iconName} size={20} color={focused ? '#FFFFFF' : (c.textMuted ?? c.muted)} />
+                <Ionicons name={iconName} size={focused ? 24 : 20} color={focused ? '#FFFFFF' : (c.textMuted ?? c.muted)} />
               </View>
               {!focused && (
                 <Text numberOfLines={1} style={{ fontSize: 11, color: c.textMuted ?? c.muted, marginTop: -SPACE.xs }}>{label}</Text>
