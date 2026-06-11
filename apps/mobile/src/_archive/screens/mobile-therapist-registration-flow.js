@@ -50,6 +50,12 @@ const certificationOptions = (fortbildungOptions ?? []).map((o) => ({ key: o.key
 const getCertificationLabel = (key) =>
   certificationOptions.find((o) => o.key === key)?.label ?? key;
 
+function formatTherapistLocationSummary({ city, postalCode, street, houseNumber }) {
+  const streetLine = [street, houseNumber].filter(Boolean).join(' ');
+  const cityLine = [postalCode, city].filter(Boolean).join(' ');
+  return [streetLine, cityLine].filter(Boolean).join(', ');
+}
+
 export function TherapistRegistrationFlow({
   visible,
   onClose,
