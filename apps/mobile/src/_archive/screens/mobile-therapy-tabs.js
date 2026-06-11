@@ -6,7 +6,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SPACE, formatDayHeader, getBaseUrl, TUNNEL_HEADERS } from '../../utils/app-utils';
-import { PatientAppointmentCard, TherapistBookingCard, STATUS_COLORS } from './mobile-booking';
+import { PatientAppointmentCard, PatientNextAppointmentCard, TherapistBookingCard, STATUS_COLORS } from './mobile-booking';
 import { TherapistTimeline } from './mobile-slot-composer';
 
 const shouldShowSectionLoading = (isLoading, lastLoadedAt) => isLoading && lastLoadedAt === 0;
@@ -53,13 +53,6 @@ export function TherapyTabPatient({
   const filteredKommend = activeFilterPatient === 'vergangen' ? [] : kommend;
   const filteredVergangen = activeFilterPatient === 'kommend' ? [] : vergangen;
 
-  const msUntil = nextApt ? getDate(nextApt) - now : 0;
-  const hoursUntil = Math.floor(msUntil / 3600000);
-  const minsUntil = Math.floor((msUntil % 3600000) / 60000);
-  const countdown = msUntil > 0
-    ? (hoursUntil > 0 ? `in ${hoursUntil} Std. ${minsUntil} Min.` : `in ${minsUntil} Min.`)
-    : null;
-
   return (
     <View style={{ flex: 1 }}>
       {/* ── Header ─────────────────────────────────────────────────── */}
@@ -81,83 +74,35 @@ export function TherapyTabPatient({
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={therapyRefreshing} onRefresh={onRefresh} tintColor={c.primary} />}
       >
-        {/* ── Hero ────────────────────────────────────────────────── */}
-        {nextApt ? (
-          <Pressable
-            onPress={() => onSelectAppointment(nextApt)}
-            style={{ backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.border, padding: 16, marginBottom: 12 }}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-              <View style={{ width: 48, height: 48, borderRadius: 12, backgroundColor: c.successBg ?? '#EAF4F1', alignItems: 'center', justifyContent: 'center' }}>
-                <Ionicons name="calendar-outline" size={24} color={c.success ?? '#5A9E8E'} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 11, fontWeight: '600', color: c.muted, textTransform: 'uppercase', letterSpacing: 0.4 }}>Nächster Termin</Text>
-                <Text style={{ fontSize: 17, fontWeight: '800', color: c.text, marginTop: 2 }}>
-                  {new Date(getDate(nextApt)).toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'long' })}{', '}
-                  {new Date(getDate(nextApt)).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
-                </Text>
-                {countdown && <Text style={{ fontSize: 12, color: c.success ?? '#5A9E8E', marginTop: 2 }}>{countdown}</Text>}
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={c.muted} />
-            </View>
-            {/* ── Stats-Zeile ── */}
-            <View style={{ flexDirection: 'row', gap: 16, marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: c.border }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                <Ionicons name="calendar-outline" size={12} color={c.primary} />
-                <Text style={{ fontSize: 12, fontWeight: '600', color: c.primary }}>{kommend.length} kommend</Text>
-              </View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                <Ionicons name="time-outline" size={12} color={c.muted} />
-                <Text style={{ fontSize: 12, fontWeight: '500', color: c.muted }}>{vergangen.length} vergangen</Text>
-              </View>
-            </View>
-          </Pressable>
-        ) : (
-          <View style={{ backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.border, padding: 16, marginBottom: 12 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-              <View style={{ width: 48, height: 48, borderRadius: 12, backgroundColor: c.mutedBg ?? '#F4F4F4', alignItems: 'center', justifyContent: 'center' }}>
-                <Ionicons name="calendar-outline" size={24} color={c.muted} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 11, fontWeight: '600', color: c.muted, textTransform: 'uppercase', letterSpacing: 0.4 }}>Nächster Termin</Text>
-                <Text style={{ fontSize: 15, fontWeight: '700', color: c.text, marginTop: 2 }}>Kein bevorstehender Termin</Text>
-              </View>
-            </View>
-            <View style={{ flexDirection: 'row', gap: 16, marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: c.border }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                <Ionicons name="calendar-outline" size={12} color={c.primary} />
-                <Text style={{ fontSize: 12, fontWeight: '600', color: c.primary }}>{kommend.length} kommend</Text>
-              </View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                <Ionicons name="time-outline" size={12} color={c.muted} />
-                <Text style={{ fontSize: 12, fontWeight: '500', color: c.muted }}>{vergangen.length} vergangen</Text>
-              </View>
-            </View>
-          </View>
-        )}
+        {/* ── Nächster Termin + Kennzahlen ──────────────────────────── */}
+        <PatientNextAppointmentCard
+          c={c}
+          appointment={nextApt}
+          kommendCount={kommend.length}
+          vergangenCount={vergangen.length}
+          onOpenDetail={() => nextApt && onSelectAppointment(nextApt)}
+          onViewTherapist={() => nextApt && openTherapist(nextApt.therapist)}
+        />
 
-        {/* ── Filter-Tabs ─────────────────────────────────────────── */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
-          <View style={{ flexDirection: 'row', gap: 6 }}>
-            {[
-              { key: 'all', label: 'Alle' },
-              { key: 'kommend', label: 'Kommend' },
-              { key: 'vergangen', label: 'Vergangen' },
-            ].map(({ key, label }) => {
-              const active = activeFilterPatient === key;
-              return (
-                <Pressable
-                  key={key}
-                  onPress={() => setActiveFilterPatient(key)}
-                  style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: active ? c.primary : c.card, borderWidth: 1, borderColor: active ? c.primary : c.border }}
-                >
-                  <Text style={{ fontSize: 13, fontWeight: active ? '700' : '500', color: active ? '#fff' : c.text }}>{label}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </ScrollView>
+        {/* ── Segment-Tabs ──────────────────────────────────────────── */}
+        <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: c.border, marginBottom: 16 }}>
+          {[
+            { key: 'all', label: 'Alle' },
+            { key: 'kommend', label: 'Kommend' },
+            { key: 'vergangen', label: 'Vergangen' },
+          ].map(({ key, label }) => {
+            const active = activeFilterPatient === key;
+            return (
+              <Pressable
+                key={key}
+                onPress={() => setActiveFilterPatient(key)}
+                style={{ flex: 1, alignItems: 'center', paddingVertical: 10, marginBottom: -1, borderBottomWidth: 2, borderBottomColor: active ? (c.success ?? '#5A9E8E') : 'transparent' }}
+              >
+                <Text style={{ fontSize: 14, fontWeight: active ? '700' : '500', color: active ? c.text : c.muted }}>{label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
 
         {/* ── Timeline ──────────────────────────────────────────────── */}
         {shouldShowSectionLoading(myAppointmentsLoading, appointmentsLastLoadedAt) ? (
@@ -175,7 +120,7 @@ export function TherapyTabPatient({
         ) : (
           <>
             {Object.entries(groupByDay(filteredKommend)).map(([day, apts]) => (
-              <View key={day} style={{ marginBottom: 12 }}>
+              <View key={day} style={{ marginBottom: 20 }}>
                 <Text style={{ fontSize: 11, fontWeight: '700', letterSpacing: 0.5, color: c.muted, textTransform: 'uppercase', marginBottom: 8 }}>{day}</Text>
                 {apts.map(apt => (
                   <PatientAppointmentCard key={apt.id} c={c} appointment={apt} onOpenDetail={() => onSelectAppointment(apt)} onViewTherapist={() => openTherapist(apt.therapist)} />
@@ -188,7 +133,7 @@ export function TherapyTabPatient({
               </Text>
             )}
             {Object.entries(groupByDay(filteredVergangen)).map(([day, apts]) => (
-              <View key={day} style={{ marginBottom: 12 }}>
+              <View key={day} style={{ marginBottom: 20 }}>
                 <Text style={{ fontSize: 11, fontWeight: '700', letterSpacing: 0.5, color: c.muted, textTransform: 'uppercase', marginBottom: 8 }}>{day}</Text>
                 {apts.map(apt => (
                   <PatientAppointmentCard key={apt.id} c={c} appointment={apt} isPast onOpenDetail={() => onSelectAppointment(apt)} onViewTherapist={() => openTherapist(apt.therapist)} />
