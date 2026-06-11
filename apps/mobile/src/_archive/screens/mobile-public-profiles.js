@@ -253,6 +253,7 @@ export function TherapistProfileScreen(props) {
     ? [...thWithSlots.availableSlots].sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt))
     : [];
   const hasOnlineBooking = canOpenBookingModal && bookingSlots.length > 0;
+  const showBookingBar = accountType !== 'therapist' && accountType !== 'manager';
   const slotGroups = bookingSlots.reduce((acc, slot) => {
     const dayKey = getSlotDayKey(slot.startsAt);
     if (!dayKey) return acc;
@@ -297,7 +298,7 @@ export function TherapistProfileScreen(props) {
 
   return (
     <View style={{ flex: 1 }}>
-    <ScrollView style={{ flex: 1 }} contentContainerStyle={[styles.scrollContent, { paddingBottom: 100 }]}>
+    <ScrollView style={{ flex: 1 }} contentContainerStyle={[styles.scrollContent, { paddingBottom: showBookingBar ? 100 : 20 }]}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: insets.top + 12 }}>
         <BackButton c={c} label={t('backBtn')} onPress={() => setSelectedTherapist(null)} topInset={false} style={{ paddingTop: 0 }} />
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -648,21 +649,23 @@ export function TherapistProfileScreen(props) {
     </ScrollView>
 
     {/* Fixed booking bar above the bottom navigation */}
-    <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12, backgroundColor: c.background, borderTopWidth: 1, borderTopColor: c.border }}>
-      {hasOnlineBooking ? (
-        <Pressable
-          style={{ backgroundColor: c.primary, borderRadius: 14, paddingVertical: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 }}
-          onPress={() => setShowBookingModal(true)}
-        >
-          <Ionicons name="calendar-outline" size={20} color="#fff" />
-          <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>Freie Termine ansehen</Text>
-        </Pressable>
-      ) : (
-        <View style={{ borderRadius: 14, paddingVertical: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: c.mutedBg ?? c.card, borderWidth: 1, borderColor: c.border }}>
-          <Text style={{ color: c.muted, fontSize: 15, fontWeight: '600' }}>Keine freien Termine online</Text>
-        </View>
-      )}
-    </View>
+    {showBookingBar && (
+      <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12, backgroundColor: c.background, borderTopWidth: 1, borderTopColor: c.border }}>
+        {hasOnlineBooking ? (
+          <Pressable
+            style={{ backgroundColor: c.primary, borderRadius: 14, paddingVertical: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 }}
+            onPress={() => setShowBookingModal(true)}
+          >
+            <Ionicons name="calendar-outline" size={20} color="#fff" />
+            <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>Freie Termine ansehen</Text>
+          </Pressable>
+        ) : (
+          <View style={{ borderRadius: 14, paddingVertical: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: c.mutedBg ?? c.card, borderWidth: 1, borderColor: c.border }}>
+            <Text style={{ color: c.muted, fontSize: 15, fontWeight: '600' }}>Keine freien Termine online</Text>
+          </View>
+        )}
+      </View>
+    )}
     </View>
   );
 }
