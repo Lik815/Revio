@@ -380,12 +380,12 @@ function FreeSlotCard({ c, slot, onCancelSlot, deletingSlotIds }) {
     <View style={{
       flexDirection: 'row', alignItems: 'center',
       borderWidth: 1, borderColor: c.border, borderRadius: 10,
-      backgroundColor: c.background,
-      paddingVertical: 10, paddingHorizontal: 14, marginBottom: 6,
+      backgroundColor: c.card,
+      paddingVertical: 12, paddingHorizontal: 14, marginBottom: 8,
     }}>
       <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: c.success ?? '#5A9E8E', marginRight: 10 }} />
       <View style={{ flex: 1 }}>
-        <Text style={{ fontSize: 14, fontWeight: '600', color: c.muted }}>{timeStr} Uhr</Text>
+        <Text style={{ fontSize: 14, fontWeight: '600', color: c.text }}>{timeStr} Uhr</Text>
         <Text style={{ fontSize: 11, color: c.muted, marginTop: 1 }}>{slot.durationMin} Min · Frei</Text>
       </View>
       {isDeleting ? (
@@ -412,7 +412,7 @@ function BookedSlotCard({ c, slot, booking, onRespond, onTherapistCancel, onOpen
   // Defensiver Fallback: Slot ist BOOKED aber kein Booking-Objekt vorhanden
   if (!booking) {
     return (
-      <View style={{ backgroundColor: c.card, borderRadius: 10, borderWidth: 1, borderColor: c.border, marginBottom: 6, paddingVertical: 10, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center' }}>
+      <View style={{ backgroundColor: c.card, borderRadius: 10, borderWidth: 1, borderColor: c.border, marginBottom: 8, paddingVertical: 12, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center' }}>
         <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: c.muted, marginRight: 10 }} />
         <Text style={{ fontSize: 14, fontWeight: '600', color: c.muted, flex: 1 }}>{timeStr} Uhr · {slot.durationMin} Min</Text>
         <View style={{ backgroundColor: c.mutedBg, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 }}>
@@ -443,19 +443,18 @@ function BookedSlotCard({ c, slot, booking, onRespond, onTherapistCancel, onOpen
     return (
       <Pressable
         onPress={() => onOpenDetail?.(booking)}
-        style={{ backgroundColor: c.card, borderRadius: 10, borderWidth: 1, borderColor: c.primary, marginBottom: 6, overflow: 'hidden' }}
+        style={{ flexDirection: 'row', backgroundColor: c.card, borderRadius: 10, borderWidth: 1, borderColor: c.border, marginBottom: 8, overflow: 'hidden' }}
       >
-        <View style={{ height: 3, backgroundColor: c.primary }} />
-        <View style={{ padding: 12, flexDirection: 'row', alignItems: 'center' }}>
-          <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: c.success ?? '#22c55e', marginRight: 10 }} />
+        <View style={{ width: 4, backgroundColor: c.success ?? '#5A9E8E' }} />
+        <View style={{ flex: 1, padding: 12, flexDirection: 'row', alignItems: 'center' }}>
           <View style={{ flex: 1 }}>
             <Text style={{ fontSize: 14, fontWeight: '700', color: c.text }}>{timeStr} Uhr · {slot.durationMin} Min</Text>
             {booking.patientName ? <Text style={{ fontSize: 13, color: c.text, marginTop: 2 }}>{booking.patientName}</Text> : null}
             {booking.patientPhone ? <Text style={{ fontSize: 12, color: c.muted, marginTop: 1 }}>{booking.patientPhone}</Text> : null}
           </View>
           <View style={{ alignItems: 'flex-end', gap: 4 }}>
-            <View style={{ backgroundColor: c.primaryBg, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 }}>
-              <Text style={{ fontSize: 10, fontWeight: '700', color: c.primary }}>GEBUCHT</Text>
+            <View style={{ backgroundColor: c.successBg ?? '#EAF4F1', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 }}>
+              <Text style={{ fontSize: 10, fontWeight: '700', color: c.success ?? '#5A9E8E' }}>GEBUCHT</Text>
             </View>
             <Ionicons name="chevron-forward" size={14} color={c.muted} />
           </View>
@@ -466,11 +465,11 @@ function BookedSlotCard({ c, slot, booking, onRespond, onTherapistCancel, onOpen
 
   return (
     <View style={{
-      backgroundColor: c.card, borderRadius: 10, borderWidth: 1,
-      borderColor: accentColor, marginBottom: 6, overflow: 'hidden',
+      flexDirection: 'row', backgroundColor: c.card, borderRadius: 10, borderWidth: 1,
+      borderColor: c.border, marginBottom: 8, overflow: 'hidden',
     }}>
-      <View style={{ height: 3, backgroundColor: accentColor }} />
-      <View style={{ padding: 12 }}>
+      <View style={{ width: 4, backgroundColor: accentColor }} />
+      <View style={{ flex: 1, padding: 12 }}>
         <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 6 }}>
           <View style={{ flex: 1 }}>
             <Text style={{ fontSize: 14, fontWeight: '700', color: c.text }}>{timeStr} Uhr · {slot.durationMin} Min</Text>
@@ -582,7 +581,7 @@ export function TherapistTimeline({ c, mySlots, incomingBookings, activeFilter, 
   return (
     <>
       {days.map(day => (
-        <View key={day} style={{ marginBottom: 12 }}>
+        <View key={day} style={{ marginBottom: 20 }}>
           <Text style={{ fontSize: 11, fontWeight: '700', letterSpacing: 0.5, color: c.muted, textTransform: 'uppercase', marginBottom: 8 }}>{day}</Text>
           {items[day].map(({ slot, booking }) => (
             slot.status === 'AVAILABLE'

@@ -282,36 +282,27 @@ export function TherapyTabTherapist({
       >
         {slotBookingEnabled ? (
           <>
-            {/* ── Hero ────────────────────────────────────────────── */}
-            <Pressable
-              onPress={() => setActiveFilterTherapist('free')}
-              style={{ backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.border, padding: 16, marginBottom: 12 }}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-                <View style={{ width: 48, height: 48, borderRadius: 12, backgroundColor: c.successBg ?? '#EAF4F1', alignItems: 'center', justifyContent: 'center' }}>
-                  <Ionicons name="time-outline" size={24} color={c.success ?? '#5A9E8E'} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 11, fontWeight: '600', color: c.muted, textTransform: 'uppercase', letterSpacing: 0.4 }}>Freie Termine heute</Text>
-                  <Text style={{ fontSize: 20, fontWeight: '800', color: c.text, marginTop: 2 }}>{freeSlots.length} freie Termine</Text>
-                  {nextFreeSlotTime && <Text style={{ fontSize: 12, color: c.muted, marginTop: 2 }}>Nächster Slot: {nextFreeSlotTime} Uhr</Text>}
-                </View>
-                <Ionicons name="chevron-forward" size={18} color={c.muted} />
+            {/* ── Summary-Card ───────────────────────────────────── */}
+            <View style={{ flexDirection: 'row', backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.border, padding: 16, marginBottom: 12 }}>
+              <Pressable
+                onPress={() => setActiveFilterTherapist('free')}
+                style={{ flex: 1, paddingRight: 12, borderRightWidth: 1, borderRightColor: c.border }}
+              >
+                <Text style={{ fontSize: 24, fontWeight: '800', color: c.success ?? '#5A9E8E' }}>{freeSlots.length}</Text>
+                <Text style={{ fontSize: 11, fontWeight: '600', color: c.muted, textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 2 }}>Frei</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setActiveFilterTherapist('booked')}
+                style={{ flex: 1, paddingHorizontal: 12, borderRightWidth: 1, borderRightColor: c.border }}
+              >
+                <Text style={{ fontSize: 24, fontWeight: '800', color: c.text }}>{bookedSlots.length}</Text>
+                <Text style={{ fontSize: 11, fontWeight: '600', color: c.muted, textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 2 }}>Gebucht</Text>
+              </Pressable>
+              <View style={{ flex: 1.3, paddingLeft: 12 }}>
+                <Text style={{ fontSize: 11, fontWeight: '600', color: c.muted, textTransform: 'uppercase', letterSpacing: 0.4 }}>Nächster Slot</Text>
+                <Text style={{ fontSize: 18, fontWeight: '800', color: c.text, marginTop: 6 }}>{nextFreeSlotTime ? `${nextFreeSlotTime} Uhr` : '–'}</Text>
               </View>
-              {/* ── Stats-Zeile ── */}
-              <View style={{ flexDirection: 'row', gap: 16, marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: c.border }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                  <Ionicons name="calendar-outline" size={12} color={c.primary} />
-                  <Text style={{ fontSize: 12, fontWeight: '600', color: c.primary }}>{bookedSlots.length} gebucht</Text>
-                </View>
-                {pendingIncomingBookings.length > 0 && (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                    <Ionicons name="person-outline" size={12} color={c.warning ?? '#B7791F'} />
-                    <Text style={{ fontSize: 12, fontWeight: '600', color: c.warning ?? '#B7791F' }}>{pendingIncomingBookings.length} Anfragen</Text>
-                  </View>
-                )}
-              </View>
-            </Pressable>
+            </View>
 
             {/* ── Segment-Filterleiste ────────────────────────────── */}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
@@ -322,9 +313,14 @@ export function TherapyTabTherapist({
                     <Pressable
                       key={key}
                       onPress={() => setActiveFilterTherapist(key)}
-                      style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: active ? c.primary : c.card, borderWidth: 1, borderColor: active ? c.primary : c.border }}
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: active ? c.text : c.card, borderWidth: 1, borderColor: active ? c.text : c.border }}
                     >
-                      <Text style={{ fontSize: 13, fontWeight: active ? '700' : '500', color: active ? '#fff' : c.text }}>{label}</Text>
+                      <Text style={{ fontSize: 13, fontWeight: active ? '700' : '500', color: active ? c.card : c.text }}>{label}</Text>
+                      {key === 'pending' && pendingIncomingBookings.length > 0 && (
+                        <View style={{ minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4, backgroundColor: active ? c.card : (c.warning ?? '#8A6000'), alignItems: 'center', justifyContent: 'center' }}>
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: active ? c.text : '#fff' }}>{pendingIncomingBookings.length}</Text>
+                        </View>
+                      )}
                     </Pressable>
                   );
                 })}
@@ -361,7 +357,7 @@ export function TherapyTabTherapist({
       {slotBookingEnabled && (
         <Pressable
           onPress={() => setShowSlotComposerModal(true)}
-          style={{ position: 'absolute', bottom: 24, right: 20, width: 54, height: 54, borderRadius: 27, backgroundColor: c.primary, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.2, shadowRadius: 6, elevation: 6 }}
+          style={{ position: 'absolute', bottom: 24, right: 20, width: 54, height: 54, borderRadius: 27, backgroundColor: c.success ?? '#5A9E8E', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.2, shadowRadius: 6, elevation: 6 }}
         >
           <Ionicons name="add" size={28} color="#fff" />
         </Pressable>
