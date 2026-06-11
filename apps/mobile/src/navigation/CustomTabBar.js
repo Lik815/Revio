@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../hooks/use-theme';
 import { RADIUS, SHADOW, SPACE } from '../utils/app-utils';
-import { TAB_ICON_BY_ROUTE, TAB_TRANSLATION_KEYS } from './tab-config';
+import { TAB_HOME_ROUTES, TAB_ICON_BY_ROUTE, TAB_TRANSLATION_KEYS } from './tab-config';
 import { translations } from '../i18n/translations';
 
 const PILL_SIZE = 44;
@@ -69,7 +69,13 @@ export function CustomTabBar({ state, descriptors, navigation }) {
 
           const onPress = () => {
             const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
-            if (!focused && !event.defaultPrevented) navigation.navigate(route.name);
+            if (event.defaultPrevented) return;
+            const homeRoute = TAB_HOME_ROUTES[route.name];
+            if (!focused) {
+              navigation.navigate(route.name, homeRoute ? { screen: homeRoute } : undefined);
+            } else if (homeRoute) {
+              navigation.navigate(route.name, { screen: homeRoute });
+            }
           };
 
           return (
