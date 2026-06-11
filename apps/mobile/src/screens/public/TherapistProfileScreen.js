@@ -69,7 +69,7 @@ export function TherapistProfileScreen() {
   const loadAvailableSlots = async (id) => {
     setSlotsLoading(true);
     try {
-      const res = await fetch(`${getBaseUrl()}/therapist/${id}/slots`, {
+      const res = await fetch(`${getBaseUrl()}/therapists/${id}/slots`, {
         headers: { ...TUNNEL_HEADERS },
       });
       setAvailableSlots(res.ok ? ((await res.json()).slots ?? []) : []);
