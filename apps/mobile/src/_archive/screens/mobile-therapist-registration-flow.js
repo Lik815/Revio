@@ -47,6 +47,9 @@ function parseComplianceDraft(rawValue) {
 
 const certificationOptions = (fortbildungOptions ?? []).map((o) => ({ key: o.key, label: o.label }));
 
+const getCertificationLabel = (key) =>
+  certificationOptions.find((o) => o.key === key)?.label ?? key;
+
 export function TherapistRegistrationFlow({
   visible,
   onClose,

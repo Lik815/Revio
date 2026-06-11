@@ -41,7 +41,13 @@ export async function bookingRoutes(fastify: FastifyInstance) {
     const toDate = to ? new Date(to) : new Date(Date.now() + 60 * 24 * 60 * 60 * 1000);
 
     const slots = await fastify.prisma.therapistSlot.findMany({
-      where: { therapistId: therapist.id, startsAt: { gte: fromDate, lte: toDate } },
+      where: {
+        therapistId: therapist.id,
+        OR: [
+          { startsAt: { gte: fromDate, lte: toDate } },
+          { status: 'BOOKED', booking: { status: 'PENDING' } },
+        ],
+      },
       include: { booking: { select: { id: true, patientName: true, patientEmail: true, patientPhone: true, status: true } } },
       orderBy: { startsAt: 'asc' },
     });
