@@ -89,7 +89,7 @@ export function CustomTabBar({ state, descriptors, navigation }) {
               <View style={{ width: PILL_SIZE, height: PILL_SIZE, alignItems: 'center', justifyContent: 'center' }}>
                 <Ionicons
                   name={iconName}
-                  size={focused ? 24 : 20}
+                  size={focused ? 27 : 20}
                   color={focused ? '#FFFFFF' : (c.textMuted ?? c.muted)}
                   style={{ includeFontPadding: false, textAlignVertical: 'center', textAlign: 'center' }}
                 />

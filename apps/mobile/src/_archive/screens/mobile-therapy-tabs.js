@@ -200,8 +200,13 @@ export function TherapyTabTherapist({
   ];
 
   const nextFreeSlot = [...freeSlots].sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt))[0];
-  const nextFreeSlotTime = nextFreeSlot
-    ? new Date(nextFreeSlot.startsAt).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
+  const nextFreeSlotDate = nextFreeSlot ? new Date(nextFreeSlot.startsAt) : null;
+  const nextFreeSlotIsToday = nextFreeSlotDate ? nextFreeSlotDate.toDateString() === new Date().toDateString() : false;
+  const nextFreeSlotTime = nextFreeSlotDate
+    ? nextFreeSlotDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
+    : null;
+  const nextFreeSlotDay = nextFreeSlotDate
+    ? nextFreeSlotDate.toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short' })
     : null;
 
   return (
@@ -245,7 +250,18 @@ export function TherapyTabTherapist({
               </Pressable>
               <View style={{ flex: 1.3, paddingLeft: 12 }}>
                 <Text style={{ fontSize: 11, fontWeight: '600', color: c.muted, textTransform: 'uppercase', letterSpacing: 0.4 }}>Nächster Slot</Text>
-                <Text style={{ fontSize: 18, fontWeight: '800', color: c.text, marginTop: 6 }}>{nextFreeSlotTime ? `${nextFreeSlotTime} Uhr` : '–'}</Text>
+                {nextFreeSlotTime ? (
+                  nextFreeSlotIsToday ? (
+                    <Text style={{ fontSize: 18, fontWeight: '800', color: c.text, marginTop: 6 }}>{nextFreeSlotTime} Uhr</Text>
+                  ) : (
+                    <>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: c.muted, marginTop: 4 }}>{nextFreeSlotDay}</Text>
+                      <Text style={{ fontSize: 16, fontWeight: '800', color: c.text, marginTop: 1 }}>{nextFreeSlotTime} Uhr</Text>
+                    </>
+                  )
+                ) : (
+                  <Text style={{ fontSize: 18, fontWeight: '800', color: c.text, marginTop: 6 }}>–</Text>
+                )}
               </View>
             </View>
 
