@@ -43,6 +43,7 @@ export function TherapistProfileScreen() {
   const [availableSlots, setAvailableSlots] = useState([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [showBookingForm, setShowBookingForm] = useState(false);
+  const [selectedSlotId, setSelectedSlotId] = useState(null);
 
   const { favorites, loadFavorites, toggleFavorite, isFavorite } = useFavorites({
     authToken,
@@ -91,6 +92,7 @@ export function TherapistProfileScreen() {
     }
     if (th) {
       loadAvailableSlots(th.id);
+      setSelectedSlotId(th.selectedSlotId ?? null);
       setShowBookingForm(true);
     }
   };
@@ -128,7 +130,7 @@ export function TherapistProfileScreen() {
         <BookingRequestForm
           c={c}
           t={t}
-          therapist={therapist}
+          therapist={selectedSlotId ? { ...therapist, selectedSlotId } : therapist}
           authToken={authToken}
           availableSlots={availableSlots}
           slotsLoading={slotsLoading}
