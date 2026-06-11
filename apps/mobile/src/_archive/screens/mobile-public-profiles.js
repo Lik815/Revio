@@ -648,7 +648,7 @@ export function TherapistProfileScreen(props) {
     </ScrollView>
 
     {/* Fixed booking bar above the bottom navigation */}
-    <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: insets.bottom + 12, backgroundColor: c.background, borderTopWidth: 1, borderTopColor: c.border }}>
+    <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12, backgroundColor: c.background, borderTopWidth: 1, borderTopColor: c.border }}>
       {hasOnlineBooking ? (
         <Pressable
           style={{ backgroundColor: c.primary, borderRadius: 14, paddingVertical: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 }}
