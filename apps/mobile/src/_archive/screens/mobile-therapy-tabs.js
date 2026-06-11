@@ -249,28 +249,26 @@ export function TherapyTabTherapist({
               </View>
             </View>
 
-            {/* ── Segment-Filterleiste ────────────────────────────── */}
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
-              <View style={{ flexDirection: 'row', gap: 6 }}>
-                {FILTERS.map(({ key, label }) => {
-                  const active = activeFilterTherapist === key;
-                  return (
-                    <Pressable
-                      key={key}
-                      onPress={() => setActiveFilterTherapist(key)}
-                      style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: active ? c.text : c.card, borderWidth: 1, borderColor: active ? c.text : c.border }}
-                    >
-                      <Text style={{ fontSize: 13, fontWeight: active ? '700' : '500', color: active ? c.card : c.text }}>{label}</Text>
-                      {key === 'pending' && pendingIncomingBookings.length > 0 && (
-                        <View style={{ minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4, backgroundColor: active ? c.card : (c.warning ?? '#8A6000'), alignItems: 'center', justifyContent: 'center' }}>
-                          <Text style={{ fontSize: 11, fontWeight: '700', color: active ? c.text : '#fff' }}>{pendingIncomingBookings.length}</Text>
-                        </View>
-                      )}
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </ScrollView>
+            {/* ── Segment-Tabs ──────────────────────────────────────── */}
+            <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: c.border, marginBottom: 16 }}>
+              {FILTERS.map(({ key, label }) => {
+                const active = activeFilterTherapist === key;
+                return (
+                  <Pressable
+                    key={key}
+                    onPress={() => setActiveFilterTherapist(key)}
+                    style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, marginBottom: -1, borderBottomWidth: 2, borderBottomColor: active ? (c.success ?? '#5A9E8E') : 'transparent' }}
+                  >
+                    <Text style={{ fontSize: 14, fontWeight: active ? '700' : '500', color: active ? c.text : c.muted }}>{label}</Text>
+                    {key === 'pending' && pendingIncomingBookings.length > 0 && (
+                      <View style={{ minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4, backgroundColor: c.warning ?? '#8A6000', alignItems: 'center', justifyContent: 'center' }}>
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: '#fff' }}>{pendingIncomingBookings.length}</Text>
+                      </View>
+                    )}
+                  </Pressable>
+                );
+              })}
+            </View>
 
             {/* ── Timeline ────────────────────────────────────────── */}
             <TherapistTimeline
