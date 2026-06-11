@@ -134,7 +134,10 @@ export function TherapistProfileScreen() {
           authToken={authToken}
           availableSlots={availableSlots}
           slotsLoading={slotsLoading}
-          onSuccess={() => setShowBookingForm(false)}
+          onSuccess={() => {
+            setShowBookingForm(false);
+            navigation.navigate(ROOT_ROUTES.MAIN_TABS, { screen: TAB_ROUTES.THERAPY });
+          }}
           onClose={() => setShowBookingForm(false)}
           onReloadSlots={() => loadAvailableSlots(therapist.id)}
         />
