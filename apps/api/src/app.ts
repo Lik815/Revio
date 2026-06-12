@@ -16,6 +16,7 @@ import { authRoutes } from './routes/auth.js';
 import { uploadRoutes } from './routes/upload.js';
 import { configRoutes } from './routes/config.js';
 import { bookingRoutes } from './routes/booking.js';
+import { reviewRoutes } from './routes/reviews.js';
 import { feedbackRoutes } from './routes/feedback.js';
 import { notificationRoutes } from './routes/notifications.js';
 
@@ -44,6 +45,7 @@ export async function buildApp() {
   await app.register(authRoutes);
   await app.register(uploadRoutes);
   await app.register(bookingRoutes);
+  await app.register(reviewRoutes);
   await app.register(feedbackRoutes);
   await app.register(notificationRoutes);
 

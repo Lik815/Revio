@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BackButton } from '../../components/BackButton';
+import { ReviewsSection } from '../../components/ReviewsSection';
 import {
   ActivityIndicator,
   Clipboard,
@@ -488,6 +489,7 @@ export function TherapistProfileScreen(props) {
         </View>
       </View>
 
+      <ReviewsSection c={c} t={t} styles={styles} therapistId={th.id} authToken={authToken} />
 
       <Modal visible={showBookingModal} transparent animationType="slide" onRequestClose={() => setShowBookingModal(false)}>
         <Pressable

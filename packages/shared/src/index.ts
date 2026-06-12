@@ -258,3 +258,24 @@ export interface LinkWithEntities extends TherapistPracticeLink {
   therapist: Pick<Therapist, 'id' | 'fullName' | 'professionalTitle'>;
   practice: Pick<Practice, 'id' | 'name' | 'city'>;
 }
+
+export type TherapistReviewStatus = 'PUBLISHED' | 'HIDDEN' | 'REPORTED';
+
+export interface TherapistReview<T = Date> {
+  id: string;
+  rating: number;
+  comment?: string | null;
+  createdAt: T;
+  patientName: string;
+}
+
+export interface TherapistReviewSummary {
+  avgRating: number | null;
+  count: number;
+}
+
+export interface ReviewEligibility {
+  eligible: boolean;
+  alreadyReviewed: boolean;
+  review?: { rating: number; comment?: string | null };
+}

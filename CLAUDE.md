@@ -35,11 +35,11 @@ Core MVP:
 - freelance therapist self-registration
 - therapist profile and availability management
 - admin review and approval workflows
+- patient reviews of therapists (login-gated, post-appointment)
 
 Out of scope for MVP:
 
 - payments
-- reviews
 - medical records
 - AI diagnosis
 - AI treatment plans

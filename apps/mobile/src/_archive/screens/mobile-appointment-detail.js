@@ -1,17 +1,19 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Image, Linking, Pressable, ScrollView, Text, View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { resolveMediaUrl, SHADOW, SPACE } from '../../utils/app-utils';
+import { getBaseUrl, resolveMediaUrl, SHADOW, SPACE, TUNNEL_HEADERS } from '../../utils/app-utils';
 import { STATUS_COLORS } from './mobile-booking';
 import { TabHeader } from '../../components/TabHeader';
+import { ReviewComposerModal } from '../../components/ReviewComposerModal';
 
 export function AppointmentDetail({
   appointment,
   onBack,
   onOpenTherapist,
   onCancelRequest,
+  authToken,
   c, t, styles,
 }) {
   const appointment_data = appointment;
@@ -41,6 +43,22 @@ export function AppointmentDetail({
     : appointment?.status === 'PENDING'
       ? 'time-outline'
       : 'close-circle-outline';
+
+  const isPastConfirmed = appointment?.status === 'CONFIRMED' && date && date.getTime() < Date.now();
+  const [reviewEligibility, setReviewEligibility] = useState(null);
+  const [showReviewModal, setShowReviewModal] = useState(false);
+
+  useEffect(() => {
+    if (!isPastConfirmed || !authToken || !appointment?.id) return;
+    let cancelled = false;
+    fetch(`${getBaseUrl()}/bookings/${appointment.id}/review-eligibility`, {
+      headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => { if (!cancelled && data) setReviewEligibility(data); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [isPastConfirmed, authToken, appointment?.id]);
 
   return (
     <View style={{ flex: 1 }}>
@@ -177,9 +195,49 @@ export function AppointmentDetail({
             </Pressable>
           ) : null}
         </View>
+
+        {/* Bewertung */}
+        {isPastConfirmed && reviewEligibility?.eligible ? (
+          <Pressable
+            onPress={() => setShowReviewModal(true)}
+            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: c.success ?? '#5A9E8E', borderRadius: 999, paddingVertical: 14, gap: 8 }}
+          >
+            <Ionicons name="star-outline" size={17} color="#fff" />
+            <Text style={{ fontSize: 15, fontWeight: '700', color: '#fff' }}>{t('writeReviewCta')}</Text>
+          </Pressable>
+        ) : null}
+
+        {isPastConfirmed && reviewEligibility?.alreadyReviewed ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <View style={{ flexDirection: 'row', gap: 2 }}>
+              {[1, 2, 3, 4, 5].map((n) => (
+                <Ionicons
+                  key={n}
+                  name={n <= (reviewEligibility.review?.rating ?? 0) ? 'star' : 'star-outline'}
+                  size={16}
+                  color={c.success ?? '#5A9E8E'}
+                />
+              ))}
+            </View>
+            <Text style={{ fontSize: 13, color: c.muted, fontWeight: '600' }}>{t('reviewAlreadyGivenMsg')}</Text>
+          </View>
+        ) : null}
       </View>
     </View>
       </ScrollView>
+
+      <ReviewComposerModal
+        visible={showReviewModal}
+        onClose={() => setShowReviewModal(false)}
+        c={c}
+        t={t}
+        authToken={authToken}
+        bookingId={appointment?.id}
+        onSubmitted={(review) => {
+          setReviewEligibility({ eligible: false, alreadyReviewed: true, review });
+          setShowReviewModal(false);
+        }}
+      />
     </View>
   );
 }

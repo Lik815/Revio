@@ -139,6 +139,7 @@ export function TherapyTabScreen() {
           onBack={() => setSelectedAppointment(null)}
           onOpenTherapist={openTherapistById}
           onCancelRequest={() => setShowCancelModal(true)}
+          authToken={authToken}
           c={c} t={t} styles={appStyles}
         />
         <CancelAppointmentModal
