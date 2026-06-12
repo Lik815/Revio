@@ -106,6 +106,7 @@ export const translations = {
     changePasswordErrorMismatch: 'Die neuen Passwörter stimmen nicht überein.',
     changePasswordErrorFail: 'Passwort konnte nicht geändert werden.',
     logoutBtn: 'Abmelden',
+    clearAllBtn: 'Alle löschen',
     deleteAccount: 'Konto löschen',
     deleteAccountConfirmTitle: 'Konto wirklich löschen?',
     deleteAccountConfirmMsg: 'Dein Profil und alle Daten werden dauerhaft gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.',

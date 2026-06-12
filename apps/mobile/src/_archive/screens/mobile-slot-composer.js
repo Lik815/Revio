@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import {
   ActivityIndicator,
@@ -16,6 +16,7 @@ import {
 
 const SLOT_DURATIONS = [20, 30, 40, 50, 60];
 const TIME_HOURS = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19];
+const TIME_ROW_HEIGHT = 46;
 
 function formatSlotDate(d) {
   if (!d) return 'Datum wählen';
@@ -112,6 +113,24 @@ export function TherapistSlotComposer({ c, onAddSlot }) {
     const d = new Date();
     return { year: d.getFullYear(), month: d.getMonth() };
   });
+  const timeScrollRef = useRef(null);
+
+  const handleShowTimePicker = () => {
+    setShowTimePicker(true);
+    if (!slotPickerDate) return;
+    const now = new Date();
+    if (slotPickerDate.toDateString() !== now.toDateString()) return;
+    const firstAvailableIndex = TIME_HOURS.findIndex((h) => {
+      const dt = new Date(slotPickerDate);
+      dt.setHours(h, 30, 0, 0);
+      return dt > now;
+    });
+    if (firstAvailableIndex > 0) {
+      requestAnimationFrame(() => {
+        timeScrollRef.current?.scrollTo({ y: firstAvailableIndex * TIME_ROW_HEIGHT, animated: false });
+      });
+    }
+  };
 
   const slotIsInFuture = useMemo(() => {
     if (slotPickerDate === null || slotPickerHour === null || slotPickerMinute === null) return null;
@@ -149,7 +168,7 @@ export function TherapistSlotComposer({ c, onAddSlot }) {
         <View>
           <Text style={{ fontSize: 11, fontWeight: '700', color: c.muted, letterSpacing: 0.5, marginBottom: 4 }}>UHRZEIT</Text>
           <Pressable
-            onPress={() => setShowTimePicker(true)}
+            onPress={handleShowTimePicker}
             style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: c.mutedBg, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: slotPickerHour !== null ? c.primary : c.border, paddingHorizontal: 12, paddingVertical: 10 }}
           >
             <Ionicons name="time-outline" size={16} color={slotPickerHour !== null ? c.primary : c.muted} />
@@ -262,7 +281,7 @@ export function TherapistSlotComposer({ c, onAddSlot }) {
         <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' }} onPress={() => setShowTimePicker(false)}>
           <Pressable onPress={() => {}} style={{ backgroundColor: c.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: 360 }}>
             <Text style={{ fontSize: 16, fontWeight: '700', color: c.text, marginBottom: 14 }}>Uhrzeit wählen</Text>
-            <ScrollView showsVerticalScrollIndicator={false}>
+            <ScrollView ref={timeScrollRef} showsVerticalScrollIndicator={false}>
               {TIME_HOURS.map((h) => (
                 <View key={h} style={{ flexDirection: 'row', gap: 10, marginBottom: 8 }}>
                   {[0, 30].map((m) => {
