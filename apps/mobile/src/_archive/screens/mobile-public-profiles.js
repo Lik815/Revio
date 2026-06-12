@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BackButton } from '../../components/BackButton';
+import { ReviewComposerModal } from '../../components/ReviewComposerModal';
 import { ReviewsSection } from '../../components/ReviewsSection';
 import {
   ActivityIndicator,
@@ -19,11 +20,13 @@ import {
 } from 'react-native';
 import {
   formatDist,
+  getBaseUrl,
   getLangLabel,
   getPracticeInitials,
   RADIUS,
   resolveMediaUrl,
   softenErrorMessage,
+  TUNNEL_HEADERS,
   TYPE,
 } from '../../utils/app-utils';
 
@@ -235,6 +238,8 @@ export function TherapistProfileScreen(props) {
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedSlotId, setSelectedSlotId] = useState(null);
+  const [reviewEligibility, setReviewEligibility] = useState(null);
+  const [showReviewModal, setShowReviewModal] = useState(false);
 
   const therapistName = typeof th?.fullName === 'string' && th.fullName.trim() ? th.fullName.trim() : 'Profil';
   const therapistLanguages = Array.isArray(th?.languages) ? th.languages : [];
@@ -296,6 +301,18 @@ export function TherapistProfileScreen(props) {
       setSelectedSlotId(visibleSlotsForSelectedDate[0].id);
     }
   }, [selectedSlotId, visibleSlotsForSelectedDate]);
+
+  useEffect(() => {
+    if (!authToken || !th?.id) return;
+    let cancelled = false;
+    fetch(`${getBaseUrl()}/therapists/${th.id}/review-eligibility`, {
+      headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => { if (!cancelled && data) setReviewEligibility(data); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [authToken, th?.id]);
 
   return (
     <View style={{ flex: 1 }}>
@@ -489,7 +506,48 @@ export function TherapistProfileScreen(props) {
         </View>
       </View>
 
+      {reviewEligibility?.eligible ? (
+        <View style={{ paddingHorizontal: 18, paddingTop: 18 }}>
+          <Pressable
+            onPress={() => setShowReviewModal(true)}
+            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: c.success ?? '#5A9E8E', borderRadius: 999, paddingVertical: 14, gap: 8 }}
+          >
+            <Ionicons name="star-outline" size={17} color="#fff" />
+            <Text style={{ fontSize: 15, fontWeight: '700', color: '#fff' }}>{t('writeReviewCta')}</Text>
+          </Pressable>
+        </View>
+      ) : null}
+
+      {reviewEligibility?.alreadyReviewed ? (
+        <View style={{ paddingHorizontal: 18, paddingTop: 18, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <View style={{ flexDirection: 'row', gap: 2 }}>
+            {[1, 2, 3, 4, 5].map((n) => (
+              <Ionicons
+                key={n}
+                name={n <= (reviewEligibility.review?.rating ?? 0) ? 'star' : 'star-outline'}
+                size={16}
+                color={c.success ?? '#5A9E8E'}
+              />
+            ))}
+          </View>
+          <Text style={{ fontSize: 13, color: c.muted, fontWeight: '600' }}>{t('reviewAlreadyGivenMsg')}</Text>
+        </View>
+      ) : null}
+
       <ReviewsSection c={c} t={t} styles={styles} therapistId={th.id} authToken={authToken} />
+
+      <ReviewComposerModal
+        visible={showReviewModal}
+        onClose={() => setShowReviewModal(false)}
+        c={c}
+        t={t}
+        authToken={authToken}
+        bookingId={reviewEligibility?.bookingId}
+        onSubmitted={(review) => {
+          setReviewEligibility({ eligible: false, alreadyReviewed: true, review });
+          setShowReviewModal(false);
+        }}
+      />
 
       <Modal visible={showBookingModal} transparent animationType="slide" onRequestClose={() => setShowBookingModal(false)}>
         <Pressable

@@ -68,6 +68,37 @@ export async function reviewRoutes(fastify: FastifyInstance) {
     });
   });
 
+  // GET /therapists/:id/review-eligibility — Hat der Patient eine bewertbare Buchung bei diesem Therapeuten?
+  fastify.get('/therapists/:id/review-eligibility', async (request, reply) => {
+    const token = request.headers.authorization?.replace('Bearer ', '');
+    if (!token) return reply.status(401).send({ error: 'Unauthorized' });
+    const patient = await resolvePatient(fastify, token);
+    if (!patient) return reply.status(403).send({ error: 'Only patients can review bookings' });
+
+    const { id } = request.params as { id: string };
+    const bookings = await fastify.prisma.bookingRequest.findMany({
+      where: { therapistId: id, patientUserId: patient.id, status: 'CONFIRMED' },
+      include: { slot: true, review: true },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const reviewable = bookings.find((b) => !b.review && isBookingReviewable(b));
+    if (reviewable) {
+      return reply.send({ eligible: true, alreadyReviewed: false, bookingId: reviewable.id });
+    }
+
+    const reviewed = bookings.find((b) => b.review);
+    if (reviewed?.review) {
+      return reply.send({
+        eligible: false,
+        alreadyReviewed: true,
+        review: { rating: reviewed.review.rating, comment: reviewed.review.comment },
+      });
+    }
+
+    return reply.send({ eligible: false, alreadyReviewed: false });
+  });
+
   // GET /bookings/:id/review-eligibility — Darf der Patient diese Buchung bewerten?
   fastify.get('/bookings/:id/review-eligibility', async (request, reply) => {
     const token = request.headers.authorization?.replace('Bearer ', '');

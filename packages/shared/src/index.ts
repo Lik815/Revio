@@ -277,5 +277,6 @@ export interface TherapistReviewSummary {
 export interface ReviewEligibility {
   eligible: boolean;
   alreadyReviewed: boolean;
+  bookingId?: string;
   review?: { rating: number; comment?: string | null };
 }
