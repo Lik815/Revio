@@ -217,9 +217,7 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
     });
 
     const normalizedCity = input.city ? normalizeText(input.city) : null;
-    const passesFilters = (t: typeof therapists[number], { requireCityMatch }: { requireCityMatch: boolean }) => {
-      if (requireCityMatch && normalizedCity && normalizeText(t.city) !== normalizedCity) return false;
-
+    const passesFilters = (t: typeof therapists[number]) => {
       const languages = splitList(t.languages).map((l) => l.toLowerCase());
       const specializations = splitList(t.specializations).map((s) => s.toLowerCase());
 
@@ -234,13 +232,9 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
     const publicTherapists = therapists.filter((t) =>
       getTherapistPublicationState(t, { links: t.links }).publicSearchEligible,
     );
-    const shouldRequireCityMatch = !input.origin && Boolean(normalizedCity);
-    const cityMatchedTherapists = shouldRequireCityMatch
-      ? publicTherapists.filter((t) => passesFilters(t, { requireCityMatch: true }))
-      : publicTherapists.filter((t) => passesFilters(t, { requireCityMatch: false }));
-    const filteredTherapists = cityMatchedTherapists.length > 0
-      ? cityMatchedTherapists
-      : publicTherapists.filter((t) => passesFilters(t, { requireCityMatch: false }));
+    // Stadt und Radius schließen Ergebnisse nicht mehr aus, sondern bestimmen nur
+    // die Sortierung (Treffer zuerst, Rest danach) – siehe cityMatch/radiusMatch unten.
+    const filteredTherapists = publicTherapists.filter((t) => passesFilters(t));
 
     const results: SearchTherapist[] = [];
 
@@ -259,7 +253,7 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
           ? haversine(input.origin.lat, input.origin.lng, tAny.homeLat, tAny.homeLng)
           : undefined;
 
-      const practices: SearchPractice[] = t.links
+      const allPractices: SearchPractice[] = t.links
         .map((link) => {
           let photos: string[] | undefined;
           if (link.practice.photos) {
@@ -285,22 +279,25 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
             photos,
           };
         })
-        .filter((practice) => {
-          if (!input.origin) return true;
-          if (practice.distKm == null) return false;
-          if (input.radiusKm == null) return true;
-          return practice.distKm <= input.radiusKm;
-        })
         .sort((a, b) => (a.distKm ?? Number.POSITIVE_INFINITY) - (b.distKm ?? Number.POSITIVE_INFINITY));
 
-      // Kein In-Radius-Ergebnis: nur mobile Therapeuten dürfen ohne Praxis erscheinen
-      if (practices.length === 0 && input.origin && input.radiusKm != null && !t.homeVisit) return;
+      const practicesInRadius = input.origin && input.radiusKm != null
+        ? allPractices.filter((p) => p.distKm != null && p.distKm <= input.radiusKm!)
+        : allPractices;
 
-      // Mobile Therapeuten ohne Praxis: Radius-Check gegen serviceRadiusKm
-      if (practices.length === 0 && t.homeVisit) {
-        const svcRadius = tAny.serviceRadiusKm as number | null;
-        if (input.origin && therapistDistKm != null && svcRadius != null) {
-          if (therapistDistKm > svcRadius) return; // Patient außerhalb Einzugsgebiet
+      // cityMatch/radiusMatch schließen nichts mehr aus, sondern bestimmen nur die
+      // Sortierung: Treffer (Stadt + Radius) zuerst, der Rest danach.
+      const cityMatch = normalizedCity ? normalizeText(t.city) === normalizedCity : true;
+
+      let radiusMatch = true;
+      if (input.origin && input.radiusKm != null) {
+        if (practicesInRadius.length > 0) {
+          radiusMatch = true;
+        } else if (t.homeVisit) {
+          const svcRadius = tAny.serviceRadiusKm as number | null;
+          radiusMatch = therapistDistKm == null || svcRadius == null || therapistDistKm <= svcRadius;
+        } else {
+          radiusMatch = allPractices.length === 0;
         }
       }
 
@@ -310,8 +307,8 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
       // requestable-Filter
       if (requestableFilter === true && !requestability.requestable) return;
 
-      const nearestPracticeDistance = practices[0]?.distKm;
-      const effectiveDistKm = practices.length > 0 ? nearestPracticeDistance : therapistDistKm;
+      const practices = practicesInRadius;
+      const effectiveDistKm = practicesInRadius[0]?.distKm ?? allPractices[0]?.distKm ?? therapistDistKm;
 
       results.push({
         id: t.id,
@@ -335,6 +332,8 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
         bookingMode: tAny.bookingMode ?? 'DIRECTORY_ONLY',
         requestable: requestability.requestable,
         nextFreeSlotAt: tAny.nextFreeSlotAt?.toISOString?.() ?? tAny.nextFreeSlotAt ?? null,
+        cityMatch,
+        radiusMatch,
         // Neue Felder für mobile Therapeuten
         ...(tAny.serviceRadiusKm != null ? { serviceRadiusKm: tAny.serviceRadiusKm } : {}),
         ...(practices.length === 0 && t.homeVisit && tAny.homeLat && tAny.homeLat !== 0
@@ -343,7 +342,12 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
       } as SearchTherapist & { serviceRadiusKm?: number; homeLat?: number; homeLng?: number });
     });
 
+    // Treffer (Stadt- und Radius-Match) zuerst, Rest danach – innerhalb der
+    // Gruppen wie bisher nach Entfernung bzw. Relevanz sortiert.
+    const matchScore = (r: SearchTherapist) => (r.cityMatch ? 1 : 0) + (r.radiusMatch ? 1 : 0);
     results.sort((a, b) => {
+      const scoreDiff = matchScore(b) - matchScore(a);
+      if (scoreDiff !== 0) return scoreDiff;
       if (input.origin) {
         const aDist = a.distKm ?? Number.POSITIVE_INFINITY;
         const bDist = b.distKm ?? Number.POSITIVE_INFINITY;
@@ -353,7 +357,10 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
     });
 
     const practiceMap = new Map<string, SearchPractice>();
-    results.forEach((t) => t.practices.forEach((p) => practiceMap.set(p.id, p)));
+    results.forEach((t) => t.practices.forEach((p) => {
+      if (input.origin && input.radiusKm != null && p.distKm != null && p.distKm > input.radiusKm) return;
+      practiceMap.set(p.id, p);
+    }));
 
     return {
       therapists: results,

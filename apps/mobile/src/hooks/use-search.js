@@ -201,8 +201,11 @@ export function useSearch({ t }) {
   };
 
   // ── Core search logic ─────────────────────────────────────────────────────
+  // Treffer für Ort/Radius schließen Ergebnisse nicht mehr aus, sondern werden
+  // weiter unten zuerst sortiert – Rest bleibt als "weitere Ergebnisse" sichtbar.
+  const matchScore = (th) => (th.cityMatch !== false ? 1 : 0) + (th.radiusMatch !== false ? 1 : 0);
+
   const applyFilters = (list, coords) => {
-    const origin = coords === undefined ? userCoords : coords;
     const safeList = Array.isArray(list) ? list : [];
     return safeList.filter((th) => {
       if (homeVisit && !th.homeVisit) return false;
@@ -215,10 +218,6 @@ export function useSearch({ t }) {
             ? th.certifications
             : [];
         if (!fortbildungen.some((f) => certs.includes(f))) return false;
-      }
-      if (origin) {
-        if (th.distKm == null) return false;
-        if (th.distKm > searchRadius) return false;
       }
       return true;
     });
@@ -240,7 +239,11 @@ export function useSearch({ t }) {
             : haversine(coords.lat, coords.lng, p.lat, p.lng);
         return { ...th, distKm };
       })
-      .sort((a, b) => (a.distKm ?? 9999) - (b.distKm ?? 9999));
+      .sort((a, b) => {
+        const scoreDiff = matchScore(b) - matchScore(a);
+        if (scoreDiff !== 0) return scoreDiff;
+        return (a.distKm ?? 9999) - (b.distKm ?? 9999);
+      });
   };
 
   const fetchSearchResults = async (q, effectiveCity, origin) => {

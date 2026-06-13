@@ -528,11 +528,16 @@ describe('POST /search', () => {
 
     expect(res.statusCode).toBe(200);
     const body = res.json();
-    expect(body.therapists).toHaveLength(1);
+    // Außerhalb des Radius liegende Therapeuten werden nicht mehr ausgeschlossen,
+    // sondern als "weitere Ergebnisse" hinter den Treffern eingereiht.
+    expect(body.therapists).toHaveLength(2);
     expect(body.therapists[0].fullName).toBe('Nearby Therapist');
+    expect(body.therapists[0].radiusMatch).toBe(true);
     expect(body.therapists[0].practices).toHaveLength(1);
     expect(body.therapists[0].practices[0].id).toBe(nearPractice.id);
     expect(body.therapists[0].distKm).toBeLessThan(0.1);
+    expect(body.therapists[1].fullName).toBe('Far Away Therapist');
+    expect(body.therapists[1].radiusMatch).toBe(false);
     expect(body.practices).toHaveLength(1);
     expect(body.practices[0].id).toBe(nearPractice.id);
   });

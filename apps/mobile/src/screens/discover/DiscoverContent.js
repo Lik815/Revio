@@ -748,14 +748,24 @@ export function DiscoverContent(props) {
         <SkeletonCard key={item} C={c} />
       ))}
 
-      {viewMode === 'list' && !searchLoading && safeResults.map((therapist) => {
+      {viewMode === 'list' && !searchLoading && safeResults.map((therapist, index) => {
         const nextSlot = formatNextSlot(therapist.nextFreeSlotAt);
         const spec = (therapist.specializations ?? [])[0] ?? null;
         const initials = (therapist.fullName ?? '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
 
+        const isOtherResult = therapist.cityMatch === false || therapist.radiusMatch === false;
+        const prevIsOtherResult = index > 0
+          && (safeResults[index - 1].cityMatch === false || safeResults[index - 1].radiusMatch === false);
+        const showMoreResultsDivider = isOtherResult && !prevIsOtherResult && index > 0;
+
         return (
+          <React.Fragment key={therapist.id}>
+          {showMoreResultsDivider ? (
+            <View style={{ paddingTop: 16, paddingBottom: 4 }}>
+              <Text style={{ ...TYPE.meta, color: mutedText }}>{t('moreResultsDivider')}</Text>
+            </View>
+          ) : null}
           <Pressable
-            key={therapist.id}
             style={[styles.resultCard, { backgroundColor: c.card, borderColor: c.border }]}
             onPress={() => openTherapistById(therapist.id)}
           >
@@ -854,6 +864,7 @@ export function DiscoverContent(props) {
               ) : null}
             </View>
           </Pressable>
+          </React.Fragment>
         );
       })}
 

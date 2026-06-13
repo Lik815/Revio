@@ -28,6 +28,7 @@ export const translations = {
     searchBtn: 'Suchen',
     resultsLabel: 'Ergebnis',
     resultsLabelPlural: 'Ergebnisse',
+    moreResultsDivider: 'Weitere Ergebnisse außerhalb deiner Auswahl',
     verifiedOnly: 'Nur geprüfte Profile',
     noResults: 'Keine Ergebnisse',
     noResultsBody: 'Keine Treffer — andere Stadt oder weiteren Radius versuchen.',

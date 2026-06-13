@@ -250,6 +250,8 @@ const mapApiTherapist = (t) => ({
   kassenart: t.kassenart ?? null,
   fortbildungen: parseStringOrArray(t.certifications),
   distKm: typeof t.distKm === 'number' ? t.distKm : null,
+  cityMatch: t.cityMatch ?? true,
+  radiusMatch: t.radiusMatch ?? true,
   verifiziert: true,
   behandlungsbereiche: parseStringOrArray(t.behandlungsbereiche ?? t.treatmentAreas ?? []),
   verfügbareZeiten: '',

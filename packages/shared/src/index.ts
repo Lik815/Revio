@@ -174,6 +174,8 @@ export interface SearchTherapist {
   bookingMode?: BookingMode;
   requestable?: boolean;
   nextFreeSlotAt?: string | null;
+  cityMatch?: boolean;
+  radiusMatch?: boolean;
 }
 
 export interface SearchResponse {

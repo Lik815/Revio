@@ -12,6 +12,7 @@ import { ROOT_ROUTES, TAB_ROUTES } from '../../navigation/route-names';
 import { HeartButton } from '../../components/HeartButton';
 import { SkeletonCard } from '../../components/SkeletonCard';
 import { ToastOverlay } from '../../components/ToastOverlay';
+import { LocationSheet } from '../../modals/LocationSheet';
 import { NotificationSheet } from '../../modals/NotificationSheet';
 import { appStyles } from '../../styles/app-styles';
 import { DiscoverContent } from './DiscoverContent';
@@ -140,6 +141,20 @@ export function DiscoverTabScreen() {
         toggleFortbildung={search.toggleFortbildung}
         userCoords={search.userCoords}
         viewMode={search.viewMode}
+      />
+
+      <LocationSheet
+        visible={search.showLocationSheet}
+        onClose={() => search.setShowLocationSheet(false)}
+        city={search.locationSheetCity}
+        onChangeCity={search.fetchLocationSuggestions}
+        suggestions={search.locationSuggestions}
+        onSelectSuggestion={search.selectLocationSuggestion}
+        onUseGPS={search.handleLocationSheetGPS}
+        loading={search.locationLoading}
+        onConfirm={search.handleLocationSheetManual}
+        c={c}
+        t={t}
       />
 
       <NotificationSheet
