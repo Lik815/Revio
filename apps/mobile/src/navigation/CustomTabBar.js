@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { StackActions } from '@react-navigation/native';
 import { Animated, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -67,6 +68,7 @@ export function CustomTabBar({ state, descriptors, navigation }) {
           const baseIcon = TAB_ICON_BY_ROUTE[route.name] ?? 'ellipse';
           const iconName = focused ? baseIcon : `${baseIcon}-outline`;
           const label = options.title ?? t[TAB_TRANSLATION_KEYS[route.name]] ?? route.name;
+          const nestedState = route.state;
 
           const onPress = () => {
             const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
@@ -75,12 +77,15 @@ export function CustomTabBar({ state, descriptors, navigation }) {
             if (!focused) {
               navigation.navigate(route.name, homeRoute ? { screen: homeRoute } : undefined);
             } else if (homeRoute) {
-              navigation.navigate(
-                route.name,
-                route.name === TAB_ROUTES.DISCOVER
-                  ? { screen: homeRoute, params: { resetToHomeAt: Date.now() } }
-                  : { screen: homeRoute },
-              );
+              if (nestedState?.key) {
+                navigation.dispatch({ ...StackActions.popToTop(), target: nestedState.key });
+              }
+              if (route.name === TAB_ROUTES.DISCOVER) {
+                navigation.navigate(route.name, {
+                  screen: homeRoute,
+                  params: { resetToHomeAt: Date.now() },
+                });
+              }
             }
           };
 
