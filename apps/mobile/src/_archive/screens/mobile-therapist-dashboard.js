@@ -14,7 +14,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
-import { TherapistSlotComposer } from './mobile-slot-composer';
+import { TherapistSlotComposer } from '../../components/SlotComposer';
 
 import {
   getLangLabel,
@@ -31,7 +31,7 @@ import {
 import {
   ComplianceStatusStep,
   getComplianceStatusLabel,
-} from './mobile-compliance-step';
+} from '../../components/ComplianceStatusStep';
 import { useAuth } from '../../context/AuthContext';
 
 const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024;

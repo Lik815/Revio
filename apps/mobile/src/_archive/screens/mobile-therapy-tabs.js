@@ -7,7 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SPACE, formatDayHeader, getBaseUrl, TUNNEL_HEADERS } from '../../utils/app-utils';
 import { PatientAppointmentCard, PatientNextAppointmentCard, TherapistBookingCard, STATUS_COLORS } from './mobile-booking';
-import { TherapistTimeline } from './mobile-slot-composer';
+import { TherapistTimeline } from '../../components/SlotComposer';
 
 const shouldShowSectionLoading = (isLoading, lastLoadedAt) => isLoading && lastLoadedAt === 0;
 

@@ -12,7 +12,7 @@ import {
 import {
   RADIUS,
   formatDayHeader,
-} from '../../utils/app-utils';
+} from '../utils/app-utils';
 
 const SLOT_DURATIONS = [20, 30, 40, 50, 60];
 const TIME_HOURS = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19];

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Modal, Pressable, View, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { TherapistSlotComposer } from './mobile-slot-composer';
+import { TherapistSlotComposer } from '../../components/SlotComposer';
 
 export function SlotComposerModal({ visible, onClose, onAddSlot, c }) {
   return (
