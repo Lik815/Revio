@@ -33,6 +33,7 @@ import {
   getComplianceStatusLabel,
 } from '../../components/ComplianceStatusStep';
 import { ProfileChecklist } from '../../components/ProfileChecklist';
+import { ProfileCompletionWizard } from '../../components/ProfileCompletionWizard';
 import { useAuth } from '../../context/AuthContext';
 
 const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024;
@@ -132,6 +133,7 @@ export function TherapistDashboardScreen({ c, t, styles, certificationOptions, o
   const [photoError, setPhotoError] = useState(false);
   const [showSlotModal, setShowSlotModal] = useState(false);
   const [adminExpanded, setAdminExpanded] = useState(false);
+  const [showWizard, setShowWizard] = useState(false);
 
   // Load documents on mount / token change
   useEffect(() => {
@@ -282,11 +284,20 @@ export function TherapistDashboardScreen({ c, t, styles, certificationOptions, o
     finally { setDocumentUploading(false); }
   };
 
-  const handleProfileSubmittedForReview = async () => {
+  const refreshProfile = async () => {
     try {
       const refreshRes = await fetch(`${getBaseUrl()}/auth/me`, { headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` } });
-      if (refreshRes.ok) setLoggedInTherapist(normalizeTherapistProfile(await refreshRes.json()));
+      if (refreshRes.ok) {
+        const next = normalizeTherapistProfile(await refreshRes.json());
+        setLoggedInTherapist(next);
+        return next;
+      }
     } catch {}
+    return null;
+  };
+
+  const handleProfileSubmittedForReview = async () => {
+    await refreshProfile();
     onProfileSaved(t('alertHint') ?? 'Eingereicht', 'Dein Profil wurde zur Prüfung eingereicht.');
   };
 
@@ -354,9 +365,20 @@ export function TherapistDashboardScreen({ c, t, styles, certificationOptions, o
           th={th}
           authToken={authToken}
           onSubmitted={handleProfileSubmittedForReview}
+          onOpenWizard={() => setShowWizard(true)}
           c={c} t={t} styles={styles}
         />
       )}
+
+      <ProfileCompletionWizard
+        visible={showWizard}
+        onClose={() => setShowWizard(false)}
+        th={th}
+        authToken={authToken}
+        certificationOptions={certificationOptions}
+        onRefresh={refreshProfile}
+        c={c} t={t} styles={styles}
+      />
 
       {editMode ? (
         <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>

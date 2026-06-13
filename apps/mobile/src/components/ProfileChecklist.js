@@ -38,7 +38,7 @@ function Row({ done, label, c }) {
 // Dashboard checklist + explicit "submit for review" action. Reads the
 // profileCompletion block from GET /auth/me and posts to the dedicated submit
 // endpoint — the only path that moves DRAFT/CHANGES_REQUESTED -> PENDING_REVIEW.
-export function ProfileChecklist({ th, authToken, onSubmitted, c, t, styles }) {
+export function ProfileChecklist({ th, authToken, onSubmitted, onOpenWizard, c, t, styles }) {
   const completion = th?.profileCompletion;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -127,9 +127,17 @@ export function ProfileChecklist({ th, authToken, onSubmitted, c, t, styles }) {
       )}
 
       {!canSubmit && !inReview && !isApproved && !completion.readyForReview && !isPreparing && (
-        <Text style={{ fontSize: 13, color: c.muted, marginTop: 12 }}>
-          Vervollständige alle Angaben (100%), um dein Profil zur Prüfung einzureichen.
-        </Text>
+        <>
+          <Pressable
+            onPress={onOpenWizard}
+            style={[styles.registerBtn, { backgroundColor: c.primary, marginTop: 14 }]}
+          >
+            <Text style={styles.registerBtnText}>Profil vervollständigen</Text>
+          </Pressable>
+          <Text style={{ fontSize: 13, color: c.muted, marginTop: 10, textAlign: 'center' }}>
+            Vervollständige alle Angaben (100%), um dein Profil zur Prüfung einzureichen.
+          </Text>
+        </>
       )}
     </View>
   );
