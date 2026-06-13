@@ -12,7 +12,7 @@ import { getBaseUrl, mapApiTherapist, TUNNEL_HEADERS } from '../../utils/app-uti
 import { HeartButton } from '../../components/HeartButton';
 import { ToastOverlay } from '../../components/ToastOverlay';
 import { BookingRequestForm } from './BookingRequestForm';
-import { TherapistProfileScreen as TherapistProfileContent } from '../../_archive/screens/mobile-public-profiles';
+import { TherapistProfileContent } from './TherapistProfileContent';
 
 const t = (key) => translations.de[key] ?? key;
 

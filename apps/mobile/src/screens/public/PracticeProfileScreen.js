@@ -7,7 +7,7 @@ import { appStyles } from '../../styles/app-styles';
 import { translations } from '../../i18n/translations';
 import { ROOT_ROUTES } from '../../navigation/route-names';
 import { getBaseUrl, mapApiTherapist, softenErrorMessage, TUNNEL_HEADERS } from '../../utils/app-utils';
-import { PracticeProfileScreen as PracticeProfileContent } from '../../_archive/screens/mobile-public-profiles';
+import { PracticeProfileContent } from './PracticeProfileContent';
 
 const t = (key) => translations.de[key] ?? key;
 const FAV_PRACTICES_KEY = 'revio_fav_practices';
