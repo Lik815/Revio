@@ -210,7 +210,7 @@ export default async function TherapistsPage({ searchParams }: { searchParams: S
                     <td data-label="Öffentlichkeit">
                       <div className="priority-stack">
                         <AdminStatusBadge status={publicVisibilityBadge.status} label={publicVisibilityBadge.label} />
-                        <span className="entity-meta" title={blockers.join(', ')}>
+                        <span className="entity-meta" title={adminVisibilityIssues.map((issue) => issue.detail).join(', ')}>
                           {getVisibilityMeta(therapist)}
                         </span>
                         {blockerSummary ? (
