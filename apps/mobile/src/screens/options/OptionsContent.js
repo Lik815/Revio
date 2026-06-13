@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SPACE, getBaseUrl } from '../../utils/app-utils';
 
-export function OptionsScreen({
+export function OptionsContent({
   loggedInTherapist, loggedInPatient, accountType,
   themeMode, setThemeMode,
   notifications, dismissedNotifIds,

@@ -6,7 +6,7 @@ import { useNotificationPolling } from '../../hooks/use-notification-polling';
 import { appStyles } from '../../styles/app-styles';
 import { translations } from '../../i18n/translations';
 import { ROOT_ROUTES, TAB_ROUTES } from '../../navigation/route-names';
-import { OptionsScreen } from '../../_archive/screens/mobile-options-screen';
+import { OptionsContent } from './OptionsContent';
 import { FeedbackModal } from '../../modals/FeedbackModal';
 import { ChangePasswordModal } from '../../modals/ChangePasswordModal';
 import { DeleteAccountModal } from '../../modals/DeleteAccountModal';
@@ -77,7 +77,7 @@ export function OptionsTabScreen() {
 
   return (
     <>
-      <OptionsScreen
+      <OptionsContent
         loggedInTherapist={loggedInTherapist}
         loggedInPatient={loggedInPatient}
         accountType={accountType}
