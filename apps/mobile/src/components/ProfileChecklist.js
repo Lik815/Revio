@@ -61,6 +61,8 @@ export function ProfileChecklist({ th, authToken, onSubmitted, c, t, styles }) {
       const res = await fetch(`${getBaseUrl()}/therapists/me/submit-for-review`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
+        // Fastify rejects an application/json POST with an empty body.
+        body: JSON.stringify({}),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { setError(data.message ?? t('alertConnectionError')); return; }
