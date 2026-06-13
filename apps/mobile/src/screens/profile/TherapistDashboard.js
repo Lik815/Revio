@@ -32,6 +32,7 @@ import {
   ComplianceStatusStep,
   getComplianceStatusLabel,
 } from '../../components/ComplianceStatusStep';
+import { ProfileChecklist } from '../../components/ProfileChecklist';
 import { useAuth } from '../../context/AuthContext';
 
 const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024;
@@ -281,6 +282,14 @@ export function TherapistDashboardScreen({ c, t, styles, certificationOptions, o
     finally { setDocumentUploading(false); }
   };
 
+  const handleProfileSubmittedForReview = async () => {
+    try {
+      const refreshRes = await fetch(`${getBaseUrl()}/auth/me`, { headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` } });
+      if (refreshRes.ok) setLoggedInTherapist(normalizeTherapistProfile(await refreshRes.json()));
+    } catch {}
+    onProfileSaved(t('alertHint') ?? 'Eingereicht', 'Dein Profil wurde zur Prüfung eingereicht.');
+  };
+
   const th = loggedInTherapist;
   if (!th) return null;
   const fullName = typeof th.fullName === 'string' && th.fullName.trim() ? th.fullName.trim() : 'Profil';
@@ -339,6 +348,15 @@ export function TherapistDashboardScreen({ c, t, styles, certificationOptions, o
           ))}
         </View>
       </View>
+
+      {!editMode && (
+        <ProfileChecklist
+          th={th}
+          authToken={authToken}
+          onSubmitted={handleProfileSubmittedForReview}
+          c={c} t={t} styles={styles}
+        />
+      )}
 
       {editMode ? (
         <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
