@@ -15,7 +15,7 @@ import { TherapyTabPatient, TherapyTabTherapist } from '../../_archive/screens/m
 import { AppointmentDetail } from '../../_archive/screens/mobile-appointment-detail';
 import { CancelAppointmentModal } from '../../modals/CancelAppointmentModal';
 import { TherapistCancelModal } from '../../modals/TherapistCancelModal';
-import { SlotComposerModal } from '../../_archive/screens/mobile-slot-composer-modal';
+import { SlotComposerModal } from '../../modals/SlotComposerModal';
 import { SlotCreatedModal } from '../../modals/SlotCreatedModal';
 import { useTherapyData } from '../../context/TherapyContext';
 

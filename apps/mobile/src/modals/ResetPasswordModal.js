@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { getBaseUrl, TUNNEL_HEADERS } from '../../utils/app-utils';
+import { getBaseUrl, TUNNEL_HEADERS } from '../utils/app-utils';
 
 export function ResetPasswordModal({ visible, token, onClose, onDone, c }) {
   const [newPassword, setNewPassword] = useState('');

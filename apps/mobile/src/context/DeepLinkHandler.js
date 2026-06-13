@@ -9,8 +9,8 @@ import { translations } from '../i18n/translations';
 import { getBaseUrl, normalizeTherapistProfile, TUNNEL_HEADERS } from '../utils/app-utils';
 import { EmailVerifyScreen } from '../_archive/screens/mobile-email-verify-screen';
 import { InviteClaimScreen } from '../_archive/screens/mobile-invite-claim-screen';
-import { ResetPasswordModal } from '../_archive/screens/mobile-reset-password-modal';
-import { VisibilityModal } from '../_archive/screens/mobile-visibility-modal';
+import { ResetPasswordModal } from '../modals/ResetPasswordModal';
+import { VisibilityModal } from '../modals/VisibilityModal';
 
 const t = (key) => translations.de[key] ?? key;
 
