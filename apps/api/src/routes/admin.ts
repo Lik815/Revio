@@ -466,6 +466,10 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
         continue;
       }
 
+      if (t.isFreelancer) {
+        continue;
+      }
+
       // publicSearchEligible is true — check practice links
       if (confirmedLinks.length === 0) {
         const hasProposed = t.links.some((l) => l.status === 'PROPOSED' || l.status === 'DISPUTED');

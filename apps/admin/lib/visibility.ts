@@ -4,6 +4,7 @@ import { summarizeValues } from './format';
 type TherapistVisibilityShape = {
   reviewStatus: string;
   isVisible: boolean;
+  isFreelancer?: boolean;
   createdAt: string;
   bio?: string | null;
   specializations?: string[];
@@ -80,7 +81,7 @@ export function getVisibilityBlockers(therapist: Pick<TherapistVisibilityShape, 
 }
 
 export function getAdminVisibilityIssues(
-  therapist: Pick<TherapistVisibilityShape, 'reviewStatus' | 'isVisible' | 'visibility' | 'links'>,
+  therapist: Pick<TherapistVisibilityShape, 'reviewStatus' | 'isVisible' | 'isFreelancer' | 'visibility' | 'links'>,
 ): AdminVisibilityIssue[] {
   if (therapist.reviewStatus !== 'APPROVED') return [];
 
@@ -88,6 +89,10 @@ export function getAdminVisibilityIssues(
     reason,
     detail: humanizeBlockingReason(reason),
   }));
+
+  if (therapist.isFreelancer) {
+    return issues.filter((issue, index, arr) => arr.findIndex((entry) => entry.reason === issue.reason) === index);
+  }
 
   const links = therapist.links ?? [];
   const confirmedLinks = links.filter((link) => link.status === 'CONFIRMED');
