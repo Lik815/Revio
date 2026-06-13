@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../hooks/use-theme';
 import { RADIUS, SHADOW, SPACE } from '../utils/app-utils';
+import { TAB_ROUTES } from './route-names';
 import { TAB_HOME_ROUTES, TAB_ICON_BY_ROUTE, TAB_TRANSLATION_KEYS } from './tab-config';
 import { translations } from '../i18n/translations';
 
@@ -74,7 +75,12 @@ export function CustomTabBar({ state, descriptors, navigation }) {
             if (!focused) {
               navigation.navigate(route.name, homeRoute ? { screen: homeRoute } : undefined);
             } else if (homeRoute) {
-              navigation.navigate(route.name, { screen: homeRoute });
+              navigation.navigate(
+                route.name,
+                route.name === TAB_ROUTES.DISCOVER
+                  ? { screen: homeRoute, params: { resetToHomeAt: Date.now() } }
+                  : { screen: homeRoute },
+              );
             }
           };
 

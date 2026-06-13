@@ -1,6 +1,6 @@
-import React, { useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Alert, Linking } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { appStoreSelectors, useAppStore } from '../../store/useStore';
 import { useTheme } from '../../hooks/use-theme';
 import { useFavorites } from '../../hooks/use-favorites';
@@ -31,6 +31,7 @@ function callPhone(phone) {
 
 export function DiscoverTabScreen() {
   const navigation = useNavigation();
+  const route = useRoute();
 
   const authToken = useAppStore(appStoreSelectors.authToken);
   const accountType = useAppStore(appStoreSelectors.accountType);
@@ -48,6 +49,13 @@ export function DiscoverTabScreen() {
 
   const search = useSearch({ t });
   const discoverScrollRef = useRef(null);
+
+  useEffect(() => {
+    if (!route.params?.resetToHomeAt) return;
+    search.resetDiscoverState();
+    setShowNotifications(false);
+    discoverScrollRef.current?.scrollTo?.({ y: 0, animated: false });
+  }, [route.params?.resetToHomeAt]);
 
   const ThemedHeartButton = (props) => (
     <HeartButton {...props} savedColor={c.saved} unsavedColor={props.unsavedColor ?? c.muted} />

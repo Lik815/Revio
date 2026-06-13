@@ -82,6 +82,8 @@ export function TherapyTabPatient({
           vergangenCount={vergangen.length}
           onOpenDetail={() => nextApt && onSelectAppointment(nextApt)}
           onViewTherapist={() => nextApt && openTherapist(nextApt.therapist)}
+          onSelectKommend={() => setActiveFilterPatient('kommend')}
+          onSelectVergangen={() => setActiveFilterPatient('vergangen')}
         />
 
         {/* ── Segment-Tabs ──────────────────────────────────────────── */}
@@ -324,4 +326,3 @@ export function TherapyTabTherapist({
     </View>
   );
 };
-

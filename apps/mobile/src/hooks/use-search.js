@@ -184,6 +184,22 @@ export function useSearch({ t }) {
     setFortbildungen((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
   };
 
+  const resetDiscoverState = () => {
+    setQuery('');
+    setShowAutocomplete(false);
+    setActiveChip(null);
+    setHomeVisit(false);
+    setKassenart(null);
+    setGender(null);
+    setRequestableOnly(false);
+    setFortbildungen([]);
+    setResults([]);
+    setSearched(false);
+    setViewMode('list');
+    setShowFilters(false);
+    setMapScrollEnabled(true);
+  };
+
   // ── Core search logic ─────────────────────────────────────────────────────
   const applyFilters = (list, coords) => {
     const origin = coords === undefined ? userCoords : coords;
@@ -566,6 +582,7 @@ export function useSearch({ t }) {
     activeFilterCount,
     getCertificationLabel,
     toggleFortbildung,
+    resetDiscoverState,
     // Search results
     results, setResults,
     searchLoading,

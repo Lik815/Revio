@@ -323,26 +323,41 @@ export const STATUS_COLORS = {
 
 // ─── PatientNextAppointmentCard ────────────────────────────────────────────────
 
-function PatientStatsRow({ c, kommend, vergangen }) {
+function PatientStatsRow({ c, kommend, vergangen, onSelectKommend, onSelectVergangen }) {
   return (
     <View style={{ flexDirection: 'row' }}>
-      <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, paddingRight: 14, borderRightWidth: 1, borderRightColor: c.border }}>
+      <Pressable
+        onPress={onSelectKommend}
+        style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, paddingRight: 14, borderRightWidth: 1, borderRightColor: c.border }}
+      >
         <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: c.successBg ?? '#EAF4F1', alignItems: 'center', justifyContent: 'center' }}>
           <Text style={{ fontSize: 14, fontWeight: '800', color: c.success ?? '#5A9E8E' }}>{kommend}</Text>
         </View>
         <Text style={{ fontSize: 13, fontWeight: '600', color: c.text }}>Kommend</Text>
-      </View>
-      <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, paddingLeft: 14 }}>
+      </Pressable>
+      <Pressable
+        onPress={onSelectVergangen}
+        style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, paddingLeft: 14 }}
+      >
         <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: c.mutedBg ?? '#EDF2F4', alignItems: 'center', justifyContent: 'center' }}>
           <Text style={{ fontSize: 14, fontWeight: '800', color: c.muted }}>{vergangen}</Text>
         </View>
         <Text style={{ fontSize: 13, fontWeight: '600', color: c.text }}>Vergangen</Text>
-      </View>
+      </Pressable>
     </View>
   );
 }
 
-export function PatientNextAppointmentCard({ c, appointment, kommendCount, vergangenCount, onOpenDetail, onViewTherapist }) {
+export function PatientNextAppointmentCard({
+  c,
+  appointment,
+  kommendCount,
+  vergangenCount,
+  onOpenDetail,
+  onViewTherapist,
+  onSelectKommend,
+  onSelectVergangen,
+}) {
   const slotDate = appointment ? (appointment.slot?.startsAt ?? appointment.confirmedSlotAt ?? null) : null;
 
   if (!appointment || !slotDate) {
@@ -351,7 +366,13 @@ export function PatientNextAppointmentCard({ c, appointment, kommendCount, verga
         <Text style={{ fontSize: 11, fontWeight: '600', color: c.muted, textTransform: 'uppercase', letterSpacing: 0.4 }}>Nächster Termin</Text>
         <Text style={{ fontSize: 16, fontWeight: '700', color: c.text, marginTop: 6 }}>Kein bevorstehender Termin</Text>
         <View style={{ height: 1, backgroundColor: c.border, marginVertical: 14 }} />
-        <PatientStatsRow c={c} kommend={kommendCount} vergangen={vergangenCount} />
+        <PatientStatsRow
+          c={c}
+          kommend={kommendCount}
+          vergangen={vergangenCount}
+          onSelectKommend={onSelectKommend}
+          onSelectVergangen={onSelectVergangen}
+        />
       </View>
     );
   }
@@ -364,14 +385,22 @@ export function PatientNextAppointmentCard({ c, appointment, kommendCount, verga
   const msUntil = d - new Date();
   const hoursUntil = Math.floor(msUntil / 3600000);
   const minsUntil = Math.floor((msUntil % 3600000) / 60000);
-  const countdown = msUntil > 0 ? `in ${hoursUntil} Std. ${minsUntil} Min.` : null;
+  let countdown = null;
+  if (msUntil > 0) {
+    if (hoursUntil >= 24) {
+      const daysUntil = Math.floor(hoursUntil / 24);
+      const remainingHours = hoursUntil % 24;
+      countdown = remainingHours > 0
+        ? `in ${daysUntil} Tag${daysUntil === 1 ? '' : 'en'}, ${remainingHours} Std.`
+        : `in ${daysUntil} Tag${daysUntil === 1 ? '' : 'en'}`;
+    } else {
+      countdown = `in ${hoursUntil} Std. ${minsUntil} Min.`;
+    }
+  }
 
   return (
-    <Pressable
-      onPress={onOpenDetail}
-      style={{ backgroundColor: c.card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: c.border, padding: SPACE.lg, marginBottom: SPACE.md }}
-    >
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+    <View style={{ backgroundColor: c.card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: c.border, padding: SPACE.lg, marginBottom: SPACE.md }}>
+      <Pressable onPress={onOpenDetail} style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
         <Pressable onPress={onViewTherapist} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
           <TherapistAvatar therapist={therapist} size={56} c={c} />
         </Pressable>
@@ -381,12 +410,18 @@ export function PatientNextAppointmentCard({ c, appointment, kommendCount, verga
           {countdown && <Text style={{ fontSize: 13, fontWeight: '600', color: c.success ?? '#5A9E8E', marginTop: 2 }}>{countdown}</Text>}
         </View>
         <Ionicons name="chevron-forward" size={18} color={c.muted} />
-      </View>
+      </Pressable>
 
       <View style={{ height: 1, backgroundColor: c.border, marginVertical: 14 }} />
 
-      <PatientStatsRow c={c} kommend={kommendCount} vergangen={vergangenCount} />
-    </Pressable>
+      <PatientStatsRow
+        c={c}
+        kommend={kommendCount}
+        vergangen={vergangenCount}
+        onSelectKommend={onSelectKommend}
+        onSelectVergangen={onSelectVergangen}
+      />
+    </View>
   );
 }
 
