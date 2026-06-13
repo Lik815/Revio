@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest';
-import { mapApiTherapist } from '../src/mobile-utils.js';
+import { mapApiTherapist } from '../src/utils/app-utils.js';
 
 // ---------- RED: mapApiTherapist must NOT map behandlungsbereiche from specializations ----------
 
