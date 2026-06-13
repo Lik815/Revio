@@ -11,7 +11,6 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import {
   getBaseUrl,
@@ -91,12 +90,6 @@ export function LoginScreen({ c, styles, t, onClose, bookingTargetTherapist, onB
       await loginAsTherapist(token, therapistProfile);
       loadIncomingBookings(token);
       registerPushToken(token);
-      if (!therapistProfile.photo) {
-        const dismissed = await AsyncStorage.getItem('revio_photo_prompt_dismissed');
-        if (!dismissed) {
-          // best-effort: photo prompt handled by LegacyApp via loggedInTherapist change
-        }
-      }
       onClose();
     } catch {
       setLoginError(t('alertConnectionError') + '. ' + t('alertConnectionErrorBody'));
