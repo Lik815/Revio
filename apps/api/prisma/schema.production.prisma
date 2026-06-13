@@ -62,6 +62,12 @@ enum AppFeedbackStatus {
   RESOLVED
 }
 
+enum TherapistReviewStatus {
+  PUBLISHED
+  HIDDEN
+  REPORTED
+}
+
 model User {
   id                     String                  @id @default(cuid())
   email                  String                  @unique
@@ -87,6 +93,7 @@ model User {
   favoriteTherapists     UserFavoriteTherapist[]
   bookingRequests        BookingRequest[]
   appFeedbacks           AppFeedback[]
+  therapistReviews       TherapistReview[]
 }
 
 model Therapist {
@@ -141,6 +148,7 @@ model Therapist {
   bookingRequests       BookingRequest[]
   favoritedBy           UserFavoriteTherapist[]
   slots                 TherapistSlot[]
+  reviews               TherapistReview[]
 }
 
 model Practice {
@@ -288,9 +296,28 @@ model BookingRequest {
   responseDueAt        DateTime
   respondedAt          DateTime?
   confirmedSlotAt      DateTime?
+  review               TherapistReview?
 
   @@index([therapistId, status, createdAt])
   @@index([patientUserId, status, createdAt])
+}
+
+model TherapistReview {
+  id               String                @id @default(cuid())
+  therapistId      String
+  therapist        Therapist             @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+  patientUserId    String
+  patientUser      User                  @relation(fields: [patientUserId], references: [id], onDelete: Cascade)
+  bookingRequestId String                @unique
+  bookingRequest   BookingRequest        @relation(fields: [bookingRequestId], references: [id], onDelete: Cascade)
+  rating           Int
+  comment          String?
+  status           TherapistReviewStatus @default(PUBLISHED)
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+
+  @@index([therapistId, status, createdAt])
+  @@index([patientUserId])
 }
 
 model TherapistRemovalLog {
