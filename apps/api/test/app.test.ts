@@ -2024,7 +2024,23 @@ describe('End-to-End: Register → Admin Approve → Visible in Search', () => {
     });
     expect(searchDraft.json().therapists).toHaveLength(0);
 
-    // 3. Therapeut reicht das Profil explizit zur Prüfung ein → PENDING_REVIEW
+    // 3. Profil auf 100% vervollständigen (Voraussetzung fürs Einreichen)
+    await app.inject({
+      method: 'PATCH',
+      url: '/auth/me',
+      headers: { authorization: `Bearer ${token}` },
+      payload: {
+        photo: 'https://example.com/p.jpg',
+        certifications: ['MT'],
+        kassenart: 'Alle',
+        street: 'Hauptstrasse',
+        houseNumber: '1',
+        homeVisit: true,
+        serviceRadiusKm: 15,
+      },
+    });
+
+    // Therapeut reicht das Profil explizit zur Prüfung ein → PENDING_REVIEW
     const submitRes = await app.inject({
       method: 'POST',
       url: '/therapists/me/submit-for-review',
@@ -2171,14 +2187,44 @@ describe('POST /therapists/me/submit-for-review', () => {
     return res.json() as { therapistId: string; token: string; employmentStatus: string };
   }
 
-  it('registers a SELF_EMPLOYED therapist as DRAFT and lets them submit for review', async () => {
+  // Bring a freshly-registered therapist to 100% completion so it can be submitted.
+  async function completeProfile(token: string) {
+    await app.inject({
+      method: 'PATCH',
+      url: '/auth/me',
+      headers: { authorization: `Bearer ${token}` },
+      payload: {
+        photo: 'https://example.com/p.jpg',
+        certifications: ['MT'],
+        kassenart: 'Alle',
+        street: 'Hauptstrasse',
+        houseNumber: '1',
+        homeVisit: false,
+      },
+    });
+  }
+
+  it('rejects submission of a minimally-complete profile (must be 100%)', async () => {
+    const { token } = await registerTherapist('submit-minimal@test.com');
+    const res = await app.inject({
+      method: 'POST',
+      url: '/therapists/me/submit-for-review',
+      headers: { authorization: `Bearer ${token}` },
+      payload: {},
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('lets a SELF_EMPLOYED therapist submit once the profile is 100% complete', async () => {
     const { therapistId, token, employmentStatus } = await registerTherapist('submit-ok@test.com');
     expect(employmentStatus).toBe('SELF_EMPLOYED');
+    await completeProfile(token);
 
     const res = await app.inject({
       method: 'POST',
       url: '/therapists/me/submit-for-review',
       headers: { authorization: `Bearer ${token}` },
+      payload: {},
     });
     expect(res.statusCode).toBe(200);
     expect(res.json().reviewStatus).toBe('PENDING_REVIEW');
@@ -2240,6 +2286,7 @@ describe('POST /therapists/me/submit-for-review', () => {
 
   it('allows re-submission from CHANGES_REQUESTED', async () => {
     const { therapistId, token } = await registerTherapist('submit-changes@test.com');
+    await completeProfile(token);
     await prisma.therapist.update({
       where: { id: therapistId },
       data: { reviewStatus: 'CHANGES_REQUESTED' },
@@ -2249,6 +2296,7 @@ describe('POST /therapists/me/submit-for-review', () => {
       method: 'POST',
       url: '/therapists/me/submit-for-review',
       headers: { authorization: `Bearer ${token}` },
+      payload: {},
     });
     expect(res.statusCode).toBe(200);
     expect(res.json().reviewStatus).toBe('PENDING_REVIEW');

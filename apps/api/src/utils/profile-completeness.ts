@@ -138,13 +138,9 @@ export function getTherapistProfileCompletionDetail(therapist: TherapistChecklis
   const missingItems = items.filter((i) => !i.done).map((i) => i.key);
   const percentage = Math.round((completedItems.length / items.length) * 100);
 
-  // Minimum criteria for admin review.
-  const readyForReview =
-    has(therapist.fullName) &&
-    has(therapist.city) &&
-    has(therapist.specializations) &&
-    has(therapist.languages) &&
-    selfEmployed;
+  // The profile may only be submitted for review once it is fully complete
+  // (every checklist item done — which also implies a self-employed status).
+  const readyForReview = missingItems.length === 0;
 
   return { percentage, completedItems, missingItems, readyForReview };
 }

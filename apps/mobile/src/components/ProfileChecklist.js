@@ -128,7 +128,7 @@ export function ProfileChecklist({ th, authToken, onSubmitted, c, t, styles }) {
 
       {!canSubmit && !inReview && !isApproved && !completion.readyForReview && !isPreparing && (
         <Text style={{ fontSize: 13, color: c.muted, marginTop: 12 }}>
-          Ergänze Name, Stadt, Spezialisierungen und Sprachen, um dein Profil einzureichen.
+          Vervollständige alle Angaben (100%), um dein Profil zur Prüfung einzureichen.
         </Text>
       )}
     </View>
