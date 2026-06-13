@@ -134,6 +134,9 @@ export function DiscoverContent(props) {
   const visibleNotifCount = notifications.filter((n) => !dismissedNotifIds?.has(n.id)).length;
 
   const safeResults = Array.isArray(results) ? results : [];
+  const matchedResultsCount = safeResults.filter(
+    (r) => r.cityMatch !== false && r.radiusMatch !== false
+  ).length;
   const safeMapTherapists = Array.isArray(mapTherapists) ? mapTherapists : [];
   const safeFortbildungen = Array.isArray(fortbildungen) ? fortbildungen : [];
   const safeCertificationOptions = Array.isArray(certificationOptions)
@@ -466,7 +469,7 @@ export function DiscoverContent(props) {
           {filtersPanel}
           {(searched || safeResults.length > 0) && (
             <Text style={{ ...TYPE.meta, color: mutedText }}>
-              {searched ? `${safeResults.length} ${safeResults.length !== 1 ? t('resultsLabelPlural') : t('resultsLabel')}` : t('suggestions')}
+              {searched ? `${matchedResultsCount} ${matchedResultsCount !== 1 ? t('resultsLabelPlural') : t('resultsLabel')}` : t('suggestions')}
             </Text>
           )}
         </View>
@@ -734,7 +737,7 @@ export function DiscoverContent(props) {
         <View style={styles.sectionRow}>
           <View style={{ flex: 1, gap: 4 }}>
             <Text style={{ ...TYPE.meta, color: mutedText }}>
-              {searched ? `${safeResults.length} ${safeResults.length !== 1 ? t('resultsLabelPlural') : t('resultsLabel')}` : t('suggestions')}
+              {searched ? `${matchedResultsCount} ${matchedResultsCount !== 1 ? t('resultsLabelPlural') : t('resultsLabel')}` : t('suggestions')}
             </Text>
             <Text style={{ ...TYPE.meta, color: mutedText }}>
               {city ? `In ${city}` : t('locationPlaceholder')}
