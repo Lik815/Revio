@@ -7,8 +7,8 @@ import { useTheme } from '../hooks/use-theme';
 import { appStyles } from '../styles/app-styles';
 import { translations } from '../i18n/translations';
 import { getBaseUrl, normalizeTherapistProfile, TUNNEL_HEADERS } from '../utils/app-utils';
-import { EmailVerifyScreen } from '../_archive/screens/mobile-email-verify-screen';
-import { InviteClaimScreen } from '../_archive/screens/mobile-invite-claim-screen';
+import { EmailVerifyScreen } from '../screens/auth/EmailVerifyScreen';
+import { InviteClaimScreen } from '../screens/auth/InviteClaimScreen';
 import { ResetPasswordModal } from '../modals/ResetPasswordModal';
 import { VisibilityModal } from '../modals/VisibilityModal';
 
