@@ -12,6 +12,18 @@ type TherapistVisibilityShape = {
     visibilityState: string;
     blockingReasons: string[];
   };
+  links?: Array<{
+    status: string;
+    practice?: {
+      name?: string | null;
+      reviewStatus?: string | null;
+    } | null;
+  }>;
+};
+
+export type AdminVisibilityIssue = {
+  reason: string;
+  detail: string;
 };
 
 export function missingProfileCount(therapist: Pick<TherapistVisibilityShape, 'bio' | 'specializations' | 'languages'>) {
@@ -65,4 +77,49 @@ export function getVisibilityBlockers(therapist: Pick<TherapistVisibilityShape, 
       : [];
 
   return sourceReasons.map(humanizeBlockingReason);
+}
+
+export function getAdminVisibilityIssues(
+  therapist: Pick<TherapistVisibilityShape, 'reviewStatus' | 'isVisible' | 'visibility' | 'links'>,
+): AdminVisibilityIssue[] {
+  if (therapist.reviewStatus !== 'APPROVED') return [];
+
+  const issues: AdminVisibilityIssue[] = therapist.visibility.blockingReasons.map((reason) => ({
+    reason,
+    detail: humanizeBlockingReason(reason),
+  }));
+
+  const links = therapist.links ?? [];
+  const confirmedLinks = links.filter((link) => link.status === 'CONFIRMED');
+
+  if (confirmedLinks.length === 0) {
+    const pendingOrDisputed = links.filter((link) => link.status === 'PROPOSED' || link.status === 'DISPUTED');
+    if (pendingOrDisputed.length > 0) {
+      issues.push({
+        reason: 'pending_link_only',
+        detail: `Es gibt ${pendingOrDisputed.length} vorgeschlagene oder strittige Praxisverknüpfungen, aber keine bestätigte.`,
+      });
+    } else {
+      issues.push({
+        reason: 'no_confirmed_link',
+        detail: 'Es gibt aktuell keine bestätigte Praxisverknüpfung.',
+      });
+    }
+  } else {
+    const approvedConfirmedLinks = confirmedLinks.filter((link) => link.practice?.reviewStatus === 'APPROVED');
+    if (approvedConfirmedLinks.length === 0) {
+      const practiceNames = confirmedLinks
+        .map((link) => link.practice?.name)
+        .filter(Boolean)
+        .join(', ');
+      issues.push({
+        reason: 'confirmed_link_practice_not_approved',
+        detail: practiceNames
+          ? `Bestätigte Praxisverknüpfungen sind noch nicht freigegeben: ${practiceNames}.`
+          : 'Bestätigte Praxisverknüpfungen sind noch nicht freigegeben.',
+      });
+    }
+  }
+
+  return issues.filter((issue, index, arr) => arr.findIndex((entry) => entry.reason === issue.reason) === index);
 }

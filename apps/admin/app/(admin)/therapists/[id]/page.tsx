@@ -8,8 +8,13 @@ import {
   suspendTherapist,
 } from '../../../../lib/actions';
 import { api } from '../../../../lib/api';
+import { getAdminVisibilityIssues } from '../../../../lib/visibility';
+import { humanizeBlockingReason } from '../../../../lib/review-status';
 
-type Props = { params: Promise<{ id: string }> };
+type Props = {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ source?: string; issue?: string }>;
+};
 
 const statusLabel: Record<string, string> = {
   PENDING_REVIEW: 'Ausstehend',
@@ -18,15 +23,6 @@ const statusLabel: Record<string, string> = {
   CHANGES_REQUESTED: 'Änderungen',
   SUSPENDED: 'Gesperrt',
   DRAFT: 'Entwurf',
-};
-
-const blockingReasonLabel: Record<string, string> = {
-  profile_incomplete: 'Profil unvollständig',
-  manually_hidden: 'Manuell versteckt',
-  publication_missing: 'Explizite Freigabe fehlt',
-  no_home_visit: 'Kein Hausbesuch aktiviert',
-  no_service_radius: 'Kein Einzugsgebiet angegeben',
-  no_kassenart: 'Keine Kassenart angegeben',
 };
 
 function mimeIcon(mimetype: string) {
@@ -48,10 +44,6 @@ function summarizeReasons(reasons: string[]) {
   return rest.length > 0 ? `${first} +${rest.length}` : first;
 }
 
-function humanizeReason(reason: string) {
-  return blockingReasonLabel[reason] ?? reason.replace(/_/g, ' ');
-}
-
 function getVisibilityCopy(therapist: {
   reviewStatus: string;
   isVisible: boolean;
@@ -66,12 +58,13 @@ function getVisibilityCopy(therapist: {
   if (therapist.visibility.visibilityState === 'visible') {
     return 'In der öffentlichen Suche sichtbar.';
   }
-  const reasons = therapist.visibility.blockingReasons.map(humanizeReason);
+  const reasons = therapist.visibility.blockingReasons.map(humanizeBlockingReason);
   return summarizeReasons(reasons) ?? 'Noch nicht öffentlich sichtbar.';
 }
 
-export default async function TherapistDetailPage({ params }: Props) {
+export default async function TherapistDetailPage({ params, searchParams }: Props) {
   const { id } = await params;
+  const query = await searchParams;
 
   const [therapist, documents] = await Promise.all([
     api.getTherapist(id),
@@ -81,20 +74,14 @@ export default async function TherapistDetailPage({ params }: Props) {
     therapist.reviewStatus === 'APPROVED' && therapist.isVisible
       ? { label: 'Öffentlich sichtbar', className: 'badge badge--APPROVED' }
       : therapist.reviewStatus === 'APPROVED' && !therapist.isVisible
-        ? { label: 'Freigegeben, aber versteckt', className: 'badge badge--PENDING_REVIEW' }
-        : { label: 'Nicht öffentlich', className: 'badge badge--DRAFT' };
-  const isApprovedButNotVisible = therapist.reviewStatus === 'APPROVED' && therapist.visibility.visibilityState !== 'visible';
-  const blockerReasons = (
-    therapist.visibility.blockingReasons.length > 0
-      ? therapist.visibility.blockingReasons
-      : isApprovedButNotVisible
-        ? ['manually_hidden']
-      : []
-  ).map(humanizeReason);
-  const visibilitySummary = summarizeReasons(blockerReasons);
-  const operationalNotes = [
-    isApprovedButNotVisible && visibilitySummary ? `Nicht sichtbar: ${visibilitySummary}` : null,
-  ].filter(Boolean) as string[];
+      ? { label: 'Freigegeben, aber versteckt', className: 'badge badge--PENDING_REVIEW' }
+      : { label: 'Nicht öffentlich', className: 'badge badge--DRAFT' };
+  const adminVisibilityIssues = getAdminVisibilityIssues(therapist);
+  const currentIssueSummary = summarizeReasons(adminVisibilityIssues.map((issue) => humanizeBlockingReason(issue.reason)));
+  const dashboardIssueReason = query.source === 'dashboard-open-issues' && query.issue
+    ? humanizeBlockingReason(query.issue)
+    : null;
+  const showResolvedDashboardHint = Boolean(dashboardIssueReason) && adminVisibilityIssues.length === 0;
 
   return (
     <PageShell
@@ -112,11 +99,27 @@ export default async function TherapistDetailPage({ params }: Props) {
         </div>
       }
     >
-      {operationalNotes.length > 0 && (
+      {adminVisibilityIssues.length > 0 && (
         <div className="notice-box notice-box--warning">
           <div className="notice-box__icon">!</div>
           <div>
-            <strong>Aktuell offen:</strong> {operationalNotes.join(' · ')}
+            <strong>Aktuell offen:</strong> {currentIssueSummary}
+            <div style={{ marginTop: 6, color: 'var(--muted)', fontSize: 13, lineHeight: 1.5 }}>
+              {adminVisibilityIssues.map((issue) => issue.detail).join(' · ')}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showResolvedDashboardHint && (
+        <div className="notice-box">
+          <div className="notice-box__icon">i</div>
+          <div>
+            <strong>Hinweis aus dem Dashboard:</strong> Dieses Profil war dort mit
+            {' '}
+            <em>{dashboardIssueReason}</em>
+            {' '}
+            markiert. Der Punkt scheint inzwischen nicht mehr aktuell zu sein.
           </div>
         </div>
       )}

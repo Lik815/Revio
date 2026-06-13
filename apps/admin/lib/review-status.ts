@@ -27,6 +27,9 @@ export const blockingReasonLabel: Record<string, string> = {
   no_home_visit: 'Kein Hausbesuch',
   no_service_radius: 'Kein Einzugsgebiet',
   no_kassenart: 'Keine Kassenart',
+  pending_link_only: 'Nur unverknüpfte oder strittige Praxislinks',
+  no_confirmed_link: 'Keine bestätigte Praxisverknüpfung',
+  confirmed_link_practice_not_approved: 'Bestätigte Praxis ist noch nicht freigegeben',
 };
 
 export function humanizeReviewStatus(status: string) {

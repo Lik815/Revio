@@ -1,20 +1,7 @@
 import Link from 'next/link';
 import { PageShell } from '../../components/page-shell';
 import { api } from '../../lib/api';
-
-const visibilityReasonLabel: Record<string, string> = {
-  publication_incomplete: 'Freigabe noch unvollständig',
-  profile_incomplete: 'Profil unvollständig',
-  manually_hidden: 'Manuell versteckt',
-  publication_missing: 'Freigabe fehlt',
-  no_home_visit: 'Hausbesuch fehlt',
-  no_service_radius: 'Einzugsgebiet fehlt',
-  no_kassenart: 'Kassenart fehlt',
-};
-
-function formatVisibilityReason(reason: string) {
-  return visibilityReasonLabel[reason] ?? reason.replace(/_/g, ' ');
-}
+import { humanizeBlockingReason } from '../../lib/review-status';
 
 export default async function HomePage() {
   const [stats, visibilityIssues] = await Promise.all([
@@ -60,12 +47,16 @@ export default async function HomePage() {
           </div>
           <div className="task-list">
             {visibilityIssues.issues.slice(0, 5).map((issue) => (
-              <Link key={issue.therapistId} href={`/therapists/${issue.therapistId}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+              <Link
+                key={issue.therapistId}
+                href={`/therapists/${issue.therapistId}?source=dashboard-open-issues&issue=${encodeURIComponent(issue.reason)}`}
+                style={{ textDecoration: 'none', color: 'inherit' }}
+              >
                 <div className="task-item task-item--clickable">
                   <span className="task-dot task-dot--danger" />
                   <div style={{ flex: 1 }}>
                     <strong>{issue.therapistName}</strong>
-                    <p className="table-note">{formatVisibilityReason(issue.reason)}</p>
+                    <p className="table-note">{humanizeBlockingReason(issue.reason)}</p>
                   </div>
                 </div>
               </Link>

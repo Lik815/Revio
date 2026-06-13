@@ -10,7 +10,8 @@ import { AdminSummaryCard } from '../../../components/admin-summary-card';
 import { AdminToolbar } from '../../../components/admin-toolbar';
 import { api } from '../../../lib/api';
 import { formatDate } from '../../../lib/format';
-import { getReviewPriority, getVisibilityBlockers, getVisibilityMeta } from '../../../lib/visibility';
+import { getAdminVisibilityIssues, getReviewPriority, getVisibilityMeta } from '../../../lib/visibility';
+import { humanizeBlockingReason } from '../../../lib/review-status';
 import {
   approveTherapist,
   rejectTherapist,
@@ -158,8 +159,8 @@ export default async function TherapistsPage({ searchParams }: { searchParams: S
             <tbody>
               {filtered.map((therapist) => {
                 const priority = getReviewPriority(therapist);
-                const blockers = getVisibilityBlockers(therapist);
-                const blockerSummary = blockers.length > 0 ? blockers[0] : null;
+                const adminVisibilityIssues = getAdminVisibilityIssues(therapist);
+                const blockerSummary = adminVisibilityIssues.length > 0 ? humanizeBlockingReason(adminVisibilityIssues[0].reason) : null;
                 const publicVisibilityBadge =
                   therapist.reviewStatus === 'APPROVED' && therapist.isVisible
                     ? { label: 'Öffentlich', status: 'APPROVED' }
@@ -224,7 +225,7 @@ export default async function TherapistsPage({ searchParams }: { searchParams: S
                             ? 'Jetzt prüfen'
                             : therapist.reviewStatus === 'CHANGES_REQUESTED'
                               ? 'Rückmeldung nachhalten'
-                              : therapist.reviewStatus === 'APPROVED' && blockers.length > 0
+                              : therapist.reviewStatus === 'APPROVED' && adminVisibilityIssues.length > 0
                                 ? 'Sichtbarkeitsblocker lösen'
                                 : therapist.reviewStatus === 'DRAFT'
                                   ? 'Profil ergänzen lassen'
@@ -237,7 +238,7 @@ export default async function TherapistsPage({ searchParams }: { searchParams: S
                             ? 'SLA gerissen, Entscheidung priorisieren.'
                             : therapist.reviewStatus === 'CHANGES_REQUESTED'
                               ? 'Prüfen, ob Rückfragen beantwortet wurden.'
-                              : therapist.reviewStatus === 'APPROVED' && blockers.length > 0
+                              : therapist.reviewStatus === 'APPROVED' && adminVisibilityIssues.length > 0
                                 ? 'Profil ist freigegeben, aber noch nicht sauber öffentlich.'
                                 : therapist.reviewStatus === 'APPROVED'
                                   ? 'Kein akuter Handlungsbedarf.'
