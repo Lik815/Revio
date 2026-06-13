@@ -36,20 +36,23 @@ async function adminFetch<T>(path: string): Promise<T> {
   let lastNetworkError: unknown;
 
   for (const base of apiBases) {
-    let res: Response;
-    try {
-      res = await fetch(`${base}${path}`, {
-        headers: { Authorization: `Bearer ${token}` },
-        cache: 'no-store',
-      });
-    } catch (error) {
-      lastNetworkError = error;
-      continue;
-    }
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      let res: Response;
+      try {
+        res = await fetch(`${base}${path}`, {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: 'no-store',
+        });
+      } catch (error) {
+        lastNetworkError = error;
+        if (attempt === 0) continue;
+        break;
+      }
 
-    if (res.status === 401) throw new AdminApiError(`API 401: ${path}`, 'unauthorized', 401);
-    if (!res.ok) throw new AdminApiError(`API ${res.status}: ${path}`, 'http', res.status);
-    return res.json() as Promise<T>;
+      if (res.status === 401) throw new AdminApiError(`API 401: ${path}`, 'unauthorized', 401);
+      if (!res.ok) throw new AdminApiError(`API ${res.status}: ${path}`, 'http', res.status);
+      return res.json() as Promise<T>;
+    }
   }
 
   const details = lastNetworkError instanceof Error ? ` (${lastNetworkError.message})` : '';
