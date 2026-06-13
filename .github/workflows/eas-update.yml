@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - 'apps/mobile/**'
+      - '!apps/mobile/src/_archive/**'
   workflow_dispatch: {}
 
 jobs:
