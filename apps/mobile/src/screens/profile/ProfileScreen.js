@@ -14,9 +14,9 @@ import { fortbildungOptions, getBaseUrl, TUNNEL_HEADERS } from '../../utils/app-
 import { TabHeader } from '../../components/TabHeader';
 import { ToastOverlay } from '../../components/ToastOverlay';
 import { NotificationSheet } from '../../modals/NotificationSheet';
-import { ProfileSavedModal } from '../../_archive/screens/mobile-profile-saved-modal';
-import { ReviewNotificationModal } from '../../_archive/screens/mobile-review-notification-modal';
-import { PhotoPromptModal } from '../../_archive/screens/mobile-photo-prompt-modal';
+import { ProfileSavedModal } from '../../modals/ProfileSavedModal';
+import { ReviewNotificationModal } from '../../modals/ReviewNotificationModal';
+import { PhotoPromptModal } from '../../modals/PhotoPromptModal';
 import { TherapistDashboardScreen } from '../../_archive/screens/mobile-therapist-dashboard';
 import { PatientDashboardScreen } from '../../_archive/screens/mobile-patient-dashboard';
 import { useTherapyData } from '../../context/TherapyContext';

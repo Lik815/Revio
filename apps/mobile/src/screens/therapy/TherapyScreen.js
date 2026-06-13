@@ -13,10 +13,10 @@ import { TabHeader } from '../../components/TabHeader';
 import { NotificationSheet } from '../../modals/NotificationSheet';
 import { TherapyTabPatient, TherapyTabTherapist } from '../../_archive/screens/mobile-therapy-tabs';
 import { AppointmentDetail } from '../../_archive/screens/mobile-appointment-detail';
-import { CancelAppointmentModal } from '../../_archive/screens/mobile-cancel-appointment-modal';
-import { TherapistCancelModal } from '../../_archive/screens/mobile-therapist-cancel-modal';
+import { CancelAppointmentModal } from '../../modals/CancelAppointmentModal';
+import { TherapistCancelModal } from '../../modals/TherapistCancelModal';
 import { SlotComposerModal } from '../../_archive/screens/mobile-slot-composer-modal';
-import { SlotCreatedModal } from '../../_archive/screens/mobile-slot-created-modal';
+import { SlotCreatedModal } from '../../modals/SlotCreatedModal';
 import { useTherapyData } from '../../context/TherapyContext';
 
 const t = (key) => translations.de[key] ?? key;

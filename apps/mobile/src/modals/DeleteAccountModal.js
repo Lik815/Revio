@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Modal, Pressable, Text, TextInput, View } from 'react-native';
-import { RADIUS } from '../../utils/app-utils';
+import { RADIUS } from '../utils/app-utils';
 
 export function DeleteAccountModal({ visible, onClose, onConfirmed, loggedInTherapist, loggedInPatient, c, t }) {
   const [nameInput, setNameInput] = useState('');
