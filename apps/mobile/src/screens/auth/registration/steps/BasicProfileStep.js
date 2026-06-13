@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BackButton } from '../../../../components/BackButton';
 
@@ -10,7 +10,7 @@ export function BasicProfileStep({
   firstName, onChangeFirstName,
   lastName, onChangeLastName,
   postalCode, onChangePostalCode,
-  city, onChangeCity,
+  city, onChangeCity, cityLoading,
   error, loading,
   onSubmit, onBack,
   c, t, styles,
@@ -49,25 +49,39 @@ export function BasicProfileStep({
         />
 
         {isTherapist && (
-          <View style={{ flexDirection: 'row', gap: 12 }}>
-            <TextInput
-              style={[styles.regInput, { flex: 1, color: c.text, borderColor: postalCode ? c.primary : c.border, backgroundColor: c.mutedBg }]}
-              placeholder={t('postalCodeLabel')}
-              placeholderTextColor={c.muted}
-              value={postalCode}
-              onChangeText={onChangePostalCode}
-              keyboardType="number-pad"
-              maxLength={5}
-            />
-            <TextInput
-              style={[styles.regInput, { flex: 2, color: c.text, borderColor: city ? c.primary : c.border, backgroundColor: c.mutedBg }]}
-              placeholder={t('cityLabel')}
-              placeholderTextColor={c.muted}
-              value={city}
-              onChangeText={onChangeCity}
-              autoCapitalize="words"
-            />
-          </View>
+          <>
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <TextInput
+                style={[styles.regInput, { flex: 1, color: c.text, borderColor: postalCode ? c.primary : c.border, backgroundColor: c.mutedBg }]}
+                placeholder={t('postalCodeLabel')}
+                placeholderTextColor={c.muted}
+                value={postalCode}
+                onChangeText={onChangePostalCode}
+                keyboardType="number-pad"
+                maxLength={5}
+              />
+              <View style={{ flex: 2, position: 'relative' }}>
+                <TextInput
+                  style={[styles.regInput, { color: c.text, borderColor: city ? c.primary : c.border, backgroundColor: c.mutedBg, paddingRight: 36 }]}
+                  placeholder={t('cityLabel')}
+                  placeholderTextColor={c.muted}
+                  value={city}
+                  onChangeText={onChangeCity}
+                  autoCapitalize="words"
+                />
+                {cityLoading && (
+                  <ActivityIndicator
+                    size="small"
+                    color={c.muted}
+                    style={{ position: 'absolute', right: 12, top: 0, bottom: 0 }}
+                  />
+                )}
+              </View>
+            </View>
+            <Text style={{ fontSize: 12, color: c.muted, marginTop: -4 }}>
+              Stadt wird aus der PLZ ermittelt. Falls nicht, bitte selbst eintragen.
+            </Text>
+          </>
         )}
       </View>
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { getBaseUrl, normalizeTherapistProfile, TUNNEL_HEADERS } from '../../../utils/app-utils';
 import { useAuth } from '../../../context/AuthContext';
@@ -44,6 +44,8 @@ export function RegistrationFlow({ onClose, onShowLogin, onComplete, c, t, style
   const [lastName, setLastName] = useState('');
   const [postalCode, setPostalCode] = useState('');
   const [city, setCity] = useState('');
+  const [cityTouched, setCityTouched] = useState(false);
+  const [cityLookupLoading, setCityLookupLoading] = useState(false);
   const [basicError, setBasicError] = useState('');
 
   // Therapist track
@@ -54,6 +56,33 @@ export function RegistrationFlow({ onClose, onShowLogin, onComplete, c, t, style
   const [submitting, setSubmitting] = useState(false);
 
   const normalizedEmail = () => email.trim().toLowerCase();
+
+  // Auto-fill the city from the German postal code (same Nominatim service the
+  // search already uses, so it works independently of our own API). Skipped once
+  // the user has typed a city manually — manual entry always wins.
+  useEffect(() => {
+    if (role !== 'therapist' || cityTouched) return;
+    if (!/^\d{5}$/.test(postalCode)) return;
+    let cancelled = false;
+    setCityLookupLoading(true);
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?postalcode=${postalCode}&country=Germany&format=json&addressdetails=1&limit=1&accept-language=de`,
+        );
+        const data = await res.json().catch(() => []);
+        if (cancelled) return;
+        const addr = Array.isArray(data) && data[0]?.address ? data[0].address : null;
+        const resolved = addr?.city || addr?.town || addr?.village || addr?.municipality || addr?.county || '';
+        if (resolved && !cityTouched) setCity(resolved);
+      } catch {
+        // Lookup failed — leave the city field for manual entry.
+      } finally {
+        if (!cancelled) setCityLookupLoading(false);
+      }
+    }, 350);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [postalCode, cityTouched, role]);
 
   // ── Step 1: role ───────────────────────────────────────────────────────────
   const handleSelectRole = (r) => { setRole(r); setAccountError(''); setStep('account'); };
@@ -278,8 +307,11 @@ export function RegistrationFlow({ onClose, onShowLogin, onComplete, c, t, style
         role={role}
         firstName={firstName} onChangeFirstName={setFirstName}
         lastName={lastName} onChangeLastName={setLastName}
-        postalCode={postalCode} onChangePostalCode={setPostalCode}
-        city={city} onChangeCity={setCity}
+        postalCode={postalCode}
+        onChangePostalCode={(v) => setPostalCode(v.replace(/\D/g, '').slice(0, 5))}
+        city={city}
+        onChangeCity={(v) => { setCity(v); setCityTouched(true); }}
+        cityLoading={cityLookupLoading}
         error={basicError} loading={submitting}
         onSubmit={handleBasicSubmit}
         onBack={() => setStep('otp')}
