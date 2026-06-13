@@ -70,7 +70,7 @@ function loadMapComponents() {
   }
 }
 
-export function DiscoverScreen(props) {
+export function DiscoverContent(props) {
   const {
     HeartButton,
     acSuggestions,

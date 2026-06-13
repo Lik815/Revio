@@ -14,7 +14,7 @@ import { SkeletonCard } from '../../components/SkeletonCard';
 import { ToastOverlay } from '../../components/ToastOverlay';
 import { NotificationSheet } from '../../modals/NotificationSheet';
 import { appStyles } from '../../styles/app-styles';
-import { DiscoverScreen } from '../../_archive/screens/mobile-discover-screen';
+import { DiscoverContent } from './DiscoverContent';
 
 const t = (key) => translations.de[key] ?? key;
 
@@ -83,7 +83,7 @@ export function DiscoverTabScreen() {
 
   return (
     <>
-      <DiscoverScreen
+      <DiscoverContent
         HeartButton={ThemedHeartButton}
         SkeletonCard={SkeletonCard}
         acSuggestions={search.acSuggestions}
