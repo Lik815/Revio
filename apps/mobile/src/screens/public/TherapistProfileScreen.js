@@ -11,7 +11,7 @@ import { ROOT_ROUTES, TAB_ROUTES } from '../../navigation/route-names';
 import { getBaseUrl, mapApiTherapist, TUNNEL_HEADERS } from '../../utils/app-utils';
 import { HeartButton } from '../../components/HeartButton';
 import { ToastOverlay } from '../../components/ToastOverlay';
-import { BookingRequestForm } from '../../_archive/screens/mobile-booking';
+import { BookingRequestForm } from './BookingRequestForm';
 import { TherapistProfileScreen as TherapistProfileContent } from '../../_archive/screens/mobile-public-profiles';
 
 const t = (key) => translations.de[key] ?? key;

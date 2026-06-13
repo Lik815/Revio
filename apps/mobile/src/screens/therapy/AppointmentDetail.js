@@ -4,7 +4,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { getBaseUrl, resolveMediaUrl, SHADOW, SPACE, TUNNEL_HEADERS } from '../../utils/app-utils';
-import { STATUS_COLORS } from './mobile-booking';
+import { STATUS_COLORS } from './AppointmentCards';
 import { TabHeader } from '../../components/TabHeader';
 import { ReviewComposerModal } from '../../components/ReviewComposerModal';
 
