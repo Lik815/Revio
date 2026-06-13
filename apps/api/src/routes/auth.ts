@@ -4,6 +4,7 @@ import { randomBytes } from 'crypto';
 import { hashPassword, verifyPassword, getToken } from './auth-utils.js';
 import {
   getTherapistProfileCompletion,
+  getTherapistProfileCompletionDetail,
   getTherapistPublicationState,
   getProfileStatus,
 } from '../utils/profile-completeness.js';
@@ -311,6 +312,8 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       isVisible: therapist.isVisible,
       availability: therapist.availability,
       reviewStatus: therapist.reviewStatus,
+      employmentStatus: (therapist as any).employmentStatus ?? 'SELF_EMPLOYED',
+      profileCompletion: getTherapistProfileCompletionDetail(therapist as any),
       visibilityPreference: therapist.visibilityPreference,
       isPublished: therapist.isPublished,
       postalCode: therapist.postalCode ?? null,
@@ -495,6 +498,56 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       homeLat: (updated as any).homeLat ?? null,
       homeLng: (updated as any).homeLng ?? null,
       ...publication,
+    };
+  });
+
+  // ── POST /therapists/me/submit-for-review ──────────────────────────────────
+  // The ONLY endpoint that moves a therapist into PENDING_REVIEW. Regular
+  // PATCH /auth/me updates never change reviewStatus. Allowed only from DRAFT or
+  // CHANGES_REQUESTED, only when the minimum criteria are met, and never for
+  // PREPARING profiles (which can never become publicly visible).
+  fastify.post('/therapists/me/submit-for-review', async (request, reply) => {
+    const token = getToken(request);
+    if (!token) return reply.unauthorized('Kein Token');
+
+    const user = await fastify.prisma.user.findUnique({ where: { sessionToken: token } });
+    const therapist = (user
+      ? (await fastify.prisma.therapist.findFirst({ where: { userId: user.id } }))
+        ?? (await fastify.prisma.therapist.findUnique({ where: { sessionToken: token } }))
+      : await fastify.prisma.therapist.findUnique({ where: { sessionToken: token } }));
+    if (!therapist) return reply.unauthorized('Ungültiger Token');
+
+    if ((therapist as any).employmentStatus === 'PREPARING') {
+      return reply.badRequest(
+        'Profile mit Status "in Vorbereitung" können nicht zur Prüfung eingereicht werden. Wechsle zuerst auf "selbstständig".',
+      );
+    }
+
+    const completion = getTherapistProfileCompletionDetail(therapist as any);
+    if (!completion.readyForReview) {
+      return reply.badRequest(
+        'Profil noch nicht vollständig genug für die Prüfung. Fehlende Angaben: ' +
+          completion.missingItems.join(', '),
+      );
+    }
+
+    if (!['DRAFT', 'CHANGES_REQUESTED'].includes(therapist.reviewStatus)) {
+      return reply.badRequest(
+        therapist.reviewStatus === 'PENDING_REVIEW'
+          ? 'Dein Profil wird bereits geprüft.'
+          : 'Dein Profil kann in diesem Status nicht erneut eingereicht werden.',
+      );
+    }
+
+    const updated = await fastify.prisma.therapist.update({
+      where: { id: therapist.id },
+      data: { reviewStatus: 'PENDING_REVIEW' },
+    });
+
+    return {
+      success: true,
+      reviewStatus: updated.reviewStatus,
+      profileCompletion: getTherapistProfileCompletionDetail(updated as any),
     };
   });
 

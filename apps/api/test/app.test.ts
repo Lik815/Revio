@@ -1042,7 +1042,7 @@ describe('POST /register/therapist', () => {
     expect(res.json().message).toContain('nicht bestätigt');
   });
 
-  it('creates therapist and practice with PENDING_REVIEW status', async () => {
+  it('creates therapist as a private DRAFT (invisible until submitted + approved)', async () => {
     await seedConfirmedOtp(validPayload.email);
     const res = await app.inject({
       method: 'POST',
@@ -1052,10 +1052,15 @@ describe('POST /register/therapist', () => {
     expect(res.statusCode).toBe(201);
     const body = res.json();
     expect(body.therapistId).toBeTruthy();
+    expect(body.accountType).toBe('therapist');
+    expect(body.employmentStatus).toBe('SELF_EMPLOYED');
 
     const therapist = await prisma.therapist.findUnique({ where: { id: body.therapistId } });
-    // Always PENDING_REVIEW — admin must approve
-    expect(therapist?.reviewStatus).toBe('PENDING_REVIEW');
+    // New accounts start as a private DRAFT — never publicly visible until the
+    // therapist explicitly submits for review and an admin approves.
+    expect(therapist?.reviewStatus).toBe('DRAFT');
+    expect(therapist?.isVisible).toBe(false);
+    expect(therapist?.isPublished).toBe(false);
     expect(therapist?.email).toBe(validPayload.email);
   });
 
@@ -2009,9 +2014,26 @@ describe('End-to-End: Register → Admin Approve → Visible in Search', () => {
       },
     });
     expect(regRes.statusCode).toBe(201);
-    const { therapistId } = regRes.json();
+    const { therapistId, token } = regRes.json();
 
-    // 2. Vor Freigabe: nicht in Suche sichtbar
+    // 2. Direkt nach Registrierung: DRAFT, nicht in Suche sichtbar
+    const searchDraft = await app.inject({
+      method: 'POST',
+      url: '/search',
+      payload: { query: 'back pain', city: 'Köln' },
+    });
+    expect(searchDraft.json().therapists).toHaveLength(0);
+
+    // 3. Therapeut reicht das Profil explizit zur Prüfung ein → PENDING_REVIEW
+    const submitRes = await app.inject({
+      method: 'POST',
+      url: '/therapists/me/submit-for-review',
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(submitRes.statusCode).toBe(200);
+    expect(submitRes.json().reviewStatus).toBe('PENDING_REVIEW');
+
+    // Vor Freigabe weiterhin nicht in Suche sichtbar
     const searchBefore = await app.inject({
       method: 'POST',
       url: '/search',
@@ -2019,7 +2041,6 @@ describe('End-to-End: Register → Admin Approve → Visible in Search', () => {
     });
     expect(searchBefore.json().therapists).toHaveLength(0);
 
-    // 3. Admin: Therapeut-Status abrufen
     const adminList = await app.inject({ method: 'GET', url: '/admin/therapists', headers: AUTH });
     const pending = adminList.json().find((t: { id: string }) => t.id === therapistId);
     expect(pending.reviewStatus).toBe('PENDING_REVIEW');
@@ -2049,6 +2070,188 @@ describe('End-to-End: Register → Admin Approve → Visible in Search', () => {
     expect(results[0].fullName).toBe('E2E Therapeut');
     expect(results[0].homeVisit).toBe(true);
     expect(results[0].practices[0].name).toBe('E2E Praxis');
+  });
+});
+
+// ─── Employment status gate (PREPARING never publicly visible) ────────────────
+
+describe('Employment status: PREPARING profiles stay private', () => {
+  it('excludes a PREPARING therapist from search even when APPROVED + visible', async () => {
+    const practice = await prisma.practice.create({
+      data: { name: 'Prep Praxis', city: 'Köln', reviewStatus: 'APPROVED' },
+    });
+    await prisma.therapist.create({
+      data: {
+        email: 'preparing@test.com',
+        fullName: 'Pia Preparing',
+        professionalTitle: 'PT',
+        city: 'Köln',
+        specializations: 'back pain',
+        languages: 'de',
+        certifications: '',
+        reviewStatus: 'APPROVED',
+        isVisible: true,
+        isPublished: true,
+        employmentStatus: 'PREPARING',
+        links: { create: { practiceId: practice.id, status: 'CONFIRMED' } },
+      },
+    });
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/search',
+      payload: { query: 'back pain', city: 'Köln' },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().therapists).toHaveLength(0);
+  });
+
+  it('returns 404 on the public detail page for a PREPARING therapist', async () => {
+    const t = await prisma.therapist.create({
+      data: {
+        email: 'preparing-detail@test.com',
+        fullName: 'Pia Preparing',
+        professionalTitle: 'PT',
+        city: 'Köln',
+        specializations: 'back pain',
+        languages: 'de',
+        certifications: '',
+        reviewStatus: 'APPROVED',
+        isVisible: true,
+        employmentStatus: 'PREPARING',
+      },
+    });
+    const res = await app.inject({ method: 'GET', url: `/therapist/${t.id}` });
+    expect(res.statusCode).toBe(404);
+  });
+
+  it('blocks admin approval of a PREPARING profile', async () => {
+    const t = await prisma.therapist.create({
+      data: {
+        email: 'preparing-approve@test.com',
+        fullName: 'Pia Preparing',
+        professionalTitle: 'PT',
+        city: 'Köln',
+        specializations: 'back pain',
+        languages: 'de',
+        certifications: '',
+        reviewStatus: 'PENDING_REVIEW',
+        employmentStatus: 'PREPARING',
+      },
+    });
+    const res = await app.inject({
+      method: 'POST',
+      url: `/admin/therapists/${t.id}/approve`,
+      headers: AUTH,
+    });
+    expect(res.statusCode).toBe(400);
+    const after = await prisma.therapist.findUnique({ where: { id: t.id } });
+    expect(after?.reviewStatus).toBe('PENDING_REVIEW');
+  });
+});
+
+// ─── Explicit submit-for-review ───────────────────────────────────────────────
+
+describe('POST /therapists/me/submit-for-review', () => {
+  async function registerTherapist(email: string, extra: Record<string, unknown> = {}) {
+    await seedConfirmedOtp(email);
+    const res = await app.inject({
+      method: 'POST',
+      url: '/register/therapist',
+      payload: {
+        email,
+        firstName: 'Tom',
+        lastName: 'Therapeut',
+        city: 'Köln',
+        specializations: ['back pain'],
+        languages: ['de'],
+        ...extra,
+      },
+    });
+    return res.json() as { therapistId: string; token: string; employmentStatus: string };
+  }
+
+  it('registers a SELF_EMPLOYED therapist as DRAFT and lets them submit for review', async () => {
+    const { therapistId, token, employmentStatus } = await registerTherapist('submit-ok@test.com');
+    expect(employmentStatus).toBe('SELF_EMPLOYED');
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/therapists/me/submit-for-review',
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().reviewStatus).toBe('PENDING_REVIEW');
+
+    const t = await prisma.therapist.findUnique({ where: { id: therapistId } });
+    expect(t?.reviewStatus).toBe('PENDING_REVIEW');
+  });
+
+  it('registers a PREPARING therapist and rejects submission', async () => {
+    const { therapistId, token } = await registerTherapist('submit-prep@test.com', {
+      employmentStatus: 'PREPARING',
+    });
+    const t0 = await prisma.therapist.findUnique({ where: { id: therapistId } });
+    expect(t0?.employmentStatus).toBe('PREPARING');
+    expect(t0?.reviewStatus).toBe('DRAFT');
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/therapists/me/submit-for-review',
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(res.statusCode).toBe(400);
+    const t1 = await prisma.therapist.findUnique({ where: { id: therapistId } });
+    expect(t1?.reviewStatus).toBe('DRAFT');
+  });
+
+  it('rejects submission of an incomplete profile', async () => {
+    // Register without city/specializations → below the minimum review criteria
+    await seedConfirmedOtp('submit-incomplete@test.com');
+    const reg = await app.inject({
+      method: 'POST',
+      url: '/register/therapist',
+      payload: { email: 'submit-incomplete@test.com', fullName: 'Min Imal' },
+    });
+    const { token } = reg.json();
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/therapists/me/submit-for-review',
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('does not change reviewStatus on a normal PATCH /auth/me update', async () => {
+    const { therapistId, token } = await registerTherapist('submit-patch@test.com');
+
+    const patchRes = await app.inject({
+      method: 'PATCH',
+      url: '/auth/me',
+      headers: { authorization: `Bearer ${token}` },
+      payload: { bio: 'Neue Bio' },
+    });
+    expect(patchRes.statusCode).toBe(200);
+
+    const t = await prisma.therapist.findUnique({ where: { id: therapistId } });
+    expect(t?.reviewStatus).toBe('DRAFT');
+  });
+
+  it('allows re-submission from CHANGES_REQUESTED', async () => {
+    const { therapistId, token } = await registerTherapist('submit-changes@test.com');
+    await prisma.therapist.update({
+      where: { id: therapistId },
+      data: { reviewStatus: 'CHANGES_REQUESTED' },
+    });
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/therapists/me/submit-for-review',
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().reviewStatus).toBe('PENDING_REVIEW');
   });
 });
 

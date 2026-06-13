@@ -23,6 +23,7 @@ type TherapistRow = {
   city: string; bio: string | null; homeVisit: boolean; specializations: string;
   isFreelancer: boolean;
   languages: string; certifications: string; reviewStatus: string;
+  employmentStatus?: string | null;
   serviceRadiusKm: number | null; kassenart: string;
   isVisible: boolean; isPublished: boolean;
   bookingMode?: string | null; nextFreeSlotAt?: Date | null;
@@ -66,6 +67,7 @@ function mapTherapist(t: TherapistRow) {
     languages: splitList(t.languages),
     certifications: splitList(t.certifications),
     reviewStatus: t.reviewStatus,
+    employmentStatus: t.employmentStatus ?? 'SELF_EMPLOYED',
     isVisible: t.isVisible,
     isPublished: t.isPublished,
     createdAt: t.createdAt.toISOString(),
@@ -533,9 +535,20 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
 
   fastify.post('/therapists/:id/approve', async (request, reply) => {
     const { id } = request.params as { id: string };
+    const existing = await fastify.prisma.therapist.findUnique({ where: { id } });
+    if (!existing) return reply.notFound('Therapist not found');
+    // PREPARING profiles must never become publicly visible — block approval until
+    // the therapist actively switches their employment status to self-employed.
+    if ((existing as any).employmentStatus === 'PREPARING') {
+      return reply.badRequest(
+        'Dieses Profil ist als "in Vorbereitung" markiert und kann nicht freigegeben werden, bis der berufliche Status auf "selbstständig" geändert wird.',
+      );
+    }
     const t = await fastify.prisma.therapist.update({
       where: { id },
-      data: { reviewStatus: 'APPROVED' },
+      // Approval is the publish moment — profiles register as a private DRAFT
+      // (isVisible: false); approving a complete, self-employed profile makes it live.
+      data: { reviewStatus: 'APPROVED', isVisible: true },
       include: { links: { include: { practice: true } } },
     }).catch(() => null);
     if (!t) return reply.notFound('Therapist not found');

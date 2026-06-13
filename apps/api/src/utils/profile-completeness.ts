@@ -8,6 +8,7 @@ type TherapistLike = {
   specializations?: string | null;
   languages?: string | null;
   reviewStatus?: string | null;
+  employmentStatus?: string | null;
   isVisible?: boolean | null;
   isPublished?: boolean | null;
   homeVisit?: boolean | null;
@@ -45,15 +46,20 @@ export function getTherapistPublicationState(
 ) {
   const reviewApproved = therapist.reviewStatus === 'APPROVED';
   const visible = therapist.isVisible === true;
+  // PREPARING profiles are never publicly visible, regardless of review/completion.
+  // Default to self-employed when the field is absent (legacy rows pre-migration).
+  const selfEmployed = (therapist.employmentStatus ?? 'SELF_EMPLOYED') === 'SELF_EMPLOYED';
   const practiceCompletion = getTherapistProfileCompletion(therapist);
   const publicSearchEligible =
     reviewApproved &&
     visible &&
+    selfEmployed &&
     practiceCompletion.complete;
 
   const blockingReasons: string[] = [];
   if (!reviewApproved) blockingReasons.push('not_approved');
   if (!visible) blockingReasons.push('manually_hidden');
+  if (!selfEmployed) blockingReasons.push('employment_preparing');
   if (!practiceCompletion.complete) {
     blockingReasons.push('profile_incomplete');
   }
@@ -92,6 +98,55 @@ export function getTherapistRequestabilityState(
     requestable: blockingReasons.length === 0,
     blockingReasons: [...new Set(blockingReasons)],
   };
+}
+
+type TherapistChecklistLike = TherapistLike & {
+  certifications?: string | null;
+  photo?: string | null;
+  street?: string | null;
+  houseNumber?: string | null;
+};
+
+/**
+ * Detailed profile completion used by GET /auth/me and the therapist dashboard
+ * checklist. `readyForReview` reflects only the minimum criteria required to
+ * submit for admin review — it never changes reviewStatus on its own; the
+ * explicit POST /therapists/me/submit-for-review endpoint owns that transition.
+ */
+export function getTherapistProfileCompletionDetail(therapist: TherapistChecklistLike) {
+  const has = (v?: string | null) => !!v && v.trim() !== '';
+  const selfEmployed = (therapist.employmentStatus ?? 'SELF_EMPLOYED') === 'SELF_EMPLOYED';
+
+  // Full checklist (drives the percentage shown in the dashboard).
+  const items: { key: string; done: boolean }[] = [
+    { key: 'name', done: has(therapist.fullName) },
+    { key: 'city', done: has(therapist.city) },
+    { key: 'specializations', done: has(therapist.specializations) },
+    { key: 'languages', done: has(therapist.languages) },
+    { key: 'photo', done: has(therapist.photo) },
+    { key: 'certifications', done: has(therapist.certifications) },
+    { key: 'kassenart', done: has(therapist.kassenart) },
+    {
+      key: 'homeVisitRadius',
+      done: therapist.homeVisit !== true || (therapist.serviceRadiusKm ?? 0) > 0,
+    },
+    { key: 'address', done: has(therapist.street) && has(therapist.houseNumber) },
+    { key: 'employmentStatus', done: selfEmployed },
+  ];
+
+  const completedItems = items.filter((i) => i.done).map((i) => i.key);
+  const missingItems = items.filter((i) => !i.done).map((i) => i.key);
+  const percentage = Math.round((completedItems.length / items.length) * 100);
+
+  // Minimum criteria for admin review.
+  const readyForReview =
+    has(therapist.fullName) &&
+    has(therapist.city) &&
+    has(therapist.specializations) &&
+    has(therapist.languages) &&
+    selfEmployed;
+
+  return { percentage, completedItems, missingItems, readyForReview };
 }
 
 export function getProfileStatus(therapist: TherapistLike): TherapistProfileStatus {

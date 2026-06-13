@@ -21,6 +21,8 @@ export type ReviewStatus =
   | 'CHANGES_REQUESTED'
   | 'SUSPENDED';
 
+export type EmploymentStatus = 'SELF_EMPLOYED' | 'PREPARING';
+
 export type LinkStatus = 'PROPOSED' | 'CONFIRMED' | 'DISPUTED' | 'REJECTED';
 
 export type BookingMode = 'DIRECTORY_ONLY' | 'FIRST_APPOINTMENT_REQUEST';
@@ -91,6 +93,7 @@ export interface Therapist {
   city: string;
   bio?: string;
   reviewStatus: ReviewStatus;
+  employmentStatus: EmploymentStatus;
   isVisible: boolean;
   isPublished: boolean;
   onboardingStatus: string | null;

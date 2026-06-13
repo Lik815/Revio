@@ -204,6 +204,7 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
       where: {
         reviewStatus: 'APPROVED',
         isVisible: true,
+        employmentStatus: 'SELF_EMPLOYED',
       },
       include: {
         links: {
@@ -452,6 +453,7 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
             therapist: {
               reviewStatus: 'APPROVED',
               isVisible: true,
+              employmentStatus: 'SELF_EMPLOYED',
             },
           },
           include: {
@@ -464,6 +466,7 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
                 reviewStatus: true,
                 isVisible: true,
                 isPublished: true,
+                employmentStatus: true,
               },
             },
           },

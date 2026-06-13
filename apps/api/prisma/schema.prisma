@@ -16,6 +16,11 @@ enum ReviewStatus {
   SUSPENDED
 }
 
+enum EmploymentStatus {
+  SELF_EMPLOYED
+  PREPARING
+}
+
 enum LinkStatus {
   PROPOSED
   CONFIRMED
@@ -114,6 +119,8 @@ model Therapist {
   homeLng               Float        @default(0)
   isVisible             Boolean      @default(true)
   reviewStatus          ReviewStatus @default(PENDING_REVIEW)
+  // Employment status (added via migration 20260613120000) — PREPARING profiles are never publicly visible
+  employmentStatus      EmploymentStatus @default(SELF_EMPLOYED)
   passwordHash          String?
   sessionToken              String?   @unique
   sessionTokenExpiresAt     DateTime?
