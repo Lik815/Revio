@@ -21,7 +21,7 @@ import { TherapistDashboardScreen } from './TherapistDashboard';
 import { PatientDashboardScreen } from './PatientDashboard';
 import { useTherapyData } from '../../context/TherapyContext';
 import { useAuth } from '../../context/AuthContext';
-import { AuthScreen } from '../auth/AuthScreen';
+import { TherapistLandingScreen } from '../auth/TherapistLandingScreen';
 
 const t = (key) => translations.de[key] ?? key;
 
@@ -204,5 +204,13 @@ export function ProfileTabScreen() {
     );
   }
 
-  return <AuthScreen />;
+  return (
+    <TherapistLandingScreen
+      c={c}
+      t={t}
+      styles={appStyles}
+      setShowLogin={() => navigation.navigate(ROOT_ROUTES.LOGIN)}
+      setShowSignup={() => navigation.navigate(ROOT_ROUTES.REGISTRATION)}
+    />
+  );
 }

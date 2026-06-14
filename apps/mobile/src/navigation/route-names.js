@@ -3,6 +3,8 @@ export const ROOT_ROUTES = {
   MAIN_TABS: 'MainTabs',
   THERAPIST_PROFILE: 'TherapistProfile',
   PRACTICE_PROFILE: 'PracticeProfile',
+  LOGIN: 'Login',
+  REGISTRATION: 'Registration',
 };
 
 export const TAB_ROUTES = {

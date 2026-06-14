@@ -3,6 +3,8 @@ import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { AppTabs } from './AppTabs';
 import { ROOT_ROUTES } from './route-names';
+import { LoginRouteScreen } from './screens/LoginRouteScreen';
+import { RegistrationRouteScreen } from './screens/RegistrationRouteScreen';
 import { useTheme } from '../hooks/use-theme';
 
 const Stack = createNativeStackNavigator();
@@ -39,6 +41,8 @@ export function RootNavigator() {
         }}
       >
         <Stack.Screen component={AppTabs} name={ROOT_ROUTES.MAIN_TABS} />
+        <Stack.Screen component={LoginRouteScreen} name={ROOT_ROUTES.LOGIN} />
+        <Stack.Screen component={RegistrationRouteScreen} name={ROOT_ROUTES.REGISTRATION} />
       </Stack.Navigator>
     </NavigationContainer>
   );
