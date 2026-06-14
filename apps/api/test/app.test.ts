@@ -76,6 +76,7 @@ afterEach(async () => {
   await prisma.therapistPracticeLink.deleteMany();
   await prisma.therapist.deleteMany();
   await prisma.practice.deleteMany();
+  await prisma.specializationOption.deleteMany();
   await prisma.emailOtp.deleteMany();
 });
 
@@ -120,6 +121,74 @@ describe('Site settings', () => {
     const nextRes = await app.inject({ method: 'GET', url: '/config/site' });
     expect(nextRes.statusCode).toBe(200);
     expect(nextRes.json()).toEqual({ underConstruction: true });
+  });
+});
+
+describe('Specialization options', () => {
+  it('returns active defaults through the public config route', async () => {
+    const res = await app.inject({ method: 'GET', url: '/config/options' });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().specializations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ label: 'Sportphysiotherapie' }),
+        expect.objectContaining({ label: 'Neurologische Rehabilitation' }),
+      ]),
+    );
+  });
+
+  it('supports admin CRUD and hides inactive options from public config', async () => {
+    const createRes = await app.inject({
+      method: 'POST',
+      url: '/admin/specializations',
+      headers: AUTH,
+      payload: { label: 'CMD' },
+    });
+    expect(createRes.statusCode).toBe(201);
+
+    const created = createRes.json();
+    const toggleRes = await app.inject({
+      method: 'POST',
+      url: `/admin/specializations/${created.id}/toggle`,
+      headers: AUTH,
+    });
+    expect(toggleRes.statusCode).toBe(200);
+    expect(toggleRes.json().isActive).toBe(false);
+
+    const publicRes = await app.inject({ method: 'GET', url: '/config/options' });
+    expect(publicRes.json().specializations).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ label: 'CMD' })]),
+    );
+  });
+
+  it('prevents deleting a specialization that is used by a therapist', async () => {
+    const listRes = await app.inject({
+      method: 'GET',
+      url: '/admin/specializations',
+      headers: AUTH,
+    });
+    const option = listRes.json().specializations.find(
+      (item: { label: string }) => item.label === 'Sportphysiotherapie',
+    );
+
+    await prisma.therapist.create({
+      data: {
+        email: 'specialization@test.de',
+        fullName: 'Specialization Test',
+        professionalTitle: 'Physiotherapeut:in',
+        city: 'Köln',
+        specializations: 'Sportphysiotherapie',
+        languages: 'de',
+      },
+    });
+
+    const deleteRes = await app.inject({
+      method: 'POST',
+      url: `/admin/specializations/${option.id}/delete`,
+      headers: AUTH,
+    });
+
+    expect(deleteRes.statusCode).toBe(409);
   });
 });
 

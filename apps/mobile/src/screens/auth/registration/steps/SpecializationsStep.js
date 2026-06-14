@@ -2,11 +2,11 @@ import React from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BackButton } from '../../../../components/BackButton';
-import { regSpecOptions } from '../../../../utils/app-utils';
 
 // Step 6 (therapist only) — pick specializations. Recommended but skippable;
 // the final submit (POST /register/therapist) happens from here.
 export function SpecializationsStep({
+  options,
   selected, onToggle,
   error, loading,
   onSubmit, onSkip, onBack,
@@ -23,7 +23,8 @@ export function SpecializationsStep({
       </View>
 
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 24 }}>
-        {regSpecOptions.map((spec) => {
+        {(options ?? []).map((option) => {
+          const spec = option.label;
           const isOn = selected.includes(spec);
           return (
             <Pressable

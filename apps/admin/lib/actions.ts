@@ -186,6 +186,37 @@ export async function deleteCertificationOption(id: string) {
   revalidatePath('/settings');
 }
 
+// Specialization option actions
+export async function createSpecializationOption(formData: FormData) {
+  const label = String(formData.get('label') ?? '').trim();
+  if (!label) return;
+
+  await adminRequest('/admin/specializations', {
+    body: { label },
+  });
+  revalidatePath('/specializations');
+}
+
+export async function updateSpecializationOption(id: string, formData: FormData) {
+  const label = String(formData.get('label') ?? '').trim();
+  if (!label) return;
+
+  await adminRequest(`/admin/specializations/${id}/update`, {
+    body: { label },
+  });
+  revalidatePath('/specializations');
+}
+
+export async function toggleSpecializationOption(id: string) {
+  await adminRequest(`/admin/specializations/${id}/toggle`);
+  revalidatePath('/specializations');
+}
+
+export async function deleteSpecializationOption(id: string) {
+  await adminRequest(`/admin/specializations/${id}/delete`);
+  revalidatePath('/specializations');
+}
+
 export async function updateSiteUnderConstruction(formData: FormData) {
   const value = String(formData.get('underConstruction') ?? '').trim();
   const underConstruction = value === 'true';

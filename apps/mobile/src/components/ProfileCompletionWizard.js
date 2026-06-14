@@ -5,7 +5,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { BackButton } from './BackButton';
 import {
   getBaseUrl, getLangLabel, kassenartOptions, languageOptions,
-  normalizeLanguageCodes, RADIUS, regSpecOptions, resolveMediaUrl, SPACE, TUNNEL_HEADERS,
+  normalizeLanguageCodes, RADIUS, resolveMediaUrl, SPACE, TUNNEL_HEADERS,
 } from '../utils/app-utils';
 
 // Canonical order of the steps; only the items still missing are shown.
@@ -46,7 +46,7 @@ function Chip({ label, active, onPress, c }) {
 
 // Step-by-step "complete your profile" flow. Walks only through the items the
 // dashboard checklist reports as missing, saving each step before advancing.
-export function ProfileCompletionWizard({ visible, onClose, th, authToken, certificationOptions, onRefresh, c, t, styles }) {
+export function ProfileCompletionWizard({ visible, onClose, th, authToken, certificationOptions, specializationOptions, onRefresh, c, t, styles }) {
   const steps = useMemo(() => {
     const missing = new Set(th?.profileCompletion?.missingItems ?? []);
     return STEP_ORDER.filter((k) => missing.has(k));
@@ -294,9 +294,12 @@ export function ProfileCompletionWizard({ visible, onClose, th, authToken, certi
 
           {current === 'specializations' && (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-              {regSpecOptions.map((spec) => (
-                <Chip key={spec} label={spec} active={specs.includes(spec)} onPress={() => toggle(setSpecs, specs, spec)} c={c} />
-              ))}
+              {(specializationOptions ?? []).map((option) => {
+                const spec = option.label;
+                return (
+                  <Chip key={spec} label={spec} active={specs.includes(spec)} onPress={() => toggle(setSpecs, specs, spec)} c={c} />
+                );
+              })}
             </View>
           )}
 

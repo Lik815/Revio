@@ -14,10 +14,11 @@ function getTitle(notification, t) {
 
 export function ReviewNotificationModal({ visible, notification, onDone, c, t }) {
   const isApproved = notification?.type === 'PROFILE_APPROVED';
+  const handleDone = () => onDone?.();
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onDone}>
-      <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', padding: 24 }} onPress={onDone}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={handleDone}>
+      <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', padding: 24 }} onPress={handleDone}>
         <Pressable onPress={(e) => e.stopPropagation()}>
           <View style={{ backgroundColor: c.card, borderRadius: 20, padding: 24, gap: 16 }}>
             <View style={{ alignItems: 'center', gap: 10 }}>
@@ -37,7 +38,7 @@ export function ReviewNotificationModal({ visible, notification, onDone, c, t })
             </Text>
             <Pressable
               style={{ backgroundColor: c.primary, borderRadius: 14, paddingVertical: 14, alignItems: 'center' }}
-              onPress={onDone}
+              onPress={handleDone}
             >
               <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>{t('doneBtn')}</Text>
             </Pressable>

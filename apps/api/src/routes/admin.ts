@@ -10,6 +10,10 @@ import { getTherapistPublicationState, getTherapistRequestabilityState } from '.
 import { sendProfileApprovedEmail, sendProfileRejectedEmail, sendProfileChangesRequestedEmail } from '../utils/mailer.js';
 import { sendPushNotification } from '../utils/push.js';
 import { ensureDefaultCertificationOptions } from '../utils/certification-options.js';
+import {
+  createSpecializationKey,
+  ensureDefaultSpecializationOptions,
+} from '../utils/specialization-options.js';
 import { getPublicSiteSettings, setBooleanAppSetting, SITE_UNDER_CONSTRUCTION_KEY } from '../utils/app-settings.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -107,6 +111,9 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
   });
   const certificationSchema = z.object({
     label: z.string().trim().min(2),
+  });
+  const specializationSchema = z.object({
+    label: z.string().trim().min(2).max(100),
   });
   const siteSettingsSchema = z.object({
     underConstruction: z.boolean(),
@@ -428,6 +435,136 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
     if (!existing) return reply.notFound('Fortbildung nicht gefunden');
 
     await fastify.prisma.certificationOption.delete({ where: { id } });
+    return { success: true };
+  });
+
+  const getSpecializationUsageCounts = async (labels: string[]) => {
+    const therapists = await fastify.prisma.therapist.findMany({
+      select: { specializations: true },
+    });
+
+    const counts = new Map(labels.map((label) => [label, 0]));
+    for (const therapist of therapists) {
+      for (const label of new Set(splitList(therapist.specializations))) {
+        if (counts.has(label)) counts.set(label, (counts.get(label) ?? 0) + 1);
+      }
+    }
+    return counts;
+  };
+
+  const getSpecializationUsageCount = async (label: string) => {
+    const counts = await getSpecializationUsageCounts([label]);
+    return counts.get(label) ?? 0;
+  };
+
+  fastify.get('/specializations', async () => {
+    await ensureDefaultSpecializationOptions(fastify.prisma);
+
+    const specializations = await fastify.prisma.specializationOption.findMany({
+      orderBy: [{ sortOrder: 'asc' }, { label: 'asc' }],
+    });
+
+    const usageCounts = await getSpecializationUsageCounts(
+      specializations.map((option) => option.label),
+    );
+
+    return {
+      specializations: specializations.map((option) => ({
+        id: option.id,
+        key: option.key,
+        label: option.label,
+        isActive: option.isActive,
+        sortOrder: option.sortOrder,
+        usageCount: usageCounts.get(option.label) ?? 0,
+      })),
+    };
+  });
+
+  fastify.post('/specializations', async (request, reply) => {
+    await ensureDefaultSpecializationOptions(fastify.prisma);
+
+    const parsed = specializationSchema.safeParse(request.body);
+    if (!parsed.success) return reply.badRequest('Ungültige Eingabedaten');
+
+    const label = parsed.data.label;
+    const key = createSpecializationKey(label);
+    if (!key) return reply.badRequest('Ungültiger Schwerpunkt');
+
+    const existing = await fastify.prisma.specializationOption.findFirst({
+      where: { OR: [{ key }, { label }] },
+    });
+    if (existing) return reply.conflict('Dieser Schwerpunkt existiert bereits');
+
+    const maxSortOrder = await fastify.prisma.specializationOption.aggregate({
+      _max: { sortOrder: true },
+    });
+    const option = await fastify.prisma.specializationOption.create({
+      data: {
+        key,
+        label,
+        isActive: true,
+        sortOrder: (maxSortOrder._max.sortOrder ?? 0) + 10,
+      },
+    });
+
+    return reply.status(201).send({ ...option, usageCount: 0 });
+  });
+
+  fastify.post('/specializations/:id/update', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const parsed = specializationSchema.safeParse(request.body);
+    if (!parsed.success) return reply.badRequest('Ungültige Eingabedaten');
+
+    const existing = await fastify.prisma.specializationOption.findUnique({ where: { id } });
+    if (!existing) return reply.notFound('Schwerpunkt nicht gefunden');
+
+    const label = parsed.data.label;
+    if (label !== existing.label && await getSpecializationUsageCount(existing.label) > 0) {
+      return reply.conflict(
+        'Verwendete Schwerpunkte können nicht umbenannt werden. Deaktiviere den Eintrag und lege einen neuen an.',
+      );
+    }
+
+    const key = createSpecializationKey(label);
+    const duplicate = await fastify.prisma.specializationOption.findFirst({
+      where: { id: { not: id }, OR: [{ key }, { label }] },
+    });
+    if (duplicate) return reply.conflict('Dieser Schwerpunkt existiert bereits');
+
+    const option = await fastify.prisma.specializationOption.update({
+      where: { id },
+      data: { key, label },
+    });
+
+    return { ...option, usageCount: 0 };
+  });
+
+  fastify.post('/specializations/:id/toggle', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const existing = await fastify.prisma.specializationOption.findUnique({ where: { id } });
+    if (!existing) return reply.notFound('Schwerpunkt nicht gefunden');
+
+    const option = await fastify.prisma.specializationOption.update({
+      where: { id },
+      data: { isActive: !existing.isActive },
+    });
+
+    return {
+      ...option,
+      usageCount: await getSpecializationUsageCount(option.label),
+    };
+  });
+
+  fastify.post('/specializations/:id/delete', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const existing = await fastify.prisma.specializationOption.findUnique({ where: { id } });
+    if (!existing) return reply.notFound('Schwerpunkt nicht gefunden');
+
+    if (await getSpecializationUsageCount(existing.label) > 0) {
+      return reply.conflict('Dieser Schwerpunkt wird verwendet und kann nur deaktiviert werden');
+    }
+
+    await fastify.prisma.specializationOption.delete({ where: { id } });
     return { success: true };
   });
 

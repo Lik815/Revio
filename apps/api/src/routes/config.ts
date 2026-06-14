@@ -1,5 +1,6 @@
 import { FastifyPluginAsync } from 'fastify';
 import { ensureDefaultCertificationOptions } from '../utils/certification-options.js';
+import { ensureDefaultSpecializationOptions } from '../utils/specialization-options.js';
 import { getPublicSiteSettings } from '../utils/app-settings.js';
 
 export const configRoutes: FastifyPluginAsync = async (fastify) => {
@@ -50,14 +51,25 @@ export const configRoutes: FastifyPluginAsync = async (fastify) => {
 
   fastify.get('/config/options', async () => {
     await ensureDefaultCertificationOptions(fastify.prisma);
+    await ensureDefaultSpecializationOptions(fastify.prisma);
 
-    const certifications = await fastify.prisma.certificationOption.findMany({
-      where: { isActive: true },
-      orderBy: [{ sortOrder: 'asc' }, { label: 'asc' }],
-    });
+    const [certifications, specializations] = await Promise.all([
+      fastify.prisma.certificationOption.findMany({
+        where: { isActive: true },
+        orderBy: [{ sortOrder: 'asc' }, { label: 'asc' }],
+      }),
+      fastify.prisma.specializationOption.findMany({
+        where: { isActive: true },
+        orderBy: [{ sortOrder: 'asc' }, { label: 'asc' }],
+      }),
+    ]);
 
     return {
       certifications: certifications.map((option) => ({
+        key: option.key,
+        label: option.label,
+      })),
+      specializations: specializations.map((option) => ({
         key: option.key,
         label: option.label,
       })),

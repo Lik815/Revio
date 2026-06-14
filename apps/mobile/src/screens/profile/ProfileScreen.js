@@ -10,7 +10,8 @@ import { useFavorites } from '../../hooks/use-favorites';
 import { appStyles } from '../../styles/app-styles';
 import { translations } from '../../i18n/translations';
 import { ROOT_ROUTES, TAB_ROUTES } from '../../navigation/route-names';
-import { fortbildungOptions, getBaseUrl, TUNNEL_HEADERS } from '../../utils/app-utils';
+import { getBaseUrl, TUNNEL_HEADERS } from '../../utils/app-utils';
+import { useConfigOptions } from '../../hooks/use-config-options';
 import { TabHeader } from '../../components/TabHeader';
 import { ToastOverlay } from '../../components/ToastOverlay';
 import { NotificationSheet } from '../../modals/NotificationSheet';
@@ -25,12 +26,6 @@ import { TherapistLandingScreen } from '../auth/TherapistLandingScreen';
 
 const t = (key) => translations.de[key] ?? key;
 
-const CERTIFICATION_OPTIONS = (fortbildungOptions ?? []).map((o) => ({
-  key: o.key,
-  label: o.label,
-  selected: false,
-}));
-
 export function ProfileTabScreen() {
   const navigation = useNavigation();
 
@@ -41,37 +36,30 @@ export function ProfileTabScreen() {
   const updatePatientProfile = useAppStore((s) => s.updatePatientProfile);
 
   const { c } = useTheme();
+  const { certificationOptions, specializationOptions } = useConfigOptions();
   const { toastMsg, toastAnim, showToast } = useToast();
 
   const { myAppointments } = useTherapyData();
   const { favorites } = useFavorites({ authToken });
+  const { setLoggedInTherapist } = useAuth();
 
   const {
     notifications, dismissedNotifIds,
     showNotifications, setShowNotifications,
     dismissNotification, dismissAllNotifications,
     showReviewNotificationModal, reviewNotification, markReviewNotificationSeen,
-  } = useNotificationPolling({ authToken, accountType });
+  } = useNotificationPolling({
+    authToken,
+    accountType,
+    onTherapistReviewStatus: (therapistId, reviewStatus) => {
+      setLoggedInTherapist((prev) => {
+        if (!prev || prev.id !== therapistId || prev.reviewStatus === reviewStatus) return prev;
+        return { ...prev, reviewStatus };
+      });
+    },
+  });
 
   const [showPhotoPrompt, setShowPhotoPrompt] = useState(false);
-
-  // Live certification catalog from the DB (admin-managed). Falls back to the
-  // bundled defaults until the request resolves / if offline.
-  const [certificationOptions, setCertificationOptions] = useState(CERTIFICATION_OPTIONS);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetch(`${getBaseUrl()}/config/options`, { headers: { ...TUNNEL_HEADERS } })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (cancelled || !data?.certifications?.length) return;
-        setCertificationOptions(
-          data.certifications.map((o) => ({ key: o.key, label: o.label, selected: false })),
-        );
-      })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, []);
 
   useEffect(() => {
     if (!loggedInTherapist || loggedInTherapist.photo) return;
@@ -183,6 +171,7 @@ export function ProfileTabScreen() {
           <TherapistDashboardScreen
             c={c} t={t} styles={appStyles}
             certificationOptions={certificationOptions}
+            specializationOptions={specializationOptions}
             onOpenTherapyTab={() => navigation.navigate(TAB_ROUTES.THERAPY)}
             onAddSlot={handleAddSlot}
             onProfileSaved={openProfileSavedModal}

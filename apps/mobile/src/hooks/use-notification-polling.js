@@ -94,13 +94,18 @@ export function useNotificationPolling({ authToken, accountType, onTherapistRevi
   };
 
   const markReviewNotificationSeen = async (notification = reviewNotification) => {
-    if (notification?.therapistId && notification?.reviewStatus) {
+    const resolvedNotification =
+      notification?.therapistId && notification?.reviewStatus
+        ? notification
+        : reviewNotification;
+
+    if (resolvedNotification?.therapistId && resolvedNotification?.reviewStatus) {
       await AsyncStorage.setItem(
-        getReviewNotificationSeenKey(notification.therapistId),
-        notification.reviewStatus,
+        getReviewNotificationSeenKey(resolvedNotification.therapistId),
+        resolvedNotification.reviewStatus,
       );
     }
-    setNotifications((prev) => prev.filter((item) => item.id !== notification?.id));
+    setNotifications((prev) => prev.filter((item) => item.id !== resolvedNotification?.id));
     setShowReviewNotificationModal(false);
     setReviewNotification(null);
   };

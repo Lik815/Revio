@@ -102,7 +102,7 @@ function StatusMiniCard({ icon, label, value, color, c }) {
   );
 }
 
-export function TherapistDashboardScreen({ c, t, styles, certificationOptions, onOpenTherapyTab, onAddSlot, onProfileSaved }) {
+export function TherapistDashboardScreen({ c, t, styles, certificationOptions, specializationOptions, onOpenTherapyTab, onAddSlot, onProfileSaved }) {
   const { authToken, loggedInTherapist, setLoggedInTherapist } = useAuth();
 
   // Edit state
@@ -376,6 +376,7 @@ export function TherapistDashboardScreen({ c, t, styles, certificationOptions, o
         th={th}
         authToken={authToken}
         certificationOptions={certificationOptions}
+        specializationOptions={specializationOptions}
         onRefresh={refreshProfile}
         c={c} t={t} styles={styles}
       />

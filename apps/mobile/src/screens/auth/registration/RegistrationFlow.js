@@ -3,6 +3,7 @@ import { View } from 'react-native';
 import { getBaseUrl, normalizeTherapistProfile, TUNNEL_HEADERS } from '../../../utils/app-utils';
 import { useAuth } from '../../../context/AuthContext';
 import { useTherapyData } from '../../../context/TherapyContext';
+import { useConfigOptions } from '../../../hooks/use-config-options';
 import { RoleSelectStep } from './steps/RoleSelectStep';
 import { AccountCreateStep } from './steps/AccountCreateStep';
 import { OtpVerifyStep } from './steps/OtpVerifyStep';
@@ -20,6 +21,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export function RegistrationFlow({ onClose, onShowLogin, onComplete, c, t, styles }) {
   const { loginAsPatient, loginAsTherapist } = useAuth();
   const { loadFavorites, loadMyAppointments, loadIncomingBookings } = useTherapyData();
+  const { specializationOptions } = useConfigOptions();
 
   const [role, setRole] = useState(null);
   const [step, setStep] = useState('role');
@@ -334,6 +336,7 @@ export function RegistrationFlow({ onClose, onShowLogin, onComplete, c, t, style
   } else if (step === 'specializations') {
     content = (
       <SpecializationsStep
+        options={specializationOptions}
         selected={specializations}
         onToggle={toggleSpec}
         error={submitError} loading={submitting}

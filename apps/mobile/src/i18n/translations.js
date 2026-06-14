@@ -347,7 +347,7 @@ export const translations = {
     searchingLabel: 'Suche…',
 
     // --- Review status ---
-    statusApproved: 'Freigegeben',
+    statusApproved: 'Geprüft',
     statusChangesRequested: 'Anpassung nötig',
     statusInReview: 'In Prüfung',
     reviewStatusLabel: 'Prüfstatus',

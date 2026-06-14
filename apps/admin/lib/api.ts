@@ -106,6 +106,15 @@ export type CertificationOption = {
   sortOrder: number;
 };
 
+export type SpecializationOption = {
+  id: string;
+  key: string;
+  label: string;
+  isActive: boolean;
+  sortOrder: number;
+  usageCount: number;
+};
+
 export type SiteSettings = {
   underConstruction: boolean;
 };
@@ -174,4 +183,5 @@ export const api = {
   getBlogPosts: () => adminFetch<BlogPost[]>('/admin/blog-posts'),
   getTherapistDocuments: (id: string) => adminFetch<TherapistDocument[]>(`/admin/therapists/${id}/documents`),
   getCertificationOptions: () => adminFetch<{ certifications: CertificationOption[] }>('/admin/certifications'),
+  getSpecializationOptions: () => adminFetch<{ specializations: SpecializationOption[] }>('/admin/specializations'),
 };
