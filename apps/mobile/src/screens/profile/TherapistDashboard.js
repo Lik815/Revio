@@ -266,6 +266,7 @@ export function TherapistDashboardScreen({ c, t, styles, certificationOptions, s
       if (uploadRes.ok) {
         const { url } = await uploadRes.json();
         setLoggedInTherapist(prev => ({ ...prev, photo: url }));
+        await refreshProfile();
         Alert.alert(t('alertSuccess'), t('alertAvatarSaved'));
       } else {
         Alert.alert(t('alertError'), `${t('alertPhotoUploadFail')} (${uploadRes.status})`);
@@ -291,6 +292,7 @@ export function TherapistDashboardScreen({ c, t, styles, certificationOptions, s
       if (res.ok) {
         const { id, originalName } = await res.json();
         setTherapistDocuments(prev => [{ id, originalName, mimetype: asset.mimeType }, ...prev]);
+        await refreshProfile();
         Alert.alert(t('alertUploaded'), t('alertUploadedBody').replace('{name}', originalName));
       } else {
         const errData = await res.json().catch(() => ({}));
