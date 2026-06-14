@@ -2196,10 +2196,20 @@ describe('End-to-End: Register → Admin Approve → Visible in Search', () => {
         photo: 'https://example.com/p.jpg',
         certifications: ['MT'],
         kassenart: 'Alle',
+        phone: '+49 221 555555',
         street: 'Hauptstrasse',
         houseNumber: '1',
         homeVisit: true,
         serviceRadiusKm: 15,
+        bio: 'Ich bin Physiotherapeut:in mit einem Schwerpunkt auf Bewegungstherapie.',
+      },
+    });
+    await prisma.therapistDocument.create({
+      data: {
+        therapistId,
+        filename: `${therapistId}.pdf`,
+        originalName: 'Berufsurkunde.pdf',
+        mimetype: 'application/pdf',
       },
     });
 

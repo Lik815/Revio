@@ -96,6 +96,8 @@ export function NotifProvider({ authToken, accountType, onReviewStatusChange, ch
       );
     }
     setNotifications((prev) => prev.filter((n) => n.id !== notification?.id));
+    setShowReviewNotificationModal(false);
+    setReviewNotification(null);
   };
 
   return (
