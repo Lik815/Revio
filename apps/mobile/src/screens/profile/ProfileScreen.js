@@ -55,6 +55,24 @@ export function ProfileTabScreen() {
 
   const [showPhotoPrompt, setShowPhotoPrompt] = useState(false);
 
+  // Live certification catalog from the DB (admin-managed). Falls back to the
+  // bundled defaults until the request resolves / if offline.
+  const [certificationOptions, setCertificationOptions] = useState(CERTIFICATION_OPTIONS);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`${getBaseUrl()}/config/options`, { headers: { ...TUNNEL_HEADERS } })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled || !data?.certifications?.length) return;
+        setCertificationOptions(
+          data.certifications.map((o) => ({ key: o.key, label: o.label, selected: false })),
+        );
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
   useEffect(() => {
     if (!loggedInTherapist || loggedInTherapist.photo) return;
     AsyncStorage.getItem('revio_photo_prompt_dismissed').then((v) => {
@@ -164,7 +182,7 @@ export function ProfileTabScreen() {
           <TabHeader c={c} title="Mein Profil" onBellPress={() => setShowNotifications(true)} hasBadge={hasBadge} />
           <TherapistDashboardScreen
             c={c} t={t} styles={appStyles}
-            certificationOptions={CERTIFICATION_OPTIONS}
+            certificationOptions={certificationOptions}
             onOpenTherapyTab={() => navigation.navigate(TAB_ROUTES.THERAPY)}
             onAddSlot={handleAddSlot}
             onProfileSaved={openProfileSavedModal}
