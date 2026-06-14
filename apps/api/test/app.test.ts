@@ -191,6 +191,45 @@ describe('Specialization options', () => {
 
     expect(deleteRes.statusCode).toBe(409);
   });
+
+  it('falls back to default specializations when the storage table is unavailable', async () => {
+    const countSpy = vi
+      .spyOn(prisma.specializationOption, 'count')
+      .mockRejectedValueOnce(new Error('no such table: SpecializationOption'));
+
+    const res = await app.inject({ method: 'GET', url: '/config/options' });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().specializations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ label: 'Sportphysiotherapie' }),
+        expect.objectContaining({ label: 'Neurologische Rehabilitation' }),
+      ]),
+    );
+
+    countSpy.mockRestore();
+  });
+
+  it('keeps the admin specializations route available when the storage table is unavailable', async () => {
+    const countSpy = vi
+      .spyOn(prisma.specializationOption, 'count')
+      .mockRejectedValueOnce(new Error('no such table: SpecializationOption'));
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/admin/specializations',
+      headers: AUTH,
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().specializations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ label: 'Sportphysiotherapie', isActive: true }),
+      ]),
+    );
+
+    countSpy.mockRestore();
+  });
 });
 
 describe('POST /feedback', () => {

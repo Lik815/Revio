@@ -13,6 +13,8 @@ import { ensureDefaultCertificationOptions } from '../utils/certification-option
 import {
   createSpecializationKey,
   ensureDefaultSpecializationOptions,
+  getDefaultSpecializationOptions,
+  isSpecializationOptionStorageError,
 } from '../utils/specialization-options.js';
 import { getPublicSiteSettings, setBooleanAppSetting, SITE_UNDER_CONSTRUCTION_KEY } from '../utils/app-settings.js';
 
@@ -458,11 +460,26 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
   };
 
   fastify.get('/specializations', async () => {
-    await ensureDefaultSpecializationOptions(fastify.prisma);
+    let specializations: Array<{
+      id: string;
+      key: string;
+      label: string;
+      isActive: boolean;
+      sortOrder: number;
+    }>;
 
-    const specializations = await fastify.prisma.specializationOption.findMany({
-      orderBy: [{ sortOrder: 'asc' }, { label: 'asc' }],
-    });
+    try {
+      await ensureDefaultSpecializationOptions(fastify.prisma);
+      specializations = await fastify.prisma.specializationOption.findMany({
+        orderBy: [{ sortOrder: 'asc' }, { label: 'asc' }],
+      });
+    } catch (error) {
+      if (!isSpecializationOptionStorageError(error)) throw error;
+      specializations = getDefaultSpecializationOptions().map((option) => ({
+        ...option,
+        id: `fallback-${option.key}`,
+      }));
+    }
 
     const usageCounts = await getSpecializationUsageCounts(
       specializations.map((option) => option.label),

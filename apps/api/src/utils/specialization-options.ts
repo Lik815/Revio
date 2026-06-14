@@ -1,4 +1,4 @@
-import type { PrismaClient } from '@prisma/client';
+import { Prisma, type PrismaClient } from '@prisma/client';
 
 const labels = [
   'Rückenschmerzen',
@@ -46,6 +46,28 @@ export const DEFAULT_SPECIALIZATION_OPTIONS = labels.map((label, index) => ({
   label,
   sortOrder: (index + 1) * 10,
 }));
+
+export function getDefaultSpecializationOptions() {
+  return DEFAULT_SPECIALIZATION_OPTIONS.map((option) => ({
+    ...option,
+    isActive: true,
+  }));
+}
+
+export function isSpecializationOptionStorageError(error: unknown) {
+  if (
+    error instanceof Prisma.PrismaClientKnownRequestError
+    && error.code === 'P2021'
+  ) {
+    return true;
+  }
+
+  if (!(error instanceof Error)) return false;
+  return (
+    /specializationoption/i.test(error.message)
+    && /(does not exist|no such table|invalid `prisma\.specializationOption|table)/i.test(error.message)
+  );
+}
 
 export async function ensureDefaultSpecializationOptions(prisma: PrismaClient) {
   const count = await prisma.specializationOption.count();
