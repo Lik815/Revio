@@ -49,7 +49,8 @@ export function ProfileChecklist({ th, authToken, onSubmitted, onOpenWizard, c, 
   if (!completion) return null;
 
   const completed = new Set(completion.completedItems ?? []);
-  const percentage = completion.percentage ?? 0;
+  const completedCount = CHECKLIST_ORDER.filter((key) => completed.has(key)).length;
+  const percentage = Math.round((completedCount / CHECKLIST_ORDER.length) * 100);
   const reviewStatus = th.reviewStatus;
   const isPreparing = th.employmentStatus === 'PREPARING';
   const canSubmit = (reviewStatus === 'DRAFT' || reviewStatus === 'CHANGES_REQUESTED')

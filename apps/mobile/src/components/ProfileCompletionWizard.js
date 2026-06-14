@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -115,6 +115,22 @@ function createBioSuggestion(th, certificationOptions, specializationOptions) {
   return `${intro} ${specializationPart}${certificationPart}.`;
 }
 
+function getMissingSteps(th) {
+  const completedItems = th?.profileCompletion?.completedItems;
+  if (Array.isArray(completedItems) && completedItems.length > 0) {
+    const completed = new Set(completedItems);
+    return STEP_ORDER.filter((key) => !completed.has(key));
+  }
+
+  const missingItems = th?.profileCompletion?.missingItems;
+  if (Array.isArray(missingItems) && missingItems.length > 0) {
+    const missing = new Set(missingItems);
+    return STEP_ORDER.filter((key) => missing.has(key));
+  }
+
+  return [];
+}
+
 export function ProfileCompletionWizard({
   visible,
   onClose,
@@ -127,11 +143,7 @@ export function ProfileCompletionWizard({
   t,
   styles,
 }) {
-  const steps = useMemo(() => {
-    const missing = new Set(th?.profileCompletion?.missingItems ?? []);
-    return STEP_ORDER.filter((key) => missing.has(key));
-  }, [visible, th?.profileCompletion?.missingItems]);
-
+  const [steps, setSteps] = useState([]);
   const [index, setIndex] = useState(0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -149,9 +161,14 @@ export function ProfileCompletionWizard({
   const [langs, setLangs] = useState([]);
   const [city, setCity] = useState('');
   const [bio, setBio] = useState('');
+  const wasVisibleRef = useRef(false);
 
   useEffect(() => {
-    if (!visible || !th) return;
+    const becameVisible = visible && !wasVisibleRef.current;
+    wasVisibleRef.current = visible;
+    if (!becameVisible || !th) return;
+    const nextSteps = getMissingSteps(th);
+    setSteps(nextSteps);
     setIndex(0);
     setError('');
     setSaving(false);
@@ -169,7 +186,7 @@ export function ProfileCompletionWizard({
     setLangs(normalizeLanguageCodes(th.languages).map((language) => language.toLowerCase()));
     setCity(th.city ?? '');
     setBio(th.bio?.trim() || createBioSuggestion(th, certificationOptions, specializationOptions));
-  }, [visible, th, certificationOptions, specializationOptions]);
+  }, [visible, th?.id, certificationOptions, specializationOptions]);
 
   useEffect(() => {
     if (!visible || th?.reviewStatus !== 'APPROVED') return;
@@ -344,6 +361,19 @@ export function ProfileCompletionWizard({
     }
   };
 
+  const completeCurrentStep = () => {
+    setSteps((prevSteps) => {
+      const nextSteps = prevSteps.filter((step) => step !== current);
+      if (nextSteps.length === 0) {
+        onClose?.();
+        return nextSteps;
+      }
+      setIndex((value) => Math.min(value, nextSteps.length - 1));
+      return nextSteps;
+    });
+    setError('');
+  };
+
   const handleNext = async () => {
     setError('');
     if (!validate()) {
@@ -351,7 +381,7 @@ export function ProfileCompletionWizard({
       return;
     }
     if (current === 'photo' || current === 'document') {
-      advance();
+      completeCurrentStep();
       return;
     }
 
@@ -373,7 +403,7 @@ export function ProfileCompletionWizard({
         return;
       }
       await onRefresh?.();
-      advance();
+      completeCurrentStep();
     } catch {
       setError('Verbindungsfehler.');
     } finally {
