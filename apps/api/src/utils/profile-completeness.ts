@@ -105,6 +105,8 @@ type TherapistChecklistLike = TherapistLike & {
   photo?: string | null;
   street?: string | null;
   houseNumber?: string | null;
+  phone?: string | null;
+  documentCount?: number | null;
 };
 
 /**
@@ -124,6 +126,8 @@ export function getTherapistProfileCompletionDetail(therapist: TherapistChecklis
     { key: 'specializations', done: has(therapist.specializations) },
     { key: 'languages', done: has(therapist.languages) },
     { key: 'photo', done: has(therapist.photo) },
+    { key: 'document', done: (therapist.documentCount ?? 0) > 0 },
+    { key: 'phone', done: has(therapist.phone) },
     { key: 'certifications', done: has(therapist.certifications) },
     { key: 'kassenart', done: has(therapist.kassenart) },
     {
@@ -131,6 +135,11 @@ export function getTherapistProfileCompletionDetail(therapist: TherapistChecklis
       done: therapist.homeVisit !== true || (therapist.serviceRadiusKm ?? 0) > 0,
     },
     { key: 'address', done: has(therapist.street) && has(therapist.houseNumber) },
+    {
+      key: 'bio',
+      done: has(therapist.bio)
+        && therapist.bio!.trim().split(/[.!?]+/).filter(Boolean).length > 0,
+    },
     { key: 'employmentStatus', done: selfEmployed },
   ];
 

@@ -73,6 +73,7 @@ afterEach(async () => {
   await prisma.user.deleteMany();
   await prisma.bookingRequest.deleteMany();
   await prisma.therapistSlot.deleteMany();
+  await prisma.therapistDocument.deleteMany();
   await prisma.therapistPracticeLink.deleteMany();
   await prisma.therapist.deleteMany();
   await prisma.practice.deleteMany();
@@ -1238,6 +1239,8 @@ describe('POST /register/therapist', () => {
     expect(body.postalCode).toBe('50667');
     expect(body.street).toBe('Komoedienstrasse');
     expect(body.gender).toBe('female');
+    expect(body.kassenarten).toEqual([]);
+    expect(body.documentCount).toBe(0);
     expect(body.taxRegistrationStatus).toBe('yes');
     expect(body.healthAuthorityStatus).toBe('in_progress');
     expect(body.complianceUpdatedAt).toBeTruthy();
@@ -1266,6 +1269,58 @@ describe('POST /register/therapist', () => {
     expect(therapist?.taxRegistrationStatus).toBe('yes');
     expect(therapist?.healthAuthorityStatus).toBe('in_progress');
     expect(therapist?.complianceUpdatedAt).toBeTruthy();
+  });
+});
+
+describe('PATCH /auth/me therapist profile fields', () => {
+  async function registerTherapist(email: string) {
+    await seedConfirmedOtp(email);
+    const res = await app.inject({
+      method: 'POST',
+      url: '/register/therapist',
+      payload: {
+        email,
+        firstName: 'Pia',
+        lastName: 'Therapeut',
+        city: 'Köln',
+        specializations: ['back pain'],
+        languages: ['de'],
+      },
+    });
+    return res.json() as { therapistId: string; token: string };
+  }
+
+  it('persists gender and normalized multiple kassenarten', async () => {
+    const { therapistId, token } = await registerTherapist('patch-fields@test.com');
+    const patchRes = await app.inject({
+      method: 'PATCH',
+      url: '/auth/me',
+      headers: { authorization: `Bearer ${token}` },
+      payload: {
+        gender: 'female',
+        kassenarten: ['gesetzlich', 'privat'],
+      },
+    });
+
+    expect(patchRes.statusCode).toBe(200);
+    const therapist = await prisma.therapist.findUnique({ where: { id: therapistId } });
+    expect(therapist?.gender).toBe('female');
+    expect(therapist?.kassenart).toBe('gesetzlich, privat');
+  });
+
+  it('blocks booking mode activation before profile approval', async () => {
+    const { token } = await registerTherapist('patch-booking-gate@test.com');
+    const patchRes = await app.inject({
+      method: 'PATCH',
+      url: '/auth/me',
+      headers: { authorization: `Bearer ${token}` },
+      payload: {
+        bookingMode: 'FIRST_APPOINTMENT_REQUEST',
+      },
+    });
+
+    expect(patchRes.statusCode).toBe(400);
+    expect(patchRes.json().message).toContain('Profilprüfung');
   });
 });
 
@@ -2257,7 +2312,7 @@ describe('POST /therapists/me/submit-for-review', () => {
   }
 
   // Bring a freshly-registered therapist to 100% completion so it can be submitted.
-  async function completeProfile(token: string) {
+  async function completeProfile(token: string, therapistId: string) {
     await app.inject({
       method: 'PATCH',
       url: '/auth/me',
@@ -2265,10 +2320,20 @@ describe('POST /therapists/me/submit-for-review', () => {
       payload: {
         photo: 'https://example.com/p.jpg',
         certifications: ['MT'],
-        kassenart: 'Alle',
+        kassenarten: ['gesetzlich', 'privat'],
+        phone: '+49 221 555555',
         street: 'Hauptstrasse',
         houseNumber: '1',
         homeVisit: false,
+        bio: 'Ich bin Physiotherapeut:in mit einem Schwerpunkt auf Bewegungstherapie.',
+      },
+    });
+    await prisma.therapistDocument.create({
+      data: {
+        therapistId,
+        filename: `${therapistId}.pdf`,
+        originalName: 'Berufsurkunde.pdf',
+        mimetype: 'application/pdf',
       },
     });
   }
@@ -2287,7 +2352,7 @@ describe('POST /therapists/me/submit-for-review', () => {
   it('lets a SELF_EMPLOYED therapist submit once the profile is 100% complete', async () => {
     const { therapistId, token, employmentStatus } = await registerTherapist('submit-ok@test.com');
     expect(employmentStatus).toBe('SELF_EMPLOYED');
-    await completeProfile(token);
+    await completeProfile(token, therapistId);
 
     const res = await app.inject({
       method: 'POST',
@@ -2355,7 +2420,7 @@ describe('POST /therapists/me/submit-for-review', () => {
 
   it('allows re-submission from CHANGES_REQUESTED', async () => {
     const { therapistId, token } = await registerTherapist('submit-changes@test.com');
-    await completeProfile(token);
+    await completeProfile(token, therapistId);
     await prisma.therapist.update({
       where: { id: therapistId },
       data: { reviewStatus: 'CHANGES_REQUESTED' },
@@ -2369,6 +2434,21 @@ describe('POST /therapists/me/submit-for-review', () => {
     });
     expect(res.statusCode).toBe(200);
     expect(res.json().reviewStatus).toBe('PENDING_REVIEW');
+  });
+
+  it('returns the new missing fields before submission', async () => {
+    const { token } = await registerTherapist('submit-missing-fields@test.com');
+    const res = await app.inject({
+      method: 'POST',
+      url: '/therapists/me/submit-for-review',
+      headers: { authorization: `Bearer ${token}` },
+      payload: {},
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json().message).toContain('document');
+    expect(res.json().message).toContain('phone');
+    expect(res.json().message).toContain('bio');
   });
 });
 
@@ -2607,6 +2687,20 @@ describe('Slot-based Booking', () => {
     expect(res.json().created[0].status).toBe('AVAILABLE');
   });
 
+  it('POST /therapist/slots — rejects therapists without approved profile', async () => {
+    await prisma.therapist.update({
+      where: { id: therapistId },
+      data: { reviewStatus: 'PENDING_REVIEW' },
+    });
+    const startsAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
+    const res = await app.inject({
+      method: 'POST', url: '/therapist/slots',
+      headers: { authorization: `Bearer ${therapistToken}`, 'content-type': 'application/json' },
+      payload: { slots: [{ startsAt, durationMin: 20 }] },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
   it('GET /therapists/:id/slots — returns only future AVAILABLE slots', async () => {
     await createFutureSlot();
     await createFutureSlot({ status: 'BOOKED' });
@@ -2633,6 +2727,21 @@ describe('Slot-based Booking', () => {
 
     const updatedSlot = await prisma.therapistSlot.findUnique({ where: { id: slot.id } });
     expect(updatedSlot?.status).toBe('BOOKED');
+  });
+
+  it('POST /bookings — rejects unapproved therapists', async () => {
+    const slot = await createFutureSlot();
+    await prisma.therapist.update({
+      where: { id: therapistId },
+      data: { reviewStatus: 'PENDING_REVIEW' },
+    });
+
+    const res = await app.inject({
+      method: 'POST', url: '/bookings',
+      headers: { authorization: `Bearer ${patientToken}`, 'content-type': 'application/json' },
+      payload: { therapistId, slotId: slot.id, consentAccepted: true },
+    });
+    expect(res.statusCode).toBe(400);
   });
 
   it('POST /bookings — double-booking same slot returns 409', async () => {

@@ -25,6 +25,7 @@ import {
   TYPE,
   getBaseUrl,
   TUNNEL_HEADERS,
+  normalizeKassenarten,
   normalizeTherapistProfile,
   normalizeLanguageCodes,
 } from '../../utils/app-utils';
@@ -80,6 +81,14 @@ function parseComplianceDraft(rawValue) {
   catch { return normalizeComplianceDraft(null); }
 }
 
+function normalizeGenderValue(value) {
+  if (value === 'female' || value === 'male') return value;
+  const normalized = String(value ?? '').trim().toLowerCase();
+  if (normalized.startsWith('f')) return 'female';
+  if (normalized.startsWith('m')) return 'male';
+  return null;
+}
+
 
 function StatusMiniCard({ icon, label, value, color, c }) {
   return (
@@ -118,7 +127,7 @@ export function TherapistDashboardScreen({ c, t, styles, certificationOptions, s
   const [editLanguages, setEditLanguages] = useState([]);
   const [editHomeVisit, setEditHomeVisit] = useState(false);
   const [editServiceRadius, setEditServiceRadius] = useState(null);
-  const [editKassenart, setEditKassenart] = useState('');
+  const [editKassenarten, setEditKassenarten] = useState([]);
   const [editGender, setEditGender] = useState(null);
   const [editIsVisible, setEditIsVisible] = useState(true);
   const [editBookingMode, setEditBookingMode] = useState('DIRECTORY_ONLY');
@@ -144,6 +153,12 @@ export function TherapistDashboardScreen({ c, t, styles, certificationOptions, s
       .catch(() => {});
   }, [authToken]);
 
+  useEffect(() => {
+    if (loggedInTherapist?.reviewStatus === 'APPROVED') {
+      setShowWizard(false);
+    }
+  }, [loggedInTherapist?.reviewStatus]);
+
   const enterEdit = async () => {
     const th = loggedInTherapist;
     if (!th) return;
@@ -163,8 +178,8 @@ export function TherapistDashboardScreen({ c, t, styles, certificationOptions, s
     setEditLanguages(normalizeLanguageCodes(th.languages));
     setEditHomeVisit(th.homeVisit ?? false);
     setEditServiceRadius(th.serviceRadiusKm ?? null);
-    setEditKassenart(th.kassenart ?? '');
-    setEditGender(th.gender ?? null);
+    setEditKassenarten(normalizeKassenarten(th.kassenarten ?? th.kassenart));
+    setEditGender(normalizeGenderValue(th.gender));
     setEditIsVisible(th.isVisible ?? true);
     setEditBookingMode(th.bookingMode ?? 'DIRECTORY_ONLY');
     setEditAvailability(th.availability ?? '');
@@ -191,7 +206,7 @@ export function TherapistDashboardScreen({ c, t, styles, certificationOptions, s
         certifications: editCertifications,
         homeVisit: editHomeVisit,
         serviceRadiusKm: editHomeVisit ? (editServiceRadius ?? null) : null,
-        kassenart: editKassenart, gender: editGender,
+        kassenarten: editKassenarten, gender: editGender,
         isVisible: editIsVisible, availability: editAvailability,
         bookingMode: editBookingMode,
         city: editCity.trim() || undefined, postalCode: editPostalCode.trim() || null,
@@ -216,6 +231,7 @@ export function TherapistDashboardScreen({ c, t, styles, certificationOptions, s
         if (refreshRes.ok) setLoggedInTherapist(normalizeTherapistProfile(await refreshRes.json()));
       }
       if (profileRes.ok && complianceRes.ok) {
+        setEditMode(false);
         onProfileSaved(t('profileSavedModalTitle'), t('profileSavedModalBody'));
       } else if (profileRes.ok) {
         setEditMode(false);
@@ -307,7 +323,8 @@ export function TherapistDashboardScreen({ c, t, styles, certificationOptions, s
   const initials = fullName.split(/\s+/).map((name) => name[0]).join('').slice(0, 2).toUpperCase();
   const isApproved = th.reviewStatus === 'APPROVED';
   const docCount = (therapistDocuments ?? []).length;
-  const docTotal = 2;
+  const docTotal = 1;
+  const canActivateBookingRequests = th.reviewStatus === 'APPROVED';
 
   const statusChips = [
     { icon: 'shield-checkmark-outline', label: isApproved ? t('statusApproved') : t('statusInReview'), color: isApproved ? c.success : c.muted },
@@ -460,22 +477,30 @@ export function TherapistDashboardScreen({ c, t, styles, certificationOptions, s
             })}
           </View>
           <Text style={[styles.filterSectionTitle, { color: c.muted, marginTop: 12 }]}>{t('kassenartLabel')}</Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 6 }}>
+          <View style={[styles.kassenartToggleGrid, { marginTop: 6 }]}>
             {[
+              { key: 'gesetzlich', label: t('kasseGesetzlich') },
               { key: 'privat', label: t('kassePrivat') },
               { key: 'selbstzahler', label: t('kasseSelbstzahler') },
             ].map((option) => (
               <Pressable
                 key={option.key}
-                onPress={() => setEditKassenart(option.key)}
-                style={[styles.kassenartBtn, {
-                  backgroundColor: editKassenart === option.key ? c.primary : c.mutedBg,
-                  borderColor: editKassenart === option.key ? c.primary : c.border,
+                onPress={() => setEditKassenarten((prev) =>
+                  prev.includes(option.key) ? prev.filter((value) => value !== option.key) : [...prev, option.key]
+                )}
+                style={[styles.kassenartToggleCard, {
+                  backgroundColor: editKassenarten.includes(option.key) ? c.primaryBg : c.mutedBg,
+                  borderColor: editKassenarten.includes(option.key) ? c.primary : c.border,
                 }]}
               >
-                <Text style={[styles.kassenartText, { color: editKassenart === option.key ? '#fff' : c.text }]}>
+                <Text style={[styles.kassenartToggleText, { color: editKassenarten.includes(option.key) ? c.primary : c.text }]}>
                   {option.label}
                 </Text>
+                <Ionicons
+                  name={editKassenarten.includes(option.key) ? 'checkbox' : 'square-outline'}
+                  size={22}
+                  color={editKassenarten.includes(option.key) ? c.primary : c.muted}
+                />
               </Pressable>
             ))}
           </View>
@@ -497,11 +522,12 @@ export function TherapistDashboardScreen({ c, t, styles, certificationOptions, s
               value={editBookingMode === 'FIRST_APPOINTMENT_REQUEST'}
               onValueChange={(val) => setEditBookingMode(val ? 'FIRST_APPOINTMENT_REQUEST' : 'DIRECTORY_ONLY')}
               trackColor={{ true: c.primary }}
+              disabled={!canActivateBookingRequests}
             />
           </View>
-          {loggedInTherapist?.reviewStatus !== 'APPROVED' && (
+          {!canActivateBookingRequests && (
             <Text style={{ fontSize: 12, color: c.muted, marginTop: 4, marginBottom: 4 }}>
-              Sichtbarkeit wird nach der Freigabe durch Revio aktiviert.
+              Terminanfragen werden nach der Profilprüfung freigeschaltet.
             </Text>
           )}
           <Text style={[styles.detailInfoLabel, { color: c.muted, marginTop: 14, marginBottom: 4 }]}>{t('availabilityLabel')}</Text>

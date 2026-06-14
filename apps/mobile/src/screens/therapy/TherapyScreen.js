@@ -8,7 +8,7 @@ import { useNotificationPolling } from '../../hooks/use-notification-polling';
 import { appStyles } from '../../styles/app-styles';
 import { translations } from '../../i18n/translations';
 import { ROOT_ROUTES, TAB_ROUTES } from '../../navigation/route-names';
-import { getBaseUrl, TUNNEL_HEADERS } from '../../utils/app-utils';
+import { getBaseUrl, normalizeTherapistProfile, TUNNEL_HEADERS } from '../../utils/app-utils';
 import { TabHeader } from '../../components/TabHeader';
 import { NotificationSheet } from '../../modals/NotificationSheet';
 import { TherapyTabPatient } from './TherapyTabPatient';
@@ -28,6 +28,7 @@ export function TherapyTabScreen() {
   const authToken = useAppStore(appStoreSelectors.authToken);
   const accountType = useAppStore(appStoreSelectors.accountType);
   const loggedInTherapist = useAppStore(appStoreSelectors.loggedInTherapist);
+  const setLoggedInTherapist = useAppStore((state) => state.setLoggedInTherapist);
 
   const { c } = useTheme();
 
@@ -117,6 +118,34 @@ export function TherapyTabScreen() {
     });
     if (res.ok) { loadIncomingBookings(authToken); loadMySlots(authToken); }
     setTherapistCancelBookingId(null);
+  };
+
+  const handleActivateBookingRequests = async () => {
+    if (!authToken) return { ok: false, message: 'Nicht angemeldet.' };
+    try {
+      const patchRes = await fetch(`${getBaseUrl()}/auth/me`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({ bookingMode: 'FIRST_APPOINTMENT_REQUEST' }),
+      });
+      const patchData = await patchRes.json().catch(() => ({}));
+      if (!patchRes.ok) {
+        return { ok: false, message: patchData.message ?? patchData.error ?? 'Aktivierung fehlgeschlagen.' };
+      }
+
+      const meRes = await fetch(`${getBaseUrl()}/auth/me`, {
+        headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
+      });
+      if (meRes.ok) {
+        setLoggedInTherapist(normalizeTherapistProfile(await meRes.json()));
+      }
+
+      await loadMySlots(authToken);
+      await loadIncomingBookings(authToken);
+      return { ok: true };
+    } catch {
+      return { ok: false, message: 'Verbindungsfehler.' };
+    }
   };
 
   const handlePatientCancelConfirm = async () => {
@@ -213,6 +242,7 @@ export function TherapyTabScreen() {
           onSelectTherapistDetailBooking={(booking) => { setTherapistCancelBookingId(booking.id); setShowTherapistCancelModal(true); }}
           setShowSlotComposerModal={setShowSlotComposer}
           loggedInTherapist={loggedInTherapist}
+          onActivateBookingRequests={handleActivateBookingRequests}
           c={c} t={t} styles={appStyles}
         />
         <NotificationSheet

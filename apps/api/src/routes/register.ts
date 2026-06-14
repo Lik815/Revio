@@ -5,6 +5,7 @@ import { hashPassword } from './auth.js';
 import { geocodeAddress } from '../utils/geocode.js';
 import { sendEmailOtpEmail } from '../utils/mailer.js';
 import { sha256 } from '../utils/hash.js';
+import { serializeKassenarten } from '../utils/kassenarten.js';
 
 const registerSchema = z.object({
   email: z.string().email(),
@@ -32,6 +33,7 @@ const registerSchema = z.object({
   homeVisit: z.boolean().optional(),
   serviceRadiusKm: z.number().min(1).max(200).nullable().optional(),
   kassenart: z.string().optional(),
+  kassenarten: z.array(z.string()).optional(),
   availability: z.string().optional(),
   practice: z.object({
     name: z.string().min(1),
@@ -291,7 +293,7 @@ export const registerRoutes: FastifyPluginAsync = async (fastify) => {
           homeVisit: data.homeVisit ?? false,
           isFreelancer: true,
           serviceRadiusKm: data.serviceRadiusKm ?? null,
-          kassenart: data.kassenart ?? '',
+          kassenart: serializeKassenarten(data.kassenarten ?? data.kassenart),
           availability: data.availability ?? '',
           passwordHash,
           employmentStatus: data.employmentStatus,

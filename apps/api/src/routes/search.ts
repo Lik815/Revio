@@ -4,6 +4,7 @@ import type { SearchInput, SearchTherapist, SearchPractice } from '@revio/shared
 import { normalizeText, scoreMatch, levenshtein } from '../utils/search-utils.js';
 import { getTherapistPublicationState, getTherapistRequestabilityState } from '../utils/profile-completeness.js';
 import { expireStaleBookings } from '../utils/booking-expiry.js';
+import { normalizeKassenarten } from '../utils/kassenarten.js';
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
@@ -221,11 +222,12 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
     const passesFilters = (t: typeof therapists[number]) => {
       const languages = splitList(t.languages).map((l) => l.toLowerCase());
       const specializations = splitList(t.specializations).map((s) => s.toLowerCase());
+      const kassenarten = normalizeKassenarten((t as any).kassenart);
 
       if (input.language && !languages.includes(input.language.toLowerCase())) return false;
       if (typeof input.homeVisit === 'boolean' && t.homeVisit !== input.homeVisit) return false;
       if (input.specialization && !specializations.includes(input.specialization.toLowerCase())) return false;
-      if (input.kassenart && (t as any).kassenart && (t as any).kassenart !== input.kassenart) return false;
+      if (input.kassenart && !kassenarten.includes(input.kassenart.toLowerCase())) return false;
 
       return true;
     };

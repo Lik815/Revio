@@ -8,6 +8,7 @@ import {
   getTherapistPublicationState,
   getProfileStatus,
 } from '../utils/profile-completeness.js';
+import { normalizeKassenarten, serializeKassenarten } from '../utils/kassenarten.js';
 import { geocodeAddress } from '../utils/geocode.js';
 import { sendPasswordResetEmail } from '../utils/mailer.js';
 
@@ -28,12 +29,14 @@ const updateMeSchema = z.object({
   isVisible: z.boolean().optional(),
   availability: z.string().optional(),
   kassenart: z.string().optional(),
+  kassenarten: z.array(z.string()).optional(),
   specializations: z.array(z.string()).optional(),
   languages: z.array(z.string()).optional(),
   certifications: z.array(z.string()).optional(),
   photo: z.string().optional(),
   bookingMode: z.enum(['DIRECTORY_ONLY', 'FIRST_APPOINTMENT_REQUEST']).optional(),
   phone: z.string().max(30).nullable().optional(),
+  gender: z.enum(['female', 'male']).nullable().optional(),
   postalCode: z.string().max(20).nullable().optional(),
   street: z.string().max(120).nullable().optional(),
   houseNumber: z.string().max(30).nullable().optional(),
@@ -259,6 +262,9 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
               where: { status: 'CONFIRMED' },
               include: { practice: true },
             },
+            _count: {
+              select: { documents: true },
+            },
           },
         },
       },
@@ -287,11 +293,17 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
             where: { status: 'CONFIRMED' },
             include: { practice: true },
           },
+          _count: {
+            select: { documents: true },
+          },
         },
       });
     }
     if (!therapist) return reply.unauthorized('Ungültiger Token');
 
+    const normalizedKassenarten = normalizeKassenarten((therapist as any).kassenart);
+    const serializedKassenarten = serializeKassenarten((therapist as any).kassenart);
+    const documentCount = therapist._count?.documents ?? 0;
     const publication = getTherapistPublicationState(therapist, { links: therapist.links });
     return {
       id: therapist.id,
@@ -303,7 +315,8 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       bio: therapist.bio,
       homeVisit: therapist.homeVisit,
       serviceRadiusKm: (therapist as any).serviceRadiusKm ?? null,
-      kassenart: (therapist as any).kassenart ?? '',
+      kassenart: serializedKassenarten,
+      kassenarten: normalizedKassenarten,
       emailVerified: !!(userWithProfile?.emailVerifiedAt ?? true),
       specializations: splitList(therapist.specializations),
       languages: splitList(therapist.languages),
@@ -313,7 +326,11 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       availability: therapist.availability,
       reviewStatus: therapist.reviewStatus,
       employmentStatus: (therapist as any).employmentStatus ?? 'SELF_EMPLOYED',
-      profileCompletion: getTherapistProfileCompletionDetail(therapist as any),
+      profileCompletion: getTherapistProfileCompletionDetail({
+        ...(therapist as any),
+        kassenart: serializedKassenarten,
+        documentCount,
+      }),
       visibilityPreference: therapist.visibilityPreference,
       isPublished: therapist.isPublished,
       postalCode: therapist.postalCode ?? null,
@@ -326,6 +343,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       homeLng: (therapist as any).homeLng ?? null,
       gender: therapist.gender ?? null,
       phone: (therapist as any).phone ?? null,
+      documentCount,
       taxRegistrationStatus: therapist.taxRegistrationStatus ?? null,
       healthAuthorityStatus: therapist.healthAuthorityStatus ?? null,
       complianceUpdatedAt: therapist.complianceUpdatedAt ?? null,
@@ -335,7 +353,10 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
         updatedAt: therapist.complianceUpdatedAt ?? null,
       },
       bookingMode: therapist.bookingMode ?? 'DIRECTORY_ONLY',
-      profileStatus: getProfileStatus(therapist as any),
+      profileStatus: getProfileStatus({
+        ...(therapist as any),
+        kassenart: serializedKassenarten,
+      }),
       ...publication,
       practices: therapist.links.map((l: any) => ({
         id: l.practice.id,
@@ -407,13 +428,21 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     if (data.serviceRadiusKm !== undefined) updateData.serviceRadiusKm = data.serviceRadiusKm;
     if (data.isVisible !== undefined) updateData.isVisible = data.isVisible;
     if (data.availability !== undefined) updateData.availability = data.availability;
-    if (data.kassenart !== undefined) updateData.kassenart = data.kassenart;
+    if (data.kassenarten !== undefined || data.kassenart !== undefined) {
+      updateData.kassenart = serializeKassenarten(data.kassenarten ?? data.kassenart);
+    }
     if (data.specializations !== undefined) updateData.specializations = data.specializations.join(', ');
     if (data.languages !== undefined) updateData.languages = data.languages.join(', ');
     if (data.certifications !== undefined) updateData.certifications = data.certifications.join(', ');
     if (data.photo !== undefined) updateData.photo = data.photo;
-    if (data.bookingMode !== undefined) updateData.bookingMode = data.bookingMode;
+    if (data.bookingMode !== undefined) {
+      if (therapist.reviewStatus !== 'APPROVED') {
+        return reply.badRequest('Terminanfragen können erst nach der Profilprüfung aktiviert werden.');
+      }
+      updateData.bookingMode = data.bookingMode;
+    }
     if (data.phone !== undefined) updateData.phone = data.phone;
+    if (data.gender !== undefined) updateData.gender = data.gender;
 
     if (data.postalCode !== undefined) updateData.postalCode = data.postalCode;
     if (data.street !== undefined) updateData.street = data.street;
@@ -478,11 +507,17 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
           where: { status: 'CONFIRMED' },
           include: { practice: true },
         },
+        _count: {
+          select: { documents: true },
+        },
       },
     });
     if (!updated) return reply.notFound('Therapeuten-Profil nicht gefunden');
 
     const publication = getTherapistPublicationState(updated, { links: updated.links });
+    const normalizedKassenarten = normalizeKassenarten((updated as any).kassenart);
+    const serializedKassenarten = serializeKassenarten((updated as any).kassenart);
+    const documentCount = updated._count?.documents ?? 0;
     return {
       success: true,
       fullName: updated.fullName,
@@ -497,6 +532,16 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       longitude: (updated as any).longitude ?? null,
       homeLat: (updated as any).homeLat ?? null,
       homeLng: (updated as any).homeLng ?? null,
+      gender: updated.gender ?? null,
+      phone: (updated as any).phone ?? null,
+      kassenart: serializedKassenarten,
+      kassenarten: normalizedKassenarten,
+      documentCount,
+      profileCompletion: getTherapistProfileCompletionDetail({
+        ...(updated as any),
+        kassenart: serializedKassenarten,
+        documentCount,
+      }),
       ...publication,
     };
   });
@@ -523,7 +568,14 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       );
     }
 
-    const completion = getTherapistProfileCompletionDetail(therapist as any);
+    const documentCount = await fastify.prisma.therapistDocument.count({
+      where: { therapistId: therapist.id },
+    });
+    const completion = getTherapistProfileCompletionDetail({
+      ...(therapist as any),
+      kassenart: serializeKassenarten((therapist as any).kassenart),
+      documentCount,
+    });
     if (!completion.readyForReview) {
       return reply.badRequest(
         'Profil noch nicht vollständig genug für die Prüfung. Fehlende Angaben: ' +
@@ -547,7 +599,11 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     return {
       success: true,
       reviewStatus: updated.reviewStatus,
-      profileCompletion: getTherapistProfileCompletionDetail(updated as any),
+      profileCompletion: getTherapistProfileCompletionDetail({
+        ...(updated as any),
+        kassenart: serializeKassenarten((updated as any).kassenart),
+        documentCount,
+      }),
     };
   });
 

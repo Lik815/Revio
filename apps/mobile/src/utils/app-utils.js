@@ -218,6 +218,25 @@ const parseStringOrArray = (val) => {
   return [];
 };
 
+const normalizeKassenarten = (values) => {
+  const source = Array.isArray(values)
+    ? values
+    : typeof values === 'string'
+    ? values.split(',')
+    : [];
+
+  const normalized = source
+    .map((value) => String(value ?? '').trim().toLowerCase())
+    .filter(Boolean)
+    .filter((value, index, arr) => arr.indexOf(value) === index);
+
+  if (normalized.includes('alle') || normalized.includes('alle kassen')) {
+    return ['gesetzlich', 'privat', 'selbstzahler'];
+  }
+
+  return normalized;
+};
+
 const normalizeLanguageCode = (value) => {
   if (typeof value !== 'string') return '';
   return value.trim().toUpperCase();
@@ -248,6 +267,7 @@ const mapApiTherapist = (t) => ({
   city: t.city ?? '',
   bio: t.bio ?? '',
   kassenart: t.kassenart ?? null,
+  kassenarten: normalizeKassenarten(t.kassenarten ?? t.kassenart),
   fortbildungen: parseStringOrArray(t.certifications),
   distKm: typeof t.distKm === 'number' ? t.distKm : null,
   cityMatch: t.cityMatch ?? true,
@@ -286,6 +306,8 @@ const normalizeTherapistProfile = (therapist) => {
     street: typeof therapist?.street === 'string' ? therapist.street : null,
     houseNumber: typeof therapist?.houseNumber === 'string' ? therapist.houseNumber : null,
     locationPrecision: therapist?.locationPrecision === 'exact' ? 'exact' : 'approximate',
+    kassenarten: normalizeKassenarten(therapist?.kassenarten ?? therapist?.kassenart),
+    documentCount: Number.isFinite(therapist?.documentCount) ? therapist.documentCount : 0,
     compliance: {
       taxRegistrationStatus: COMPLIANCE_STATUS_VALUES.includes(therapist?.compliance?.taxRegistrationStatus)
         ? therapist.compliance.taxRegistrationStatus
@@ -418,6 +440,7 @@ export {
   kassenartOptions,
   languageOptions,
   mapApiTherapist,
+  normalizeKassenarten,
   normalizeLanguageCodes,
   normalizeTherapistProfile,
   quickChips,

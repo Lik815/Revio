@@ -19,6 +19,11 @@ async function resolveTherapist(fastify: FastifyInstance, token: string) {
   return therapist ?? null;
 }
 
+function canUseBookingMode(therapist: { reviewStatus?: string | null; bookingMode?: string | null }) {
+  return therapist.reviewStatus === 'APPROVED'
+    && therapist.bookingMode === 'FIRST_APPOINTMENT_REQUEST';
+}
+
 function serializeSlot(slot: { id: string; startsAt: Date; durationMin: number; status: string } | null | undefined) {
   if (!slot) return null;
   return { id: slot.id, startsAt: slot.startsAt.toISOString(), durationMin: slot.durationMin, status: slot.status };
@@ -72,6 +77,9 @@ export async function bookingRoutes(fastify: FastifyInstance) {
     if (!token) return reply.status(401).send({ error: 'Unauthorized' });
     const therapist = await resolveTherapist(fastify, token);
     if (!therapist) return reply.status(403).send({ error: 'Only therapists can create slots' });
+    if (!canUseBookingMode(therapist)) {
+      return reply.status(400).send({ error: 'Booking requests can only be activated after profile approval' });
+    }
 
     const schema = z.object({
       slots: z.array(z.object({
@@ -178,7 +186,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
     // Therapeut und Modus prüfen
     const therapist = await fastify.prisma.therapist.findUnique({ where: { id: therapistId } });
     if (!therapist) return reply.status(404).send({ error: 'Therapist not found' });
-    if (therapist.bookingMode !== 'FIRST_APPOINTMENT_REQUEST') {
+    if (!canUseBookingMode(therapist)) {
       return reply.status(400).send({ error: 'This therapist does not accept booking requests' });
     }
 

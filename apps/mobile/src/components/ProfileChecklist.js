@@ -10,16 +10,19 @@ const CHECKLIST_LABELS = {
   specializations: 'Spezialisierungen',
   languages: 'Sprachen',
   photo: 'Profilfoto',
-  certifications: 'Berufsurkunde / Fortbildungen',
+  document: 'Nachweis',
+  phone: 'Telefonnummer',
+  certifications: 'Fortbildungen',
   kassenart: 'Kassenart',
   homeVisitRadius: 'Hausbesuche und Radius',
   address: 'Genaue Adresse',
+  bio: 'Über mich',
   employmentStatus: 'Beruflicher Status',
 };
 
 const CHECKLIST_ORDER = [
   'name', 'city', 'specializations', 'languages',
-  'photo', 'certifications', 'kassenart', 'homeVisitRadius', 'address', 'employmentStatus',
+  'photo', 'document', 'phone', 'certifications', 'kassenart', 'homeVisitRadius', 'address', 'bio', 'employmentStatus',
 ];
 
 function Row({ done, label, c }) {
@@ -53,6 +56,9 @@ export function ProfileChecklist({ th, authToken, onSubmitted, onOpenWizard, c, 
     && completion.readyForReview && !isPreparing;
   const inReview = reviewStatus === 'PENDING_REVIEW';
   const isApproved = reviewStatus === 'APPROVED';
+  const showRows = percentage < 100;
+
+  if (isApproved) return null;
 
   const handleSubmit = async () => {
     setLoading(true);
@@ -85,7 +91,7 @@ export function ProfileChecklist({ th, authToken, onSubmitted, onOpenWizard, c, 
         <View style={{ width: `${percentage}%`, height: '100%', backgroundColor: c.primary }} />
       </View>
 
-      {CHECKLIST_ORDER.map((key) => (
+      {showRows && CHECKLIST_ORDER.map((key) => (
         <Row key={key} done={completed.has(key)} label={CHECKLIST_LABELS[key]} c={c} />
       ))}
 
@@ -109,13 +115,6 @@ export function ProfileChecklist({ th, authToken, onSubmitted, onOpenWizard, c, 
         </View>
       )}
 
-      {isApproved && (
-        <View style={{ flexDirection: 'row', gap: 8, marginTop: 12, alignItems: 'center' }}>
-          <Ionicons name="checkmark-circle" size={16} color={c.success} />
-          <Text style={{ fontSize: 13, color: c.success }}>Dein Profil ist freigegeben und sichtbar.</Text>
-        </View>
-      )}
-
       {canSubmit && (
         <Pressable
           onPress={handleSubmit}
@@ -126,7 +125,7 @@ export function ProfileChecklist({ th, authToken, onSubmitted, onOpenWizard, c, 
         </Pressable>
       )}
 
-      {!canSubmit && !inReview && !isApproved && !completion.readyForReview && !isPreparing && (
+      {!canSubmit && !inReview && !completion.readyForReview && !isPreparing && (
         <>
           <Pressable
             onPress={onOpenWizard}
