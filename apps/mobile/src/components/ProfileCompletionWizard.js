@@ -5,7 +5,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { BackButton } from './BackButton';
 import {
   getBaseUrl, getLangLabel, kassenartOptions, languageOptions,
-  normalizeLanguageCodes, RADIUS, regSpecOptions, SPACE, TUNNEL_HEADERS,
+  normalizeLanguageCodes, RADIUS, regSpecOptions, resolveMediaUrl, SPACE, TUNNEL_HEADERS,
 } from '../utils/app-utils';
 
 // Canonical order of the steps; only the items still missing are shown.
@@ -144,7 +144,8 @@ export function ProfileCompletionWizard({ visible, onClose, th, authToken, certi
       });
       if (!res.ok) { setError('Foto konnte nicht hochgeladen werden.'); return; }
       const { url } = await res.json();
-      setPhotoUrl(url);
+      // The upload endpoint may return a relative path — resolve it to a full URL.
+      setPhotoUrl(resolveMediaUrl(url) ?? url);
       await onRefresh?.();
     } catch {
       setError('Verbindungsfehler.');
