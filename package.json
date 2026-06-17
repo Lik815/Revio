@@ -18,9 +18,7 @@
     "db:seed:koeln": "pnpm --filter @revio/api seed:koeln",
     "db:seed:practice-logos": "pnpm --filter @revio/api seed:practice-logos"
   },
-  "dependencies": {
-    "expo": "^55.0.8"
-  },
+  "dependencies": {},
   "devDependencies": {
     "next": "15.5.14",
     "@types/react": "~19.2.10",

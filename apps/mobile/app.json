@@ -16,6 +16,7 @@
       "bundleIdentifier": "de.myrevio.app",
       "supportsTablet": false,
       "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
         "NSLocationWhenInUseUsageDescription": "Revio benötigt deinen Standort, um Therapeuten in deiner Nähe zu finden.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Revio benötigt deinen Standort, um Therapeuten in deiner Nähe zu finden."
       }
