@@ -6,8 +6,8 @@ const workspaceRoot = path.resolve(projectRoot, '../..');
 
 const config = getDefaultConfig(projectRoot);
 
-// Watch all files in the monorepo
-config.watchFolders = [workspaceRoot];
+// Watch all files in the monorepo (append to Expo defaults, don't replace)
+config.watchFolders = [...(config.watchFolders ?? []), workspaceRoot];
 
 // Resolve modules from the workspace root so pnpm symlinks work
 config.resolver.nodeModulesPaths = [
@@ -69,8 +69,5 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
   }
   return null;
 };
-
-// Follow symlinks (required for pnpm)
-config.resolver.unstable_enableSymlinks = true;
 
 module.exports = config;
