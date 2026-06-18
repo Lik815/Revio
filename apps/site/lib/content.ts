@@ -17,16 +17,20 @@ export const siteConfig = {
 
 export const homeHighlights = [
   {
-    title: 'Passende Spezialisierungen schneller finden',
-    body: 'Revio hilft dabei, Physiotherapeut:innen klarer nach Fachgebiet, Schwerpunkt und Beschwerdebild zu entdecken.',
+    title: 'Beschwerde eingeben',
+    body: 'Rückenschmerzen, Kniereha, Sportphysio — gib ein, wobei du Hilfe brauchst.',
   },
   {
-    title: 'In der Nähe oder mobil suchen',
-    body: 'Standort, Hausbesuch und Einsatzgebiet werden verständlich dargestellt, ohne die Suche unnötig aufzublähen.',
+    title: 'Passende Physios finden',
+    body: 'Geprüfte Therapeut:innen nach Fachgebiet, Standort, Hausbesuch und Verfügbarkeit.',
   },
   {
-    title: 'Direkt Kontakt aufnehmen',
-    body: 'Das MVP konzentriert sich auf den entscheidenden Schritt: die passende Physiotherapie finden und unkompliziert erreichen.',
+    title: 'Profile vergleichen',
+    body: 'Qualifikationen, Sprachen und Spezialisierungen auf einen Blick — ohne zehn Tabs.',
+  },
+  {
+    title: 'Direkt anfragen',
+    body: 'Termin anfragen oder Kontakt aufnehmen — unkompliziert, direkt aus der App.',
   },
 ];
 
@@ -86,23 +90,23 @@ export const principles = [
 export const showcaseScreens = [
   {
     src: '/screenshot-1.png',
-    alt: 'Revio Suche mit passenden Physiotherapeut:innen in der App',
-    title: 'Suche mit klarem Fokus',
-    body: 'Beschwerden, Ort und mobile Behandlung werden ruhig und verständlich zusammengeführt.',
+    alt: 'Revio Suche nach Physiotherapeut:innen in der App',
+    title: 'Suche nach Beschwerde',
+    body: 'Gib ein, wobei du Hilfe brauchst — Revio zeigt dir passende Therapeut:innen in deiner Nähe.',
     tone: 'left' as const,
   },
   {
     src: '/screenshot-2.png',
     alt: 'Revio Favoritenansicht mit gespeicherten Therapeut:innen',
-    title: 'Favoriten mit Gedächtnis',
-    body: 'Gefundene Therapeut:innen bleiben schnell wieder auffindbar, ohne dass die App unnötig kompliziert wird.',
+    title: 'Profile vergleichen',
+    body: 'Spezialisierungen, Qualifikationen und Verfügbarkeit auf einen Blick — klar und ohne Lärm.',
     tone: 'center' as const,
   },
   {
     src: '/screenshot-3.png',
-    alt: 'Revio Optionen und ruhige Kontoansicht in der App',
-    title: 'Fokussierte Produktoberfläche',
-    body: 'Die App bleibt bewusst reduziert und wirkt eher wie ein hochwertiges Gesundheitsprodukt als wie ein Marktplatz.',
+    alt: 'Revio App — Termin anfragen',
+    title: 'Direkt anfragen',
+    body: 'Den richtigen Therapeuten gefunden? Termin anfragen oder direkt Kontakt aufnehmen.',
     tone: 'right' as const,
   },
 ];
