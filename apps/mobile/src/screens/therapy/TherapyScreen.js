@@ -279,28 +279,25 @@ export function TherapyTabScreen() {
   }
 
   return (
-    <View style={{ flex: 1 }}>
-      <TabHeader c={c} title="Meine Termine" />
-      <ScrollView
-        contentContainerStyle={[appStyles.scrollContent, { paddingBottom: 20 }]}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={[appStyles.emptyState, { backgroundColor: c.card, borderColor: c.border }]}>
-          <Ionicons name="calendar-outline" size={32} color={c.muted} />
-          <Text style={[appStyles.emptyTitle, { color: c.text }]}>
-            {t('therapyLoginRequired') ?? 'Hier kannst du deine Termine sehen'}
-          </Text>
-          <Text style={[appStyles.emptyBody, { color: c.muted }]}>
-            {t('therapyLoginRequiredBody') ?? 'Dafür musst du dich registrieren oder anmelden.'}
-          </Text>
-          <Pressable
-            onPress={() => navigation.navigate(ROOT_ROUTES.MAIN_TABS, { screen: TAB_ROUTES.PROFILE })}
-            style={[appStyles.registerBtn, { backgroundColor: c.primary, marginTop: 16, paddingHorizontal: 32 }]}
-          >
-            <Text style={appStyles.registerBtnText}>{t('loginAction')}</Text>
-          </Pressable>
+    <View style={{ flex: 1, backgroundColor: c.background }}>
+      <TabHeader c={c} title={t('myAppointments')} />
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 36 }}>
+        <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: c.mutedBg, alignItems: 'center', justifyContent: 'center', marginBottom: 24 }}>
+          <Ionicons name="calendar-outline" size={36} color={c.primary} />
         </View>
-      </ScrollView>
+        <Text style={{ fontSize: 22, fontWeight: '800', color: c.text, textAlign: 'center', lineHeight: 30, marginBottom: 10 }}>
+          {t('therapyLoginRequired')}
+        </Text>
+        <Text style={{ fontSize: 15, color: c.muted, textAlign: 'center', lineHeight: 22, marginBottom: 28 }}>
+          {t('therapyLoginRequiredBody')}
+        </Text>
+        <Pressable
+          onPress={() => navigation.navigate(ROOT_ROUTES.MAIN_TABS, { screen: TAB_ROUTES.PROFILE })}
+          style={[appStyles.registerBtn, { backgroundColor: c.primary, paddingHorizontal: 40 }]}
+        >
+          <Text style={appStyles.registerBtnText}>{t('loginAction')}</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }

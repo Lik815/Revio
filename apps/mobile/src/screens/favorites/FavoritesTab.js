@@ -118,21 +118,25 @@ export function FavoritesTab({
 }) {
   if (!authToken) {
     return (
-      <View style={{ flex: 1 }}>
+      <View style={{ flex: 1, backgroundColor: c.background }}>
         <TabHeader c={c} title={t('favoritesTitle')} />
-        <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 20 }]} showsVerticalScrollIndicator={false}>
-          <View style={[styles.emptyState, { backgroundColor: c.card, borderColor: c.border }]}>
-            <Ionicons name="heart-outline" size={32} color={c.muted} />
-            <Text style={[styles.emptyTitle, { color: c.text }]}>{t('favoritesLoginRequired') ?? 'Einloggen für Favoriten'}</Text>
-            <Text style={[styles.emptyBody, { color: c.muted }]}>{t('favoritesLoginRequiredBody') ?? 'Melde dich an, um Therapeuten als Favoriten zu speichern.'}</Text>
-            <Pressable
-              onPress={() => { setActiveTab('profile'); setShowLogin(true); }}
-              style={[styles.registerBtn, { backgroundColor: c.primary, marginTop: 16, paddingHorizontal: 32 }]}
-            >
-              <Text style={styles.registerBtnText}>{t('loginAction')}</Text>
-            </Pressable>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 36 }}>
+          <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: c.mutedBg, alignItems: 'center', justifyContent: 'center', marginBottom: 24 }}>
+            <Ionicons name="heart-outline" size={36} color={c.primary} />
           </View>
-        </ScrollView>
+          <Text style={{ fontSize: 22, fontWeight: '800', color: c.text, textAlign: 'center', lineHeight: 30, marginBottom: 10 }}>
+            {t('favoritesLoginRequired')}
+          </Text>
+          <Text style={{ fontSize: 15, color: c.muted, textAlign: 'center', lineHeight: 22, marginBottom: 28 }}>
+            {t('favoritesLoginRequiredBody')}
+          </Text>
+          <Pressable
+            onPress={() => { setActiveTab('profile'); setShowLogin(true); }}
+            style={[styles.registerBtn, { backgroundColor: c.primary, paddingHorizontal: 40 }]}
+          >
+            <Text style={styles.registerBtnText}>{t('loginAction')}</Text>
+          </Pressable>
+        </View>
       </View>
     );
   }
