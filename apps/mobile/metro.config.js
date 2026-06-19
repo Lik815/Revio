@@ -1,13 +1,19 @@
 const { getDefaultConfig } = require('expo/metro-config');
 const path = require('path');
+const fs = require('fs');
 
 const projectRoot = __dirname;
 const workspaceRoot = path.resolve(projectRoot, '../..');
 
 const config = getDefaultConfig(projectRoot);
 
-// Watch all files in the monorepo (append to Expo defaults, don't replace)
-config.watchFolders = [...(config.watchFolders ?? []), workspaceRoot];
+// Only watch the monorepo root when root node_modules exist (local pnpm dev).
+// In CI (npm install inside apps/mobile only) this directory is absent and
+// Metro's verifyRootExists check would crash before bundling.
+const rootNodeModules = path.resolve(workspaceRoot, 'node_modules');
+if (fs.existsSync(rootNodeModules)) {
+  config.watchFolders = [...(config.watchFolders ?? []), workspaceRoot];
+}
 
 // Resolve modules from the workspace root so pnpm symlinks work
 config.resolver.nodeModulesPaths = [
