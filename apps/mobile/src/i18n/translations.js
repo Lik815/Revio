@@ -55,7 +55,7 @@ export const translations = {
     favoritesHint: 'Gespeichert · mit deinem Konto synchronisiert',
     favoritesLoginRequired: 'Speichere deine Therapeuten',
     favoritesLoginRequiredBody: 'Melde dich an, um Favoriten auf allen Geräten zu nutzen.',
-    therapyLoginRequired: 'Deine Termine erscheinen hier',
+    therapyLoginRequired: 'Deine Termine',
     therapyLoginRequiredBody: 'Melde dich an, um Termine zu buchen und zu verwalten.',
     favLoginRequired: 'Bitte einloggen um Favoriten zu speichern',
     favoritesTherapists: 'Therapeuten',
