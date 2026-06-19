@@ -228,7 +228,6 @@ h3 {
 .feature-card p,
 .surface-card p,
 .quote-card p,
-.hero-card__text,
 .site-footer__copy,
 .legal-card p,
 .form-note,
@@ -388,7 +387,6 @@ h3 {
   border-color: rgba(62, 98, 113, 0.3);
 }
 
-.hero-card,
 .surface-card,
 .feature-card,
 .quote-card,
@@ -401,50 +399,17 @@ h3 {
   box-shadow: var(--shadow-card);
 }
 
-.hero-card {
-  padding: 24px;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  align-items: stretch;
-  min-height: 560px;
-  overflow: hidden;
-  background: linear-gradient(180deg, var(--accent-soft) 0%, var(--surface) 60%);
-}
-
-.hero-product {
+.hero-device {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: min(100%, 360px);
-  margin: 0 auto 22px;
+  min-width: 0;
 }
 
-.hero-product__image {
+.hero-device__image {
   display: block;
-  width: 100%;
+  width: min(100%, 420px);
   height: auto;
-  filter: drop-shadow(0 24px 34px rgba(28, 43, 51, 0.16));
-}
-
-.hero-card__label {
-  font-size: 0.8rem;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  font-weight: 600;
-  margin-top: 20px;
-}
-
-.hero-card__text {
-  margin-top: 8px;
-}
-
-.hero-card__meta {
-  margin-top: 14px;
-  color: var(--accent);
-  font-size: 0.9rem;
-  font-weight: 600;
 }
 
 .section {
@@ -712,10 +677,6 @@ h3 {
   .site-footer__grid,
   .card-grid {
     grid-template-columns: 1fr;
-  }
-
-  .hero-card {
-    min-height: 300px;
   }
 
   .cta-banner {

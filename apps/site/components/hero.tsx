@@ -80,24 +80,15 @@ export function Hero({
         </div>
 
         {!hideImage && (
-          <div className="hero-card">
-            <div className="hero-product">
-              <Image
-                src="/media/AppShowWeb.png"
-                alt="Revio App auf einem Smartphone"
-                width={1024}
-                height={1535}
-                className="hero-product__image"
-                priority
-              />
-            </div>
-            <div className="hero-card__label">Revio App</div>
-            <div className="hero-card__text">
-              Beschwerde eingeben. Geprüfte Therapeut:innen finden. Direkt anfragen.
-            </div>
-            <div className="hero-card__meta">
-              Suchen · Vergleichen · Anfragen
-            </div>
+          <div className="hero-device">
+            <Image
+              src="/media/AppShowWeb-transparent.png"
+              alt="Revio App auf einem Smartphone"
+              width={1024}
+              height={1535}
+              className="hero-device__image"
+              priority
+            />
           </div>
         )}
       </div>
