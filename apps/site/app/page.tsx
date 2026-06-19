@@ -1,9 +1,8 @@
-import Image from 'next/image';
 import Link from 'next/link';
 import { Hero } from '../components/hero';
 import { Section } from '../components/section';
 import { getPublishedBlogPosts } from '../lib/blog';
-import { homeHighlights, patientBenefits, showcaseScreens, therapistBenefits } from '../lib/content';
+import { homeHighlights, patientBenefits, therapistBenefits } from '../lib/content';
 
 export default async function HomePage() {
   const blogPosts = await getPublishedBlogPosts();
@@ -22,36 +21,6 @@ export default async function HomePage() {
         searchPlaceholder="Wobei brauchst du Hilfe?"
         chips={['Rückenschmerzen', 'Kniereha', 'Sportphysiotherapie']}
       />
-
-      <section className="app-showcase">
-        <div className="shell">
-          <div className="app-showcase__text">
-            <div className="eyebrow">Die App</div>
-            <h2>Physiotherapie — direkt gefunden.</h2>
-            <p>Revio ist als App für iOS und Android verfügbar. Beschwerde eingeben, geprüfte Therapeut:innen in deiner Nähe finden, direkt anfragen.</p>
-          </div>
-          <div className="phone-row">
-            {showcaseScreens.map((screen) => (
-              <article key={screen.src} className={`showcase-card showcase-card--${screen.tone}`}>
-                <div className={`phone-frame phone-frame--${screen.tone}`}>
-                  <Image
-                    src={screen.src}
-                    alt={screen.alt}
-                    width={1179}
-                    height={2556}
-                    sizes="(max-width: 720px) 82vw, (max-width: 1080px) 32vw, 260px"
-                    className="showcase-image"
-                  />
-                </div>
-                <div className="showcase-card__meta">
-                  <h3>{screen.title}</h3>
-                  <p>{screen.body}</p>
-                </div>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
 
       <Section
         eyebrow="So funktioniert Revio"

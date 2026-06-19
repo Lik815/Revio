@@ -86,27 +86,3 @@ export const principles = [
   'Vertrauen statt Marktplatzgefühl',
   'Ein digitales Produkt, das medizinisch ernst genommen werden kann',
 ];
-
-export const showcaseScreens = [
-  {
-    src: '/screenshot-1.png',
-    alt: 'Revio Suche nach Physiotherapeut:innen in der App',
-    title: 'Suche nach Beschwerde',
-    body: 'Gib ein, wobei du Hilfe brauchst — Revio zeigt dir passende Therapeut:innen in deiner Nähe.',
-    tone: 'left' as const,
-  },
-  {
-    src: '/screenshot-2.png',
-    alt: 'Revio Favoritenansicht mit gespeicherten Therapeut:innen',
-    title: 'Profile vergleichen',
-    body: 'Spezialisierungen, Qualifikationen und Verfügbarkeit auf einen Blick — klar und ohne Lärm.',
-    tone: 'center' as const,
-  },
-  {
-    src: '/screenshot-3.png',
-    alt: 'Revio App — Termin anfragen',
-    title: 'Direkt anfragen',
-    body: 'Den richtigen Therapeuten gefunden? Termin anfragen oder direkt Kontakt aufnehmen.',
-    tone: 'right' as const,
-  },
-];

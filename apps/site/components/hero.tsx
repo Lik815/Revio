@@ -1,4 +1,3 @@
-import Image from 'next/image';
 import Link from 'next/link';
 
 type HeroProps = {
@@ -81,16 +80,34 @@ export function Hero({
 
         {!hideImage && (
           <div className="hero-card">
-            <div className="hero-phones hero-phones--single">
-              <div className="hero-phone hero-phone--single">
-                <Image
-                  src="/IMG_2453.jpeg"
-                  alt="Revio App — Physiotherapeut:innen finden"
-                  width={1179}
-                  height={1076}
-                  className="hero-phone__img"
-                  priority
-                />
+            <div className="hero-product">
+              <div className="hero-product__topline">
+                <span className="hero-product__dot" />
+                Geprüfte Profile
+              </div>
+              <div className="hero-product__search">
+                <span>⌕</span>
+                Rückenschmerzen
+              </div>
+              <div className="hero-product__list">
+                <div className="hero-product__item">
+                  <div className="hero-product__avatar">R</div>
+                  <div>
+                    <strong>Rückentherapie</strong>
+                    <span>3 passende Physios in deiner Nähe</span>
+                  </div>
+                </div>
+                <div className="hero-product__item">
+                  <div className="hero-product__avatar hero-product__avatar--muted">T</div>
+                  <div>
+                    <strong>Termin anfragen</strong>
+                    <span>Freie Slots und direkter Kontakt</span>
+                  </div>
+                </div>
+              </div>
+              <div className="hero-product__status">
+                <span className="hero-product__pill">Hausbesuch</span>
+                <span className="hero-product__pill">Geprüft</span>
               </div>
             </div>
             <div className="hero-card__label">Revio App</div>
