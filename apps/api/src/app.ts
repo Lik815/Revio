@@ -29,7 +29,7 @@ export async function buildApp() {
   await app.register(sensible);
   await app.register(multipart, { limits: { fileSize: 5 * 1024 * 1024 } }); // 5MB max image
   await app.register(staticPlugin, {
-    root: join(__dirname, '../uploads'),
+    root: join(__dirname, '../storage/public/uploads'),
     prefix: '/uploads/',
     decorateReply: false,
   });

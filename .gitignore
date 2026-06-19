@@ -39,5 +39,14 @@ revioApp/
 
 # Uploaded user files (use S3/CDN in production)
 apps/api/uploads/
+apps/api/documents/
+apps/api/storage/public/uploads/profile-photos/*
+!apps/api/storage/public/uploads/profile-photos/.gitkeep
+apps/api/storage/public/uploads/practice-logos/*
+!apps/api/storage/public/uploads/practice-logos/.gitkeep
+apps/api/storage/public/uploads/practice-photos/*
+!apps/api/storage/public/uploads/practice-photos/.gitkeep
+apps/api/storage/private/documents/therapist-verifications/*
+!apps/api/storage/private/documents/therapist-verifications/.gitkeep
 .next_stale_*/
 .vercel

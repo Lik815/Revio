@@ -2,9 +2,9 @@ import { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { hashPassword } from './auth-utils.js';
 import { createReadStream, existsSync } from 'fs';
-import { join, dirname, basename } from 'path';
-import { fileURLToPath } from 'url';
+import { join, basename } from 'path';
 import { getEnv } from '../env.js';
+import { THERAPIST_VERIFICATIONS_DIR } from '../utils/storage-paths.js';
 import { geocodeAddress } from '../utils/geocode.js';
 import { getTherapistPublicationState, getTherapistRequestabilityState } from '../utils/profile-completeness.js';
 import { sendProfileApprovedEmail, sendProfileRejectedEmail, sendProfileChangesRequestedEmail } from '../utils/mailer.js';
@@ -18,8 +18,6 @@ import {
 } from '../utils/specialization-options.js';
 import { getPublicSiteSettings, setBooleanAppSetting, SITE_UNDER_CONSTRUCTION_KEY } from '../utils/app-settings.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const DOCUMENTS_DIR = join(__dirname, '../../../documents');
 
 const splitList = (value: string) =>
   value.split(',').map((s) => s.trim()).filter(Boolean);
@@ -909,7 +907,7 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.badRequest('Ungültiger Dateiname');
     }
 
-    const filepath = join(DOCUMENTS_DIR, filename);
+    const filepath = join(THERAPIST_VERIFICATIONS_DIR, filename);
     if (!existsSync(filepath)) return reply.notFound('Datei nicht gefunden');
 
     // Verify the file is actually tracked in the DB (no orphan access)

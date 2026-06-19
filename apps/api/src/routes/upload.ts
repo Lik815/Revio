@@ -1,13 +1,8 @@
 import { FastifyPluginAsync } from 'fastify';
 import { randomBytes } from 'crypto';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
 import { getToken } from './auth-utils.js';
 import { uploadFile } from '../utils/storage.js';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const UPLOADS_DIR = join(__dirname, '../../uploads');
-const DOCUMENTS_DIR = join(__dirname, '../../documents');
+import { PROFILE_PHOTOS_DIR, THERAPIST_VERIFICATIONS_DIR } from '../utils/storage-paths.js';
 
 export const uploadRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.post('/upload/photo', async (request, reply) => {
@@ -32,8 +27,8 @@ export const uploadRoutes: FastifyPluginAsync = async (fastify) => {
       key,
       stream: data.file,
       mimetype: data.mimetype,
-      localDir: UPLOADS_DIR,
-      publicPrefix: '/uploads',
+      localDir: PROFILE_PHOTOS_DIR,
+      publicPrefix: '/uploads/profile-photos',
     });
 
     await fastify.prisma.therapist.update({ where: { id: therapist.id }, data: { photo: url } });
@@ -66,7 +61,7 @@ export const uploadRoutes: FastifyPluginAsync = async (fastify) => {
       key,
       stream: data.file,
       mimetype: data.mimetype,
-      localDir: DOCUMENTS_DIR,
+      localDir: THERAPIST_VERIFICATIONS_DIR,
       publicPrefix: '/documents',
     });
 
