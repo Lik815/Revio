@@ -82,10 +82,10 @@ export function Hero({
         {!hideImage && (
           <div className="hero-device">
             <Image
-              src="/media/AppShowWeb-transparent.png"
+              src="/media/AppShowWeb-phone.png"
               alt="Revio App auf einem Smartphone"
-              width={1024}
-              height={1535}
+              width={683}
+              height={1468}
               className="hero-device__image"
               priority
             />

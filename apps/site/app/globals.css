@@ -408,8 +408,8 @@ h3 {
 
 .hero-device__image {
   display: block;
-  width: min(100%, 420px);
-  height: auto;
+  width: 71.5mm;
+  height: 149.6mm;
 }
 
 .section {
@@ -677,6 +677,11 @@ h3 {
   .site-footer__grid,
   .card-grid {
     grid-template-columns: 1fr;
+  }
+
+  .hero-device__image {
+    width: min(78vw, 300px);
+    height: auto;
   }
 
   .cta-banner {
