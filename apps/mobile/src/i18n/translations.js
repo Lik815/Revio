@@ -14,7 +14,7 @@ export const translations = {
     patientNameTitle: 'Wie heißt du?',
     patientNameSubtitle: 'Dein Name erscheint auf keinem öffentlichen Profil.',
     createAccountBtn: 'Konto erstellen',
-    landingTitle: 'Dein Revio-Konto',
+    landingTitle: 'Den richtigen Physio für dein Problem finden.',
     landingSub: 'Für Patienten, die den richtigen Physio suchen — und für Therapeuten, die gefunden werden wollen.',
     landingFeature1Title: 'Therapeuten finden',
     landingFeature1Body: 'Suche nach Beschwerde, Sprache und Kassenart.',

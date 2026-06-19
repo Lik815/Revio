@@ -216,8 +216,8 @@ export function ProfileTabScreen() {
       c={c}
       t={t}
       styles={appStyles}
-      setShowLogin={() => navigation.navigate(ROOT_ROUTES.LOGIN)}
-      setShowSignup={() => navigation.navigate(ROOT_ROUTES.REGISTRATION)}
+      onLogin={() => navigation.navigate(ROOT_ROUTES.LOGIN)}
+      onSignup={() => navigation.navigate(ROOT_ROUTES.REGISTRATION)}
     />
   );
 }

@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import { BackButton } from '../../components/BackButton';
+import { AuthHero } from '../../components/auth/AuthHero';
+import { AuthPrimaryButton } from '../../components/auth/AuthPrimaryButton';
+import { AuthScreenShell } from '../../components/auth/AuthScreenShell';
 import {
   Pressable,
-  ScrollView,
   Text,
   TextInput,
   View,
@@ -29,7 +30,6 @@ export function LoginScreen({ c, styles, t, onClose, bookingTargetTherapist, onB
   const [loginLoading, setLoginLoading] = useState(false);
   const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [showInfo, setShowInfo] = useState(false);
 
   const registerPushToken = async (token) => {
     try {
@@ -121,28 +121,13 @@ export function LoginScreen({ c, styles, t, onClose, bookingTargetTherapist, onB
   };
 
   return (
-    <ScrollView
-      style={{ flex: 1 }}
-      contentContainerStyle={[styles.scrollContent, { paddingHorizontal: 20, paddingTop: 0, paddingBottom: 40, flexGrow: 1 }]}
-      keyboardShouldPersistTaps="handled"
-    >
-      <BackButton c={c} label={t('backBtn')} onPress={onClose} />
-
-      {/* Headline */}
-      <View style={{ alignItems: 'center', paddingTop: 12, paddingBottom: 28 }}>
-        <Text style={{ fontSize: 24, fontWeight: '700', color: c.text, marginBottom: 6 }}>Willkommen zurück</Text>
-        <Pressable onPress={() => setShowInfo(v => !v)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-          <Text style={{ fontSize: 13, color: c.muted }}>Mehr erfahren</Text>
-          <Ionicons name={showInfo ? 'chevron-up' : 'chevron-down'} size={13} color={c.muted} />
-        </Pressable>
-        {showInfo && (
-          <View style={{ backgroundColor: c.mutedBg, borderRadius: 12, padding: 14, marginTop: 10, borderWidth: 1, borderColor: c.border }}>
-            <Text style={{ fontSize: 13, color: c.muted, lineHeight: 20, textAlign: 'center' }}>
-              {t('loginInfoBody')}
-            </Text>
-          </View>
-        )}
-      </View>
+    <AuthScreenShell c={c} t={t} onBack={onClose} paddingHorizontal={20} paddingTop={0} grow>
+      <AuthHero
+        align="center"
+        title="Willkommen zurück"
+        expandable={{ label: 'Mehr erfahren', body: t('loginInfoBody') }}
+        c={c}
+      />
 
       {/* Inputs */}
       <View style={{ gap: 14 }}>
@@ -201,13 +186,14 @@ export function LoginScreen({ c, styles, t, onClose, bookingTargetTherapist, onB
         </View>
       ) : null}
 
-      <Pressable
-        style={[styles.registerBtn, { backgroundColor: loginLoading ? c.border : c.primary, marginTop: 24 }]}
+      <AuthPrimaryButton
+        label={loginLoading ? t('loginLoading') : t('loginAction')}
         onPress={handleLogin}
         disabled={loginLoading}
-      >
-        <Text style={styles.registerBtnText}>{loginLoading ? t('loginLoading') : t('loginAction')}</Text>
-      </Pressable>
+        c={c}
+        styles={styles}
+        style={{ marginTop: 24 }}
+      />
 
       {/* Demo logins */}
       <View style={{ marginTop: 28 }}>
@@ -239,6 +225,6 @@ export function LoginScreen({ c, styles, t, onClose, bookingTargetTherapist, onB
           </Pressable>
         </View>
       </View>
-    </ScrollView>
+    </AuthScreenShell>
   );
 }

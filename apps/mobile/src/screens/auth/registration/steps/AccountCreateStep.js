@@ -1,7 +1,10 @@
 import React from 'react';
-import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { Pressable, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { BackButton } from '../../../../components/BackButton';
+import { AuthHero } from '../../../../components/auth/AuthHero';
+import { AuthInlineLink } from '../../../../components/auth/AuthInlineLink';
+import { AuthPrimaryButton } from '../../../../components/auth/AuthPrimaryButton';
+import { AuthScreenShell } from '../../../../components/auth/AuthScreenShell';
 import { ICON_HIT_SLOP } from '../../../../utils/app-utils';
 
 // Step 2 — email + password + terms. On submit it sends the OTP; the parent
@@ -18,13 +21,8 @@ export function AccountCreateStep({
   c, t, styles,
 }) {
   return (
-    <ScrollView contentContainerStyle={[styles.scrollContent, { paddingHorizontal: 24, paddingBottom: 40 }]} keyboardShouldPersistTaps="handled">
-      <BackButton c={c} label={t('backBtn')} onPress={onBack} />
-
-      <View style={{ paddingTop: 8, paddingBottom: 20 }}>
-        <Text style={{ fontSize: 26, fontWeight: '800', color: c.text }}>{t('createAccountTitle')}</Text>
-        <Text style={{ fontSize: 14, color: c.muted, marginTop: 6, lineHeight: 20 }}>{t('emailVerificationSubtitle')}</Text>
-      </View>
+    <AuthScreenShell c={c} t={t} onBack={onBack}>
+      <AuthHero title={t('createAccountTitle')} subtitle={t('emailVerificationSubtitle')} c={c} />
 
       <View style={{ gap: 12 }}>
         <TextInput
@@ -85,18 +83,23 @@ export function AccountCreateStep({
 
         {!!error && <Text style={{ color: c.error, fontSize: 13 }}>{error}</Text>}
 
-        <Pressable
+        <AuthPrimaryButton
+          label={loading ? '...' : t('regContinue')}
           onPress={onSubmit}
           disabled={loading}
-          style={[styles.registerBtn, { backgroundColor: c.primary, marginTop: 8, opacity: loading ? 0.6 : 1 }]}
-        >
-          <Text style={styles.registerBtnText}>{loading ? '...' : t('regContinue')}</Text>
-        </Pressable>
+          c={c}
+          styles={styles}
+          style={{ marginTop: 8 }}
+        />
 
-        <Pressable style={{ marginTop: 4, alignSelf: 'flex-end' }} onPress={onShowLogin}>
-          <Text style={{ color: c.muted, fontSize: 13 }}>{t('alreadyHaveAccount')} {t('loginAction')}</Text>
-        </Pressable>
+        <AuthInlineLink
+          lead={t('alreadyHaveAccount')}
+          action={t('loginAction')}
+          onPress={onShowLogin}
+          c={c}
+          style={{ marginTop: 4 }}
+        />
       </View>
-    </ScrollView>
+    </AuthScreenShell>
   );
 }
