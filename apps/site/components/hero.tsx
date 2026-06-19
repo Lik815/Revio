@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 
 type HeroProps = {
   eyebrow: string;
@@ -81,34 +82,14 @@ export function Hero({
         {!hideImage && (
           <div className="hero-card">
             <div className="hero-product">
-              <div className="hero-product__topline">
-                <span className="hero-product__dot" />
-                Geprüfte Profile
-              </div>
-              <div className="hero-product__search">
-                <span>⌕</span>
-                Rückenschmerzen
-              </div>
-              <div className="hero-product__list">
-                <div className="hero-product__item">
-                  <div className="hero-product__avatar">R</div>
-                  <div>
-                    <strong>Rückentherapie</strong>
-                    <span>3 passende Physios in deiner Nähe</span>
-                  </div>
-                </div>
-                <div className="hero-product__item">
-                  <div className="hero-product__avatar hero-product__avatar--muted">T</div>
-                  <div>
-                    <strong>Termin anfragen</strong>
-                    <span>Freie Slots und direkter Kontakt</span>
-                  </div>
-                </div>
-              </div>
-              <div className="hero-product__status">
-                <span className="hero-product__pill">Hausbesuch</span>
-                <span className="hero-product__pill">Geprüft</span>
-              </div>
+              <Image
+                src="/media/AppShowWeb.png"
+                alt="Revio App auf einem Smartphone"
+                width={1024}
+                height={1535}
+                className="hero-product__image"
+                priority
+              />
             </div>
             <div className="hero-card__label">Revio App</div>
             <div className="hero-card__text">
