@@ -30,8 +30,9 @@ jobs:
           token: ${{ secrets.EXPO_TOKEN }}
 
       - name: Install dependencies
-        working-directory: apps/mobile
-        run: npm install
+        run: |
+          mkdir -p node_modules
+          cd apps/mobile && npm install
 
       - name: Publish EAS Update
         working-directory: apps/mobile
