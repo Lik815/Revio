@@ -64,31 +64,31 @@ export function AppointmentDetail({
     <View style={{ flex: 1 }}>
       <TabHeader c={c} title="Termin" />
       <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: 20, paddingTop: SPACE.sm }]}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: 12, paddingTop: SPACE.sm }]}
         showsVerticalScrollIndicator={false}
       >
-    <View style={{ gap: 14 }}>
+    <View style={{ gap: 10 }}>
       <Pressable
         onPress={() => onBack()}
-        style={{ alignSelf: 'flex-start', paddingVertical: 6, flexDirection: 'row', alignItems: 'center', gap: 6 }}
+        style={{ alignSelf: 'flex-start', paddingVertical: 4, flexDirection: 'row', alignItems: 'center', gap: 6 }}
       >
         <Ionicons name="chevron-back" size={16} color={c.primary} />
         <Text style={{ fontSize: 14, fontWeight: '600', color: c.primary }}>Zurück</Text>
       </Pressable>
 
       {/* Main Card */}
-      <View style={{ backgroundColor: c.card, borderRadius: 28, padding: 24, borderWidth: 1, borderColor: c.border, gap: 20, ...SHADOW.card }}>
+      <View style={{ backgroundColor: c.card, borderRadius: 24, padding: 18, borderWidth: 1, borderColor: c.border, gap: 14, ...SHADOW.card }}>
 
         {/* Status Pill */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', backgroundColor: badge.bg, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 7, gap: 6 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', backgroundColor: badge.bg, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 6, gap: 6 }}>
           <Ionicons name={statusIcon} size={14} color={badge.text} />
           <Text style={{ fontSize: 13, fontWeight: '700', color: badge.text }}>{badge.label}</Text>
         </View>
 
         {/* Datum + Illustration */}
-        <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
-          <View style={{ flex: 1, gap: 8 }}>
-            <Text style={{ fontSize: 32, fontWeight: '800', color: c.text, lineHeight: 36 }}>{bigDateLabel}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <View style={{ flex: 1, gap: 6 }}>
+            <Text style={{ fontSize: 26, fontWeight: '800', color: c.text, lineHeight: 30 }}>{bigDateLabel}</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <Ionicons name="calendar-outline" size={14} color={c.muted} />
               <Text style={{ fontSize: 13, color: c.muted, fontWeight: '500' }}>{weekdayDateLabel}</Text>
@@ -99,22 +99,22 @@ export function AppointmentDetail({
             </View>
           </View>
           {/* Illustration */}
-          <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: c.primaryBg, alignItems: 'center', justifyContent: 'center', marginLeft: 12 }}>
-            <Ionicons name="calendar-outline" size={28} color={c.primary} />
+          <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: c.primaryBg, alignItems: 'center', justifyContent: 'center', marginLeft: 12 }}>
+            <Ionicons name="calendar-outline" size={24} color={c.primary} />
           </View>
         </View>
 
         <View style={{ height: 1, backgroundColor: c.border }} />
 
         {/* Therapeut Block */}
-        <View style={{ gap: 12 }}>
+        <View style={{ gap: 8 }}>
           <Text style={{ fontSize: 12, fontWeight: '700', color: c.muted, textTransform: 'uppercase', letterSpacing: 0.6 }}>Therapeut:in</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
             {therapistPhoto ? (
-              <Image source={{ uri: therapistPhoto }} style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: c.primaryBg }} />
+              <Image source={{ uri: therapistPhoto }} style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: c.primaryBg }} />
             ) : (
-              <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: c.primaryBg, alignItems: 'center', justifyContent: 'center' }}>
-                <Ionicons name="person-outline" size={24} color={c.primary} />
+              <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: c.primaryBg, alignItems: 'center', justifyContent: 'center' }}>
+                <Ionicons name="person-outline" size={22} color={c.primary} />
               </View>
             )}
             <View style={{ flex: 1 }}>
@@ -157,11 +157,11 @@ export function AppointmentDetail({
 
         {/* Hinweisbox */}
         {isActive ? (
-          <View style={{ flexDirection: 'row', gap: 12, backgroundColor: c.primaryBg, borderRadius: 16, padding: 14, borderWidth: 1, borderColor: c.primary + '30' }}>
-            <Ionicons name="information-circle-outline" size={20} color={c.primary} style={{ marginTop: 1 }} />
-            <View style={{ flex: 1, gap: 3 }}>
+          <View style={{ flexDirection: 'row', gap: 10, backgroundColor: c.primaryBg, borderRadius: 14, padding: 10, borderWidth: 1, borderColor: c.primary + '30' }}>
+            <Ionicons name="information-circle-outline" size={18} color={c.primary} style={{ marginTop: 1 }} />
+            <View style={{ flex: 1, gap: 2 }}>
               <Text style={{ fontSize: 13, fontWeight: '700', color: c.primary }}>Wichtiger Hinweis</Text>
-              <Text style={{ fontSize: 13, color: c.text, lineHeight: 18 }}>Bitte erscheine 5–10 Minuten vor deinem Termin. Falls du verhindert bist, storniere bitte rechtzeitig.</Text>
+              <Text style={{ fontSize: 13, color: c.text, lineHeight: 17 }}>Bitte erscheine 5–10 Minuten vor deinem Termin. Falls du verhindert bist, storniere bitte rechtzeitig.</Text>
             </View>
           </View>
         ) : null}
@@ -169,7 +169,7 @@ export function AppointmentDetail({
         <View style={{ height: 1, backgroundColor: c.border }} />
 
         {/* CTAs */}
-        <View style={{ gap: 10 }}>
+        <View style={{ gap: 8 }}>
           {therapist ? (
             <Pressable
               onPress={() => {
@@ -177,7 +177,7 @@ export function AppointmentDetail({
                 if (therapist?.id) onOpenTherapist(therapist.id, therapist);
                 else setSelectedTherapist(therapist);
               }}
-              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: c.primary, borderRadius: 999, paddingVertical: 15, gap: 8 }}
+              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: c.primary, borderRadius: 999, paddingVertical: 12, gap: 8 }}
             >
               <Ionicons name="person-outline" size={18} color="#fff" />
               <Text style={{ fontSize: 16, fontWeight: '700', color: '#fff' }}>Profil ansehen</Text>
@@ -188,7 +188,7 @@ export function AppointmentDetail({
           {isActive ? (
             <Pressable
               onPress={() => onCancelRequest()}
-              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: 999, paddingVertical: 14, gap: 8, borderWidth: 1.5, borderColor: c.error, backgroundColor: 'transparent' }}
+              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: 999, paddingVertical: 11, gap: 8, borderWidth: 1.5, borderColor: c.error, backgroundColor: 'transparent' }}
             >
               <Ionicons name="trash-outline" size={17} color={c.error} />
               <Text style={{ fontSize: 15, fontWeight: '700', color: c.error }}>Termin stornieren</Text>
