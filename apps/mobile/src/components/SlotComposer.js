@@ -13,6 +13,7 @@ import {
   RADIUS,
   formatDayHeader,
 } from '../utils/app-utils';
+import { DeclineBookingModal } from '../modals/DeclineBookingModal';
 
 const SLOT_DURATIONS = [20, 30, 40, 50, 60];
 const TIME_HOURS = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19];
@@ -420,8 +421,7 @@ function FreeSlotCard({ c, slot, onCancelSlot, deletingSlotIds }) {
 
 function BookedSlotCard({ c, slot, booking, onRespond, onTherapistCancel, onOpenDetail }) {
   const [loading, setLoading] = useState(false);
-  const [showDecline, setShowDecline] = useState(false);
-  const [declinedReason, setDeclinedReason] = useState('');
+  const [showDeclineModal, setShowDeclineModal] = useState(false);
   const [error, setError] = useState('');
   const d = new Date(slot.startsAt);
   const timeStr = d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
@@ -441,12 +441,13 @@ function BookedSlotCard({ c, slot, booking, onRespond, onTherapistCancel, onOpen
     );
   }
 
-  const handleRespond = async (action) => {
+  const handleRespond = async (action, declinedReason) => {
     if (!onRespond || !booking) return;
     setError(''); setLoading(true);
     try {
-      const body = action === 'CONFIRM' ? { action: 'CONFIRM' } : { action: 'DECLINE', declinedReason: declinedReason.trim() || undefined };
+      const body = action === 'CONFIRM' ? { action: 'CONFIRM' } : { action: 'DECLINE', declinedReason: declinedReason?.trim() || undefined };
       await onRespond(booking.id, body);
+      if (action === 'DECLINE') setShowDeclineModal(false);
     } catch (e) {
       setError(e?.message ?? 'Fehler beim Speichern.');
     } finally {
@@ -509,21 +510,16 @@ function BookedSlotCard({ c, slot, booking, onRespond, onTherapistCancel, onOpen
           </View>
         </View>
 
-        {isPending && showDecline && (
-          <View style={{ borderWidth: 1, borderColor: c.border, borderRadius: 8, backgroundColor: c.mutedBg, paddingHorizontal: 10, paddingVertical: 6, marginBottom: 8 }}>
-            <Text style={{ fontSize: 12, color: c.muted }} onChangeText={setDeclinedReason}>{declinedReason}</Text>
-          </View>
-        )}
-        {!!error && <Text style={{ fontSize: 12, color: c.error ?? '#DC2626', marginBottom: 6 }}>{error}</Text>}
+        {!!error && !showDeclineModal && <Text style={{ fontSize: 12, color: c.error ?? '#DC2626', marginBottom: 6 }}>{error}</Text>}
 
         {isPending && onRespond && (
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <Pressable
-              onPress={() => showDecline ? handleRespond('DECLINE') : setShowDecline(true)}
+              onPress={() => setShowDeclineModal(true)}
               disabled={loading}
               style={{ flex: 1, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: c.border, alignItems: 'center' }}
             >
-              <Text style={{ fontSize: 13, fontWeight: '600', color: c.muted }}>{showDecline ? 'Ablehnen' : 'Ablehnen'}</Text>
+              <Text style={{ fontSize: 13, fontWeight: '600', color: c.muted }}>Ablehnen</Text>
             </Pressable>
             <Pressable
               onPress={() => handleRespond('CONFIRM')}
@@ -544,6 +540,16 @@ function BookedSlotCard({ c, slot, booking, onRespond, onTherapistCancel, onOpen
           </Pressable>
         )}
       </View>
+
+      <DeclineBookingModal
+        visible={showDeclineModal}
+        onClose={() => { setShowDeclineModal(false); setError(''); }}
+        onConfirm={(reason) => handleRespond('DECLINE', reason)}
+        booking={booking}
+        loading={loading}
+        error={error}
+        c={c}
+      />
     </View>
   );
 }
