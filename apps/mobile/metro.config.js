@@ -7,27 +7,34 @@ const workspaceRoot = path.resolve(projectRoot, '../..');
 
 const config = getDefaultConfig(projectRoot);
 
-// Only watch the monorepo root when root node_modules exist (local pnpm dev).
-// In CI (npm install inside apps/mobile only) this directory is absent and
-// Metro's verifyRootExists check would crash before bundling.
+// Metro calls statSync (verifyRootExists) on every entry in watchFolders AND
+// nodeModulesPaths at startup. When the CI workflow runs `npm install` only
+// inside apps/mobile, the workspace root's node_modules never exists and Metro
+// crashes before bundling. Guard every workspace-root reference behind this
+// check so the config is a no-op in that environment.
 const rootNodeModules = path.resolve(workspaceRoot, 'node_modules');
-if (fs.existsSync(rootNodeModules)) {
+const hasWorkspaceModules = fs.existsSync(rootNodeModules);
+
+if (hasWorkspaceModules) {
+  // Local pnpm dev: watch the whole monorepo and resolve via workspace root
   config.watchFolders = [...(config.watchFolders ?? []), workspaceRoot];
+  config.resolver.nodeModulesPaths = [
+    path.resolve(projectRoot, 'node_modules'),
+    rootNodeModules,
+  ];
+  // pnpm hoists this under .pnpm — needs an explicit mapping
+  config.resolver.extraNodeModules = {
+    '@react-native/assets-registry': path.resolve(
+      workspaceRoot,
+      'node_modules/.pnpm/@react-native+assets-registry@0.74.87/node_modules/@react-native/assets-registry',
+    ),
+  };
+} else {
+  // CI (npm install in apps/mobile only): resolve purely from local node_modules
+  config.resolver.nodeModulesPaths = [
+    path.resolve(projectRoot, 'node_modules'),
+  ];
 }
-
-// Resolve modules from the workspace root so pnpm symlinks work
-config.resolver.nodeModulesPaths = [
-  path.resolve(projectRoot, 'node_modules'),
-  path.resolve(workspaceRoot, 'node_modules'),
-];
-
-// Explicit mappings for packages not symlinked by pnpm into project node_modules
-config.resolver.extraNodeModules = {
-  '@react-native/assets-registry': path.resolve(
-    workspaceRoot,
-    'node_modules/.pnpm/@react-native+assets-registry@0.74.87/node_modules/@react-native/assets-registry',
-  ),
-};
 
 // Force React 18 for mobile — prevents duplicate React (admin uses React 19)
 // Maps module name → real file path in mobile's own node_modules (no symlinks)
