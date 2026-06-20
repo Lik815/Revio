@@ -10,6 +10,11 @@ const STATIC_ROUTES: MetadataRoute.Sitemap = [
     priority: 1.0,
   },
   {
+    url: `${SITE_URL}/finden`,
+    changeFrequency: 'weekly',
+    priority: 0.9,
+  },
+  {
     url: `${SITE_URL}/patients`,
     changeFrequency: 'monthly',
     priority: 0.8,
