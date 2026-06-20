@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import Image from 'next/image';
+import { CityInput } from './city-input';
 
 type HeroProps = {
   eyebrow: string;
@@ -49,13 +50,7 @@ export function Hero({
                 aria-label="Beschwerden eingeben"
               />
               <span className="hero-search__divider" />
-              <input
-                className="hero-search__input hero-search__input--city"
-                name="city"
-                placeholder="Ort"
-                aria-label="Ort eingeben"
-                required
-              />
+              <CityInput name="city" placeholder="Ort" required wrapperClassName="hero-search__input--city" inputClassName="hero-search__input" />
               <button type="submit" className="hero-search__filter" aria-label="Suchen">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="11" cy="11" r="8" />

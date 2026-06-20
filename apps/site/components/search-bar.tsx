@@ -1,3 +1,5 @@
+import { CityInput } from './city-input';
+
 type SearchBarProps = {
   defaultQuery?: string;
   defaultCity?: string;
@@ -16,10 +18,10 @@ export function SearchBar({ defaultQuery = '', defaultCity = '', defaultHomeVisi
           <span>Beschwerde oder Spezialisierung</span>
           <input type="text" name="q" defaultValue={defaultQuery} placeholder="z. B. Rückenschmerzen" />
         </label>
-        <label className="field">
-          <span>Ort</span>
-          <input type="text" name="city" defaultValue={defaultCity} placeholder="z. B. Köln" required />
-        </label>
+        <div className="field">
+          <label htmlFor="finden-city">Ort</label>
+          <CityInput id="finden-city" name="city" defaultValue={defaultCity} placeholder="z. B. Köln" required />
+        </div>
       </div>
 
       <div className="search-form__row search-form__row--filters">
