@@ -2947,6 +2947,131 @@ describe('Slot-based Booking', () => {
   });
 });
 
+// ─── Therapist Patients ───────────────────────────────────────────────────────
+
+describe('Therapist Patients', () => {
+  async function createTherapist(email: string, sessionToken: string) {
+    return prisma.therapist.create({
+      data: {
+        email, fullName: `Therapeut ${email}`, professionalTitle: 'Physiotherapeut',
+        city: 'Berlin', specializations: 'Rückenschmerzen', languages: 'Deutsch',
+        reviewStatus: 'APPROVED', isVisible: true,
+        bookingMode: 'FIRST_APPOINTMENT_REQUEST', sessionToken,
+      },
+    });
+  }
+
+  async function createPatient(email: string, sessionToken: string) {
+    return prisma.user.create({
+      data: {
+        email, passwordHash: await hashPassword('test1234'), role: 'patient',
+        firstName: 'Patient', lastName: email.split('@')[0],
+        sessionToken, emailVerifiedAt: new Date(), phone: '+49 170 0000000',
+      },
+    });
+  }
+
+  async function createBooking(therapistId: string, patientUserId: string, overrides: Record<string, unknown> = {}) {
+    return prisma.bookingRequest.create({
+      data: {
+        therapistId, patientUserId, status: 'CONFIRMED',
+        patientName: 'Test Patient', patientEmail: 'snapshot@test.de',
+        consentAcceptedAt: new Date(), responseDueAt: new Date(Date.now() + 86400000),
+        confirmedSlotAt: new Date(Date.now() + 3600000),
+        ...overrides,
+      },
+    });
+  }
+
+  it('GET /therapist/patients — rejects non-therapist callers', async () => {
+    await createPatient('reject-patient@test.de', 'reject-patient-token');
+    const res = await app.inject({
+      method: 'GET', url: '/therapist/patients',
+      headers: { authorization: 'Bearer reject-patient-token' },
+    });
+    expect(res.statusCode).toBe(403);
+  });
+
+  it('GET /therapist/patients — deduplicates by patientUserId and aggregates booking count', async () => {
+    const therapist = await createTherapist('dedup-therapist@test.de', 'dedup-therapist-token');
+    const patient = await createPatient('dedup-patient@test.de', 'dedup-patient-token');
+    await createBooking(therapist.id, patient.id, {
+      status: 'DECLINED', declinedReason: 'Keine Kapazität', createdAt: new Date(Date.now() - 2 * 86400000),
+    });
+    await createBooking(therapist.id, patient.id, { status: 'CONFIRMED' });
+
+    const res = await app.inject({
+      method: 'GET', url: '/therapist/patients',
+      headers: { authorization: 'Bearer dedup-therapist-token' },
+    });
+    expect(res.statusCode).toBe(200);
+    const { patients } = res.json();
+    expect(patients).toHaveLength(1);
+    expect(patients[0].id).toBe(patient.id);
+    expect(patients[0].bookingCount).toBe(2);
+    expect(patients[0].email).toBe('dedup-patient@test.de');
+    expect(patients[0].addressLine).toBeNull();
+  });
+
+  it('GET /therapist/patients — does not leak patients booked only with another therapist', async () => {
+    const therapistA = await createTherapist('scope-a@test.de', 'scope-a-token');
+    const therapistB = await createTherapist('scope-b@test.de', 'scope-b-token');
+    const patientA = await createPatient('scope-patient-a@test.de', 'scope-patient-a-token');
+    const patientB = await createPatient('scope-patient-b@test.de', 'scope-patient-b-token');
+    await createBooking(therapistA.id, patientA.id);
+    await createBooking(therapistB.id, patientB.id);
+
+    const res = await app.inject({
+      method: 'GET', url: '/therapist/patients',
+      headers: { authorization: 'Bearer scope-a-token' },
+    });
+    const { patients } = res.json();
+    expect(patients).toHaveLength(1);
+    expect(patients[0].id).toBe(patientA.id);
+  });
+
+  it('GET /therapist/patients/:patientUserId — returns appointment history scoped to the relationship', async () => {
+    const therapist = await createTherapist('detail-therapist@test.de', 'detail-therapist-token');
+    const patient = await createPatient('detail-patient@test.de', 'detail-patient-token');
+    await createBooking(therapist.id, patient.id, {
+      status: 'DECLINED', declinedReason: 'Keine Kapazität', message: 'Bitte vormittags',
+    });
+    await createBooking(therapist.id, patient.id, { status: 'CONFIRMED' });
+
+    const res = await app.inject({
+      method: 'GET', url: `/therapist/patients/${patient.id}`,
+      headers: { authorization: 'Bearer detail-therapist-token' },
+    });
+    expect(res.statusCode).toBe(200);
+    const { patient: patientPayload, appointments } = res.json();
+    expect(patientPayload.id).toBe(patient.id);
+    expect(appointments).toHaveLength(2);
+    expect(appointments.some((a: any) => a.declinedReason === 'Keine Kapazität')).toBe(true);
+  });
+
+  it('GET /therapist/patients/:patientUserId — 404 when no booking relationship exists', async () => {
+    const therapistA = await createTherapist('iso-a@test.de', 'iso-a-token');
+    const therapistB = await createTherapist('iso-b@test.de', 'iso-b-token');
+    const patientB = await createPatient('iso-patient-b@test.de', 'iso-patient-b-token');
+    await createBooking(therapistB.id, patientB.id);
+
+    const res = await app.inject({
+      method: 'GET', url: `/therapist/patients/${patientB.id}`,
+      headers: { authorization: 'Bearer iso-a-token' },
+    });
+    expect(res.statusCode).toBe(404);
+  });
+
+  it('GET /therapist/patients/:patientUserId — rejects non-therapist callers', async () => {
+    const patient = await createPatient('detail-reject-patient@test.de', 'detail-reject-patient-token');
+    const res = await app.inject({
+      method: 'GET', url: `/therapist/patients/${patient.id}`,
+      headers: { authorization: 'Bearer detail-reject-patient-token' },
+    });
+    expect(res.statusCode).toBe(403);
+  });
+});
+
 // ─── Notification Routing Metadata ───────────────────────────────────────────
 
 describe('GET /notifications — routing metadata', () => {

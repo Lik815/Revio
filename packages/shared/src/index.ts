@@ -285,3 +285,33 @@ export interface ReviewEligibility {
   bookingId?: string;
   review?: { rating: number; comment?: string | null };
 }
+
+// ─── Therapist-Patient Relationship ───────────────────────────────────────────
+
+export interface TherapistPatientListItem {
+  id: string;
+  fullName: string;
+  email: string;
+  phone?: string | null;
+  addressLine?: string | null;
+  bookingCount: number;
+  lastBookingAt: string;
+  nextAppointmentAt?: string | null;
+  lastStatus?: BookingRequestStatus | null;
+}
+
+export interface TherapistPatientAppointment {
+  id: string;
+  status: BookingRequestStatus;
+  slot?: { id: string; startsAt: string; durationMin: number; status: SlotStatus } | null;
+  confirmedSlotAt?: string | null;
+  createdAt: string;
+  respondedAt?: string | null;
+  message?: string | null;
+  declinedReason?: string | null;
+}
+
+export interface TherapistPatientDetail {
+  patient: TherapistPatientListItem;
+  appointments: TherapistPatientAppointment[];
+}

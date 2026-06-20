@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import type { TherapistPatientListItem, TherapistPatientAppointment } from '@revio/shared';
 import { sendPushNotification } from '../utils/push.js';
 import { expireStaleBookings } from '../utils/booking-expiry.js';
 
@@ -29,6 +30,56 @@ function serializeSlot(slot: { id: string; startsAt: Date; durationMin: number; 
   return { id: slot.id, startsAt: slot.startsAt.toISOString(), durationMin: slot.durationMin, status: slot.status };
 }
 
+type PatientBooking = {
+  id: string;
+  status: string;
+  createdAt: Date;
+  confirmedSlotAt: Date | null;
+  respondedAt: Date | null;
+  message: string | null;
+  declinedReason: string | null;
+  patientPhone: string | null;
+  slot: { id: string; startsAt: Date; durationMin: number; status: string } | null;
+};
+
+function buildPatientListItem(
+  patientUser: { id: string; firstName: string | null; lastName: string | null; email: string; phone: string | null },
+  bookings: PatientBooking[],
+): TherapistPatientListItem {
+  const sorted = [...bookings].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  const latest = sorted[0];
+  const now = new Date();
+  const nextAppointment = bookings
+    .filter((b) => b.status === 'CONFIRMED')
+    .map((b) => b.slot?.startsAt ?? b.confirmedSlotAt)
+    .filter((d): d is Date => !!d && d > now)
+    .sort((a, b) => a.getTime() - b.getTime())[0] ?? null;
+
+  return {
+    id: patientUser.id,
+    fullName: `${patientUser.firstName ?? ''} ${patientUser.lastName ?? ''}`.trim() || patientUser.email,
+    email: patientUser.email,
+    phone: patientUser.phone ?? latest.patientPhone ?? null,
+    addressLine: null,
+    bookingCount: bookings.length,
+    lastBookingAt: latest.createdAt.toISOString(),
+    nextAppointmentAt: nextAppointment ? nextAppointment.toISOString() : null,
+    lastStatus: latest.status as TherapistPatientListItem['lastStatus'],
+  };
+}
+
+function serializePatientAppointment(booking: PatientBooking): TherapistPatientAppointment {
+  return {
+    id: booking.id,
+    status: booking.status as TherapistPatientAppointment['status'],
+    slot: serializeSlot(booking.slot) as TherapistPatientAppointment['slot'],
+    confirmedSlotAt: booking.confirmedSlotAt?.toISOString() ?? null,
+    createdAt: booking.createdAt.toISOString(),
+    respondedAt: booking.respondedAt?.toISOString() ?? null,
+    message: booking.message,
+    declinedReason: booking.declinedReason,
+  };
+}
 
 export async function bookingRoutes(fastify: FastifyInstance) {
 
@@ -153,6 +204,62 @@ export async function bookingRoutes(fastify: FastifyInstance) {
 
     await fastify.prisma.therapistSlot.delete({ where: { id } });
     return { deleted: true };
+  });
+
+  // GET /therapist/patients — Eigene Patient:innen auflisten (dedupliziert über Buchungen)
+  fastify.get('/therapist/patients', async (request, reply) => {
+    const token = request.headers.authorization?.replace('Bearer ', '');
+    if (!token) return reply.status(401).send({ error: 'Unauthorized' });
+    const therapist = await resolveTherapist(fastify, token);
+    if (!therapist) return reply.status(403).send({ error: 'Only therapists can view their patients' });
+
+    await expireStaleBookings(fastify, { therapistId: therapist.id });
+
+    const bookings = await fastify.prisma.bookingRequest.findMany({
+      where: { therapistId: therapist.id, patientUserId: { not: null } },
+      include: { slot: true, patientUser: true },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const groups = new Map<string, { patientUser: NonNullable<(typeof bookings)[number]['patientUser']>; bookings: PatientBooking[] }>();
+    for (const booking of bookings) {
+      if (!booking.patientUserId || !booking.patientUser) continue;
+      const existing = groups.get(booking.patientUserId);
+      if (existing) existing.bookings.push(booking);
+      else groups.set(booking.patientUserId, { patientUser: booking.patientUser, bookings: [booking] });
+    }
+
+    const patients = [...groups.values()]
+      .map(({ patientUser, bookings: group }) => buildPatientListItem(patientUser, group))
+      .sort((a, b) => new Date(b.lastBookingAt).getTime() - new Date(a.lastBookingAt).getTime());
+
+    return { patients };
+  });
+
+  // GET /therapist/patients/:patientUserId — Patient:in-Detail + Terminverlauf mit diesem Therapeuten
+  fastify.get('/therapist/patients/:patientUserId', async (request, reply) => {
+    const token = request.headers.authorization?.replace('Bearer ', '');
+    if (!token) return reply.status(401).send({ error: 'Unauthorized' });
+    const therapist = await resolveTherapist(fastify, token);
+    if (!therapist) return reply.status(403).send({ error: 'Only therapists can view their patients' });
+
+    await expireStaleBookings(fastify, { therapistId: therapist.id });
+
+    const { patientUserId } = request.params as { patientUserId: string };
+    const bookings = await fastify.prisma.bookingRequest.findMany({
+      where: { therapistId: therapist.id, patientUserId },
+      include: { slot: true, patientUser: true },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (bookings.length === 0 || !bookings[0].patientUser) {
+      return reply.status(404).send({ error: 'Patient not found' });
+    }
+
+    const patient = buildPatientListItem(bookings[0].patientUser, bookings);
+    const appointments = bookings.map(serializePatientAppointment);
+
+    return { patient, appointments };
   });
 
   // ── Patient: Buchung ────────────────────────────────────────────────────
