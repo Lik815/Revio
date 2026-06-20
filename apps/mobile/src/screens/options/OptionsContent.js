@@ -1,5 +1,5 @@
 import React from 'react';
-import { Image, Linking, Pressable, ScrollView, Switch, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, Switch, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SPACE, getBaseUrl } from '../../utils/app-utils';
@@ -124,14 +124,7 @@ const renderOptions = () => {
         {/* ── App-Einstellungen ── */}
         <SectionHeader title="App-Einstellungen" />
         <OptionGroup>
-          <Pressable onPress={() => Linking.openSettings()} style={[styles.optionRow, { backgroundColor: c.card, borderColor: 'transparent' }]}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <Ionicons name="phone-portrait-outline" size={18} color={c.muted} />
-              <Text style={[styles.optionLabel, { color: c.text }]}>{t('deviceSettings')}</Text>
-            </View>
-            <Text style={[styles.optionValue, { color: c.muted }]}>›</Text>
-          </Pressable>
-          <View style={[styles.optionRow, { backgroundColor: c.card, borderColor: 'transparent', borderTopWidth: 1, borderTopColor: c.border }]}>
+          <View style={[styles.optionRow, { backgroundColor: c.card, borderColor: 'transparent' }]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
               <Ionicons name="contrast-outline" size={18} color={c.muted} />
               <Text style={[styles.optionLabel, { color: c.text }]}>{t('appearanceOption')}</Text>

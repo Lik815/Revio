@@ -407,7 +407,6 @@ export const translations = {
     writeEmail: 'E-Mail schreiben',
 
     // --- Settings ---
-    deviceSettings: 'Geräteeinstellungen',
     faqOption: 'FAQ',
     appFeedback: 'App-Feedback',
     appFeedbackTitle: 'App-Feedback senden',
