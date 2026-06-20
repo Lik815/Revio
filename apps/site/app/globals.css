@@ -254,7 +254,7 @@ h3 {
   background: var(--surface);
   padding: 0 16px;
   margin-top: 28px;
-  max-width: 460px;
+  max-width: 560px;
   height: 54px;
   box-shadow: var(--shadow-card);
   transition: border-color 140ms ease;
@@ -272,7 +272,6 @@ h3 {
 }
 
 .hero-search__input {
-  flex: 1;
   border: none;
   background: transparent;
   outline: none;
@@ -280,6 +279,15 @@ h3 {
   font-size: 0.97rem;
   color: var(--ink);
   padding: 0 12px;
+  min-width: 0;
+}
+
+.hero-search__input--query {
+  flex: 1.6;
+}
+
+.hero-search__input--city {
+  flex: 1;
 }
 
 .hero-search__input::placeholder {
@@ -1060,6 +1068,32 @@ h3 {
 
   .hero-search {
     max-width: 100%;
+    height: auto;
+    flex-wrap: wrap;
+    row-gap: 10px;
+    padding: 14px 16px;
+  }
+
+  .hero-search__input--query {
+    flex: 1 1 100%;
+    order: 1;
+  }
+
+  .hero-search__icon {
+    order: 0;
+  }
+
+  .hero-search__input--city {
+    flex: 1;
+    order: 2;
+  }
+
+  .hero-search__divider {
+    display: none;
+  }
+
+  .hero-search__filter {
+    order: 3;
   }
 
   .flow-steps {
