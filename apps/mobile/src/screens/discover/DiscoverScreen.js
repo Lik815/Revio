@@ -4,16 +4,14 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { appStoreSelectors, useAppStore } from '../../store/useStore';
 import { useTheme } from '../../hooks/use-theme';
 import { useFavorites } from '../../hooks/use-favorites';
-import { useNotificationPolling } from '../../hooks/use-notification-polling';
 import { useToast } from '../../hooks/use-toast';
 import { useSearch } from '../../hooks/use-search';
 import { translations } from '../../i18n/translations';
-import { ROOT_ROUTES, TAB_ROUTES } from '../../navigation/route-names';
+import { ROOT_ROUTES } from '../../navigation/route-names';
 import { HeartButton } from '../../components/HeartButton';
 import { SkeletonCard } from '../../components/SkeletonCard';
 import { ToastOverlay } from '../../components/ToastOverlay';
 import { LocationSheet } from '../../modals/LocationSheet';
-import { NotificationSheet } from '../../modals/NotificationSheet';
 import { appStyles } from '../../styles/app-styles';
 import { DiscoverContent } from './DiscoverContent';
 
@@ -35,18 +33,10 @@ export function DiscoverTabScreen() {
   const route = useRoute();
 
   const authToken = useAppStore(appStoreSelectors.authToken);
-  const accountType = useAppStore(appStoreSelectors.accountType);
-
   const { c } = useTheme();
   const { toastMsg, toastAnim, showToast } = useToast();
 
   const { favorites, toggleFavorite, isFavorite } = useFavorites({ authToken, showToast, t });
-
-  const {
-    notifications, dismissedNotifIds,
-    showNotifications, setShowNotifications,
-    dismissNotification, dismissAllNotifications,
-  } = useNotificationPolling({ authToken, accountType });
 
   const search = useSearch({ t });
   const discoverScrollRef = useRef(null);
@@ -54,7 +44,6 @@ export function DiscoverTabScreen() {
   useEffect(() => {
     if (!route.params?.resetToHomeAt) return;
     search.resetDiscoverState();
-    setShowNotifications(false);
     discoverScrollRef.current?.scrollTo?.({ y: 0, animated: false });
   }, [route.params?.resetToHomeAt]);
 
@@ -64,22 +53,6 @@ export function DiscoverTabScreen() {
 
   const openTherapistById = (id, fallback = null) => {
     navigation.navigate(ROOT_ROUTES.THERAPIST_PROFILE, { therapistId: id, therapist: fallback });
-  };
-
-  const handleNotificationPress = (notification) => {
-    setShowNotifications(false);
-    const type = notification?.type;
-    if (
-      type === 'NEW_BOOKING_REQUEST' || type === 'BOOKING_CONFIRMED' ||
-      type === 'BOOKING_DECLINED' || type === 'BOOKING_CANCELLED'
-    ) {
-      navigation.navigate(ROOT_ROUTES.MAIN_TABS, { screen: TAB_ROUTES.THERAPY });
-    } else if (
-      type === 'PROFILE_APPROVED' || type === 'PROFILE_CHANGES_REQUESTED' ||
-      type === 'PROFILE_REJECTED' || type === 'PROFILE_SUSPENDED'
-    ) {
-      navigation.navigate(ROOT_ROUTES.MAIN_TABS, { screen: TAB_ROUTES.PROFILE });
-    }
   };
 
   return (
@@ -96,7 +69,6 @@ export function DiscoverTabScreen() {
         certificationOptions={search.certificationOptions}
         city={search.city}
         discoverScrollRef={discoverScrollRef}
-        dismissedNotifIds={dismissedNotifIds}
         fortbildungen={search.fortbildungen}
         gender={search.gender}
         getMapRegion={search.getMapRegion}
@@ -106,7 +78,6 @@ export function DiscoverTabScreen() {
         locationLabel={search.locationLabel}
         mapScrollEnabled={search.mapScrollEnabled}
         mapTherapists={search.mapTherapists}
-        notifications={notifications}
         openTherapistById={openTherapistById}
         query={search.query}
         requestableOnly={search.requestableOnly}
@@ -130,7 +101,6 @@ export function DiscoverTabScreen() {
         setShowAutocomplete={search.setShowAutocomplete}
         setShowFilters={search.setShowFilters}
         setShowLocationSheet={search.setShowLocationSheet}
-        setShowNotifications={setShowNotifications}
         setSearchRadius={search.setSearchRadius}
         setViewMode={search.setViewMode}
         showAutocomplete={search.showAutocomplete}
@@ -153,18 +123,6 @@ export function DiscoverTabScreen() {
         onUseGPS={search.handleLocationSheetGPS}
         loading={search.locationLoading}
         onConfirm={search.handleLocationSheetManual}
-        c={c}
-        t={t}
-      />
-
-      <NotificationSheet
-        visible={showNotifications}
-        onClose={() => setShowNotifications(false)}
-        notifications={notifications}
-        dismissedNotifIds={dismissedNotifIds}
-        dismissNotification={dismissNotification}
-        dismissAllNotifications={dismissAllNotifications}
-        onPressNotification={handleNotificationPress}
         c={c}
         t={t}
       />

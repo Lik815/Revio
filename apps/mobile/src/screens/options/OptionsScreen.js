@@ -2,15 +2,13 @@ import React, { useState } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import { appStoreSelectors, useAppStore } from '../../store/useStore';
 import { useTheme } from '../../hooks/use-theme';
-import { useNotificationPolling } from '../../hooks/use-notification-polling';
 import { appStyles } from '../../styles/app-styles';
 import { translations } from '../../i18n/translations';
-import { ROOT_ROUTES, TAB_ROUTES } from '../../navigation/route-names';
+import { ROOT_ROUTES } from '../../navigation/route-names';
 import { OptionsContent } from './OptionsContent';
 import { FeedbackModal } from '../../modals/FeedbackModal';
 import { ChangePasswordModal } from '../../modals/ChangePasswordModal';
 import { DeleteAccountModal } from '../../modals/DeleteAccountModal';
-import { NotificationSheet } from '../../modals/NotificationSheet';
 import { AuthDebugScreen } from '../AuthDebugScreen';
 import { useAuth } from '../../context/AuthContext';
 
@@ -20,21 +18,11 @@ export function OptionsTabScreen() {
   const navigation = useNavigation();
 
   const authToken = useAppStore(appStoreSelectors.authToken);
-  const accountType = useAppStore(appStoreSelectors.accountType);
   const loggedInPatient = useAppStore(appStoreSelectors.loggedInPatient);
   const loggedInTherapist = useAppStore(appStoreSelectors.loggedInTherapist);
   const signOut = useAppStore((s) => s.signOut);
 
   const { themeMode, setThemeMode, c } = useTheme();
-
-  const {
-    notifications,
-    dismissedNotifIds,
-    showNotifications,
-    setShowNotifications,
-    dismissNotification,
-    dismissAllNotifications,
-  } = useNotificationPolling({ authToken, accountType });
 
   const { logout: logoutFromContext, authToken: ctxAuthToken, accountType: ctxAccountType, bootReady, loggedInPatient: ctxPatient, loggedInTherapist: ctxTherapist } = useAuth();
 
@@ -46,33 +34,17 @@ export function OptionsTabScreen() {
   const handleLogout = async () => {
     await logoutFromContext();
     signOut();
-    navigation.navigate(ROOT_ROUTES.MAIN_TABS, { screen: TAB_ROUTES.PROFILE });
+    navigation.navigate(ROOT_ROUTES.LOGIN);
   };
 
   const handleDeleteAccountConfirmed = async () => {
     await logoutFromContext();
     signOut();
-    navigation.navigate(ROOT_ROUTES.MAIN_TABS, { screen: TAB_ROUTES.PROFILE });
+    navigation.navigate(ROOT_ROUTES.LOGIN);
   };
 
   const handleNavigateToProfile = () => {
-    navigation.navigate(TAB_ROUTES.PROFILE);
-  };
-
-  const handleNotificationPress = (notification) => {
-    setShowNotifications(false);
-    const type = notification?.type;
-    if (
-      type === 'NEW_BOOKING_REQUEST' || type === 'BOOKING_CONFIRMED' ||
-      type === 'BOOKING_DECLINED' || type === 'BOOKING_CANCELLED'
-    ) {
-      navigation.navigate(ROOT_ROUTES.MAIN_TABS, { screen: TAB_ROUTES.THERAPY });
-    } else if (
-      type === 'PROFILE_APPROVED' || type === 'PROFILE_CHANGES_REQUESTED' ||
-      type === 'PROFILE_REJECTED' || type === 'PROFILE_SUSPENDED'
-    ) {
-      navigation.navigate(ROOT_ROUTES.MAIN_TABS, { screen: TAB_ROUTES.PROFILE });
-    }
+    navigation.navigate(ROOT_ROUTES.PROFILE);
   };
 
   return (
@@ -80,14 +52,10 @@ export function OptionsTabScreen() {
       <OptionsContent
         loggedInTherapist={loggedInTherapist}
         loggedInPatient={loggedInPatient}
-        accountType={accountType}
         themeMode={themeMode}
         setThemeMode={setThemeMode}
-        notifications={notifications}
-        dismissedNotifIds={dismissedNotifIds}
-        onShowNotifications={() => setShowNotifications(true)}
-        onShowLogin={() => navigation.navigate(ROOT_ROUTES.MAIN_TABS, { screen: TAB_ROUTES.PROFILE })}
-        onShowRegister={() => navigation.navigate(ROOT_ROUTES.MAIN_TABS, { screen: TAB_ROUTES.PROFILE })}
+        onShowLogin={() => navigation.navigate(ROOT_ROUTES.LOGIN)}
+        onShowRegister={() => navigation.navigate(ROOT_ROUTES.REGISTRATION)}
         onShowFeedback={() => setShowFeedback(true)}
         onShowChangePassword={() => setShowChangePassword(true)}
         onDeleteAccount={() => setShowDeleteAccount(true)}
@@ -97,18 +65,6 @@ export function OptionsTabScreen() {
         c={c}
         t={t}
         styles={appStyles}
-      />
-
-      <NotificationSheet
-        visible={showNotifications}
-        onClose={() => setShowNotifications(false)}
-        notifications={notifications}
-        dismissedNotifIds={dismissedNotifIds}
-        dismissNotification={dismissNotification}
-        dismissAllNotifications={dismissAllNotifications}
-        onPressNotification={handleNotificationPress}
-        c={c}
-        t={t}
       />
 
       <FeedbackModal

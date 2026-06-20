@@ -5,10 +5,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SPACE, getBaseUrl } from '../../utils/app-utils';
 
 export function OptionsContent({
-  loggedInTherapist, loggedInPatient, accountType,
+  loggedInTherapist, loggedInPatient,
   themeMode, setThemeMode,
-  notifications, dismissedNotifIds,
-  onShowNotifications, onShowLogin, onShowRegister,
+  onShowLogin, onShowRegister,
   onShowFeedback, onShowChangePassword, onDeleteAccount, onLogout,
   onNavigateToProfile, onShowDebug,
   c, t, styles,
@@ -125,18 +124,7 @@ const renderOptions = () => {
         {/* ── App-Einstellungen ── */}
         <SectionHeader title="App-Einstellungen" />
         <OptionGroup>
-          {isLoggedIn && (
-            <Pressable onPress={() => onShowNotifications()} style={[styles.optionRow, { backgroundColor: c.card, borderColor: 'transparent' }]}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                <Ionicons name="notifications-outline" size={18} color={c.muted} />
-                <Text style={[styles.optionLabel, { color: c.text }]}>{t('notificationsOption')}</Text>
-              </View>
-              <Text style={[styles.optionValue, { color: notifications.filter((n) => !dismissedNotifIds.has(n.id)).length > 0 ? c.primary : c.muted }]}>
-                {notifications.filter((n) => !dismissedNotifIds.has(n.id)).length > 0 ? `${notifications.filter((n) => !dismissedNotifIds.has(n.id)).length} ›` : '›'}
-              </Text>
-            </Pressable>
-          )}
-          <Pressable onPress={() => Linking.openSettings()} style={[styles.optionRow, { backgroundColor: c.card, borderColor: 'transparent', borderTopWidth: isLoggedIn ? 1 : 0, borderTopColor: c.border }]}>
+          <Pressable onPress={() => Linking.openSettings()} style={[styles.optionRow, { backgroundColor: c.card, borderColor: 'transparent' }]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
               <Ionicons name="phone-portrait-outline" size={18} color={c.muted} />
               <Text style={[styles.optionLabel, { color: c.text }]}>{t('deviceSettings')}</Text>
@@ -191,6 +179,13 @@ const renderOptions = () => {
                 subtitle={t('notLoggedIn')}
                 icon="log-in-outline"
                 onPress={onShowLogin}
+                valueColor={c.primary}
+              />
+              <OptionRow
+                label={t('registerBtn')}
+                subtitle={t('patientRegSubtitle')}
+                icon="person-add-outline"
+                onPress={onShowRegister}
                 valueColor={c.primary}
                 last
               />

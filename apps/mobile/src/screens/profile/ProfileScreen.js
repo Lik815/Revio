@@ -14,7 +14,6 @@ import { getBaseUrl, TUNNEL_HEADERS } from '../../utils/app-utils';
 import { useConfigOptions } from '../../hooks/use-config-options';
 import { TabHeader } from '../../components/TabHeader';
 import { ToastOverlay } from '../../components/ToastOverlay';
-import { NotificationSheet } from '../../modals/NotificationSheet';
 import { ProfileSavedModal } from '../../modals/ProfileSavedModal';
 import { ReviewNotificationModal } from '../../modals/ReviewNotificationModal';
 import { PhotoPromptModal } from '../../modals/PhotoPromptModal';
@@ -44,9 +43,6 @@ export function ProfileTabScreen() {
   const { setLoggedInTherapist } = useAuth();
 
   const {
-    notifications, dismissedNotifIds,
-    showNotifications, setShowNotifications,
-    dismissNotification, dismissAllNotifications,
     showReviewNotificationModal, reviewNotification, markReviewNotificationSeen,
   } = useNotificationPolling({
     authToken,
@@ -78,22 +74,9 @@ export function ProfileTabScreen() {
     await AsyncStorage.setItem('revio_photo_prompt_dismissed', '1');
   };
 
-  const handleNotificationPress = (notification) => {
-    setShowNotifications(false);
-    const type = notification?.type;
-    if (
-      type === 'NEW_BOOKING_REQUEST' || type === 'BOOKING_CONFIRMED' ||
-      type === 'BOOKING_DECLINED' || type === 'BOOKING_CANCELLED'
-    ) {
-      navigation.navigate(ROOT_ROUTES.MAIN_TABS, { screen: TAB_ROUTES.THERAPY });
-    }
-  };
-
   const [profileSavedTitle, setProfileSavedTitle] = useState('');
   const [profileSavedBody, setProfileSavedBody] = useState('');
   const [showProfileSaved, setShowProfileSaved] = useState(false);
-
-  const hasBadge = notifications.filter((n) => !dismissedNotifIds.has(n.id)).length > 0;
 
   const handlePatientProfileSaved = ({ firstName, lastName, phone }) => {
     updatePatientProfile({ firstName, lastName, phone });
@@ -124,7 +107,7 @@ export function ProfileTabScreen() {
     return (
       <>
         <View style={{ flex: 1 }}>
-          <TabHeader c={c} title="Mein Profil" onBellPress={() => setShowNotifications(true)} hasBadge={hasBadge} />
+          <TabHeader c={c} title="Mein Profil" />
           <PatientDashboardScreen
             c={c} t={t} styles={appStyles}
             loggedInPatient={loggedInPatient}
@@ -135,16 +118,6 @@ export function ProfileTabScreen() {
             onProfileSaved={handlePatientProfileSaved}
           />
         </View>
-        <NotificationSheet
-          visible={showNotifications}
-          onClose={() => setShowNotifications(false)}
-          notifications={notifications}
-          dismissedNotifIds={dismissedNotifIds}
-          dismissNotification={dismissNotification}
-          dismissAllNotifications={dismissAllNotifications}
-          onPressNotification={handleNotificationPress}
-          c={c} t={t}
-        />
         <ProfileSavedModal
           visible={showProfileSaved}
           onClose={() => setShowProfileSaved(false)}
@@ -167,26 +140,16 @@ export function ProfileTabScreen() {
     return (
       <>
         <View style={{ flex: 1 }}>
-          <TabHeader c={c} title="Mein Profil" onBellPress={() => setShowNotifications(true)} hasBadge={hasBadge} />
+          <TabHeader c={c} title="Mein Profil" />
           <TherapistDashboardScreen
             c={c} t={t} styles={appStyles}
             certificationOptions={certificationOptions}
             specializationOptions={specializationOptions}
-            onOpenTherapyTab={() => navigation.navigate(TAB_ROUTES.THERAPY)}
+            onOpenTherapyTab={() => navigation.navigate(ROOT_ROUTES.MAIN_TABS, { screen: TAB_ROUTES.THERAPY })}
             onAddSlot={handleAddSlot}
             onProfileSaved={openProfileSavedModal}
           />
         </View>
-        <NotificationSheet
-          visible={showNotifications}
-          onClose={() => setShowNotifications(false)}
-          notifications={notifications}
-          dismissedNotifIds={dismissedNotifIds}
-          dismissNotification={dismissNotification}
-          dismissAllNotifications={dismissAllNotifications}
-          onPressNotification={handleNotificationPress}
-          c={c} t={t}
-        />
         <ProfileSavedModal
           visible={showProfileSaved}
           onClose={() => setShowProfileSaved(false)}

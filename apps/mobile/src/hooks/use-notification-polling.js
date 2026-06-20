@@ -23,7 +23,6 @@ function getReviewNotificationSeenKey(therapistId) {
 export function useNotificationPolling({ authToken, accountType, onTherapistReviewStatus }) {
   const [notifications, setNotifications] = useState([]);
   const [dismissedNotifIds, setDismissedNotifIds] = useState(new Set());
-  const [showNotifications, setShowNotifications] = useState(false);
   const [showReviewNotificationModal, setShowReviewNotificationModal] = useState(false);
   const [reviewNotification, setReviewNotification] = useState(null);
   const pollRef = useRef(null);
@@ -115,8 +114,6 @@ export function useNotificationPolling({ authToken, accountType, onTherapistRevi
     setNotifications,
     dismissedNotifIds,
     setDismissedNotifIds,
-    showNotifications,
-    setShowNotifications,
     showReviewNotificationModal,
     setShowReviewNotificationModal,
     reviewNotification,

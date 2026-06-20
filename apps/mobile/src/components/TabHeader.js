@@ -1,6 +1,5 @@
 import React from 'react';
-import { Image, Pressable, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Image, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, RADIUS, SPACE, TYPE } from '../utils/app-utils';
 
@@ -23,36 +22,18 @@ const styles = {
   title: { ...TYPE.lg },
   sub: { ...TYPE.meta, marginTop: 1 },
   wordmark: { ...TYPE.lg, marginLeft: 4, letterSpacing: 0.4 },
-  bellButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  badge: {
-    position: 'absolute',
-    top: 3,
-    right: 3,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
 };
 
 /**
- * Shared tab header with logo, optional title/subtitle, and optional notification bell.
+ * Shared tab header with logo and optional title/subtitle.
  *
  * Props:
  *   c              — COLORS[scheme] theme object (required)
  *   title          — screen title string; omit for wordmark-only mode
  *   sub            — optional subtitle string below title
  *   wordmark       — if true, renders "evio" wordmark instead of title
- *   onBellPress    — if provided, renders the notification bell button
- *   hasBadge       — if true, shows the red badge dot on the bell
  */
-export function TabHeader({ c, title, sub, wordmark = false, onBellPress, hasBadge = false }) {
+export function TabHeader({ c, title, sub, wordmark = false }) {
   const insets = useSafeAreaInsets();
   return (
     <View style={[styles.wrapper, { backgroundColor: c.background, paddingTop: insets.top + 8 }]}>
@@ -68,15 +49,6 @@ export function TabHeader({ c, title, sub, wordmark = false, onBellPress, hasBad
           </View>
         )}
 
-        {onBellPress ? (
-          <Pressable
-            onPress={onBellPress}
-            style={[styles.bellButton, { backgroundColor: c.card, borderColor: c.border }]}
-          >
-            <Ionicons name="notifications-outline" size={18} color={c.text} />
-            {hasBadge && <View style={[styles.badge, { backgroundColor: c.error }]} />}
-          </Pressable>
-        ) : null}
       </View>
     </View>
   );

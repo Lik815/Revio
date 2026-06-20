@@ -14,7 +14,6 @@ export function TherapyTabPatient({
   myAppointments, myAppointmentsLoading,
   activeFilterPatient, setActiveFilterPatient,
   therapyRefreshing, appointmentsLastLoadedAt,
-  notifications, dismissedNotifIds, onShowNotifications,
   onRefresh, onOpenTherapistById, onSelectAppointment,
   c, t, styles,
 }) {
@@ -59,12 +58,6 @@ export function TherapyTabPatient({
         <View style={[styles.header, { marginBottom: 0 }]}>
           <Image source={require('../../../assets/icon.png')} style={styles.logoMark} />
           <Text style={[styles.headerTitle, { color: c.text, flex: 1 }]}>Meine Termine</Text>
-          <Pressable onPress={() => onShowNotifications()} style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: c.card, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' }}>
-            <Ionicons name="notifications-outline" size={18} color={c.text} />
-            {notifications.filter(n => !dismissedNotifIds.has(n.id)).length > 0 && (
-              <View style={{ position: 'absolute', top: 3, right: 3, width: 8, height: 8, borderRadius: 4, backgroundColor: c.error }} />
-            )}
-          </Pressable>
         </View>
       </View>
 

@@ -88,7 +88,6 @@ export function DiscoverContent(props) {
     locationLabel,
     mapTherapists,
     mapScrollEnabled,
-    notifications,
     openTherapistById,
     query,
     results,
@@ -110,7 +109,6 @@ export function DiscoverContent(props) {
     setShowAutocomplete,
     setShowFilters,
     setShowLocationSheet,
-    setShowNotifications,
     setViewMode,
     showAutocomplete,
     showFilters,
@@ -127,11 +125,9 @@ export function DiscoverContent(props) {
     setSearchRadius,
     requestableOnly,
     setRequestableOnly,
-    dismissedNotifIds,
   } = props;
 
   const insets = useSafeAreaInsets();
-  const visibleNotifCount = notifications.filter((n) => !dismissedNotifIds?.has(n.id)).length;
 
   const safeResults = Array.isArray(results) ? results : [];
   const matchedResultsCount = safeResults.filter(

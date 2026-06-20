@@ -112,7 +112,6 @@ export function FavoritesTab({
   authToken,
   favorites, favoritesLoading, favoritesLastLoadedAt,
   loadFavorites, toggleFavorite, openTherapistById,
-  notifications, dismissedNotifIds, setShowNotifications,
   setActiveTab, setShowLogin,
   styles, c, t,
 }) {
@@ -141,16 +140,12 @@ export function FavoritesTab({
     );
   }
 
-  const badgeCount = notifications.filter(n => !dismissedNotifIds.has(n.id)).length;
-
   return (
     <View style={{ flex: 1 }}>
       <TabHeader
         c={c}
         title={t('favoritesTitle')}
         sub={`${favorites.length} gespeicherte ${favorites.length === 1 ? 'Therapeut:in' : 'Therapeut:innen'}`}
-        onBellPress={() => setShowNotifications(true)}
-        hasBadge={badgeCount > 0}
       />
       <ScrollView
         contentContainerStyle={[styles.scrollContent, { paddingBottom: 40, paddingTop: 12 }]}

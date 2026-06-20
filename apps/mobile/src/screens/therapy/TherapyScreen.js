@@ -4,16 +4,16 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { appStoreSelectors, useAppStore } from '../../store/useStore';
 import { useTheme } from '../../hooks/use-theme';
-import { useNotificationPolling } from '../../hooks/use-notification-polling';
 import { appStyles } from '../../styles/app-styles';
 import { translations } from '../../i18n/translations';
-import { ROOT_ROUTES, TAB_ROUTES } from '../../navigation/route-names';
+import { ROOT_ROUTES } from '../../navigation/route-names';
 import { getBaseUrl, normalizeTherapistProfile, TUNNEL_HEADERS } from '../../utils/app-utils';
 import { TabHeader } from '../../components/TabHeader';
-import { NotificationSheet } from '../../modals/NotificationSheet';
 import { TherapyTabPatient } from './TherapyTabPatient';
 import { TherapyTabTherapist } from './TherapyTabTherapist';
 import { AppointmentDetail } from './AppointmentDetail';
+import { TherapistPatientsScreen } from './TherapistPatientsScreen';
+import { TherapistPatientDetailScreen } from './TherapistPatientDetailScreen';
 import { CancelAppointmentModal } from '../../modals/CancelAppointmentModal';
 import { TherapistCancelModal } from '../../modals/TherapistCancelModal';
 import { SlotComposerModal } from '../../modals/SlotComposerModal';
@@ -41,13 +41,9 @@ export function TherapyTabScreen() {
     handleTherapyRefresh,
   } = useTherapyData();
 
-  const {
-    notifications, dismissedNotifIds,
-    showNotifications, setShowNotifications,
-    dismissNotification, dismissAllNotifications,
-  } = useNotificationPolling({ authToken, accountType });
-
   const [selectedAppointment, setSelectedAppointment] = useState(null);
+  const [showPatients, setShowPatients] = useState(false);
+  const [selectedPatientId, setSelectedPatientId] = useState(null);
   const [activeFilterPatient, setActiveFilterPatient] = useState('all');
   const [activeFilterTherapist, setActiveFilterTherapist] = useState('all');
   const [showCancelModal, setShowCancelModal] = useState(false);
@@ -68,17 +64,6 @@ export function TherapyTabScreen() {
 
   const openTherapistById = (id, fallback = null) => {
     navigation.navigate(ROOT_ROUTES.THERAPIST_PROFILE, { therapistId: id, therapist: fallback });
-  };
-
-  const handleNotificationPress = async (notification) => {
-    setShowNotifications(false);
-    const type = notification?.type;
-    if (type === 'NEW_BOOKING_REQUEST') {
-      setActiveFilterTherapist('pending');
-      if (authToken) loadIncomingBookings(authToken, { background: true });
-    } else if (type === 'BOOKING_CONFIRMED' || type === 'BOOKING_DECLINED' || type === 'BOOKING_CANCELLED') {
-      if (authToken) await loadMyAppointments(authToken, { background: true });
-    }
   };
 
   const handleAddSlot = async (slot) => {
@@ -193,29 +178,38 @@ export function TherapyTabScreen() {
           setActiveFilterPatient={setActiveFilterPatient}
           therapyRefreshing={therapyRefreshing}
           appointmentsLastLoadedAt={appointmentsLastLoadedAt}
-          notifications={notifications}
-          dismissedNotifIds={dismissedNotifIds}
-          onShowNotifications={() => setShowNotifications(true)}
           onRefresh={() => handleTherapyRefresh(authToken, accountType, loggedInTherapist)}
           onOpenTherapistById={openTherapistById}
           onSelectAppointment={setSelectedAppointment}
           c={c} t={t} styles={appStyles}
-        />
-        <NotificationSheet
-          visible={showNotifications}
-          onClose={() => setShowNotifications(false)}
-          notifications={notifications}
-          dismissedNotifIds={dismissedNotifIds}
-          dismissNotification={dismissNotification}
-          dismissAllNotifications={dismissAllNotifications}
-          onPressNotification={handleNotificationPress}
-          c={c} t={t}
         />
       </>
     );
   }
 
   if (accountType === 'therapist') {
+    if (showPatients && selectedPatientId) {
+      return (
+        <TherapistPatientDetailScreen
+          authToken={authToken}
+          patientId={selectedPatientId}
+          onBack={() => setSelectedPatientId(null)}
+          c={c}
+        />
+      );
+    }
+
+    if (showPatients) {
+      return (
+        <TherapistPatientsScreen
+          authToken={authToken}
+          onBack={() => setShowPatients(false)}
+          onSelectPatient={setSelectedPatientId}
+          c={c}
+        />
+      );
+    }
+
     return (
       <>
         <TherapyTabTherapist
@@ -234,26 +228,14 @@ export function TherapyTabScreen() {
           onLoadMySlots={loadMySlots}
           onLoadIncomingBookings={loadIncomingBookings}
           onOpenTherapistById={openTherapistById}
-          notifications={notifications}
-          dismissedNotifIds={dismissedNotifIds}
-          onShowNotifications={() => setShowNotifications(true)}
           onCancelSlot={handleCancelSlot}
           onTherapistCancelRequest={(id) => { setTherapistCancelBookingId(id); setShowTherapistCancelModal(true); }}
           onSelectTherapistDetailBooking={(booking) => { setTherapistCancelBookingId(booking.id); setShowTherapistCancelModal(true); }}
           setShowSlotComposerModal={setShowSlotComposer}
           loggedInTherapist={loggedInTherapist}
           onActivateBookingRequests={handleActivateBookingRequests}
+          onOpenPatients={() => setShowPatients(true)}
           c={c} t={t} styles={appStyles}
-        />
-        <NotificationSheet
-          visible={showNotifications}
-          onClose={() => setShowNotifications(false)}
-          notifications={notifications}
-          dismissedNotifIds={dismissedNotifIds}
-          dismissNotification={dismissNotification}
-          dismissAllNotifications={dismissAllNotifications}
-          onPressNotification={handleNotificationPress}
-          c={c} t={t}
         />
         <TherapistCancelModal
           visible={showTherapistCancelModal}
@@ -292,7 +274,7 @@ export function TherapyTabScreen() {
           {t('therapyLoginRequiredBody')}
         </Text>
         <Pressable
-          onPress={() => navigation.navigate(ROOT_ROUTES.MAIN_TABS, { screen: TAB_ROUTES.PROFILE })}
+          onPress={() => navigation.navigate(ROOT_ROUTES.LOGIN)}
           style={[appStyles.registerBtn, { backgroundColor: c.primary, paddingHorizontal: 40 }]}
         >
           <Text style={appStyles.registerBtnText}>{t('loginAction')}</Text>

@@ -11,7 +11,7 @@ import { translations } from '../i18n/translations';
 
 const PILL_SIZE = 44;
 
-export function CustomTabBar({ state, descriptors, navigation }) {
+export function CustomTabBar({ state, descriptors, navigation, badgeCounts = {} }) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
   const t = translations.de;
@@ -69,6 +69,7 @@ export function CustomTabBar({ state, descriptors, navigation }) {
           const iconName = focused ? baseIcon : `${baseIcon}-outline`;
           const label = options.title ?? t[TAB_TRANSLATION_KEYS[route.name]] ?? route.name;
           const nestedState = route.state;
+          const badgeCount = Number(badgeCounts[route.name] ?? 0);
 
           const onPress = () => {
             const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
@@ -104,6 +105,32 @@ export function CustomTabBar({ state, descriptors, navigation }) {
                   color={focused ? '#FFFFFF' : (c.textMuted ?? c.muted)}
                   style={{ includeFontPadding: false, textAlignVertical: 'center', textAlign: 'center' }}
                 />
+                {badgeCount > 0 ? (
+                  <View
+                    style={{
+                      position: 'absolute',
+                      top: 6,
+                      right: 4,
+                      minWidth: 16,
+                      height: 16,
+                      paddingHorizontal: badgeCount > 9 ? 4 : 0,
+                      borderRadius: 8,
+                      backgroundColor: focused ? '#FFFFFF' : c.error,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 10,
+                        fontWeight: '700',
+                        color: focused ? c.primary : '#FFFFFF',
+                      }}
+                    >
+                      {badgeCount > 99 ? '99+' : badgeCount}
+                    </Text>
+                  </View>
+                ) : null}
               </View>
               {!focused && (
                 <Text numberOfLines={1} style={{ fontSize: 11, color: c.textMuted ?? c.muted, marginTop: -SPACE.xs }}>{label}</Text>

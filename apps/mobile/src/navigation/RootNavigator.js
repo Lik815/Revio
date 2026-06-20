@@ -6,6 +6,9 @@ import { ROOT_ROUTES } from './route-names';
 import { LoginRouteScreen } from './screens/LoginRouteScreen';
 import { RegistrationRouteScreen } from './screens/RegistrationRouteScreen';
 import { useTheme } from '../hooks/use-theme';
+import { ProfileTabScreen } from '../screens/profile/ProfileScreen';
+import { TherapistProfileScreen } from '../screens/public/TherapistProfileScreen';
+import { PracticeProfileScreen } from '../screens/public/PracticeProfileScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -41,6 +44,9 @@ export function RootNavigator() {
         }}
       >
         <Stack.Screen component={AppTabs} name={ROOT_ROUTES.MAIN_TABS} />
+        <Stack.Screen component={ProfileTabScreen} name={ROOT_ROUTES.PROFILE} />
+        <Stack.Screen component={TherapistProfileScreen} name={ROOT_ROUTES.THERAPIST_PROFILE} />
+        <Stack.Screen component={PracticeProfileScreen} name={ROOT_ROUTES.PRACTICE_PROFILE} />
         <Stack.Screen component={LoginRouteScreen} name={ROOT_ROUTES.LOGIN} />
         <Stack.Screen component={RegistrationRouteScreen} name={ROOT_ROUTES.REGISTRATION} />
       </Stack.Navigator>

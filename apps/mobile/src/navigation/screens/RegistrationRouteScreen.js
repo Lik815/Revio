@@ -16,9 +16,12 @@ export function RegistrationRouteScreen() {
   const { c } = useTheme();
 
   const handleComplete = ({ landing } = {}) => {
-    const tab = landing === 'discover' ? TAB_ROUTES.DISCOVER : TAB_ROUTES.PROFILE;
     navigation.reset({ index: 0, routes: [{ name: ROOT_ROUTES.MAIN_TABS }] });
-    navigation.navigate(ROOT_ROUTES.MAIN_TABS, { screen: tab });
+    if (landing === 'discover') {
+      navigation.navigate(ROOT_ROUTES.MAIN_TABS, { screen: TAB_ROUTES.DISCOVER });
+      return;
+    }
+    navigation.navigate(ROOT_ROUTES.PROFILE);
   };
 
   return (

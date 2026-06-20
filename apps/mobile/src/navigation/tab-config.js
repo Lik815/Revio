@@ -4,7 +4,7 @@ export const TAB_ICON_BY_ROUTE = {
   [TAB_ROUTES.DISCOVER]:   'search',
   [TAB_ROUTES.THERAPY]:    'calendar',
   [TAB_ROUTES.FAVORITES]:  'heart',
-  [TAB_ROUTES.PROFILE]:    'person',
+  [TAB_ROUTES.NOTIFICATIONS]: 'notifications',
   [TAB_ROUTES.OPTIONS]:    'settings',
 };
 
@@ -12,7 +12,7 @@ export const TAB_TRANSLATION_KEYS = {
   [TAB_ROUTES.DISCOVER]:   'tabSearch',
   [TAB_ROUTES.THERAPY]:    'tabTherapy',
   [TAB_ROUTES.FAVORITES]:  'tabFavorites',
-  [TAB_ROUTES.PROFILE]:    'tabProfile',
+  [TAB_ROUTES.NOTIFICATIONS]: 'tabNotifications',
   [TAB_ROUTES.OPTIONS]:    'tabOptions',
 };
 
@@ -24,5 +24,5 @@ export const TAB_HOME_ROUTES = {
   [TAB_ROUTES.DISCOVER]:   'DiscoverHome',
   [TAB_ROUTES.THERAPY]:    'TherapyHome',
   [TAB_ROUTES.FAVORITES]:  'FavoritesHome',
-  [TAB_ROUTES.PROFILE]:    'ProfileHome',
+  [TAB_ROUTES.NOTIFICATIONS]: 'NotificationsHome',
 };

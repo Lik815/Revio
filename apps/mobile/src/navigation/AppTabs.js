@@ -5,13 +5,15 @@ import { ROOT_ROUTES, TAB_ROUTES } from './route-names';
 import { DiscoverTabScreen } from '../screens/discover/DiscoverScreen';
 import { TherapyTabScreen } from '../screens/therapy/TherapyScreen';
 import { FavoritesTabScreen } from '../screens/favorites/FavoritesScreen';
-import { ProfileTabScreen } from '../screens/profile/ProfileScreen';
+import { NotificationsTabScreen } from '../screens/notifications/NotificationsScreen';
 import { OptionsTabScreen } from '../screens/options/OptionsScreen';
 import { TherapistProfileScreen } from '../screens/public/TherapistProfileScreen';
 import { PracticeProfileScreen } from '../screens/public/PracticeProfileScreen';
 import { translations } from '../i18n/translations';
 import { CustomTabBar } from './CustomTabBar';
 import { TAB_TRANSLATION_KEYS } from './tab-config';
+import { appStoreSelectors, useAppStore } from '../store/useStore';
+import { useNotificationPolling } from '../hooks/use-notification-polling';
 
 const Tab = createBottomTabNavigator();
 const ProfileStack = createNativeStackNavigator();
@@ -35,14 +37,23 @@ function withProfileScreens(HomeComponent, homeName) {
 const DiscoverStack = withProfileScreens(DiscoverTabScreen, 'DiscoverHome');
 const FavoritesStack = withProfileScreens(FavoritesTabScreen, 'FavoritesHome');
 const TherapyStack = withProfileScreens(TherapyTabScreen, 'TherapyHome');
-const ProfileStackScreen = withProfileScreens(ProfileTabScreen, 'ProfileHome');
+const NotificationsStack = withProfileScreens(NotificationsTabScreen, 'NotificationsHome');
 
 export function AppTabs() {
   const t = translations.de;
+  const authToken = useAppStore(appStoreSelectors.authToken);
+  const accountType = useAppStore(appStoreSelectors.accountType);
+  const { notifications, dismissedNotifIds } = useNotificationPolling({ authToken, accountType });
+  const unreadNotifications = notifications.filter((n) => !dismissedNotifIds.has(n.id)).length;
 
   return (
     <Tab.Navigator
-      tabBar={(props) => <CustomTabBar {...props} />}
+      tabBar={(props) => (
+        <CustomTabBar
+          {...props}
+          badgeCounts={{ [TAB_ROUTES.NOTIFICATIONS]: unreadNotifications }}
+        />
+      )}
       screenOptions={{ headerShown: false }}
     >
       <Tab.Screen
@@ -61,9 +72,9 @@ export function AppTabs() {
         options={{ title: t[TAB_TRANSLATION_KEYS[TAB_ROUTES.THERAPY]] }}
       />
       <Tab.Screen
-        component={ProfileStackScreen}
-        name={TAB_ROUTES.PROFILE}
-        options={{ title: t[TAB_TRANSLATION_KEYS[TAB_ROUTES.PROFILE]] }}
+        component={NotificationsStack}
+        name={TAB_ROUTES.NOTIFICATIONS}
+        options={{ title: t[TAB_TRANSLATION_KEYS[TAB_ROUTES.NOTIFICATIONS]] }}
       />
       <Tab.Screen
         component={OptionsTabScreen}

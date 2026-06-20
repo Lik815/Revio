@@ -1,6 +1,7 @@
 export const ROOT_ROUTES = {
   AUTH: 'Auth',
   MAIN_TABS: 'MainTabs',
+  PROFILE: 'Profile',
   THERAPIST_PROFILE: 'TherapistProfile',
   PRACTICE_PROFILE: 'PracticeProfile',
   LOGIN: 'Login',
@@ -11,6 +12,6 @@ export const TAB_ROUTES = {
   DISCOVER:   'DiscoverTab',
   THERAPY:    'TherapyTab',
   FAVORITES:  'FavoritesTab',
-  PROFILE:    'ProfileTab',
+  NOTIFICATIONS: 'NotificationsTab',
   OPTIONS:    'OptionsTab',
 };
