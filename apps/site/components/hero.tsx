@@ -72,14 +72,14 @@ export function Hero({
               />
 
               <div className="store-badges" aria-label="App Download Buttons">
-                <a href="#" className="store-badge" aria-disabled="true" onClick={(event) => event.preventDefault()}>
+                <div className="store-badge" aria-hidden="true">
                   <span className="store-badge__overline">Download on the</span>
                   <span className="store-badge__label">App Store</span>
-                </a>
-                <a href="#" className="store-badge" aria-disabled="true" onClick={(event) => event.preventDefault()}>
+                </div>
+                <div className="store-badge" aria-hidden="true">
                   <span className="store-badge__overline">Get it on</span>
                   <span className="store-badge__label">Google Play</span>
-                </a>
+                </div>
               </div>
             </div>
           </div>
