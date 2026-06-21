@@ -12,7 +12,13 @@ import {
 import {
   RADIUS,
   formatDayHeader,
+  kassenartOptions,
 } from '../utils/app-utils';
+import { useConfigOptions } from '../hooks/use-config-options';
+
+function resolveKassenartLabel(key) {
+  return kassenartOptions.find((opt) => opt.key === key)?.label ?? null;
+}
 import { DeclineBookingModal } from '../modals/DeclineBookingModal';
 
 const SLOT_DURATIONS = [20, 30, 40, 50, 60];
@@ -420,6 +426,7 @@ function FreeSlotCard({ c, slot, onCancelSlot, deletingSlotIds }) {
 }
 
 function BookedSlotCard({ c, slot, booking, onRespond, onTherapistCancel, onOpenDetail }) {
+  const { heilmittelOptions } = useConfigOptions();
   const [loading, setLoading] = useState(false);
   const [showDeclineModal, setShowDeclineModal] = useState(false);
   const [error, setError] = useState('');
@@ -498,6 +505,14 @@ function BookedSlotCard({ c, slot, booking, onRespond, onTherapistCancel, onOpen
             ) : null}
             {booking?.patientPhone ? (
               <Text style={{ fontSize: 12, color: c.muted, marginTop: 1 }}>{booking.patientPhone}</Text>
+            ) : null}
+            {booking?.heilmittel || booking?.kassenart ? (
+              <Text style={{ fontSize: 12, color: c.muted, marginTop: 1 }}>
+                {[
+                  heilmittelOptions.find((opt) => opt.key === booking.heilmittel)?.label,
+                  resolveKassenartLabel(booking.kassenart),
+                ].filter(Boolean).join(' · ')}
+              </Text>
             ) : null}
             {booking?.message ? (
               <Text style={{ fontSize: 12, color: c.muted, fontStyle: 'italic', marginTop: 3 }}>„{booking.message}"</Text>

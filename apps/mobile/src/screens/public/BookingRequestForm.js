@@ -11,7 +11,8 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { getBaseUrl, RADIUS, SPACE, TYPE } from '../../utils/app-utils';
+import { getBaseUrl, kassenartOptions, RADIUS, SPACE, TYPE } from '../../utils/app-utils';
+import { useConfigOptions } from '../../hooks/use-config-options';
 
 function formatSlot(startsAt, durationMin) {
   if (!startsAt) return '—';
@@ -23,14 +24,22 @@ function formatSlot(startsAt, durationMin) {
 
 export function BookingRequestForm({ c, t, therapist, authToken, availableSlots, slotsLoading, onSuccess, onClose, onReloadSlots }) {
   const insets = useSafeAreaInsets();
+  const { heilmittelOptions } = useConfigOptions();
   const [selectedSlotId, setSelectedSlotId] = useState(therapist?.selectedSlotId ?? null);
   const [message, setMessage] = useState('');
   const [consent, setConsent] = useState(false);
+  const [selectedHeilmittel, setSelectedHeilmittel] = useState(null);
+  const [selectedKassenart, setSelectedKassenart] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [rejectedSlotId, setRejectedSlotId] = useState(null);
   const [rejectedSlotLabel, setRejectedSlotLabel] = useState('');
+
+  const availableHeilmittel = heilmittelOptions.filter(
+    (opt) => Array.isArray(therapist?.heilmittel) && therapist.heilmittel.includes(opt.key),
+  );
+  const insuranceOptions = kassenartOptions.filter((opt) => opt.key != null);
 
   const slots = (Array.isArray(availableSlots) ? availableSlots : []).filter(s => s?.id !== rejectedSlotId).reduce((acc, slot) => {
     const slotKey = `${slot?.startsAt ?? 'unknown'}-${slot?.durationMin ?? 20}`;
@@ -66,6 +75,8 @@ export function BookingRequestForm({ c, t, therapist, authToken, availableSlots,
 
   async function handleSubmit() {
     if (!selectedSlotId) { setError('Bitte wähle einen Termin aus.'); return; }
+    if (availableHeilmittel.length > 0 && !selectedHeilmittel) { setError('Bitte wähle ein Heilmittel aus.'); return; }
+    if (!selectedKassenart) { setError('Bitte gib an, wie du versichert bist.'); return; }
     if (!consent) { setError('Bitte stimme der Datenschutzerklärung zu.'); return; }
     setError('');
     setLoading(true);
@@ -78,6 +89,8 @@ export function BookingRequestForm({ c, t, therapist, authToken, availableSlots,
           slotId: selectedSlotId,
           message: message.trim() || undefined,
           consentAccepted: true,
+          heilmittel: selectedHeilmittel ?? undefined,
+          kassenart: selectedKassenart ?? undefined,
         }),
       });
       const data = await res.json();
@@ -230,6 +243,64 @@ export function BookingRequestForm({ c, t, therapist, authToken, availableSlots,
           })}
         </View>
       )}
+
+      {/* Heilmittel */}
+      {availableHeilmittel.length > 0 && (
+        <View style={{ marginBottom: SPACE.md }}>
+          <Text style={{ ...TYPE.label, color: c.text, marginBottom: SPACE.sm }}>Heilmittel</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            {availableHeilmittel.map((opt) => {
+              const active = selectedHeilmittel === opt.key;
+              return (
+                <Pressable
+                  key={opt.key}
+                  onPress={() => setSelectedHeilmittel(opt.key)}
+                  style={{
+                    flexDirection: 'row', alignItems: 'center', gap: 6,
+                    paddingVertical: 8, paddingHorizontal: 14,
+                    borderRadius: RADIUS.lg, borderWidth: 1.5,
+                    borderColor: active ? c.primary : c.border,
+                    backgroundColor: active ? c.primaryBg : c.mutedBg,
+                  }}
+                >
+                  {active && <Ionicons name="checkmark" size={14} color={c.primary} />}
+                  <Text style={{ fontSize: 13, color: active ? c.primary : c.muted, fontWeight: active ? '600' : '400' }}>
+                    {opt.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      )}
+
+      {/* Kassenart */}
+      <View style={{ marginBottom: SPACE.md }}>
+        <Text style={{ ...TYPE.label, color: c.text, marginBottom: SPACE.sm }}>Wie bist du versichert?</Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+          {insuranceOptions.map((opt) => {
+            const active = selectedKassenart === opt.key;
+            return (
+              <Pressable
+                key={opt.key}
+                onPress={() => setSelectedKassenart(opt.key)}
+                style={{
+                  flexDirection: 'row', alignItems: 'center', gap: 6,
+                  paddingVertical: 8, paddingHorizontal: 14,
+                  borderRadius: RADIUS.lg, borderWidth: 1.5,
+                  borderColor: active ? c.primary : c.border,
+                  backgroundColor: active ? c.primaryBg : c.mutedBg,
+                }}
+              >
+                {active && <Ionicons name="checkmark" size={14} color={c.primary} />}
+                <Text style={{ fontSize: 13, color: active ? c.primary : c.muted, fontWeight: active ? '600' : '400' }}>
+                  {opt.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
 
       {/* Message */}
       <Text style={{ ...TYPE.label, color: c.text, marginBottom: SPACE.xs }}>Nachricht (optional)</Text>

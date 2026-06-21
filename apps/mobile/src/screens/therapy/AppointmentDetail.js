@@ -3,10 +3,11 @@ import {
   Image, Linking, Pressable, ScrollView, Text, View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { getBaseUrl, resolveMediaUrl, SHADOW, SPACE, TUNNEL_HEADERS } from '../../utils/app-utils';
+import { getBaseUrl, kassenartOptions, resolveMediaUrl, SHADOW, SPACE, TUNNEL_HEADERS } from '../../utils/app-utils';
 import { STATUS_COLORS } from './AppointmentCards';
 import { TabHeader } from '../../components/TabHeader';
 import { ReviewComposerModal } from '../../components/ReviewComposerModal';
+import { useConfigOptions } from '../../hooks/use-config-options';
 
 export function AppointmentDetail({
   appointment,
@@ -26,6 +27,9 @@ export function AppointmentDetail({
   const therapistPhoto = resolveMediaUrl(therapist?.photo);
   const hasMessage = typeof appointment?.message === 'string' && appointment.message.trim().length > 0;
   const isActive = appointment?.status === 'PENDING' || appointment?.status === 'CONFIRMED';
+  const { heilmittelOptions } = useConfigOptions();
+  const heilmittelLabel = heilmittelOptions.find((opt) => opt.key === appointment?.heilmittel)?.label ?? null;
+  const kassenartLabel = kassenartOptions.find((opt) => opt.key === appointment?.kassenart)?.label ?? null;
 
   const date = slotDate ? new Date(slotDate) : null;
   const bigDateLabel = date
@@ -140,6 +144,19 @@ export function AppointmentDetail({
             <View style={{ gap: 6 }}>
               <Text style={{ fontSize: 12, fontWeight: '700', letterSpacing: 0.4, color: c.muted, textTransform: 'uppercase' }}>Deine Nachricht</Text>
               <Text style={{ fontSize: 14, lineHeight: 21, color: c.muted, fontStyle: 'italic' }}>"{appointment.message.trim()}"</Text>
+            </View>
+          </>
+        ) : null}
+
+        {/* Heilmittel / Kassenart */}
+        {heilmittelLabel || kassenartLabel ? (
+          <>
+            <View style={{ height: 1, backgroundColor: c.border }} />
+            <View style={{ gap: 6 }}>
+              <Text style={{ fontSize: 12, fontWeight: '700', letterSpacing: 0.4, color: c.muted, textTransform: 'uppercase' }}>Heilmittel & Versicherung</Text>
+              <Text style={{ fontSize: 14, lineHeight: 21, color: c.text }}>
+                {[heilmittelLabel, kassenartLabel].filter(Boolean).join(' · ')}
+              </Text>
             </View>
           </>
         ) : null}

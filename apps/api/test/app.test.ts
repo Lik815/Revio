@@ -2778,6 +2778,34 @@ describe('Slot-based Booking', () => {
     expect(updatedSlot?.status).toBe('BOOKED');
   });
 
+  it('POST /bookings — accepts a valid heilmittel + kassenart and stores it', async () => {
+    await prisma.therapist.update({ where: { id: therapistId }, data: { heilmittel: 'KG,MT' } });
+    const slot = await createFutureSlot();
+
+    const res = await app.inject({
+      method: 'POST', url: '/bookings',
+      headers: { authorization: `Bearer ${patientToken}`, 'content-type': 'application/json' },
+      payload: { therapistId, slotId: slot.id, consentAccepted: true, heilmittel: 'KG', kassenart: 'gesetzlich' },
+    });
+    expect(res.statusCode).toBe(201);
+
+    const created = await prisma.bookingRequest.findUnique({ where: { id: res.json().id } });
+    expect(created?.heilmittel).toBe('KG');
+    expect(created?.kassenart).toBe('gesetzlich');
+  });
+
+  it('POST /bookings — rejects a heilmittel the therapist does not offer', async () => {
+    await prisma.therapist.update({ where: { id: therapistId }, data: { heilmittel: 'KG' } });
+    const slot = await createFutureSlot();
+
+    const res = await app.inject({
+      method: 'POST', url: '/bookings',
+      headers: { authorization: `Bearer ${patientToken}`, 'content-type': 'application/json' },
+      payload: { therapistId, slotId: slot.id, consentAccepted: true, heilmittel: 'MT', kassenart: 'gesetzlich' },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
   it('POST /bookings — rejects unapproved therapists', async () => {
     const slot = await createFutureSlot();
     await prisma.therapist.update({

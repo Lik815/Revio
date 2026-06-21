@@ -297,6 +297,8 @@ model BookingRequest {
   preferredDays        String               @default("")
   preferredTimeWindows String               @default("")
   message              String?
+  heilmittel           String?
+  kassenart            String?
   declinedReason       String?
   consentAcceptedAt    DateTime
   createdAt            DateTime             @default(now())

@@ -3,9 +3,10 @@ import {
   ActivityIndicator, Linking, Pressable, ScrollView, Text, View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { getBaseUrl, RADIUS, SHADOW, SPACE, TUNNEL_HEADERS } from '../../utils/app-utils';
+import { getBaseUrl, kassenartOptions, RADIUS, SHADOW, SPACE, TUNNEL_HEADERS } from '../../utils/app-utils';
 import { TabHeader } from '../../components/TabHeader';
 import { STATUS_COLORS } from './AppointmentCards';
+import { useConfigOptions } from '../../hooks/use-config-options';
 
 function formatAppointmentDate(appointment) {
   const slotDate = appointment.slot?.startsAt ?? appointment.confirmedSlotAt ?? null;
@@ -17,7 +18,10 @@ function formatAppointmentDate(appointment) {
 }
 
 function AppointmentRow({ c, appointment }) {
+  const { heilmittelOptions } = useConfigOptions();
   const badge = STATUS_COLORS[appointment.status] ?? STATUS_COLORS.EXPIRED;
+  const heilmittelLabel = heilmittelOptions.find((opt) => opt.key === appointment.heilmittel)?.label ?? null;
+  const kassenartLabel = kassenartOptions.find((opt) => opt.key === appointment.kassenart)?.label ?? null;
   return (
     <View style={{ backgroundColor: c.card, borderRadius: RADIUS.md, borderWidth: 1, borderColor: c.border, padding: SPACE.md, marginBottom: SPACE.sm }}>
       <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
@@ -26,6 +30,11 @@ function AppointmentRow({ c, appointment }) {
           <Text style={{ fontSize: 11, fontWeight: '700', color: badge.text }}>{badge.label}</Text>
         </View>
       </View>
+      {heilmittelLabel || kassenartLabel ? (
+        <Text style={{ fontSize: 12, color: c.muted, marginTop: 8 }}>
+          {[heilmittelLabel, kassenartLabel].filter(Boolean).join(' · ')}
+        </Text>
+      ) : null}
       {appointment.message ? (
         <Text style={{ fontSize: 13, color: c.muted, fontStyle: 'italic', marginTop: 8 }}>„{appointment.message}"</Text>
       ) : null}

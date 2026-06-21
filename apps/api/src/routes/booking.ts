@@ -25,6 +25,9 @@ function canUseBookingMode(therapist: { reviewStatus?: string | null; bookingMod
     && therapist.bookingMode === 'FIRST_APPOINTMENT_REQUEST';
 }
 
+const splitList = (value: string) =>
+  value.split(',').map((s) => s.trim()).filter(Boolean);
+
 function serializeSlot(slot: { id: string; startsAt: Date; durationMin: number; status: string } | null | undefined) {
   if (!slot) return null;
   return { id: slot.id, startsAt: slot.startsAt.toISOString(), durationMin: slot.durationMin, status: slot.status };
@@ -37,6 +40,8 @@ type PatientBooking = {
   confirmedSlotAt: Date | null;
   respondedAt: Date | null;
   message: string | null;
+  heilmittel: string | null;
+  kassenart: string | null;
   declinedReason: string | null;
   patientPhone: string | null;
   slot: { id: string; startsAt: Date; durationMin: number; status: string } | null;
@@ -77,6 +82,8 @@ function serializePatientAppointment(booking: PatientBooking): TherapistPatientA
     createdAt: booking.createdAt.toISOString(),
     respondedAt: booking.respondedAt?.toISOString() ?? null,
     message: booking.message,
+    heilmittel: booking.heilmittel,
+    kassenart: booking.kassenart,
     declinedReason: booking.declinedReason,
   };
 }
@@ -277,6 +284,8 @@ export async function bookingRoutes(fastify: FastifyInstance) {
       slotId: z.string(),
       message: z.string().max(1000).optional(),
       consentAccepted: z.literal(true),
+      heilmittel: z.string().optional(),
+      kassenart: z.enum(['gesetzlich', 'privat', 'selbstzahler']).optional(),
       // Legacy-Felder werden ignoriert, damit bestehende Mobile-Calls nicht brechen
       preferredDays: z.string().optional(),
       preferredTimeWindows: z.string().optional(),
@@ -288,13 +297,16 @@ export async function bookingRoutes(fastify: FastifyInstance) {
     const parsed = schema.safeParse(request.body);
     if (!parsed.success) return reply.status(400).send({ error: 'Invalid request', details: parsed.error.flatten() });
 
-    const { therapistId, slotId, message } = parsed.data;
+    const { therapistId, slotId, message, heilmittel, kassenart } = parsed.data;
 
     // Therapeut und Modus prüfen
     const therapist = await fastify.prisma.therapist.findUnique({ where: { id: therapistId } });
     if (!therapist) return reply.status(404).send({ error: 'Therapist not found' });
     if (!canUseBookingMode(therapist)) {
       return reply.status(400).send({ error: 'This therapist does not accept booking requests' });
+    }
+    if (heilmittel && !splitList(therapist.heilmittel ?? '').includes(heilmittel)) {
+      return reply.status(400).send({ error: 'Dieses Heilmittel wird von diesem Therapeuten nicht angeboten.' });
     }
 
     // Patientenname aus Account ableiten
@@ -326,6 +338,8 @@ export async function bookingRoutes(fastify: FastifyInstance) {
             consentAcceptedAt: now,
             responseDueAt: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),
             message,
+            heilmittel,
+            kassenart,
           },
           include: { slot: true },
         });
