@@ -1,8 +1,9 @@
 import Link from 'next/link';
 import { Hero } from '../components/hero';
+import { RevioStory } from '../components/revio-story';
 import { Section } from '../components/section';
 import { getPublishedBlogPosts } from '../lib/blog';
-import { homeHighlights, patientBenefits, therapistBenefits } from '../lib/content';
+import { patientBenefits, therapistBenefits } from '../lib/content';
 
 export default async function HomePage() {
   const blogPosts = await getPublishedBlogPosts();
@@ -21,21 +22,7 @@ export default async function HomePage() {
         chips={['Rückenschmerzen', 'Kniereha', 'Sportphysiotherapie']}
       />
 
-      <Section
-        eyebrow="So funktioniert Revio"
-        title="In vier Schritten zum richtigen Therapeuten."
-        body="Kein überladener Buchungsprozess. Revio bringt dich direkt dahin, wo es zählt: die richtige Therapie finden und unkompliziert anfragen."
-      >
-        <div className="flow-steps">
-          {homeHighlights.map((item, i) => (
-            <div key={item.title} className="flow-step">
-              <span className="flow-step__num">{i + 1}</span>
-              <h3>{item.title}</h3>
-              <p>{item.body}</p>
-            </div>
-          ))}
-        </div>
-      </Section>
+      <RevioStory />
 
       <Section
         eyebrow="Für Patienten"

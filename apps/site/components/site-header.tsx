@@ -23,7 +23,7 @@ export function SiteHeader() {
 
         <div className="site-header__actions">
           <Link href="/contact" className="button button--primary site-header__cta">
-            Interesse anmelden
+            Anmeldung
           </Link>
           <button
             className="hamburger"
@@ -52,7 +52,7 @@ export function SiteHeader() {
               </Link>
             ))}
             <Link href="/contact" className="button button--primary mobile-menu__cta" onClick={() => setOpen(false)}>
-              Interesse anmelden
+              Anmeldung
             </Link>
           </nav>
         </div>
