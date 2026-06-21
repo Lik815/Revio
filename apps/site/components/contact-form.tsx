@@ -4,8 +4,8 @@ import emailjs from '@emailjs/browser';
 import { FormEvent, useState } from 'react';
 
 const roleOptions = [
-  { value: 'Patient:in', label: 'Patient:in' },
-  { value: 'Therapeut:in', label: 'Therapeut:in' },
+  { value: 'Patient', label: 'Patient' },
+  { value: 'Therapeut', label: 'Therapeut' },
 ];
 
 type Status = 'idle' | 'sending' | 'success' | 'error';

@@ -7,19 +7,19 @@ export default function PatientsPage() {
   return (
     <>
       <Hero
-        eyebrow="Für Patient:innen"
+        eyebrow="Für Patienten"
         title="Passende Physiotherapie ohne Umwege finden"
-        body="Revio hilft dabei, Physiotherapeut:innen nach Spezialisierung, Standort und Angebot klarer zu entdecken."
+        body="Revio hilft dabei, Physiotherapeuten nach Spezialisierung, Standort und Angebot klarer zu entdecken."
         primaryHref="/contact"
         primaryLabel="Kontakt aufnehmen"
         secondaryHref="/therapists"
-        secondaryLabel="Therapeut:innen entdecken"
+        secondaryLabel="Therapeuten entdecken"
         hideImage
       />
 
       <Section
         eyebrow="Was Revio hilft"
-        title="Worauf Patient:innen sich konzentrieren können"
+        title="Worauf Patienten sich konzentrieren können"
         body="Die Website erklärt den Wert des Produkts, ohne einen künstlich komplexen Buchungsprozess zu versprechen."
       >
         <div className="card-grid">
@@ -41,7 +41,7 @@ export default function PatientsPage() {
           <div className="surface-card">
             <h3>Was Revio im MVP tut</h3>
             <ul className="check-list">
-              <li>Therapeut:innen auffindbar machen</li>
+              <li>Therapeuten auffindbar machen</li>
               <li>Profile verständlich darstellen</li>
               <li>Kontakt und Orientierung vereinfachen</li>
             </ul>
@@ -65,7 +65,7 @@ export default function PatientsPage() {
         <div className="cta-banner">
           <div>
             <h3>Fragen oder frühes Interesse</h3>
-            <p>Wir freuen uns über Hinweise aus echter Versorgungspraxis und echte Bedürfnisse auf Patient:innenseite.</p>
+            <p>Wir freuen uns über Hinweise aus echter Versorgungspraxis und echte Bedürfnisse auf Patientenseite.</p>
           </div>
           <div className="cta-banner__actions">
             <Link href="/contact" className="button button--primary">

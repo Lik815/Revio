@@ -3,9 +3,9 @@ export const siteConfig = {
   contactEmail: 'admin@my-revio.de',
   nav: [
     { href: '/', label: 'Startseite' },
-    { href: '/finden', label: 'Therapeut:innen finden' },
-    { href: '/patients', label: 'Für Patient:innen' },
-    { href: '/therapists', label: 'Für Therapeut:innen' },
+    { href: '/finden', label: 'Therapeuten finden' },
+    { href: '/patients', label: 'Für Patienten' },
+    { href: '/therapists', label: 'Für Therapeuten' },
     { href: '/blog', label: 'Blog' },
     { href: '/about', label: 'Über Revio' },
     { href: '/contact', label: 'Kontakt' },
@@ -23,7 +23,7 @@ export const homeHighlights = [
   },
   {
     title: 'Passende Physios finden',
-    body: 'Geprüfte Therapeut:innen nach Fachgebiet, Standort, Hausbesuch und Verfügbarkeit.',
+    body: 'Geprüfte Therapeuten nach Fachgebiet, Standort, Hausbesuch und Verfügbarkeit.',
   },
   {
     title: 'Profile vergleichen',
@@ -37,11 +37,11 @@ export const homeHighlights = [
 
 export const patientBenefits = [
   {
-    title: 'Passende Physiotherapeut:innen nach Fachgebiet entdecken',
+    title: 'Passende Physiotherapeuten nach Fachgebiet entdecken',
     body: 'Filtere nach Spezialisierung wie Sportphysio, Neurologie oder manuelle Therapie — und finde direkt den richtigen Fachbereich für dein Beschwerdebild.',
   },
   {
-    title: 'Therapeut:innen in der Nähe oder für mobile Behandlungen finden',
+    title: 'Therapeuten in der Nähe oder für mobile Behandlungen finden',
     body: 'Suche nach Standort oder aktiviere die Option für Hausbesuche — Revio zeigt dir transparent, wer in deiner Nähe behandelt und wer zu dir kommt.',
   },
   {
@@ -57,10 +57,10 @@ export const patientBenefits = [
 export const therapistBenefits = [
   {
     title: 'Mit einem professionellen Profil sichtbar werden',
-    body: 'Dein Revio-Profil zeigt Fachgebiete, Qualifikationen und Schwerpunkte klar strukturiert — damit Patient:innen dich fachlich einordnen können.',
+    body: 'Dein Revio-Profil zeigt Fachgebiete, Qualifikationen und Schwerpunkte klar strukturiert — damit Patienten dich fachlich einordnen können.',
   },
   {
-    title: 'Von passenden Patient:innen besser gefunden werden',
+    title: 'Von passenden Patienten besser gefunden werden',
     body: 'Revio bringt dich nicht in eine endlose Liste, sondern matcht dich mit Menschen, deren Beschwerdebild zu deiner Expertise passt.',
   },
   {

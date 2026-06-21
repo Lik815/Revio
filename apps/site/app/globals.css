@@ -483,10 +483,60 @@ h3 {
   min-width: 0;
 }
 
+.hero-device__stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+}
+
 .hero-device__image {
   display: block;
   width: 71.5mm;
   height: 149.6mm;
+}
+
+.store-badges {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.store-badge {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 64px;
+  padding: 12px 18px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+  text-align: left;
+  transition: transform 140ms ease, border-color 140ms ease;
+}
+
+.store-badge:hover {
+  transform: translateY(-1px);
+  border-color: rgba(62, 98, 113, 0.28);
+}
+
+.store-badge__overline {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.store-badge__label {
+  color: var(--ink);
+  font-size: 1.15rem;
+  font-weight: 800;
+  line-height: 1.15;
+  margin-top: 3px;
+  white-space: nowrap;
 }
 
 .section {
@@ -763,6 +813,10 @@ h3 {
   .hero-device__image {
     width: min(78vw, 300px);
     height: auto;
+  }
+
+  .store-badges {
+    width: min(100%, 420px);
   }
 
   .cta-banner {

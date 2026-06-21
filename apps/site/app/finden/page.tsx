@@ -5,8 +5,8 @@ import { TherapistResultCard } from '../../components/therapist-result-card';
 import { PracticeResultCard } from '../../components/practice-result-card';
 
 export const metadata: Metadata = {
-  title: 'Physiotherapeut:innen finden',
-  description: 'Suche geprüfte Physiotherapeut:innen nach Beschwerde, Spezialisierung und Ort.',
+  title: 'Physiotherapeuten finden',
+  description: 'Suche geprüfte Physiotherapeuten nach Beschwerde, Spezialisierung und Ort.',
 };
 
 type FindenSearchParams = {
@@ -35,9 +35,9 @@ export default async function FindenPage({
         <div className="shell">
           <div className="section-heading">
             <div className="eyebrow">Suche</div>
-            <h1>Physiotherapeut:innen finden</h1>
+            <h1>Physiotherapeuten finden</h1>
             <p className="section-copy">
-              Gib an, wobei du Hilfe brauchst und in welcher Stadt — wir zeigen dir geprüfte Therapeut:innen in deiner Nähe.
+              Gib an, wobei du Hilfe brauchst und in welcher Stadt — wir zeigen dir geprüfte Therapeuten in deiner Nähe.
             </p>
           </div>
           <SearchBar defaultQuery={query} />
@@ -58,10 +58,10 @@ export default async function FindenPage({
       <div className="shell">
         <div className="section-heading">
           <div className="eyebrow">Suche</div>
-          <h1>Physiotherapeut:innen finden</h1>
+          <h1>Physiotherapeuten finden</h1>
           <p className="section-copy">
             {therapists.length > 0
-              ? `${therapists.length} Therapeut:in${therapists.length === 1 ? '' : 'nen'} in ${city}${query ? ` für „${query}“` : ''}.`
+              ? `${therapists.length} ${therapists.length === 1 ? 'Therapeut' : 'Therapeuten'} in ${city}${query ? ` für „${query}“` : ''}.`
               : `Keine Treffer für „${query || 'Physiotherapie'}“ in ${city}.`}
           </p>
         </div>

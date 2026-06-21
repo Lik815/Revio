@@ -13,7 +13,7 @@ export default function AboutPage() {
         primaryHref="/contact"
         primaryLabel="Kontakt"
         secondaryHref="/patients"
-        secondaryLabel="Für Patient:innen"
+        secondaryLabel="Für Patienten"
         hideImage
       />
 
@@ -40,7 +40,7 @@ export default function AboutPage() {
         <div className="cta-banner">
           <div>
             <h3>Interesse oder Fragen?</h3>
-            <p>Wir freuen uns über Austausch — ob als Patient:in, Therapeut:in oder einfach Neugierige:r.</p>
+            <p>Wir freuen uns über Austausch — ob als Patient, Therapeut oder einfach aus Interesse.</p>
           </div>
           <div className="cta-banner__actions">
             <Link href="/contact" className="button button--primary">
@@ -78,7 +78,7 @@ export default function AboutPage() {
       <Section
         eyebrow="Kontakt"
         title="Interesse an Revio?"
-        body="Ob als Patient:in, Therapeut:in oder mit allgemeiner Frage — wir freuen uns über Nachrichten."
+        body="Ob als Patient, Therapeut oder mit allgemeiner Frage — wir freuen uns über Nachrichten."
       >
         <div className="cta-banner">
           <div>
@@ -90,7 +90,7 @@ export default function AboutPage() {
               Nachricht senden
             </Link>
             <Link href="/patients" className="button button--ghost">
-              Für Patient:innen
+              Für Patienten
             </Link>
           </div>
         </div>

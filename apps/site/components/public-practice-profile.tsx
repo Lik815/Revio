@@ -76,7 +76,7 @@ export function PublicPracticeProfile({
         ) : null}
 
         <div className="surface-card" style={{ marginTop: 20 }}>
-          <h3>Therapeut:innen ({therapists.length})</h3>
+          <h3>Therapeuten ({therapists.length})</h3>
           {therapists.length === 0 ? (
             <p style={{ marginTop: 8 }}>Aktuell keine öffentlichen Profile in dieser Praxis.</p>
           ) : (

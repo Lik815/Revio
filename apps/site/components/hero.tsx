@@ -3,7 +3,7 @@ import Image from 'next/image';
 import { HeroSearchBar } from './hero-search-bar';
 
 type HeroProps = {
-  eyebrow: string;
+  eyebrow?: string;
   title: string;
   body: string;
   primaryHref: string;
@@ -31,7 +31,7 @@ export function Hero({
     <section className={`hero${hideImage ? ' hero--no-image' : ''}`}>
       <div className={`shell${hideImage ? '' : ' hero__grid'}`}>
         <div className="hero__copy">
-          <div className="eyebrow">{eyebrow}</div>
+          {eyebrow ? <div className="eyebrow">{eyebrow}</div> : null}
           <h1>{title}</h1>
           <p className="hero__body">{body}</p>
 
@@ -61,14 +61,27 @@ export function Hero({
 
         {!hideImage && (
           <div className="hero-device">
-            <Image
-              src="/media/AppShowWeb-phone.png"
-              alt="Revio App auf einem Smartphone"
-              width={683}
-              height={1468}
-              className="hero-device__image"
-              priority
-            />
+            <div className="hero-device__stack">
+              <Image
+                src="/media/AppShowWeb-phone.png"
+                alt="Revio App auf einem Smartphone"
+                width={683}
+                height={1468}
+                className="hero-device__image"
+                priority
+              />
+
+              <div className="store-badges" aria-label="App Download Buttons">
+                <a href="#" className="store-badge" aria-disabled="true" onClick={(event) => event.preventDefault()}>
+                  <span className="store-badge__overline">Download on the</span>
+                  <span className="store-badge__label">App Store</span>
+                </a>
+                <a href="#" className="store-badge" aria-disabled="true" onClick={(event) => event.preventDefault()}>
+                  <span className="store-badge__overline">Get it on</span>
+                  <span className="store-badge__label">Google Play</span>
+                </a>
+              </div>
+            </div>
           </div>
         )}
       </div>

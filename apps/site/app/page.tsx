@@ -11,13 +11,12 @@ export default async function HomePage() {
   return (
     <>
       <Hero
-        eyebrow="Revio"
         title="Den richtigen Physio für dein Problem finden."
-        body="Geprüfte Physiotherapeut:innen in deiner Nähe — nach Beschwerde, Spezialisierung und Verfügbarkeit."
+        body="Geprüfte Physiotherapeuten in deiner Nähe — nach Beschwerde, Spezialisierung und Verfügbarkeit."
         primaryHref="/patients"
-        primaryLabel="Für Patient:innen"
+        primaryLabel="Für Patienten"
         secondaryHref="/therapists"
-        secondaryLabel="Für Therapeut:innen"
+        secondaryLabel="Für Therapeuten"
         searchPlaceholder="Wobei brauchst du Hilfe?"
         chips={['Rückenschmerzen', 'Kniereha', 'Sportphysiotherapie']}
       />
@@ -39,9 +38,9 @@ export default async function HomePage() {
       </Section>
 
       <Section
-        eyebrow="Für Patient:innen"
+        eyebrow="Für Patienten"
         title="Passende Physiotherapie ohne Umwege"
-        body="Ob Rückenschmerzen, Reha oder neurologische Beschwerden: Revio zeigt dir geprüfte Therapeut:innen nach Fachgebiet, Standort und freien Terminen."
+        body="Ob Rückenschmerzen, Reha oder neurologische Beschwerden: Revio zeigt dir geprüfte Therapeuten nach Fachgebiet, Standort und freien Terminen."
       >
         <div className="split-panel">
           <div className="surface-card">
@@ -58,16 +57,16 @@ export default async function HomePage() {
               Beschwerde eingeben. Passende Physios finden. Direkt anfragen — ohne komplizierte Terminlogik oder zehn offene Tabs.
             </p>
             <Link href="/patients" className="button button--ghost" style={{ marginTop: 16 }}>
-              Mehr für Patient:innen
+              Mehr für Patienten
             </Link>
           </div>
         </div>
       </Section>
 
       <Section
-        eyebrow="Für Therapeut:innen"
+        eyebrow="Für Therapeuten"
         title="Sichtbar werden. Professionell auftreten."
-        body="Revio gibt Physiotherapeut:innen einen klaren, medizinisch glaubwürdigen digitalen Auftritt — und bringt sie mit Patient:innen zusammen, deren Beschwerden zur eigenen Expertise passen."
+        body="Revio gibt Physiotherapeuten einen klaren, medizinisch glaubwürdigen digitalen Auftritt — und bringt sie mit Patienten zusammen, deren Beschwerden zur eigenen Expertise passen."
       >
         <div className="split-panel">
           <div className="surface-card surface-card--tall">
@@ -80,10 +79,10 @@ export default async function HomePage() {
           <div className="quote-card">
             <h3>Kein Marketplace-Lärm</h3>
             <p>
-              Finde geprüfte Therapeut:innen nach Spezialisierung, Ort, Hausbesuch und freien Terminen — in einem Umfeld, das Expertise sichtbar macht statt zu überfordern.
+              Finde geprüfte Therapeuten nach Spezialisierung, Ort, Hausbesuch und freien Terminen — in einem Umfeld, das Expertise sichtbar macht statt zu überfordern.
             </p>
             <Link href="/therapists" className="button button--ghost" style={{ marginTop: 16 }}>
-              Mehr für Therapeut:innen
+              Mehr für Therapeuten
             </Link>
           </div>
         </div>

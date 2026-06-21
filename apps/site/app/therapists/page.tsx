@@ -7,9 +7,9 @@ export default function TherapistsPage() {
   return (
     <>
       <Hero
-        eyebrow="Für Therapeut:innen"
+        eyebrow="Für Therapeuten"
         title="Ein professionelles Profil für moderne Physiotherapie"
-        body="Revio hilft Therapeut:innen, sichtbar zu werden und von passenden Patient:innen besser gefunden zu werden."
+        body="Revio hilft Therapeuten, sichtbar zu werden und von passenden Patienten besser gefunden zu werden."
         primaryHref="/contact"
         primaryLabel="Interesse anmelden"
         secondaryHref="/about"
@@ -46,10 +46,10 @@ export default function TherapistsPage() {
             </ul>
           </div>
           <div className="surface-card surface-card--accent">
-            <div className="eyebrow">Für Freiberufler:innen</div>
+            <div className="eyebrow">Für Freiberufler</div>
             <h3>Klar auffindbar, ohne schweres Workflow-System</h3>
             <p>
-              Gerade für freiberufliche Therapeut:innen ist ein klarer digitaler Auftritt wertvoll. Revio soll diese Sichtbarkeit stärken, ohne das Produkt unnötig aufzublähen.
+              Gerade für freiberufliche Therapeuten ist ein klarer digitaler Auftritt wertvoll. Revio soll diese Sichtbarkeit stärken, ohne das Produkt unnötig aufzublähen.
             </p>
           </div>
         </div>
@@ -58,7 +58,7 @@ export default function TherapistsPage() {
       <Section
         eyebrow="Kontakt"
         title="Früh dabei sein"
-        body="Wenn du als Therapeut:in Interesse an Revio hast, freuen wir uns über deine Nachricht."
+        body="Wenn du als Therapeut Interesse an Revio hast, freuen wir uns über deine Nachricht."
       >
         <div className="cta-banner">
           <div>

@@ -14,7 +14,7 @@ export const metadata: Metadata = {
     default: 'Revio – Physiotherapie digital finden',
     template: '%s | Revio',
   },
-  description: 'Revio hilft Ihnen, passende Physiotherapeut:innen in Deutschland schnell und unkompliziert zu finden.',
+  description: 'Revio hilft Ihnen, passende Physiotherapeuten in Deutschland schnell und unkompliziert zu finden.',
   openGraph: {
     siteName: 'Revio',
     locale: 'de_DE',
