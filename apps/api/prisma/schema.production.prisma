@@ -119,6 +119,7 @@ model Therapist {
   specializations       String
   languages             String
   certifications        String       @default("")
+  heilmittel            String       @default("")
   kassenart             String       @default("")
   gender                String?
   availability          String       @default("")
@@ -358,6 +359,18 @@ model CertificationOption {
 }
 
 model SpecializationOption {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  label     String   @unique
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, sortOrder, label])
+}
+
+model HeilmittelOption {
   id        String   @id @default(cuid())
   key       String   @unique
   label     String   @unique
