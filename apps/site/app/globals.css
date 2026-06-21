@@ -500,17 +500,18 @@ h3 {
   display: flex;
   align-items: stretch;
   justify-content: center;
-  gap: 12px;
-  width: 100%;
+  gap: 8px;
+  width: fit-content;
+  max-width: 100%;
 }
 
 .store-badge {
   display: flex;
   align-items: center;
-  gap: 16px;
-  min-height: 72px;
-  padding: 12px 22px;
-  border-radius: 18px;
+  gap: 10px;
+  min-height: 40px;
+  padding: 7px 12px;
+  border-radius: 12px;
   border: 1.5px solid rgba(255, 255, 255, 0.52);
   background: #000000;
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
@@ -531,14 +532,14 @@ h3 {
 }
 
 .store-badge__brand-icon--apple {
-  width: 42px;
-  height: 42px;
+  width: 24px;
+  height: 24px;
   color: #FFFFFF;
 }
 
 .store-badge__brand-icon--google {
-  width: 44px;
-  height: 44px;
+  width: 26px;
+  height: 26px;
 }
 
 .store-badge__copy {
@@ -549,7 +550,7 @@ h3 {
 
 .store-badge__overline {
   color: rgba(255, 255, 255, 0.94);
-  font-size: 0.76rem;
+  font-size: 0.48rem;
   font-weight: 500;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -558,10 +559,10 @@ h3 {
 
 .store-badge__label {
   color: #FFFFFF;
-  font-size: 1.2rem;
+  font-size: 0.92rem;
   font-weight: 500;
-  line-height: 1.15;
-  margin-top: 2px;
+  line-height: 1;
+  margin-top: 1px;
   white-space: nowrap;
 }
 
@@ -843,7 +844,8 @@ h3 {
   }
 
   .store-badges {
-    width: min(100%, 420px);
+    width: fit-content;
+    max-width: 100%;
   }
 
   .cta-banner {
@@ -1813,7 +1815,7 @@ h3 {
 
   .store-badge {
     width: 100%;
-    border-radius: 28px;
+    border-radius: 18px;
   }
 
   .profile-inline-summary {
