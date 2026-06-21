@@ -22,5 +22,9 @@
       "Bash(pkill -f \"expo start\")",
       "mcp__railway__list-services"
     ]
-  }
+  },
+  "enabledMcpjsonServers": [
+    "vercel"
+  ],
+  "enableAllProjectMcpServers": true
 }
