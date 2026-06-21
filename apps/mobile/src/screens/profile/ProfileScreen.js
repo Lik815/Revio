@@ -35,7 +35,7 @@ export function ProfileTabScreen() {
   const updatePatientProfile = useAppStore((s) => s.updatePatientProfile);
 
   const { c } = useTheme();
-  const { certificationOptions, specializationOptions } = useConfigOptions();
+  const { certificationOptions, specializationOptions, heilmittelOptions } = useConfigOptions();
   const { toastMsg, toastAnim, showToast } = useToast();
 
   const { myAppointments } = useTherapyData();
@@ -145,6 +145,7 @@ export function ProfileTabScreen() {
             c={c} t={t} styles={appStyles}
             certificationOptions={certificationOptions}
             specializationOptions={specializationOptions}
+            heilmittelOptions={heilmittelOptions}
             onOpenTherapyTab={() => navigation.navigate(ROOT_ROUTES.MAIN_TABS, { screen: TAB_ROUTES.THERAPY })}
             onAddSlot={handleAddSlot}
             onProfileSaved={openProfileSavedModal}

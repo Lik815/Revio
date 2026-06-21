@@ -87,6 +87,7 @@ export interface Therapist {
   specializations: string[];
   languages: string[];
   certifications: string[];
+  heilmittel: string[];
   homeVisit: boolean;
   serviceRadiusKm?: number | null;
   kassenart: string;
@@ -135,6 +136,7 @@ export interface SearchInput {
   language?: string;
   homeVisit?: boolean;
   specialization?: string;
+  heilmittel?: string;
   kassenart?: string;
 }
 
@@ -161,6 +163,7 @@ export interface SearchTherapist {
   specializations: string[];
   languages: string[];
   certifications: string[];
+  heilmittel: string[];
   kassenart: string;
   availability?: string;
   homeVisit: boolean;

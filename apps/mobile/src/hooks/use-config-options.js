@@ -29,10 +29,12 @@ function normalizeOptions(options, fallback) {
 
 const certificationFallback = normalizeOptions(fortbildungOptions, []);
 const specializationFallback = normalizeOptions(regSpecOptions, []);
+const heilmittelFallback = [];
 
 export function useConfigOptions() {
   const [certificationOptions, setCertificationOptions] = useState(certificationFallback);
   const [specializationOptions, setSpecializationOptions] = useState(specializationFallback);
+  const [heilmittelOptions, setHeilmittelOptions] = useState(heilmittelFallback);
 
   useEffect(() => {
     let cancelled = false;
@@ -43,11 +45,12 @@ export function useConfigOptions() {
         if (cancelled || !data) return;
         setCertificationOptions(normalizeOptions(data.certifications, certificationFallback));
         setSpecializationOptions(normalizeOptions(data.specializations, specializationFallback));
+        setHeilmittelOptions(normalizeOptions(data.heilmittel, heilmittelFallback));
       })
       .catch(() => {});
 
     return () => { cancelled = true; };
   }, []);
 
-  return { certificationOptions, specializationOptions };
+  return { certificationOptions, specializationOptions, heilmittelOptions };
 }

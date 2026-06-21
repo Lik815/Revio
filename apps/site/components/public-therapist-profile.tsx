@@ -189,6 +189,22 @@ export function PublicTherapistProfile({ therapist }: { therapist: PublicTherapi
             </div>
           ) : null}
 
+          {therapist.heilmittel.length > 0 ? (
+            <div className="surface-card profile-details-card">
+              <section className="profile-details-card__section">
+                <h3>Heilmittel</h3>
+                <p style={{ color: 'var(--muted)', marginTop: 4, marginBottom: 12 }}>
+                  Verordnungsfähige Leistungen, die dieser Therapeut bzw. diese Therapeutin behandelt.
+                </p>
+                <div className="profile-detail-chips">
+                  {therapist.heilmittel.map((item) => (
+                    <span key={item} className="profile-detail-chip profile-detail-chip--primary">{item}</span>
+                  ))}
+                </div>
+              </section>
+            </div>
+          ) : null}
+
           {(therapist.specializations.length > 0 || therapist.certifications.length > 0) ? (
             <div className="surface-card profile-details-card">
               {therapist.specializations.length > 0 ? (

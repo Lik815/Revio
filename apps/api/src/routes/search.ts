@@ -181,6 +181,7 @@ const searchBodySchema = z.object({
   language: z.string().optional(),
   homeVisit: z.boolean().optional(),
   specialization: z.string().optional(),
+  heilmittel: z.string().optional(),
   kassenart: z.string().optional(),
   requestable: z.boolean().optional(),
 }).refine((data) => Boolean(data.city) || Boolean(data.origin), {
@@ -222,11 +223,13 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
     const passesFilters = (t: typeof therapists[number]) => {
       const languages = splitList(t.languages).map((l) => l.toLowerCase());
       const specializations = splitList(t.specializations).map((s) => s.toLowerCase());
+      const heilmittel = splitList((t as any).heilmittel ?? '').map((h) => h.toLowerCase());
       const kassenarten = normalizeKassenarten((t as any).kassenart);
 
       if (input.language && !languages.includes(input.language.toLowerCase())) return false;
       if (typeof input.homeVisit === 'boolean' && t.homeVisit !== input.homeVisit) return false;
       if (input.specialization && !specializations.includes(input.specialization.toLowerCase())) return false;
+      if (input.heilmittel && !heilmittel.includes(input.heilmittel.toLowerCase())) return false;
       if (input.kassenart && !kassenarten.includes(input.kassenart.toLowerCase())) return false;
 
       return true;
@@ -321,6 +324,7 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
         specializations,
         languages: splitList(t.languages),
         certifications: splitList(t.certifications),
+        heilmittel: splitList(tAny.heilmittel ?? ''),
         kassenart: tAny.kassenart ?? '',
         availability: tAny.availability ?? '',
         homeVisit: t.homeVisit,
@@ -406,6 +410,7 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
         specializations: splitList(t.specializations),
         languages: splitList(t.languages),
         certifications: splitList(t.certifications),
+        heilmittel: splitList((t as any).heilmittel ?? ''),
         kassenart: (t as any).kassenart ?? '',
         availability: (t as any).availability ?? '',
         email: t.email,

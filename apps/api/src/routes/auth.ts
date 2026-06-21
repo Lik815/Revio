@@ -33,6 +33,7 @@ const updateMeSchema = z.object({
   specializations: z.array(z.string()).optional(),
   languages: z.array(z.string()).optional(),
   certifications: z.array(z.string()).optional(),
+  heilmittel: z.array(z.string()).optional(),
   photo: z.string().optional(),
   bookingMode: z.enum(['DIRECTORY_ONLY', 'FIRST_APPOINTMENT_REQUEST']).optional(),
   phone: z.string().max(30).nullable().optional(),
@@ -321,6 +322,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       specializations: splitList(therapist.specializations),
       languages: splitList(therapist.languages),
       certifications: splitList(therapist.certifications),
+      heilmittel: splitList((therapist as any).heilmittel ?? ''),
       photo: therapist.photo,
       isVisible: therapist.isVisible,
       availability: therapist.availability,
@@ -434,10 +436,23 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     if (data.specializations !== undefined) updateData.specializations = data.specializations.join(', ');
     if (data.languages !== undefined) updateData.languages = data.languages.join(', ');
     if (data.certifications !== undefined) updateData.certifications = data.certifications.join(', ');
+    if (data.heilmittel !== undefined) updateData.heilmittel = data.heilmittel.join(', ');
     if (data.photo !== undefined) updateData.photo = data.photo;
     if (data.bookingMode !== undefined) {
       if (therapist.reviewStatus !== 'APPROVED') {
         return reply.badRequest('Terminanfragen können erst nach der Profilprüfung aktiviert werden.');
+      }
+      if (data.bookingMode === 'FIRST_APPOINTMENT_REQUEST') {
+        // Heilmittel sind Voraussetzung für Online-Terminanfragen: Patient:innen
+        // müssen sofort sehen können, was angeboten wird, ohne es selbst angeben
+        // zu müssen. Berücksichtigt sowohl bereits gespeicherte als auch in
+        // diesem Request mitgesendete Heilmittel.
+        const effectiveHeilmittel = data.heilmittel !== undefined
+          ? data.heilmittel
+          : splitList((therapist as any).heilmittel ?? '');
+        if (effectiveHeilmittel.length === 0) {
+          return reply.badRequest('Bitte wähle zuerst, welche Heilmittel du behandelst, bevor du Terminanfragen aktivierst.');
+        }
       }
       updateData.bookingMode = data.bookingMode;
     }

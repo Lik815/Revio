@@ -186,6 +186,37 @@ export async function deleteCertificationOption(id: string) {
   revalidatePath('/settings');
 }
 
+// Heilmittel option actions
+export async function createHeilmittelOption(formData: FormData) {
+  const label = String(formData.get('label') ?? '').trim();
+  if (!label) return;
+
+  await adminRequest('/admin/heilmittel', {
+    body: { label },
+  });
+  revalidatePath('/heilmittel');
+}
+
+export async function updateHeilmittelOption(id: string, formData: FormData) {
+  const label = String(formData.get('label') ?? '').trim();
+  if (!label) return;
+
+  await adminRequest(`/admin/heilmittel/${id}/update`, {
+    body: { label },
+  });
+  revalidatePath('/heilmittel');
+}
+
+export async function toggleHeilmittelOption(id: string) {
+  await adminRequest(`/admin/heilmittel/${id}/toggle`);
+  revalidatePath('/heilmittel');
+}
+
+export async function deleteHeilmittelOption(id: string) {
+  await adminRequest(`/admin/heilmittel/${id}/delete`);
+  revalidatePath('/heilmittel');
+}
+
 // Specialization option actions
 export async function createSpecializationOption(formData: FormData) {
   const label = String(formData.get('label') ?? '').trim();

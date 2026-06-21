@@ -269,6 +269,7 @@ const mapApiTherapist = (t) => ({
   kassenart: t.kassenart ?? null,
   kassenarten: normalizeKassenarten(t.kassenarten ?? t.kassenart),
   fortbildungen: parseStringOrArray(t.certifications),
+  heilmittel: parseStringOrArray(t.heilmittel),
   distKm: typeof t.distKm === 'number' ? t.distKm : null,
   cityMatch: t.cityMatch ?? true,
   radiusMatch: t.radiusMatch ?? true,

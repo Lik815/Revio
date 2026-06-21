@@ -112,6 +112,10 @@ model Therapist {
   specializations       String
   languages             String
   certifications        String       @default("")
+  // Verordnungsfähige Heilmittel, die der/die Therapeut:in behandelt (CSV, wie
+  // specializations/certifications). Gesetzt bei Aktivierung von bookingMode =
+  // FIRST_APPOINTMENT_REQUEST, dann automatisch für Patient:innen sichtbar.
+  heilmittel            String       @default("")
   kassenart             String       @default("")
   availability          String       @default("")
   serviceRadiusKm       Float?
@@ -308,6 +312,22 @@ model CertificationOption {
 }
 
 model SpecializationOption {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  label     String   @unique
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, sortOrder, label])
+}
+
+// Verordnungsfähige Heilmittel-Kategorien (KG, MT, MLD, ...) — bewusst getrennt
+// von CertificationOption: Fortbildungen sind absolvierte Zusatzqualifikationen,
+// Heilmittel sind die offiziellen, abrechenbaren Leistungskategorien, die ein/e
+// Therapeut:in anbietet. Gate für die Aktivierung von Terminanfragen.
+model HeilmittelOption {
   id        String   @id @default(cuid())
   key       String   @unique
   label     String   @unique

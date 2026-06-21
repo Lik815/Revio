@@ -5,6 +5,7 @@ import {
   getDefaultSpecializationOptions,
   isSpecializationOptionStorageError,
 } from '../utils/specialization-options.js';
+import { ensureDefaultHeilmittelOptions } from '../utils/heilmittel-options.js';
 import { getPublicSiteSettings } from '../utils/app-settings.js';
 
 export const configRoutes: FastifyPluginAsync = async (fastify) => {
@@ -55,9 +56,15 @@ export const configRoutes: FastifyPluginAsync = async (fastify) => {
 
   fastify.get('/config/options', async () => {
     await ensureDefaultCertificationOptions(fastify.prisma);
+    await ensureDefaultHeilmittelOptions(fastify.prisma);
     let specializations = getDefaultSpecializationOptions();
 
     const certifications = await fastify.prisma.certificationOption.findMany({
+      where: { isActive: true },
+      orderBy: [{ sortOrder: 'asc' }, { label: 'asc' }],
+    });
+
+    const heilmittel = await fastify.prisma.heilmittelOption.findMany({
       where: { isActive: true },
       orderBy: [{ sortOrder: 'asc' }, { label: 'asc' }],
     });
@@ -78,6 +85,10 @@ export const configRoutes: FastifyPluginAsync = async (fastify) => {
         label: option.label,
       })),
       specializations: specializations.map((option) => ({
+        key: option.key,
+        label: option.label,
+      })),
+      heilmittel: heilmittel.map((option) => ({
         key: option.key,
         label: option.label,
       })),

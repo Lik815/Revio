@@ -10,6 +10,7 @@ import { getTherapistPublicationState, getTherapistRequestabilityState } from '.
 import { sendProfileApprovedEmail, sendProfileRejectedEmail, sendProfileChangesRequestedEmail } from '../utils/mailer.js';
 import { sendPushNotification } from '../utils/push.js';
 import { ensureDefaultCertificationOptions } from '../utils/certification-options.js';
+import { ensureDefaultHeilmittelOptions } from '../utils/heilmittel-options.js';
 import {
   createSpecializationKey,
   ensureDefaultSpecializationOptions,
@@ -110,6 +111,9 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
     password: z.string().min(1),
   });
   const certificationSchema = z.object({
+    label: z.string().trim().min(2),
+  });
+  const heilmittelSchema = z.object({
     label: z.string().trim().min(2),
   });
   const specializationSchema = z.object({
@@ -435,6 +439,119 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
     if (!existing) return reply.notFound('Fortbildung nicht gefunden');
 
     await fastify.prisma.certificationOption.delete({ where: { id } });
+    return { success: true };
+  });
+
+  fastify.get('/heilmittel', async () => {
+    await ensureDefaultHeilmittelOptions(fastify.prisma);
+
+    const heilmittel = await fastify.prisma.heilmittelOption.findMany({
+      orderBy: [{ sortOrder: 'asc' }, { label: 'asc' }],
+    });
+
+    return {
+      heilmittel: heilmittel.map((option) => ({
+        id: option.id,
+        key: option.key,
+        label: option.label,
+        isActive: option.isActive,
+        sortOrder: option.sortOrder,
+      })),
+    };
+  });
+
+  fastify.post('/heilmittel', async (request, reply) => {
+    await ensureDefaultHeilmittelOptions(fastify.prisma);
+
+    const parsed = heilmittelSchema.safeParse(request.body);
+    if (!parsed.success) return reply.badRequest('Ungültige Eingabedaten');
+
+    const label = parsed.data.label;
+    const existing = await fastify.prisma.heilmittelOption.findFirst({
+      where: {
+        OR: [{ key: label }, { label }],
+      },
+    });
+    if (existing) return reply.conflict('Dieses Heilmittel existiert bereits');
+
+    const maxSortOrder = await fastify.prisma.heilmittelOption.aggregate({
+      _max: { sortOrder: true },
+    });
+
+    const option = await fastify.prisma.heilmittelOption.create({
+      data: {
+        key: label,
+        label,
+        isActive: true,
+        sortOrder: (maxSortOrder._max.sortOrder ?? 0) + 10,
+      },
+    });
+
+    return reply.status(201).send({
+      id: option.id,
+      key: option.key,
+      label: option.label,
+      isActive: option.isActive,
+      sortOrder: option.sortOrder,
+    });
+  });
+
+  fastify.post('/heilmittel/:id/update', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const parsed = heilmittelSchema.safeParse(request.body);
+    if (!parsed.success) return reply.badRequest('Ungültige Eingabedaten');
+
+    const existing = await fastify.prisma.heilmittelOption.findUnique({ where: { id } });
+    if (!existing) return reply.notFound('Heilmittel nicht gefunden');
+
+    const label = parsed.data.label;
+    const duplicate = await fastify.prisma.heilmittelOption.findFirst({
+      where: {
+        id: { not: id },
+        OR: [{ key: label }, { label }],
+      },
+    });
+    if (duplicate) return reply.conflict('Dieses Heilmittel existiert bereits');
+
+    const option = await fastify.prisma.heilmittelOption.update({
+      where: { id },
+      data: { label },
+    });
+
+    return {
+      id: option.id,
+      key: option.key,
+      label: option.label,
+      isActive: option.isActive,
+      sortOrder: option.sortOrder,
+    };
+  });
+
+  fastify.post('/heilmittel/:id/toggle', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const existing = await fastify.prisma.heilmittelOption.findUnique({ where: { id } });
+    if (!existing) return reply.notFound('Heilmittel nicht gefunden');
+
+    const option = await fastify.prisma.heilmittelOption.update({
+      where: { id },
+      data: { isActive: !existing.isActive },
+    });
+
+    return {
+      id: option.id,
+      key: option.key,
+      label: option.label,
+      isActive: option.isActive,
+      sortOrder: option.sortOrder,
+    };
+  });
+
+  fastify.post('/heilmittel/:id/delete', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const existing = await fastify.prisma.heilmittelOption.findUnique({ where: { id } });
+    if (!existing) return reply.notFound('Heilmittel nicht gefunden');
+
+    await fastify.prisma.heilmittelOption.delete({ where: { id } });
     return { success: true };
   });
 

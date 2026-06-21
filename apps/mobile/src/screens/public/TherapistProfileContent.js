@@ -100,6 +100,7 @@ export function TherapistProfileContent(props) {
   const therapistCertifications = Array.isArray(th?.fortbildungen) && th.fortbildungen.length > 0
     ? th.fortbildungen
     : Array.isArray(th?.certifications) ? th.certifications : [];
+  const therapistHeilmittel = Array.isArray(th?.heilmittel) ? th.heilmittel : [];
   const therapistPhone = th?.phone || null;
   const displayEmail = th?.email || null;
   const iconHitSlop = { top: 10, bottom: 10, left: 10, right: 10 };
@@ -290,9 +291,25 @@ export function TherapistProfileContent(props) {
       {/* ── Content-Cards ─────────────────────────────────────────────────── */}
       <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border, paddingHorizontal: 0, paddingVertical: 0, overflow: 'hidden' }]}>
 
+        {/* 0. Heilmittel — verordnungsfähige Leistungen, die behandelt werden */}
+        {therapistHeilmittel.length > 0 && (
+          <View style={{ paddingHorizontal: 18, paddingTop: 18, paddingBottom: 18 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+              <Text style={[styles.filterSectionTitle, { color: c.muted, marginBottom: 0 }]}>Heilmittel</Text>
+            </View>
+            <View style={styles.tagRow}>
+              {therapistHeilmittel.map((item) => (
+                <View key={item} style={[styles.tag, { backgroundColor: c.primary, paddingHorizontal: 18, paddingVertical: 10 }]}>
+                  <Text style={[styles.tagText, { color: '#fff', fontSize: 13 }]}>{item}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
         {/* 1. Spezialisierungen */}
         {therapistSpecializations.length > 0 && (
-          <View style={{ paddingHorizontal: 18, paddingTop: 18, paddingBottom: 18 }}>
+          <View style={{ borderTopWidth: therapistHeilmittel.length > 0 ? 1 : 0, borderTopColor: c.border, paddingHorizontal: 18, paddingTop: 18, paddingBottom: 18 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
               <Text style={[styles.filterSectionTitle, { color: c.muted, marginBottom: 0 }]}>{t('specsLabel')}</Text>
             </View>
@@ -308,7 +325,7 @@ export function TherapistProfileContent(props) {
 
         {/* 2. Behandlungsbereiche */}
         {therapistAreas.length > 0 && (
-          <View style={{ borderTopWidth: therapistSpecializations.length > 0 ? 1 : 0, borderTopColor: c.border, paddingHorizontal: 18, paddingTop: 18, paddingBottom: 18 }}>
+          <View style={{ borderTopWidth: (therapistHeilmittel.length > 0 || therapistSpecializations.length > 0) ? 1 : 0, borderTopColor: c.border, paddingHorizontal: 18, paddingTop: 18, paddingBottom: 18 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
               <Text style={[styles.filterSectionTitle, { color: c.muted, marginBottom: 0 }]}>{t('behandlungLabel')}</Text>
             </View>
@@ -324,7 +341,7 @@ export function TherapistProfileContent(props) {
 
         {/* 3. Fortbildungen */}
         {therapistCertifications.length > 0 && (
-          <View style={{ borderTopWidth: (therapistSpecializations.length > 0 || therapistAreas.length > 0) ? 1 : 0, borderTopColor: c.border, paddingHorizontal: 18, paddingTop: 18, paddingBottom: 18 }}>
+          <View style={{ borderTopWidth: (therapistHeilmittel.length > 0 || therapistSpecializations.length > 0 || therapistAreas.length > 0) ? 1 : 0, borderTopColor: c.border, paddingHorizontal: 18, paddingTop: 18, paddingBottom: 18 }}>
             <Text style={[styles.filterSectionTitle, { color: c.muted, marginBottom: 14 }]}>{t('certsLabel')}</Text>
             <View style={styles.tagRow}>
               {therapistCertifications.map((cert) => (
@@ -337,7 +354,7 @@ export function TherapistProfileContent(props) {
         )}
 
         {/* 4. Summary-Leiste: Kassenart · Sprachen */}
-        <View style={{ borderTopWidth: (therapistSpecializations.length > 0 || therapistAreas.length > 0 || therapistCertifications.length > 0) ? 1 : 0, borderTopColor: c.border }}>
+        <View style={{ borderTopWidth: (therapistHeilmittel.length > 0 || therapistSpecializations.length > 0 || therapistAreas.length > 0 || therapistCertifications.length > 0) ? 1 : 0, borderTopColor: c.border }}>
           <View style={{ flexDirection: 'row' }}>
             {[
               { label: 'KASSENART', icon: 'card-outline', value: th.kassenart || 'Alle' },
@@ -423,12 +440,18 @@ export function TherapistProfileContent(props) {
               <View style={{ width: 44, height: 5, borderRadius: 999, backgroundColor: c.border }} />
             </View>
 
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: therapistHeilmittel.length > 0 ? 4 : 16 }}>
               <Text style={{ color: c.text, fontSize: 18, fontWeight: '700' }}>Freie Termine</Text>
               <Pressable onPress={() => setShowBookingModal(false)} hitSlop={iconHitSlop}>
                 <Ionicons name="close-outline" size={26} color={c.muted} />
               </Pressable>
             </View>
+
+            {therapistHeilmittel.length > 0 ? (
+              <Text style={{ color: c.muted, fontSize: 13, lineHeight: 18, marginBottom: 16 }} numberOfLines={2}>
+                Behandelte Heilmittel: {therapistHeilmittel.join(', ')}
+              </Text>
+            ) : null}
 
             {bookingSlots.length > 0 ? (
               <ScrollView showsVerticalScrollIndicator={false} bounces={false}>

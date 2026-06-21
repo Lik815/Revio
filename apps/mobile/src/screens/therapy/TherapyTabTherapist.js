@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getBaseUrl, TUNNEL_HEADERS } from '../../utils/app-utils';
 import { TherapistTimeline } from '../../components/SlotComposer';
+import { HeilmittelSelectModal } from '../../modals/HeilmittelSelectModal';
 
 const shouldShowSectionLoading = (isLoading, lastLoadedAt) => isLoading && lastLoadedAt === 0;
 
@@ -18,6 +19,7 @@ export function TherapyTabTherapist({
   onCancelSlot, onTherapistCancelRequest, onSelectTherapistDetailBooking, setShowSlotComposerModal,
   loggedInTherapist,
   onActivateBookingRequests,
+  heilmittelOptions,
   onOpenPatients,
   c, t, styles,
 }) {
@@ -26,6 +28,7 @@ export function TherapyTabTherapist({
   const reviewApproved = loggedInTherapist?.reviewStatus === 'APPROVED';
   const [activationLoading, setActivationLoading] = useState(false);
   const [activationError, setActivationError] = useState('');
+  const [showHeilmittelModal, setShowHeilmittelModal] = useState(false);
   const pendingIncomingBookings = incomingBookings.filter((r) => r.status === 'PENDING');
   const freeSlots = mySlots.filter(s => s.status === 'AVAILABLE');
   const bookedSlots = mySlots.filter(s => s.status === 'BOOKED');
@@ -53,15 +56,22 @@ export function TherapyTabTherapist({
     onTherapistCancelRequest(booking.id);
   };
 
-  const handleActivate = async () => {
+  const handleActivate = () => {
+    setActivationError('');
+    setShowHeilmittelModal(true);
+  };
+
+  const handleConfirmHeilmittel = async (selectedHeilmittel) => {
     if (!onActivateBookingRequests || activationLoading) return;
     setActivationLoading(true);
     setActivationError('');
-    const result = await onActivateBookingRequests();
+    const result = await onActivateBookingRequests(selectedHeilmittel);
+    setActivationLoading(false);
     if (!result?.ok) {
       setActivationError(result?.message ?? 'Aktivierung fehlgeschlagen.');
+      return;
     }
-    setActivationLoading(false);
+    setShowHeilmittelModal(false);
   };
 
   const FILTERS = [
@@ -219,6 +229,16 @@ export function TherapyTabTherapist({
           <Ionicons name="add" size={28} color="#fff" />
         </Pressable>
       )}
+
+      <HeilmittelSelectModal
+        visible={showHeilmittelModal}
+        onClose={() => setShowHeilmittelModal(false)}
+        onConfirm={handleConfirmHeilmittel}
+        options={Array.isArray(heilmittelOptions) ? heilmittelOptions : []}
+        loading={activationLoading}
+        error={activationError}
+        c={c}
+      />
     </View>
   );
 }

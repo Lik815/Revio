@@ -19,6 +19,7 @@ import { TherapistCancelModal } from '../../modals/TherapistCancelModal';
 import { SlotComposerModal } from '../../modals/SlotComposerModal';
 import { SlotCreatedModal } from '../../modals/SlotCreatedModal';
 import { useTherapyData } from '../../context/TherapyContext';
+import { useConfigOptions } from '../../hooks/use-config-options';
 
 const t = (key) => translations.de[key] ?? key;
 
@@ -31,6 +32,7 @@ export function TherapyTabScreen() {
   const setLoggedInTherapist = useAppStore((state) => state.setLoggedInTherapist);
 
   const { c } = useTheme();
+  const { heilmittelOptions } = useConfigOptions();
 
   const {
     myAppointments, myAppointmentsLoading, appointmentsLastLoadedAt,
@@ -105,13 +107,13 @@ export function TherapyTabScreen() {
     setTherapistCancelBookingId(null);
   };
 
-  const handleActivateBookingRequests = async () => {
+  const handleActivateBookingRequests = async (heilmittel) => {
     if (!authToken) return { ok: false, message: 'Nicht angemeldet.' };
     try {
       const patchRes = await fetch(`${getBaseUrl()}/auth/me`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
-        body: JSON.stringify({ bookingMode: 'FIRST_APPOINTMENT_REQUEST' }),
+        body: JSON.stringify({ bookingMode: 'FIRST_APPOINTMENT_REQUEST', heilmittel }),
       });
       const patchData = await patchRes.json().catch(() => ({}));
       if (!patchRes.ok) {
@@ -234,6 +236,7 @@ export function TherapyTabScreen() {
           setShowSlotComposerModal={setShowSlotComposer}
           loggedInTherapist={loggedInTherapist}
           onActivateBookingRequests={handleActivateBookingRequests}
+          heilmittelOptions={heilmittelOptions}
           onOpenPatients={() => setShowPatients(true)}
           c={c} t={t} styles={appStyles}
         />

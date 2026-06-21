@@ -1,6 +1,5 @@
 import Link from 'next/link';
 import { Hero } from '../components/hero';
-import { RevioStory } from '../components/revio-story';
 import { Section } from '../components/section';
 import { getPublishedBlogPosts } from '../lib/blog';
 import { patientBenefits, therapistBenefits } from '../lib/content';
@@ -12,17 +11,14 @@ export default async function HomePage() {
   return (
     <>
       <Hero
+        eyebrow="Revio"
         title="Den richtigen Physio für dein Problem finden."
         body="Geprüfte Physiotherapeuten in deiner Nähe — nach Beschwerde, Spezialisierung und Verfügbarkeit."
         primaryHref="/patients"
         primaryLabel="Für Patienten"
         secondaryHref="/therapists"
         secondaryLabel="Für Therapeuten"
-        searchPlaceholder="Wobei brauchst du Hilfe?"
-        chips={['Rückenschmerzen', 'Kniereha', 'Sportphysiotherapie']}
       />
-
-      <RevioStory />
 
       <Section
         eyebrow="Für Patienten"

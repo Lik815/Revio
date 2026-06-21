@@ -115,6 +115,14 @@ export type SpecializationOption = {
   usageCount: number;
 };
 
+export type HeilmittelOption = {
+  id: string;
+  key: string;
+  label: string;
+  isActive: boolean;
+  sortOrder: number;
+};
+
 export type SiteSettings = {
   underConstruction: boolean;
 };
@@ -184,4 +192,5 @@ export const api = {
   getTherapistDocuments: (id: string) => adminFetch<TherapistDocument[]>(`/admin/therapists/${id}/documents`),
   getCertificationOptions: () => adminFetch<{ certifications: CertificationOption[] }>('/admin/certifications'),
   getSpecializationOptions: () => adminFetch<{ specializations: SpecializationOption[] }>('/admin/specializations'),
+  getHeilmittelOptions: () => adminFetch<{ heilmittel: HeilmittelOption[] }>('/admin/heilmittel'),
 };

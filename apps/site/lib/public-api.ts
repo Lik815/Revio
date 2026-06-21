@@ -66,6 +66,7 @@ export type PublicTherapist = {
   kassenart: string;
   specializations: string[];
   certifications: string[];
+  heilmittel: string[];
   practices: PublicPractice[];
   bookingMode?: string;
   requestable: boolean;
@@ -106,6 +107,7 @@ function normalizeTherapist(raw: any): PublicTherapist {
     kassenart: raw.kassenart ?? '',
     specializations: Array.isArray(raw.specializations) ? raw.specializations : [],
     certifications: Array.isArray(raw.certifications) ? raw.certifications : [],
+    heilmittel: Array.isArray(raw.heilmittel) ? raw.heilmittel : [],
     practices: Array.isArray(raw.practices) ? raw.practices.map(normalizePractice) : [],
     bookingMode: raw.bookingMode,
     requestable: Boolean(raw.requestable),

@@ -111,7 +111,7 @@ function StatusMiniCard({ icon, label, value, color, c }) {
   );
 }
 
-export function TherapistDashboardScreen({ c, t, styles, certificationOptions, specializationOptions, onOpenTherapyTab, onAddSlot, onProfileSaved }) {
+export function TherapistDashboardScreen({ c, t, styles, certificationOptions, specializationOptions, heilmittelOptions, onOpenTherapyTab, onAddSlot, onProfileSaved }) {
   const { authToken, loggedInTherapist, setLoggedInTherapist } = useAuth();
 
   // Edit state
@@ -135,6 +135,7 @@ export function TherapistDashboardScreen({ c, t, styles, certificationOptions, s
   const [editTaxRegistrationStatus, setEditTaxRegistrationStatus] = useState(null);
   const [editHealthAuthorityStatus, setEditHealthAuthorityStatus] = useState(null);
   const [editCertifications, setEditCertifications] = useState([]);
+  const [editHeilmittel, setEditHeilmittel] = useState([]);
   const [profileSaving, setProfileSaving] = useState(false);
   const [therapistDocuments, setTherapistDocuments] = useState([]);
   const [documentUploading, setDocumentUploading] = useState(false);
@@ -186,11 +187,16 @@ export function TherapistDashboardScreen({ c, t, styles, certificationOptions, s
     setEditTaxRegistrationStatus(nextCompliance.taxRegistrationStatus);
     setEditHealthAuthorityStatus(nextCompliance.healthAuthorityStatus);
     setEditCertifications(Array.isArray(th.certifications) ? th.certifications : []);
+    setEditHeilmittel(Array.isArray(th.heilmittel) ? th.heilmittel : []);
     setEditMode(true);
   };
 
   const handleSaveProfile = async () => {
     if (!authToken || !loggedInTherapist?.id) return;
+    if (editBookingMode === 'FIRST_APPOINTMENT_REQUEST' && editHeilmittel.length === 0) {
+      Alert.alert(t('alertHint') ?? 'Hinweis', 'Bitte wähle mindestens ein Heilmittel, bevor du Terminanfragen aktivierst.');
+      return;
+    }
     setProfileSaving(true);
     const complianceDraftKey = getTherapistComplianceDraftKey(loggedInTherapist.id);
     const compliancePayload = {
@@ -204,6 +210,7 @@ export function TherapistDashboardScreen({ c, t, styles, certificationOptions, s
         specializations: editSpecializations.split(',').map(s => s.trim()).filter(Boolean),
         languages: editLanguages.map(l => l.toLowerCase()),
         certifications: editCertifications,
+        heilmittel: editHeilmittel,
         homeVisit: editHomeVisit,
         serviceRadiusKm: editHomeVisit ? (editServiceRadius ?? null) : null,
         kassenarten: editKassenarten, gender: editGender,
@@ -522,7 +529,13 @@ export function TherapistDashboardScreen({ c, t, styles, certificationOptions, s
             </View>
             <Switch
               value={editBookingMode === 'FIRST_APPOINTMENT_REQUEST'}
-              onValueChange={(val) => setEditBookingMode(val ? 'FIRST_APPOINTMENT_REQUEST' : 'DIRECTORY_ONLY')}
+              onValueChange={(val) => {
+                if (val && editHeilmittel.length === 0) {
+                  Alert.alert(t('alertHint') ?? 'Hinweis', 'Bitte wähle zuerst weiter unten, welche Heilmittel du behandelst.');
+                  return;
+                }
+                setEditBookingMode(val ? 'FIRST_APPOINTMENT_REQUEST' : 'DIRECTORY_ONLY');
+              }}
               trackColor={{ true: c.primary }}
               disabled={!canActivateBookingRequests}
             />
@@ -531,6 +544,39 @@ export function TherapistDashboardScreen({ c, t, styles, certificationOptions, s
             <Text style={{ fontSize: 12, color: c.muted, marginTop: 4, marginBottom: 4 }}>
               Terminanfragen werden nach der Profilprüfung freigeschaltet.
             </Text>
+          )}
+          {Array.isArray(heilmittelOptions) && heilmittelOptions.length > 0 && (
+            <View style={{ marginTop: 14 }}>
+              <Text style={[styles.detailInfoLabel, { color: c.muted, marginBottom: 4 }]}>Heilmittel</Text>
+              <Text style={{ fontSize: 12, color: c.muted, marginBottom: 8 }}>
+                Welche Heilmittel behandelst du? Patient:innen sehen das automatisch, ohne es selbst angeben zu müssen.
+              </Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                {heilmittelOptions.map((opt) => {
+                  const active = (editHeilmittel ?? []).includes(opt.label);
+                  return (
+                    <Pressable
+                      key={opt.key}
+                      onPress={() => setEditHeilmittel(prev =>
+                        prev.includes(opt.label) ? prev.filter(l => l !== opt.label) : [...prev, opt.label]
+                      )}
+                      style={{
+                        flexDirection: 'row', alignItems: 'center', gap: 6,
+                        paddingVertical: 7, paddingHorizontal: 12,
+                        borderRadius: 20, borderWidth: 1.5,
+                        borderColor: active ? c.primary : c.border,
+                        backgroundColor: active ? c.primaryBg : c.mutedBg,
+                      }}
+                    >
+                      {active && <Ionicons name="checkmark" size={13} color={c.primary} />}
+                      <Text style={{ fontSize: 13, color: active ? c.primary : c.muted, fontWeight: active ? '600' : '400' }}>
+                        {opt.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
           )}
           <Text style={[styles.detailInfoLabel, { color: c.muted, marginTop: 14, marginBottom: 4 }]}>{t('availabilityLabel')}</Text>
           <TextInput
@@ -696,6 +742,20 @@ export function TherapistDashboardScreen({ c, t, styles, certificationOptions, s
               </>
             )}
           </View>
+
+          {/* ── Heilmittel ───────────────────────────────────────────── */}
+          {Array.isArray(th.heilmittel) && th.heilmittel.length > 0 && (
+            <View style={{ backgroundColor: c.card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: c.border, padding: SPACE.lg, marginBottom: SPACE.md }}>
+              <Text style={{ fontSize: 15, fontWeight: '700', color: c.text, marginBottom: SPACE.md }}>Heilmittel</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                {th.heilmittel.map((item) => (
+                  <View key={item} style={{ backgroundColor: c.primary, borderRadius: 20, paddingVertical: 5, paddingHorizontal: 12 }}>
+                    <Text style={{ fontSize: 13, color: '#fff', fontWeight: '500' }}>{item}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
 
           {/* ── Spezialisierungen ────────────────────────────────────── */}
           {(th.specializations ?? []).length > 0 && (
