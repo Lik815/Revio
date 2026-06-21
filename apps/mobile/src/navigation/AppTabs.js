@@ -7,6 +7,7 @@ import { TherapyTabScreen } from '../screens/therapy/TherapyScreen';
 import { FavoritesTabScreen } from '../screens/favorites/FavoritesScreen';
 import { NotificationsTabScreen } from '../screens/notifications/NotificationsScreen';
 import { OptionsTabScreen } from '../screens/options/OptionsScreen';
+import { ProfileTabScreen } from '../screens/profile/ProfileScreen';
 import { TherapistProfileScreen } from '../screens/public/TherapistProfileScreen';
 import { PracticeProfileScreen } from '../screens/public/PracticeProfileScreen';
 import { translations } from '../i18n/translations';
@@ -27,6 +28,7 @@ function withProfileScreens(HomeComponent, homeName) {
     return (
       <ProfileStack.Navigator screenOptions={{ headerShown: false }}>
         <ProfileStack.Screen component={HomeComponent} name={homeName} />
+        <ProfileStack.Screen component={ProfileTabScreen} name={ROOT_ROUTES.PROFILE} />
         <ProfileStack.Screen component={TherapistProfileScreen} name={ROOT_ROUTES.THERAPIST_PROFILE} />
         <ProfileStack.Screen component={PracticeProfileScreen} name={ROOT_ROUTES.PRACTICE_PROFILE} />
       </ProfileStack.Navigator>
@@ -38,6 +40,7 @@ const DiscoverStack = withProfileScreens(DiscoverTabScreen, 'DiscoverHome');
 const FavoritesStack = withProfileScreens(FavoritesTabScreen, 'FavoritesHome');
 const TherapyStack = withProfileScreens(TherapyTabScreen, 'TherapyHome');
 const NotificationsStack = withProfileScreens(NotificationsTabScreen, 'NotificationsHome');
+const OptionsStack = withProfileScreens(OptionsTabScreen, 'OptionsHome');
 
 export function AppTabs() {
   const t = translations.de;
@@ -77,7 +80,7 @@ export function AppTabs() {
         options={{ title: t[TAB_TRANSLATION_KEYS[TAB_ROUTES.NOTIFICATIONS]] }}
       />
       <Tab.Screen
-        component={OptionsTabScreen}
+        component={OptionsStack}
         name={TAB_ROUTES.OPTIONS}
         options={{ title: t[TAB_TRANSLATION_KEYS[TAB_ROUTES.OPTIONS]] }}
       />

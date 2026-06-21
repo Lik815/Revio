@@ -21,7 +21,10 @@ export function RegistrationRouteScreen() {
       navigation.navigate(ROOT_ROUTES.MAIN_TABS, { screen: TAB_ROUTES.DISCOVER });
       return;
     }
-    navigation.navigate(ROOT_ROUTES.PROFILE);
+    navigation.navigate(ROOT_ROUTES.MAIN_TABS, {
+      screen: TAB_ROUTES.OPTIONS,
+      params: { screen: ROOT_ROUTES.PROFILE },
+    });
   };
 
   return (
