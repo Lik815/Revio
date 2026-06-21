@@ -14,6 +14,9 @@ export function TherapyProvider({ children }) {
   const [mySlots, setMySlots] = useState([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [deletingSlotIds, setDeletingSlotIds] = useState([]);
+  const [patients, setPatients] = useState([]);
+  const [patientsLoading, setPatientsLoading] = useState(false);
+  const [patientsLastLoadedAt, setPatientsLastLoadedAt] = useState(0);
   const [favorites, setFavorites] = useState([]);
   const [favoritesLoading, setFavoritesLoading] = useState(false);
   const [favoritePractices, setFavoritePractices] = useState([]);
@@ -86,6 +89,21 @@ export function TherapyProvider({ children }) {
     } catch {} finally { setSlotsLoading(false); }
   }, [slotsLastLoadedAt]);
 
+  const loadPatients = useCallback(async (token, { background = false } = {}) => {
+    if (!token) return;
+    if (!background || patientsLastLoadedAt === 0) setPatientsLoading(true);
+    try {
+      const res = await fetch(`${getBaseUrl()}/therapist/patients`, {
+        headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPatients(Array.isArray(data.patients) ? data.patients : []);
+        setPatientsLastLoadedAt(Date.now());
+      }
+    } catch {} finally { setPatientsLoading(false); }
+  }, [patientsLastLoadedAt]);
+
   const loadAvailableSlots = useCallback(async (therapistId) => {
     setAvailableSlotsLoading(true);
     setAvailableSlotsTherapistId(therapistId);
@@ -104,14 +122,17 @@ export function TherapyProvider({ children }) {
     setIncomingBookings([]);
     setMySlots([]);
     setDeletingSlotIds([]);
+    setPatients([]);
     setFavoritesLastLoadedAt(0);
     setAppointmentsLastLoadedAt(0);
     setIncomingBookingsLastLoadedAt(0);
     setSlotsLastLoadedAt(0);
+    setPatientsLastLoadedAt(0);
     setFavoritesLoading(false);
     setMyAppointmentsLoading(false);
     setIncomingBookingsLoading(false);
     setSlotsLoading(false);
+    setPatientsLoading(false);
     setTherapyRefreshing(false);
   }, []);
 
@@ -124,10 +145,11 @@ export function TherapyProvider({ children }) {
     } else if (loggedInTherapist) {
       if (force || isStale(slotsLastLoadedAt)) jobs.push(loadMySlots(token, { background: true }));
       if (force || isStale(incomingBookingsLastLoadedAt)) jobs.push(loadIncomingBookings(token, { background: true }));
+      if (force || isStale(patientsLastLoadedAt)) jobs.push(loadPatients(token, { background: true }));
     }
     if (jobs.length > 0) await Promise.allSettled(jobs);
-  }, [favoritesLastLoadedAt, appointmentsLastLoadedAt, slotsLastLoadedAt, incomingBookingsLastLoadedAt,
-      loadFavorites, loadMyAppointments, loadMySlots, loadIncomingBookings]);
+  }, [favoritesLastLoadedAt, appointmentsLastLoadedAt, slotsLastLoadedAt, incomingBookingsLastLoadedAt, patientsLastLoadedAt,
+      loadFavorites, loadMyAppointments, loadMySlots, loadIncomingBookings, loadPatients]);
 
   const handleTherapyRefresh = useCallback(async (token, accountType, loggedInTherapist) => {
     if (!token) return;
@@ -141,6 +163,7 @@ export function TherapyProvider({ children }) {
       myAppointments, myAppointmentsLoading, setMyAppointments,
       incomingBookings, incomingBookingsLoading, setIncomingBookings,
       mySlots, slotsLoading, deletingSlotIds, setMySlots, setDeletingSlotIds,
+      patients, patientsLoading, patientsLastLoadedAt,
       favorites, favoritesLoading, favoritePractices,
       setFavorites, setFavoritesLoading, setFavoritePractices,
       availableSlots, availableSlotsTherapistId, availableSlotsLoading,
@@ -149,7 +172,7 @@ export function TherapyProvider({ children }) {
       favoritesLastLoadedAt, appointmentsLastLoadedAt,
       incomingBookingsLastLoadedAt, slotsLastLoadedAt,
       loadFavorites, loadMyAppointments, loadIncomingBookings,
-      loadMySlots, loadAvailableSlots,
+      loadMySlots, loadAvailableSlots, loadPatients,
       resetTherapyData, refreshTherapyTab, handleTherapyRefresh,
     }}>
       {children}

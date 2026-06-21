@@ -1,10 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import {
-  ActivityIndicator, Pressable, ScrollView, Text, View,
+  ActivityIndicator, Pressable, Text, View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { getBaseUrl, RADIUS, SHADOW, SPACE, TUNNEL_HEADERS } from '../../utils/app-utils';
-import { TabHeader } from '../../components/TabHeader';
+import { RADIUS, SHADOW, SPACE } from '../../utils/app-utils';
 
 function initialsOf(fullName) {
   return (fullName ?? '?').split(' ').filter(Boolean).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
@@ -53,63 +52,34 @@ function PatientListRow({ c, patient, onPress }) {
   );
 }
 
-export function TherapistPatientsScreen({ authToken, onBack, onSelectPatient, c }) {
-  const [patients, setPatients] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+export function PatientsPane({ patients, patientsLoading, patientsLastLoadedAt, onSelectPatient, c }) {
+  const showLoading = patientsLoading && patientsLastLoadedAt === 0;
 
-  useEffect(() => {
-    if (!authToken) return;
-    let cancelled = false;
-    setLoading(true);
-    setError('');
-    fetch(`${getBaseUrl()}/therapist/patients`, {
-      headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
-    })
-      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`Fehler ${res.status}`))))
-      .then((data) => { if (!cancelled) setPatients(Array.isArray(data.patients) ? data.patients : []); })
-      .catch(() => { if (!cancelled) setError('Patient:innen konnten nicht geladen werden.'); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, [authToken]);
+  if (showLoading) {
+    return (
+      <View style={{ borderWidth: 1, borderColor: c.border, borderRadius: RADIUS.lg, paddingVertical: 32, alignItems: 'center' }}>
+        <ActivityIndicator color={c.primary} />
+      </View>
+    );
+  }
+
+  if (!Array.isArray(patients) || patients.length === 0) {
+    return (
+      <View style={{ borderWidth: 1, borderColor: c.border, borderRadius: RADIUS.lg, paddingVertical: 32, paddingHorizontal: 20, alignItems: 'center', gap: 8 }}>
+        <Ionicons name="people-outline" size={36} color={c.muted} />
+        <Text style={{ fontSize: 16, fontWeight: '700', color: c.text, textAlign: 'center' }}>Noch keine Patient:innen</Text>
+        <Text style={{ fontSize: 13, color: c.muted, textAlign: 'center', lineHeight: 20 }}>
+          Sobald jemand einen Termin bei dir bucht, erscheint die Person hier.
+        </Text>
+      </View>
+    );
+  }
 
   return (
-    <View style={{ flex: 1 }}>
-      <TabHeader c={c} title="Patient:innen" />
-      <ScrollView
-        contentContainerStyle={{ padding: SPACE.xl, paddingTop: SPACE.sm, paddingBottom: 32 }}
-        showsVerticalScrollIndicator={false}
-      >
-        <Pressable
-          onPress={onBack}
-          style={{ alignSelf: 'flex-start', paddingVertical: 4, marginBottom: 10, flexDirection: 'row', alignItems: 'center', gap: 6 }}
-        >
-          <Ionicons name="chevron-back" size={16} color={c.primary} />
-          <Text style={{ fontSize: 14, fontWeight: '600', color: c.primary }}>Zurück</Text>
-        </Pressable>
-
-        {loading ? (
-          <View style={{ borderWidth: 1, borderColor: c.border, borderRadius: RADIUS.lg, paddingVertical: 32, alignItems: 'center' }}>
-            <ActivityIndicator color={c.primary} />
-          </View>
-        ) : error ? (
-          <View style={{ borderWidth: 1, borderColor: c.border, borderRadius: RADIUS.lg, paddingVertical: 28, paddingHorizontal: 20, alignItems: 'center', gap: 8 }}>
-            <Text style={{ fontSize: 14, color: c.error, textAlign: 'center' }}>{error}</Text>
-          </View>
-        ) : patients.length === 0 ? (
-          <View style={{ borderWidth: 1, borderColor: c.border, borderRadius: RADIUS.lg, paddingVertical: 32, paddingHorizontal: 20, alignItems: 'center', gap: 8 }}>
-            <Ionicons name="people-outline" size={36} color={c.muted} />
-            <Text style={{ fontSize: 16, fontWeight: '700', color: c.text, textAlign: 'center' }}>Noch keine Patient:innen</Text>
-            <Text style={{ fontSize: 13, color: c.muted, textAlign: 'center', lineHeight: 20 }}>
-              Sobald jemand einen Termin bei dir bucht, erscheint die Person hier.
-            </Text>
-          </View>
-        ) : (
-          patients.map((patient) => (
-            <PatientListRow key={patient.id} c={c} patient={patient} onPress={() => onSelectPatient(patient.id)} />
-          ))
-        )}
-      </ScrollView>
-    </View>
+    <>
+      {patients.map((patient) => (
+        <PatientListRow key={patient.id} c={c} patient={patient} onPress={() => onSelectPatient(patient.id)} />
+      ))}
+    </>
   );
 }

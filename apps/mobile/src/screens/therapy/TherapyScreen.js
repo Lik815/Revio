@@ -12,7 +12,6 @@ import { TabHeader } from '../../components/TabHeader';
 import { TherapyTabPatient } from './TherapyTabPatient';
 import { TherapyTabTherapist } from './TherapyTabTherapist';
 import { AppointmentDetail } from './AppointmentDetail';
-import { TherapistPatientsScreen } from './TherapistPatientsScreen';
 import { TherapistPatientDetailScreen } from './TherapistPatientDetailScreen';
 import { CancelAppointmentModal } from '../../modals/CancelAppointmentModal';
 import { TherapistCancelModal } from '../../modals/TherapistCancelModal';
@@ -38,13 +37,14 @@ export function TherapyTabScreen() {
     myAppointments, myAppointmentsLoading, appointmentsLastLoadedAt,
     incomingBookings, incomingBookingsLoading, incomingBookingsLastLoadedAt,
     mySlots, slotsLoading, deletingSlotIds, slotsLastLoadedAt,
+    patients, patientsLoading, patientsLastLoadedAt,
     therapyRefreshing,
-    loadMyAppointments, loadIncomingBookings, loadMySlots,
+    loadMyAppointments, loadIncomingBookings, loadMySlots, loadPatients,
     handleTherapyRefresh,
   } = useTherapyData();
 
   const [selectedAppointment, setSelectedAppointment] = useState(null);
-  const [showPatients, setShowPatients] = useState(false);
+  const [therapistView, setTherapistView] = useState('termine');
   const [selectedPatientId, setSelectedPatientId] = useState(null);
   const [activeFilterPatient, setActiveFilterPatient] = useState('all');
   const [activeFilterTherapist, setActiveFilterTherapist] = useState('all');
@@ -61,6 +61,7 @@ export function TherapyTabScreen() {
     if (accountType === 'therapist') {
       loadMySlots(authToken);
       loadIncomingBookings(authToken);
+      loadPatients(authToken);
     }
   }, [authToken, accountType]);
 
@@ -190,23 +191,12 @@ export function TherapyTabScreen() {
   }
 
   if (accountType === 'therapist') {
-    if (showPatients && selectedPatientId) {
+    if (selectedPatientId) {
       return (
         <TherapistPatientDetailScreen
           authToken={authToken}
           patientId={selectedPatientId}
           onBack={() => setSelectedPatientId(null)}
-          c={c}
-        />
-      );
-    }
-
-    if (showPatients) {
-      return (
-        <TherapistPatientsScreen
-          authToken={authToken}
-          onBack={() => setShowPatients(false)}
-          onSelectPatient={setSelectedPatientId}
           c={c}
         />
       );
@@ -237,7 +227,12 @@ export function TherapyTabScreen() {
           loggedInTherapist={loggedInTherapist}
           onActivateBookingRequests={handleActivateBookingRequests}
           heilmittelOptions={heilmittelOptions}
-          onOpenPatients={() => setShowPatients(true)}
+          therapistView={therapistView}
+          setTherapistView={setTherapistView}
+          patients={patients}
+          patientsLoading={patientsLoading}
+          patientsLastLoadedAt={patientsLastLoadedAt}
+          onSelectPatient={setSelectedPatientId}
           c={c} t={t} styles={appStyles}
         />
         <TherapistCancelModal
