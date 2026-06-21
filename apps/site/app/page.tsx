@@ -18,6 +18,8 @@ export default async function HomePage() {
         primaryLabel="Für Patienten"
         secondaryHref="/therapists"
         secondaryLabel="Für Therapeuten"
+        searchPlaceholder="Wobei brauchst du Hilfe?"
+        chips={['Rückenschmerzen', 'Kniereha', 'Sportphysiotherapie']}
       />
 
       <Section
