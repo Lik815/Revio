@@ -7,7 +7,7 @@ import { getAdminSessionState } from '../../lib/api';
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   const cookieStore = await cookies();
-  const token = cookieStore.get('revio_admin_token')?.value ?? process.env.REVIO_ADMIN_TOKEN ?? process.env.ADMIN_TOKEN;
+  const token = cookieStore.get('revio_admin_token')?.value;
   const userCookie = cookieStore.get('revio_admin_user')?.value;
 
   if (!token) {

@@ -26,7 +26,7 @@ export type AdminSessionState = {
 
 async function getAdminToken() {
   const cookieStore = await cookies();
-  return cookieStore.get('revio_admin_token')?.value ?? process.env.REVIO_ADMIN_TOKEN ?? process.env.ADMIN_TOKEN ?? '';
+  return cookieStore.get('revio_admin_token')?.value ?? '';
 }
 
 async function adminFetch<T>(path: string): Promise<T> {
