@@ -3,7 +3,6 @@ export const siteConfig = {
   contactEmail: 'admin@my-revio.de',
   nav: [
     { href: '/', label: 'Startseite' },
-    { href: '/finden', label: 'Therapeuten finden' },
     { href: '/patients', label: 'Für Patienten' },
     { href: '/therapists', label: 'Für Therapeuten' },
     { href: '/blog', label: 'Blog' },

@@ -235,8 +235,8 @@ export function PublicTherapistProfile({ therapist }: { therapist: PublicTherapi
 
           <div className="profile-app-cta-wrap">
             <AppOnlyCta
-              title="Terminbuchung aktuell nur in der Revio App"
-              body="Lade die Revio App herunter, um direkt eine Terminanfrage zu senden. Das Profil bleibt im Web sichtbar, die Buchung laeuft aber bewusst ueber die App."
+              title="App herunterladen, um einen Termin zu buchen"
+              body="Um einen Termin zu buchen, musst du die Revio App herunterladen. Das Profil kannst du im Web ansehen, die Buchung laeuft ueber die App."
             />
           </div>
         </div>

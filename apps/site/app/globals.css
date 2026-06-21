@@ -506,14 +506,16 @@ h3 {
 
 .store-badge {
   display: flex;
-  flex-direction: column;
-  justify-content: center;
-  min-height: 64px;
-  padding: 12px 18px;
-  border-radius: 18px;
-  border: 1px solid var(--line);
-  background: var(--surface);
-  box-shadow: var(--shadow-card);
+  align-items: center;
+  gap: 14px;
+  min-height: 84px;
+  padding: 14px 22px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.7);
+  background: linear-gradient(180deg, #FFFFFF, #F8F8F8);
+  box-shadow:
+    0 12px 28px rgba(28, 43, 51, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.96);
   text-align: left;
   transition: transform 140ms ease, border-color 140ms ease;
 }
@@ -523,17 +525,42 @@ h3 {
   border-color: rgba(62, 98, 113, 0.28);
 }
 
+.store-badge__brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.store-badge__brand-icon--apple {
+  width: 48px;
+  height: 48px;
+  color: #22323C;
+}
+
+.store-badge__brand-icon--google {
+  width: 54px;
+  height: 54px;
+}
+
+.store-badge__copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
 .store-badge__overline {
-  color: var(--muted);
-  font-size: 0.72rem;
-  font-weight: 600;
+  color: #636363;
+  font-size: 0.82rem;
+  font-weight: 500;
+  letter-spacing: 0.03em;
   line-height: 1.1;
 }
 
 .store-badge__label {
-  color: var(--ink);
+  color: #4B4B4B;
   font-size: 1.15rem;
-  font-weight: 800;
+  font-weight: 600;
   line-height: 1.15;
   margin-top: 3px;
   white-space: nowrap;
@@ -1749,6 +1776,13 @@ h3 {
   margin-top: 6px;
 }
 
+.app-only-cta__stores {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+}
+
 @media (max-width: 720px) {
   .profile-hero {
     padding: 22px;
@@ -1763,6 +1797,17 @@ h3 {
   .profile-header__avatar {
     width: 84px;
     height: 84px;
+  }
+
+  .app-only-cta__stores,
+  .store-badges {
+    grid-template-columns: 1fr;
+    flex-direction: column;
+  }
+
+  .store-badge {
+    width: 100%;
+    border-radius: 28px;
   }
 
   .profile-inline-summary {

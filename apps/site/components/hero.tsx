@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { HeroSearchBar } from './hero-search-bar';
+import { StoreBadges } from './store-badges';
 
 type HeroProps = {
   eyebrow?: string;
@@ -71,16 +72,7 @@ export function Hero({
                 priority
               />
 
-              <div className="store-badges" aria-label="App Download Buttons">
-                <div className="store-badge" aria-hidden="true">
-                  <span className="store-badge__overline">Download on the</span>
-                  <span className="store-badge__label">App Store</span>
-                </div>
-                <div className="store-badge" aria-hidden="true">
-                  <span className="store-badge__overline">Get it on</span>
-                  <span className="store-badge__label">Google Play</span>
-                </div>
-              </div>
+              <StoreBadges />
             </div>
           </div>
         )}

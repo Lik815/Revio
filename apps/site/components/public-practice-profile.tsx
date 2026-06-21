@@ -92,8 +92,8 @@ export function PublicPracticeProfile({
 
         <div style={{ marginTop: 20 }}>
           <AppOnlyCta
-            title="Terminbuchung aktuell nur in der Revio App"
-            body="Lade die Revio App herunter, um direkt einen Termin bei dieser Praxis anzufragen."
+            title="App herunterladen, um einen Termin zu buchen"
+            body="Um einen Termin bei dieser Praxis zu buchen, musst du die Revio App herunterladen."
           />
         </div>
       </div>
