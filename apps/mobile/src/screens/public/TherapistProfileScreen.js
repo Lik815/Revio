@@ -7,7 +7,7 @@ import { useFavorites } from '../../hooks/use-favorites';
 import { useToast } from '../../hooks/use-toast';
 import { appStyles } from '../../styles/app-styles';
 import { translations } from '../../i18n/translations';
-import { ROOT_ROUTES } from '../../navigation/route-names';
+import { ROOT_ROUTES, TAB_ROUTES } from '../../navigation/route-names';
 import { getBaseUrl, mapApiTherapist, TUNNEL_HEADERS } from '../../utils/app-utils';
 import { HeartButton } from '../../components/HeartButton';
 import { ToastOverlay } from '../../components/ToastOverlay';

@@ -2,12 +2,15 @@ import React, { useEffect, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getBaseUrl, RADIUS, SPACE, TYPE } from '../../utils/app-utils';
 
 function formatSlot(startsAt, durationMin) {
@@ -19,6 +22,7 @@ function formatSlot(startsAt, durationMin) {
 }
 
 export function BookingRequestForm({ c, t, therapist, authToken, availableSlots, slotsLoading, onSuccess, onClose, onReloadSlots }) {
+  const insets = useSafeAreaInsets();
   const [selectedSlotId, setSelectedSlotId] = useState(therapist?.selectedSlotId ?? null);
   const [message, setMessage] = useState('');
   const [consent, setConsent] = useState(false);
@@ -101,7 +105,7 @@ export function BookingRequestForm({ c, t, therapist, authToken, availableSlots,
   if (success) {
     const bookedSlot = slots.find((s) => s.id === selectedSlotId);
     return (
-      <View style={{ flex: 1, padding: SPACE.lg, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ flex: 1, padding: SPACE.lg, alignItems: 'center', justifyContent: 'center', backgroundColor: c.background }}>
         <Ionicons name="checkmark-circle" size={64} color={c.success ?? '#1A7A40'} />
         <Text style={{ ...TYPE.h2, color: c.text, marginTop: SPACE.md, textAlign: 'center' }}>Anfrage gesendet</Text>
         {therapist?.fullName ? (
@@ -128,15 +132,18 @@ export function BookingRequestForm({ c, t, therapist, authToken, availableSlots,
   }
 
   return (
-    <View style={{ flex: 1 }}>
+    <KeyboardAvoidingView
+      style={{ flex: 1, backgroundColor: c.background }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
       {/* Header — fixed outside ScrollView so close button is always reachable */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', padding: SPACE.lg, paddingBottom: SPACE.sm, borderBottomWidth: 1, borderBottomColor: c.border }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', padding: SPACE.lg, paddingBottom: SPACE.sm, backgroundColor: c.background, borderBottomWidth: 1, borderBottomColor: c.border }}>
         <Pressable onPress={onClose} style={{ marginRight: 12, padding: 4 }} hitSlop={12}>
           <Ionicons name="close" size={24} color={c.muted} />
         </Pressable>
         <Text style={{ ...TYPE.h2, color: c.text, flex: 1 }}>Termin buchen</Text>
       </View>
-    <ScrollView contentContainerStyle={{ padding: SPACE.lg, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
+    <ScrollView contentContainerStyle={{ padding: SPACE.lg, paddingBottom: insets.bottom + 40 }} keyboardShouldPersistTaps="handled">
 
       <Text style={{ ...TYPE.caption, color: c.muted, marginBottom: SPACE.md }}>
         {therapist.fullName} · {therapist.professionalTitle}
@@ -280,6 +287,6 @@ export function BookingRequestForm({ c, t, therapist, authToken, availableSlots,
         </Pressable>
       )}
     </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   );
 }

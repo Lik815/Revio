@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Modal, Pressable, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { getBaseUrl, TUNNEL_HEADERS } from '../utils/app-utils';
 
@@ -31,6 +31,7 @@ export function ReviewComposerModal({ visible, onClose, c, t, authToken, booking
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', padding: 24 }} onPress={onClose}>
         <Pressable onPress={(e) => e.stopPropagation()}>
           <View style={{ backgroundColor: c.card, borderRadius: 20, padding: 24, gap: 18 }}>
@@ -89,6 +90,7 @@ export function ReviewComposerModal({ visible, onClose, c, t, authToken, booking
           </View>
         </Pressable>
       </Pressable>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
