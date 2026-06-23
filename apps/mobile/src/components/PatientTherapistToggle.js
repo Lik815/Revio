@@ -5,7 +5,7 @@ import { RADIUS } from '../utils/app-utils';
 export function PatientTherapistToggle({ c, value, onChange, terminCount, patientCount }) {
   const segments = [
     { key: 'termine', label: `Termine (${terminCount})` },
-    { key: 'patienten', label: `Patienten (${patientCount})` },
+    { key: 'patients', label: `Patienten (${patientCount})` },
   ];
 
   return (

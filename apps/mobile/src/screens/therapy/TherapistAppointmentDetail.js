@@ -33,6 +33,7 @@ export function TherapistAppointmentDetail({
   patient,
   onBack,
   onRespond,
+  onCancelRequest,
   c,
   styles,
 }) {
@@ -47,6 +48,7 @@ export function TherapistAppointmentDetail({
     : null;
   const hasMessage = typeof appointment?.message === 'string' && appointment.message.trim().length > 0;
   const isPending = appointment?.status === 'PENDING';
+  const isConfirmed = appointment?.status === 'CONFIRMED';
 
   // First content is the appointment/patient passed in via props — no fetch gates the initial paint.
   useEffect(() => {
@@ -208,6 +210,19 @@ export function TherapistAppointmentDetail({
                     {loading ? <ActivityIndicator size="small" color="#fff" /> : <Text style={{ fontSize: 14, fontWeight: '700', color: '#fff' }}>Bestätigen</Text>}
                   </Pressable>
                 </View>
+              </>
+            ) : null}
+
+            {isConfirmed && onCancelRequest ? (
+              <>
+                <View style={{ height: 1, backgroundColor: c.border }} />
+                <Pressable
+                  onPress={onCancelRequest}
+                  style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: 10, paddingVertical: 12, gap: 8, borderWidth: 1.5, borderColor: c.error, backgroundColor: 'transparent' }}
+                >
+                  <Ionicons name="trash-outline" size={17} color={c.error} />
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: c.error }}>Termin absagen</Text>
+                </Pressable>
               </>
             ) : null}
           </View>

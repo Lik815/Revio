@@ -153,7 +153,26 @@ export function TherapyTabScreen() {
         loadMySlots(authToken);
       }
     }
+    if (selectedTherapistPatientAppointment?.appointment?.id === therapistCancelBookingId) {
+      setSelectedTherapistPatientAppointment(null);
+    }
     setTherapistCancelBookingId(null);
+  };
+
+  // Reached from the new day timeline — the `booking` already has the shape
+  // TherapistAppointmentDetail expects (it comes straight from incomingBookings).
+  const handleOpenBookingDetail = (booking) => {
+    if (!booking) return;
+    markTap(booking.id);
+    setSelectedTherapistPatientAppointment({
+      appointment: booking,
+      patient: {
+        fullName: booking.patientName ?? null,
+        phone: booking.patientPhone ?? null,
+        email: booking.patientEmail ?? null,
+        addressLine: null,
+      },
+    });
   };
 
   const handleActivateBookingRequests = async (heilmittel) => {
@@ -232,6 +251,10 @@ export function TherapyTabScreen() {
         patient={selectedTherapistPatientAppointment.patient}
         onBack={() => setSelectedTherapistPatientAppointment(null)}
         onRespond={handleTherapistRespond}
+        onCancelRequest={() => {
+          setTherapistCancelBookingId(selectedTherapistPatientAppointment.appointment.id);
+          setShowTherapistCancelModal(true);
+        }}
         c={c}
         styles={appStyles}
       />
@@ -289,6 +312,7 @@ export function TherapyTabScreen() {
           onCancelSlot={handleCancelSlot}
           onTherapistCancelRequest={(id) => { setTherapistCancelBookingId(id); setShowTherapistCancelModal(true); }}
           onSelectTherapistDetailBooking={(booking) => { setTherapistCancelBookingId(booking.id); setShowTherapistCancelModal(true); }}
+          onOpenBookingDetail={handleOpenBookingDetail}
           setShowSlotComposerModal={setShowSlotComposer}
           loggedInTherapist={loggedInTherapist}
           onActivateBookingRequests={handleActivateBookingRequests}

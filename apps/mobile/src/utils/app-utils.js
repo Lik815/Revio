@@ -462,6 +462,10 @@ export {
   GERMAN_CITIES,
   formatDayHeader,
   formatKpiDate,
+  isSameDay,
+  startOfDay,
+  startOfWeek,
+  addDays,
 };
 
 function formatDayHeader(isoString, locale = 'de-DE') {
@@ -473,4 +477,31 @@ function formatDayHeader(isoString, locale = 'de-DE') {
 function formatKpiDate(isoString, locale = 'de-DE') {
   return new Date(isoString)
     .toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+function isSameDay(a, b) {
+  return a.getFullYear() === b.getFullYear()
+    && a.getMonth() === b.getMonth()
+    && a.getDate() === b.getDate();
+}
+
+function startOfDay(d) {
+  const copy = new Date(d);
+  copy.setHours(0, 0, 0, 0);
+  return copy;
+}
+
+// Monday-based week start (Mo..So), matching the week strip's day order.
+function startOfWeek(d) {
+  const copy = startOfDay(d);
+  const day = copy.getDay(); // 0=Sun..6=Sat
+  const diff = day === 0 ? -6 : 1 - day;
+  copy.setDate(copy.getDate() + diff);
+  return copy;
+}
+
+function addDays(d, n) {
+  const copy = new Date(d);
+  copy.setDate(copy.getDate() + n);
+  return copy;
 }

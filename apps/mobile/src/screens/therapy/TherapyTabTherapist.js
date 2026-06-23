@@ -5,31 +5,17 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { addDays, startOfDay, startOfWeek } from '../../utils/app-utils';
 import { TherapistTimeline } from '../../components/SlotComposer';
 import { HeilmittelSelectModal } from '../../modals/HeilmittelSelectModal';
 import { PatientTherapistToggle } from '../../components/PatientTherapistToggle';
+import { TherapistSummaryCard } from '../../components/TherapistSummaryCard';
+import { TherapistWeekStrip } from '../../components/TherapistWeekStrip';
+import { ScheduleModeTabs } from '../../components/ScheduleModeTabs';
+import { TherapistDayTimeline } from '../../components/TherapistDayTimeline';
 import { PatientsPane } from './TherapistPatientsScreen';
 
 const shouldShowSectionLoading = (isLoading, lastLoadedAt) => isLoading && lastLoadedAt === 0;
-
-function StatBlock({ c, value, label, valueColor, onPress, style, children }) {
-  const content = children ?? (
-    <>
-      <Text style={{ fontSize: 24, fontWeight: '800', color: valueColor ?? c.text }}>
-        {value}
-      </Text>
-      <Text style={{ fontSize: 11, fontWeight: '600', color: c.muted, textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 2 }}>
-        {label}
-      </Text>
-    </>
-  );
-
-  return (
-    <Pressable onPress={onPress} style={[{ flex: 1 }, style]}>
-      {content}
-    </Pressable>
-  );
-}
 
 export function TherapyTabTherapist({
   mySlots, slotsLoading, incomingBookings, incomingBookingsLoading,
@@ -37,6 +23,7 @@ export function TherapyTabTherapist({
   therapyRefreshing, slotsLastLoadedAt, incomingBookingsLastLoadedAt,
   onRefresh, onRespond, onOpenTherapistById,
   onCancelSlot, onTherapistCancelRequest, onSelectTherapistDetailBooking, setShowSlotComposerModal,
+  onOpenBookingDetail,
   loggedInTherapist,
   onActivateBookingRequests,
   heilmittelOptions,
@@ -50,12 +37,19 @@ export function TherapyTabTherapist({
   const [activationLoading, setActivationLoading] = useState(false);
   const [activationError, setActivationError] = useState('');
   const [showHeilmittelModal, setShowHeilmittelModal] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(() => startOfDay(new Date()));
+  const [visibleWeekStart, setVisibleWeekStart] = useState(() => startOfWeek(new Date()));
+  const [scheduleView, setScheduleView] = useState('timeline');
+
   const pendingIncomingBookings = useMemo(
     () => incomingBookings.filter((r) => r.status === 'PENDING'),
     [incomingBookings],
   );
   const freeSlots = useMemo(() => mySlots.filter(s => s.status === 'AVAILABLE'), [mySlots]);
-  const bookedSlots = useMemo(() => mySlots.filter(s => s.status === 'BOOKED'), [mySlots]);
+  const confirmedBookingsCount = useMemo(
+    () => incomingBookings.filter((b) => b.status === 'CONFIRMED').length,
+    [incomingBookings],
+  );
 
   const handleTherapistCancel = (bookingId) => {
     onTherapistCancelRequest(bookingId);
@@ -82,6 +76,18 @@ export function TherapyTabTherapist({
       return;
     }
     setShowHeilmittelModal(false);
+  };
+
+  const goToListFilter = (filterKey) => {
+    setTherapistView('termine');
+    setScheduleView('list');
+    setActiveFilterTherapist(filterKey);
+  };
+
+  const handleJumpToToday = () => {
+    const today = new Date();
+    setSelectedDate(startOfDay(today));
+    setVisibleWeekStart(startOfWeek(today));
   };
 
   const FILTERS = [
@@ -115,40 +121,14 @@ export function TherapyTabTherapist({
   // each of which owns its own single scroll root so the patient list can virtualize properly.
   const summaryAndToggle = (
     <>
-      <View style={{ flexDirection: 'row', backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.border, padding: 16, marginBottom: 12 }}>
-        <StatBlock
-          c={c}
-          value={freeSlots.length}
-          label="Frei"
-          valueColor={c.success ?? '#5A9E8E'}
-          style={{ paddingRight: 12, borderRightWidth: 1, borderRightColor: c.border }}
-          onPress={() => {
-            setTherapistView('termine');
-            setActiveFilterTherapist('free');
-          }}
-        />
-        <StatBlock
-          c={c}
-          value={bookedSlots.length}
-          label="Gebucht"
-          style={{ paddingHorizontal: 12, borderRightWidth: 1, borderRightColor: c.border }}
-          onPress={() => {
-            setTherapistView('termine');
-            setActiveFilterTherapist('booked');
-          }}
-        />
-        <View style={{ flex: 1.3, paddingLeft: 12 }}>
-          <Text style={{ fontSize: 11, fontWeight: '600', color: c.muted, textTransform: 'uppercase', letterSpacing: 0.4 }}>Nächster Slot</Text>
-          <Text
-            numberOfLines={1}
-            adjustsFontSizeToFit
-            minimumFontScale={0.82}
-            style={{ fontSize: 16, fontWeight: '800', color: c.text, marginTop: 6 }}
-          >
-            {nextFreeSlotSummaryLabel}
-          </Text>
-        </View>
-      </View>
+      <TherapistSummaryCard
+        c={c}
+        freeCount={freeSlots.length}
+        confirmedCount={confirmedBookingsCount}
+        nextSlotLabel={nextFreeSlotSummaryLabel}
+        onPressFree={() => goToListFilter('free')}
+        onPressBooked={() => goToListFilter('booked')}
+      />
 
       <PatientTherapistToggle
         c={c}
@@ -191,41 +171,97 @@ export function TherapyTabTherapist({
 
           {slotBookingEnabled ? (
             <>
-              {/* ── Segment-Tabs ──────────────────────────────────────── */}
-              <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: c.border, marginBottom: 16 }}>
-                {FILTERS.map(({ key, label }) => {
-                  const active = activeFilterTherapist === key;
-                  return (
-                    <Pressable
-                      key={key}
-                      onPress={() => setActiveFilterTherapist(key)}
-                      style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, marginBottom: -1, borderBottomWidth: 2, borderBottomColor: active ? (c.success ?? '#5A9E8E') : 'transparent' }}
-                    >
-                      <Text style={{ fontSize: 14, fontWeight: active ? '700' : '500', color: active ? c.text : c.muted }}>{label}</Text>
-                      {key === 'pending' && pendingIncomingBookings.length > 0 && (
-                        <View style={{ minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4, backgroundColor: c.warning ?? '#8A6000', alignItems: 'center', justifyContent: 'center' }}>
-                          <Text style={{ fontSize: 11, fontWeight: '700', color: '#fff' }}>{pendingIncomingBookings.length}</Text>
-                        </View>
-                      )}
-                    </Pressable>
-                  );
-                })}
-              </View>
-
-              {/* ── Timeline ────────────────────────────────────────── */}
-              <TherapistTimeline
+              <TherapistWeekStrip
                 c={c}
+                selectedDate={selectedDate}
+                visibleWeekStart={visibleWeekStart}
                 mySlots={mySlots}
-                incomingBookings={incomingBookings}
-                activeFilter={activeFilterTherapist}
-                deletingSlotIds={deletingSlotIds}
-                onCancelSlot={onCancelSlot}
-                onRespond={onRespond}
-                onTherapistCancel={handleTherapistCancel}
-                onOpenDetail={handleOpenDetail}
-                slotsLoading={shouldShowSectionLoading(slotsLoading, slotsLastLoadedAt)}
-                incomingLoading={shouldShowSectionLoading(incomingBookingsLoading, incomingBookingsLastLoadedAt)}
+                onSelectDate={setSelectedDate}
+                onPrevWeek={() => setVisibleWeekStart((prev) => addDays(prev, -7))}
+                onNextWeek={() => setVisibleWeekStart((prev) => addDays(prev, 7))}
+                onPressCalendar={handleJumpToToday}
               />
+
+              <ScheduleModeTabs
+                c={c}
+                value={scheduleView}
+                onChange={setScheduleView}
+                pendingCount={pendingIncomingBookings.length}
+              />
+
+              {scheduleView === 'list' ? (
+                <>
+                  {/* ── Segment-Tabs ──────────────────────────────────────── */}
+                  <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: c.border, marginBottom: 16 }}>
+                    {FILTERS.map(({ key, label }) => {
+                      const active = activeFilterTherapist === key;
+                      return (
+                        <Pressable
+                          key={key}
+                          onPress={() => setActiveFilterTherapist(key)}
+                          style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, marginBottom: -1, borderBottomWidth: 2, borderBottomColor: active ? (c.success ?? '#5A9E8E') : 'transparent' }}
+                        >
+                          <Text style={{ fontSize: 14, fontWeight: active ? '700' : '500', color: active ? c.text : c.muted }}>{label}</Text>
+                          {key === 'pending' && pendingIncomingBookings.length > 0 && (
+                            <View style={{ minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4, backgroundColor: c.warning ?? '#8A6000', alignItems: 'center', justifyContent: 'center' }}>
+                              <Text style={{ fontSize: 11, fontWeight: '700', color: '#fff' }}>{pendingIncomingBookings.length}</Text>
+                            </View>
+                          )}
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+
+                  <TherapistTimeline
+                    c={c}
+                    mySlots={mySlots}
+                    incomingBookings={incomingBookings}
+                    activeFilter={activeFilterTherapist}
+                    deletingSlotIds={deletingSlotIds}
+                    onCancelSlot={onCancelSlot}
+                    onRespond={onRespond}
+                    onTherapistCancel={handleTherapistCancel}
+                    onOpenDetail={handleOpenDetail}
+                    slotsLoading={shouldShowSectionLoading(slotsLoading, slotsLastLoadedAt)}
+                    incomingLoading={shouldShowSectionLoading(incomingBookingsLoading, incomingBookingsLastLoadedAt)}
+                  />
+                </>
+              ) : scheduleView === 'timeline' ? (
+                <TherapistDayTimeline
+                  c={c}
+                  selectedDate={selectedDate}
+                  mySlots={mySlots}
+                  incomingBookings={incomingBookings}
+                  slotsLoading={slotsLoading}
+                  slotsLastLoadedAt={slotsLastLoadedAt}
+                  incomingBookingsLoading={incomingBookingsLoading}
+                  incomingBookingsLastLoadedAt={incomingBookingsLastLoadedAt}
+                  onOpenBooking={onOpenBookingDetail}
+                  onOpenFree={() => setShowSlotComposerModal(true)}
+                />
+              ) : scheduleView === 'requested' ? (
+                <TherapistTimeline
+                  c={c}
+                  mySlots={mySlots}
+                  incomingBookings={incomingBookings}
+                  activeFilter="pending"
+                  deletingSlotIds={deletingSlotIds}
+                  onCancelSlot={onCancelSlot}
+                  onRespond={onRespond}
+                  onTherapistCancel={handleTherapistCancel}
+                  onOpenDetail={handleOpenDetail}
+                  slotsLoading={shouldShowSectionLoading(slotsLoading, slotsLastLoadedAt)}
+                  incomingLoading={shouldShowSectionLoading(incomingBookingsLoading, incomingBookingsLastLoadedAt)}
+                />
+              ) : (
+                <View style={{ backgroundColor: c.card, borderRadius: 12, borderWidth: 1, borderColor: c.border, paddingVertical: 28, paddingHorizontal: 20, alignItems: 'center' }}>
+                  <Ionicons name="calendar-outline" size={28} color={c.muted} style={{ marginBottom: 8 }} />
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: c.text, textAlign: 'center' }}>Kalenderansicht folgt in Kürze</Text>
+                  <Text style={{ fontSize: 13, color: c.muted, textAlign: 'center', marginTop: 4, lineHeight: 18 }}>
+                    Nutze bis dahin Liste oder Timeline.
+                  </Text>
+                </View>
+              )}
             </>
           ) : (
             <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
@@ -268,7 +304,7 @@ export function TherapyTabTherapist({
       )}
 
       {/* ── FAB ─────────────────────────────────────────────────────── */}
-      {therapistView === 'termine' && slotBookingEnabled && (
+      {therapistView === 'termine' && slotBookingEnabled && (scheduleView === 'timeline' || scheduleView === 'list') && (
         <Pressable
           onPress={() => setShowSlotComposerModal(true)}
           style={{ position: 'absolute', bottom: 24, right: 20, width: 54, height: 54, borderRadius: 27, backgroundColor: c.success ?? '#5A9E8E', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.2, shadowRadius: 6, elevation: 6 }}
