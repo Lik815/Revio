@@ -4,60 +4,14 @@ import {
   Text, View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getBaseUrl, TUNNEL_HEADERS } from '../../utils/app-utils';
 import { TherapistTimeline } from '../../components/SlotComposer';
 import { HeilmittelSelectModal } from '../../modals/HeilmittelSelectModal';
 import { PatientTherapistToggle } from '../../components/PatientTherapistToggle';
 import { PatientsPane } from './TherapistPatientsScreen';
-import { TAB_ROUTES } from '../../navigation/route-names';
-import { useTabBadges } from '../../context/TabBadgeContext';
 
 const shouldShowSectionLoading = (isLoading, lastLoadedAt) => isLoading && lastLoadedAt === 0;
-
-function HeaderBell({ c, count, onPress }) {
-  return (
-    <Pressable
-      onPress={onPress}
-      hitSlop={10}
-      style={{
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: c.card,
-        borderWidth: 1,
-        borderColor: c.border,
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
-    >
-      <Ionicons name="notifications-outline" size={18} color={c.text} />
-      {count > 0 ? (
-        <View
-          style={{
-            position: 'absolute',
-            top: -2,
-            right: -2,
-            minWidth: 18,
-            height: 18,
-            borderRadius: 9,
-            paddingHorizontal: count > 9 ? 4 : 0,
-            backgroundColor: c.primary,
-            borderWidth: 1.5,
-            borderColor: c.card,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>
-            {count > 99 ? '99+' : count}
-          </Text>
-        </View>
-      ) : null}
-    </Pressable>
-  );
-}
 
 function StatBlock({ c, value, label, valueColor, onPress, style, children }) {
   const content = children ?? (
@@ -91,9 +45,7 @@ export function TherapyTabTherapist({
   patients, patientsLoading, patientsLastLoadedAt, onSelectPatient,
   c, t, styles,
 }) {
-  const navigation = useNavigation();
   const insets = useSafeAreaInsets();
-  const { unreadNotifications } = useTabBadges();
   const slotBookingEnabled = loggedInTherapist?.bookingMode === 'FIRST_APPOINTMENT_REQUEST';
   const reviewApproved = loggedInTherapist?.reviewStatus === 'APPROVED';
   const [activationLoading, setActivationLoading] = useState(false);
@@ -170,11 +122,6 @@ export function TherapyTabTherapist({
         <View style={[styles.header, { marginBottom: 0 }]}>
           <Image source={require('../../../assets/icon.png')} style={styles.logoMark} />
           <Text style={[styles.headerTitle, { color: c.text, flex: 1 }]}>{'Meine Übersicht'}</Text>
-          <HeaderBell
-            c={c}
-            count={unreadNotifications}
-            onPress={() => navigation.navigate(TAB_ROUTES.NOTIFICATIONS)}
-          />
         </View>
       </View>
 
