@@ -13,7 +13,7 @@ const LINE_WIDTH = 2;
 export function TherapistDayTimeline({
   c, selectedDate, mySlots, incomingBookings,
   slotsLoading, slotsLastLoadedAt, incomingBookingsLoading, incomingBookingsLastLoadedAt,
-  onOpenBooking, onOpenFree,
+  deletingSlotIds = [], onOpenBooking, onCancelSlot,
 }) {
   const rows = useMemo(() => {
     const bookingBySlotId = {};
@@ -84,10 +84,9 @@ export function TherapistDayTimeline({
             kind={kind}
             title={title}
             durationMin={slot.durationMin}
-            onPress={() => {
-              if (kind === 'free') onOpenFree?.(slot);
-              else onOpenBooking?.(booking);
-            }}
+            isDeleting={deletingSlotIds.includes(slot.id)}
+            onDelete={() => onCancelSlot?.(slot.id)}
+            onPress={() => onOpenBooking?.(booking)}
           />
         );
       })}

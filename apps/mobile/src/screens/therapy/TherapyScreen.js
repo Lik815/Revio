@@ -38,7 +38,7 @@ export function TherapyTabScreen() {
   const {
     myAppointments, myAppointmentsLoading, appointmentsLastLoadedAt, setMyAppointments,
     incomingBookings, incomingBookingsLoading, incomingBookingsLastLoadedAt, setIncomingBookings,
-    mySlots, slotsLoading, deletingSlotIds, slotsLastLoadedAt, setMySlots,
+    mySlots, slotsLoading, deletingSlotIds, slotsLastLoadedAt, setMySlots, setDeletingSlotIds,
     patients, patientsLoading, patientsLastLoadedAt,
     therapyRefreshing,
     loadMyAppointments, loadIncomingBookings, loadMySlots, loadPatients,
@@ -99,13 +99,19 @@ export function TherapyTabScreen() {
 
   const handleCancelSlot = async (slotId) => {
     if (!authToken) return;
+    setDeletingSlotIds((prev) => [...prev, slotId]);
     try {
-      await fetch(`${getBaseUrl()}/therapist/slots/${slotId}`, {
+      const res = await fetch(`${getBaseUrl()}/therapist/slots/${slotId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${authToken}` },
       });
-      await loadMySlots(authToken);
+      if (res.ok) {
+        setMySlots((prev) => prev.filter((s) => s.id !== slotId));
+      }
     } catch {}
+    finally {
+      setDeletingSlotIds((prev) => prev.filter((id) => id !== slotId));
+    }
   };
 
   // Patches the local incoming-bookings/slots cache from the PATCH response instead of

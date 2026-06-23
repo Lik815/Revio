@@ -203,13 +203,24 @@ export async function bookingRoutes(fastify: FastifyInstance) {
       .filter((s) => existingTimes.has(new Date(s.startsAt).getTime()))
       .map((s) => ({ startsAt: s.startsAt, reason: 'duplicate' as const }));
 
-    const created = toCreate.length === 0 ? [] : await fastify.prisma.$transaction(
-      toCreate.map((s) =>
-        fastify.prisma.therapistSlot.create({
-          data: { therapistId: therapist.id, startsAt: new Date(s.startsAt), durationMin: s.durationMin ?? 20 },
-        }),
-      ),
-    );
+    let created: { id: string; startsAt: Date; durationMin: number; status: string }[] = [];
+    if (toCreate.length > 0) {
+      try {
+        created = await fastify.prisma.$transaction(
+          toCreate.map((s) =>
+            fastify.prisma.therapistSlot.create({
+              data: { therapistId: therapist.id, startsAt: new Date(s.startsAt), durationMin: s.durationMin ?? 20 },
+            }),
+          ),
+        );
+      } catch (err: any) {
+        // A concurrent request (e.g. a double-submit) created the same slots first.
+        // The (therapistId, startsAt) unique constraint rolled the whole batch back —
+        // report these as already-existing instead of surfacing a raw 500.
+        if (err.code !== 'P2002') throw err;
+        skipped.push(...toCreate.map((s) => ({ startsAt: s.startsAt, reason: 'duplicate' as const })));
+      }
+    }
 
     const response: CreateTherapistSlotsResponse = {
       created: created.map(serializeSlot) as CreateTherapistSlotsResponse['created'],

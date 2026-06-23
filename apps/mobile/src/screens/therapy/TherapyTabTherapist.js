@@ -233,8 +233,9 @@ export function TherapyTabTherapist({
                   slotsLastLoadedAt={slotsLastLoadedAt}
                   incomingBookingsLoading={incomingBookingsLoading}
                   incomingBookingsLastLoadedAt={incomingBookingsLastLoadedAt}
+                  deletingSlotIds={deletingSlotIds}
                   onOpenBooking={onOpenBookingDetail}
-                  onOpenFree={() => setShowSlotComposerModal(true)}
+                  onCancelSlot={onCancelSlot}
                 />
               ) : scheduleView === 'requested' ? (
                 <TherapistTimeline
