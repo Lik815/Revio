@@ -107,6 +107,20 @@ export function TherapyTabScreen() {
     } catch {}
   };
 
+  const handleTherapistRespond = async (bookingId, body) => {
+    const res = await fetch(`${getBaseUrl()}/bookings/${bookingId}/respond`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data?.error ?? `Fehler ${res.status}`);
+    }
+    await loadIncomingBookings(authToken);
+    await loadMySlots(authToken);
+  };
+
   const handleTherapistCancelConfirm = async () => {
     setShowTherapistCancelModal(false);
     if (!therapistCancelBookingId) return;
@@ -187,6 +201,7 @@ export function TherapyTabScreen() {
         appointment={selectedTherapistPatientAppointment.appointment}
         patient={selectedTherapistPatientAppointment.patient}
         onBack={() => setSelectedTherapistPatientAppointment(null)}
+        onRespond={handleTherapistRespond}
         c={c}
         styles={appStyles}
       />

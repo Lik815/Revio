@@ -111,9 +111,14 @@ export function TherapyTabTherapist({
   const nextFreeSlotDateLabel = nextFreeSlotDate
     ? nextFreeSlotDate.toLocaleDateString('de-DE', { day: 'numeric', month: 'long' })
     : '–';
-  const nextFreeSlotSummaryLabel = nextFreeSlotDate && nextFreeSlotTime
-    ? `${nextFreeSlotDateLabel} · ${nextFreeSlotTime} Uhr`
-    : nextFreeSlotDateLabel;
+  const nextFreeSlotIsWithin24h = nextFreeSlotDate
+    ? nextFreeSlotDate.getTime() - Date.now() < 24 * 60 * 60 * 1000
+    : false;
+  const nextFreeSlotSummaryLabel = !nextFreeSlotDate
+    ? nextFreeSlotDateLabel
+    : nextFreeSlotIsWithin24h
+      ? `${nextFreeSlotTime} Uhr`
+      : nextFreeSlotDateLabel;
 
   return (
     <View style={{ flex: 1 }}>

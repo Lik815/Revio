@@ -1,12 +1,13 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
-  Linking, Pressable, ScrollView, Text, View,
+  ActivityIndicator, Linking, Pressable, ScrollView, Text, View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { kassenartOptions, SHADOW, SPACE } from '../../utils/app-utils';
 import { STATUS_COLORS } from './AppointmentCards';
 import { TabHeader } from '../../components/TabHeader';
 import { useConfigOptions } from '../../hooks/use-config-options';
+import { DeclineBookingModal } from '../../modals/DeclineBookingModal';
 
 function formatDateParts(appointment) {
   const slotDate = appointment?.slot?.startsAt ?? appointment?.confirmedSlotAt ?? null;
@@ -30,14 +31,39 @@ export function TherapistAppointmentDetail({
   appointment,
   patient,
   onBack,
+  onRespond,
   c,
   styles,
 }) {
   const badge = STATUS_COLORS[appointment?.status] ?? STATUS_COLORS.EXPIRED;
   const { heilmittelOptions } = useConfigOptions();
+  const [loading, setLoading] = useState(false);
+  const [showDeclineModal, setShowDeclineModal] = useState(false);
+  const [error, setError] = useState('');
   const heilmittelLabel = heilmittelOptions.find((opt) => opt.key === appointment?.heilmittel)?.label ?? null;
-  const kassenartLabel = kassenartOptions.find((opt) => opt.key === appointment?.kassenart)?.label ?? null;
+  const kassenartLabel = appointment?.kassenart
+    ? kassenartOptions.find((opt) => opt.key === appointment.kassenart)?.label ?? null
+    : null;
   const hasMessage = typeof appointment?.message === 'string' && appointment.message.trim().length > 0;
+  const isPending = appointment?.status === 'PENDING';
+
+  const handleRespond = async (action, declinedReason) => {
+    if (!onRespond || !appointment?.id) return;
+    setError('');
+    setLoading(true);
+    try {
+      const body = action === 'CONFIRM'
+        ? { action: 'CONFIRM' }
+        : { action: 'DECLINE', declinedReason: declinedReason?.trim() || undefined };
+      await onRespond(appointment.id, body);
+      setShowDeclineModal(false);
+      onBack?.();
+    } catch (e) {
+      setError(e?.message ?? 'Fehler beim Speichern.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const { bigDateLabel, weekdayDateLabel, timeLabel } = formatDateParts(appointment);
 
@@ -153,9 +179,44 @@ export function TherapistAppointmentDetail({
                 </View>
               </>
             ) : null}
+
+            {isPending ? (
+              <>
+                <View style={{ height: 1, backgroundColor: c.border }} />
+                {!!error && !showDeclineModal ? (
+                  <Text style={{ fontSize: 13, color: c.error ?? '#DC2626' }}>{error}</Text>
+                ) : null}
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  <Pressable
+                    onPress={() => setShowDeclineModal(true)}
+                    disabled={loading}
+                    style={{ flex: 1, paddingVertical: 12, borderRadius: 10, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center', opacity: loading ? 0.65 : 1 }}
+                  >
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: c.muted }}>Ablehnen</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => handleRespond('CONFIRM')}
+                    disabled={loading}
+                    style={{ flex: 1, paddingVertical: 12, borderRadius: 10, backgroundColor: c.primary, alignItems: 'center', justifyContent: 'center', opacity: loading ? 0.75 : 1 }}
+                  >
+                    {loading ? <ActivityIndicator size="small" color="#fff" /> : <Text style={{ fontSize: 14, fontWeight: '700', color: '#fff' }}>Bestätigen</Text>}
+                  </Pressable>
+                </View>
+              </>
+            ) : null}
           </View>
         </View>
       </ScrollView>
+
+      <DeclineBookingModal
+        visible={showDeclineModal}
+        onClose={() => { setShowDeclineModal(false); setError(''); }}
+        onConfirm={(reason) => handleRespond('DECLINE', reason)}
+        booking={{ ...appointment, patientName: patient?.fullName, patientPhone: patient?.phone }}
+        loading={loading}
+        error={error}
+        c={c}
+      />
     </View>
   );
 }
