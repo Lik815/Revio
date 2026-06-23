@@ -87,7 +87,7 @@ export function TherapistProfileScreen() {
 
   const handleBookingRequest = (th) => {
     if (!authToken) {
-      navigation.navigate(ROOT_ROUTES.LOGIN);
+      navigation.navigate(ROOT_ROUTES.MAIN_TABS, { screen: TAB_ROUTES.AUTH });
       return;
     }
     if (th) {

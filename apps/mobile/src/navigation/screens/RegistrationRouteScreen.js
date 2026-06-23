@@ -33,7 +33,10 @@ export function RegistrationRouteScreen() {
       t={t}
       styles={appStyles}
       onClose={() => navigation.goBack()}
-      onShowLogin={() => navigation.replace(ROOT_ROUTES.LOGIN)}
+      onShowLogin={() => navigation.reset({
+        index: 0,
+        routes: [{ name: ROOT_ROUTES.MAIN_TABS, params: { screen: TAB_ROUTES.AUTH } }],
+      })}
       onComplete={handleComplete}
     />
   );

@@ -6,7 +6,7 @@ import { useFavorites } from '../../hooks/use-favorites';
 import { useToast } from '../../hooks/use-toast';
 import { appStyles } from '../../styles/app-styles';
 import { translations } from '../../i18n/translations';
-import { ROOT_ROUTES } from '../../navigation/route-names';
+import { ROOT_ROUTES, TAB_ROUTES } from '../../navigation/route-names';
 import { FavoritesTab } from './FavoritesTab';
 import { ToastOverlay } from '../../components/ToastOverlay';
 
@@ -46,7 +46,7 @@ export function FavoritesTabScreen() {
         toggleFavorite={toggleFavorite}
         openTherapistById={openTherapistById}
         setActiveTab={() => {}}
-        setShowLogin={() => navigation.navigate(ROOT_ROUTES.LOGIN)}
+        setShowLogin={() => navigation.navigate(ROOT_ROUTES.MAIN_TABS, { screen: TAB_ROUTES.AUTH })}
         styles={appStyles}
         c={c}
         t={t}

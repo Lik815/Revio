@@ -4,7 +4,7 @@ import { appStoreSelectors, useAppStore } from '../../store/useStore';
 import { useTheme } from '../../hooks/use-theme';
 import { appStyles } from '../../styles/app-styles';
 import { translations } from '../../i18n/translations';
-import { ROOT_ROUTES } from '../../navigation/route-names';
+import { ROOT_ROUTES, TAB_ROUTES } from '../../navigation/route-names';
 import { OptionsContent } from './OptionsContent';
 import { FeedbackModal } from '../../modals/FeedbackModal';
 import { ChangePasswordModal } from '../../modals/ChangePasswordModal';
@@ -13,6 +13,10 @@ import { AuthDebugScreen } from '../AuthDebugScreen';
 import { useAuth } from '../../context/AuthContext';
 
 const t = (key) => translations.de[key] ?? key;
+
+function showLoginTab(navigation) {
+  navigation.navigate(ROOT_ROUTES.MAIN_TABS, { screen: TAB_ROUTES.AUTH });
+}
 
 export function OptionsTabScreen() {
   const navigation = useNavigation();
@@ -34,13 +38,13 @@ export function OptionsTabScreen() {
   const handleLogout = async () => {
     await logoutFromContext();
     signOut();
-    navigation.navigate(ROOT_ROUTES.LOGIN);
+    showLoginTab(navigation);
   };
 
   const handleDeleteAccountConfirmed = async () => {
     await logoutFromContext();
     signOut();
-    navigation.navigate(ROOT_ROUTES.LOGIN);
+    showLoginTab(navigation);
   };
 
   const handleNavigateToProfile = () => {
@@ -54,7 +58,7 @@ export function OptionsTabScreen() {
         loggedInPatient={loggedInPatient}
         themeMode={themeMode}
         setThemeMode={setThemeMode}
-        onShowLogin={() => navigation.navigate(ROOT_ROUTES.LOGIN)}
+        onShowLogin={() => showLoginTab(navigation)}
         onShowRegister={() => navigation.navigate(ROOT_ROUTES.REGISTRATION)}
         onShowFeedback={() => setShowFeedback(true)}
         onShowChangePassword={() => setShowChangePassword(true)}

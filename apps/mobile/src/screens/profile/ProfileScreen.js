@@ -169,7 +169,7 @@ export function ProfileTabScreen() {
       c={c}
       t={t}
       styles={appStyles}
-      onLogin={() => navigation.navigate(ROOT_ROUTES.LOGIN)}
+      onLogin={() => navigation.navigate(ROOT_ROUTES.MAIN_TABS, { screen: TAB_ROUTES.AUTH })}
       onSignup={() => navigation.navigate(ROOT_ROUTES.REGISTRATION)}
     />
   );
