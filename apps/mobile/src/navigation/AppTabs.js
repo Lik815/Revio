@@ -13,8 +13,7 @@ import { PracticeProfileScreen } from '../screens/public/PracticeProfileScreen';
 import { translations } from '../i18n/translations';
 import { CustomTabBar } from './CustomTabBar';
 import { TAB_TRANSLATION_KEYS } from './tab-config';
-import { appStoreSelectors, useAppStore } from '../store/useStore';
-import { useNotificationPolling } from '../hooks/use-notification-polling';
+import { useNotifications } from '../context/NotificationContext';
 
 const Tab = createBottomTabNavigator();
 const ProfileStack = createNativeStackNavigator();
@@ -44,9 +43,7 @@ const OptionsStack = withProfileScreens(OptionsTabScreen, 'OptionsHome');
 
 export function AppTabs() {
   const t = translations.de;
-  const authToken = useAppStore(appStoreSelectors.authToken);
-  const accountType = useAppStore(appStoreSelectors.accountType);
-  const { notifications, dismissedNotifIds } = useNotificationPolling({ authToken, accountType });
+  const { notifications, dismissedNotifIds } = useNotifications();
   const unreadNotifications = notifications.filter((n) => !dismissedNotifIds.has(n.id)).length;
 
   return (

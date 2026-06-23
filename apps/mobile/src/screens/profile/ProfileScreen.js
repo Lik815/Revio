@@ -4,7 +4,7 @@ import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { appStoreSelectors, useAppStore } from '../../store/useStore';
 import { useTheme } from '../../hooks/use-theme';
-import { useNotificationPolling } from '../../hooks/use-notification-polling';
+import { useNotifications } from '../../context/NotificationContext';
 import { useToast } from '../../hooks/use-toast';
 import { useFavorites } from '../../hooks/use-favorites';
 import { appStyles } from '../../styles/app-styles';
@@ -20,7 +20,6 @@ import { PhotoPromptModal } from '../../modals/PhotoPromptModal';
 import { TherapistDashboardScreen } from './TherapistDashboard';
 import { PatientDashboardScreen } from './PatientDashboard';
 import { useTherapyData } from '../../context/TherapyContext';
-import { useAuth } from '../../context/AuthContext';
 import { TherapistLandingScreen } from '../auth/TherapistLandingScreen';
 
 const t = (key) => translations.de[key] ?? key;
@@ -40,20 +39,10 @@ export function ProfileTabScreen() {
 
   const { myAppointments } = useTherapyData();
   const { favorites } = useFavorites({ authToken });
-  const { setLoggedInTherapist } = useAuth();
 
   const {
     showReviewNotificationModal, reviewNotification, markReviewNotificationSeen,
-  } = useNotificationPolling({
-    authToken,
-    accountType,
-    onTherapistReviewStatus: (therapistId, reviewStatus) => {
-      setLoggedInTherapist((prev) => {
-        if (!prev || prev.id !== therapistId || prev.reviewStatus === reviewStatus) return prev;
-        return { ...prev, reviewStatus };
-      });
-    },
-  });
+  } = useNotifications();
 
   const [showPhotoPrompt, setShowPhotoPrompt] = useState(false);
 

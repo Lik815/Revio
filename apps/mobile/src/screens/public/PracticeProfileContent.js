@@ -157,7 +157,13 @@ export function PracticeProfileContent(props) {
           const therapistSpecializations = Array.isArray(therapist?.specializations) ? therapist.specializations : [];
           return (
             <Pressable key={therapist.id} onPress={() => openTherapistById(therapist.id)} style={[styles.miniCard, { backgroundColor: c.card, borderColor: c.border }]}>
-              <Image source={{ uri: therapist.photo }} style={styles.miniAvatar} />
+              {therapist.photo ? (
+                <Image source={{ uri: therapist.photo }} style={styles.miniAvatar} />
+              ) : (
+                <View style={[styles.miniAvatar, { backgroundColor: c.primaryBg, alignItems: 'center', justifyContent: 'center' }]}>
+                  <Text style={{ fontSize: 15, fontWeight: '700', color: c.primary }}>{getPracticeInitials(therapist.fullName ?? 'Profil')}</Text>
+                </View>
+              )}
               <View style={{ flex: 1 }}>
                 <Text style={[styles.cardName, { color: c.text }]}>{therapist.fullName ?? 'Profil'}</Text>
                 <Text style={[styles.cardTitle, { color: c.muted }]}>{therapist.professionalTitle ?? ''}</Text>

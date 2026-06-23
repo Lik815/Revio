@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import { getBaseUrl, TUNNEL_HEADERS } from '../utils/app-utils';
+import { timedFetch } from '../utils/perf-log';
 
 const TherapyContext = createContext(null);
 
@@ -17,6 +18,7 @@ export function TherapyProvider({ children }) {
   const [patients, setPatients] = useState([]);
   const [patientsLoading, setPatientsLoading] = useState(false);
   const [patientsLastLoadedAt, setPatientsLastLoadedAt] = useState(0);
+  const [patientDetails, setPatientDetails] = useState({});
   const [favorites, setFavorites] = useState([]);
   const [favoritesLoading, setFavoritesLoading] = useState(false);
   const [favoritePractices, setFavoritePractices] = useState([]);
@@ -48,7 +50,7 @@ export function TherapyProvider({ children }) {
     if (!token) return;
     if (!background || appointmentsLastLoadedAt === 0) setMyAppointmentsLoading(true);
     try {
-      const res = await fetch(`${getBaseUrl()}/bookings/my`, {
+      const res = await timedFetch('bookings/my', `${getBaseUrl()}/bookings/my`, {
         headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
@@ -63,7 +65,7 @@ export function TherapyProvider({ children }) {
     if (!token) return;
     if (!background || incomingBookingsLastLoadedAt === 0) setIncomingBookingsLoading(true);
     try {
-      const res = await fetch(`${getBaseUrl()}/bookings/incoming`, {
+      const res = await timedFetch('bookings/incoming', `${getBaseUrl()}/bookings/incoming`, {
         headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
@@ -78,7 +80,7 @@ export function TherapyProvider({ children }) {
     if (!token) return;
     if (!background || slotsLastLoadedAt === 0) setSlotsLoading(true);
     try {
-      const res = await fetch(`${getBaseUrl()}/therapist/slots`, {
+      const res = await timedFetch('therapist/slots', `${getBaseUrl()}/therapist/slots`, {
         headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
@@ -93,7 +95,7 @@ export function TherapyProvider({ children }) {
     if (!token) return;
     if (!background || patientsLastLoadedAt === 0) setPatientsLoading(true);
     try {
-      const res = await fetch(`${getBaseUrl()}/therapist/patients`, {
+      const res = await timedFetch('therapist/patients', `${getBaseUrl()}/therapist/patients`, {
         headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
@@ -103,6 +105,26 @@ export function TherapyProvider({ children }) {
       }
     } catch {} finally { setPatientsLoading(false); }
   }, [patientsLastLoadedAt]);
+
+  const loadPatientDetail = useCallback(async (token, patientId) => {
+    if (!token || !patientId) return null;
+    try {
+      const res = await timedFetch('therapist/patients/:id', `${getBaseUrl()}/therapist/patients/${patientId}`, {
+        headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      setPatientDetails((prev) => ({
+        ...prev,
+        [patientId]: {
+          patient: data.patient ?? null,
+          appointments: Array.isArray(data.appointments) ? data.appointments : [],
+          loadedAt: Date.now(),
+        },
+      }));
+      return data;
+    } catch { return null; }
+  }, []);
 
   const loadAvailableSlots = useCallback(async (therapistId) => {
     setAvailableSlotsLoading(true);
@@ -123,6 +145,7 @@ export function TherapyProvider({ children }) {
     setMySlots([]);
     setDeletingSlotIds([]);
     setPatients([]);
+    setPatientDetails({});
     setFavoritesLastLoadedAt(0);
     setAppointmentsLastLoadedAt(0);
     setIncomingBookingsLastLoadedAt(0);
@@ -163,7 +186,8 @@ export function TherapyProvider({ children }) {
       myAppointments, myAppointmentsLoading, setMyAppointments,
       incomingBookings, incomingBookingsLoading, setIncomingBookings,
       mySlots, slotsLoading, deletingSlotIds, setMySlots, setDeletingSlotIds,
-      patients, patientsLoading, patientsLastLoadedAt,
+      patients, patientsLoading, patientsLastLoadedAt, setPatients,
+      patientDetails, loadPatientDetail, setPatientDetails,
       favorites, favoritesLoading, favoritePractices,
       setFavorites, setFavoritesLoading, setFavoritePractices,
       availableSlots, availableSlotsTherapistId, availableSlotsLoading,

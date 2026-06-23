@@ -284,7 +284,7 @@ const mapApiTherapist = (t) => ({
   behandlungsbereiche: parseStringOrArray(t.behandlungsbereiche ?? t.treatmentAreas ?? []),
   verfügbareZeiten: '',
   website: '',
-  photo: resolveMediaUrl(t.photo) ?? `https://i.pravatar.cc/96?u=${t.id}`,
+  photo: resolveMediaUrl(t.photo),
   practices: (t.practices ?? []).map((p) => ({
     id: p.id,
     name: p.name,

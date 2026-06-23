@@ -11,17 +11,15 @@ import {
 } from 'react-native';
 import { RADIUS, SHADOW, SPACE, TYPE, resolveMediaUrl } from '../../utils/app-utils';
 
-function TherapistAvatar({ therapist, size = 40, c }) {
+const TherapistAvatar = React.memo(function TherapistAvatar({ therapist, size = 40, c }) {
   const [imgError, setImgError] = useState(false);
   const photo = resolveMediaUrl(therapist?.photo);
-  const fallback = `https://i.pravatar.cc/${size * 2}?u=${therapist?.id ?? 'default'}`;
-  const uri = (!imgError && photo) ? photo : fallback;
   const initials = (therapist?.fullName ?? '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
 
-  if (uri) {
+  if (photo && !imgError) {
     return (
       <Image
-        source={{ uri }}
+        source={{ uri: photo }}
         style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: c.primaryBg }}
         onError={() => setImgError(true)}
       />
@@ -32,7 +30,7 @@ function TherapistAvatar({ therapist, size = 40, c }) {
       <Text style={{ fontSize: size * 0.38, fontWeight: '700', color: c.primary }}>{initials}</Text>
     </View>
   );
-}
+});
 
 function formatSlot(startsAt, durationMin) {
   if (!startsAt) return '—';
@@ -158,7 +156,7 @@ export function PatientNextAppointmentCard({
 
 // ─── PatientAppointmentCard ────────────────────────────────────────────────────
 
-export function PatientAppointmentCard({ c, appointment, onOpenDetail, onViewTherapist, isPast = false }) {
+export const PatientAppointmentCard = React.memo(function PatientAppointmentCard({ c, appointment, onOpenDetail, onViewTherapist, isPast = false }) {
   const { status, therapist, slot, confirmedSlotAt } = appointment;
   const badge = STATUS_COLORS[status] ?? STATUS_COLORS.EXPIRED;
   const slotDate = slot?.startsAt ?? confirmedSlotAt ?? null;
@@ -214,7 +212,7 @@ export function PatientAppointmentCard({ c, appointment, onOpenDetail, onViewThe
       </View>
     </Pressable>
   );
-}
+});
 
 // ─── TherapistBookingCard ──────────────────────────────────────────────────────
 

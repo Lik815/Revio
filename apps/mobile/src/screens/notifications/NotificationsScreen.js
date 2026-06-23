@@ -1,25 +1,20 @@
 import React from 'react';
 import { ScrollView, Text, View, Pressable } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { appStoreSelectors, useAppStore } from '../../store/useStore';
 import { useTheme } from '../../hooks/use-theme';
-import { useNotificationPolling } from '../../hooks/use-notification-polling';
+import { useNotifications } from '../../context/NotificationContext';
 import { appStyles } from '../../styles/app-styles';
 import { translations } from '../../i18n/translations';
 import { NotificationCard } from '../../components/NotificationCard';
 import { ReviewNotificationModal } from '../../modals/ReviewNotificationModal';
 import { ROOT_ROUTES, TAB_ROUTES } from '../../navigation/route-names';
-import { useAuth } from '../../context/AuthContext';
 import { TabHeader } from '../../components/TabHeader';
 
 const t = (key) => translations.de[key] ?? key;
 
 export function NotificationsTabScreen() {
   const navigation = useNavigation();
-  const authToken = useAppStore(appStoreSelectors.authToken);
-  const accountType = useAppStore(appStoreSelectors.accountType);
   const { c } = useTheme();
-  const { setLoggedInTherapist } = useAuth();
 
   const {
     notifications,
@@ -29,16 +24,7 @@ export function NotificationsTabScreen() {
     showReviewNotificationModal,
     reviewNotification,
     markReviewNotificationSeen,
-  } = useNotificationPolling({
-    authToken,
-    accountType,
-    onTherapistReviewStatus: (therapistId, reviewStatus) => {
-      setLoggedInTherapist((prev) => {
-        if (!prev || prev.id !== therapistId || prev.reviewStatus === reviewStatus) return prev;
-        return { ...prev, reviewStatus };
-      });
-    },
-  });
+  } = useNotifications();
 
   const items = notifications.filter((n) => !dismissedNotifIds.has(n.id));
 

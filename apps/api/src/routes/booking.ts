@@ -28,6 +28,40 @@ function canUseBookingMode(therapist: { reviewStatus?: string | null; bookingMod
 const splitList = (value: string) =>
   value.split(',').map((s) => s.trim()).filter(Boolean);
 
+const SLOT_STATUS_VALUES = ['AVAILABLE', 'BOOKED', 'CANCELLED'] as const;
+type SlotStatusValue = (typeof SLOT_STATUS_VALUES)[number];
+
+function parseSlotStatusFilter(status: string | undefined): SlotStatusValue[] {
+  if (!status) return [];
+  return splitList(status).filter((s): s is SlotStatusValue =>
+    (SLOT_STATUS_VALUES as readonly string[]).includes(s));
+}
+
+// Optional, additive filters for /bookings/my and /bookings/incoming. Absent params
+// preserve today's behaviour (full, unfiltered history) — nothing calls these with
+// params yet, this just makes the capability available for future pagination UI.
+function parseBookingListQuery(query: Record<string, unknown>) {
+  const { from, to, status, limit } = query as { from?: string; to?: string; status?: string; limit?: string };
+  const where: Record<string, unknown> = {};
+
+  if (status) {
+    const statuses = splitList(status);
+    if (statuses.length > 0) where.status = { in: statuses };
+  }
+
+  if (from || to) {
+    const range: { gte?: Date; lte?: Date } = {};
+    if (from) range.gte = new Date(from);
+    if (to) range.lte = new Date(to);
+    where.confirmedSlotAt = range;
+  }
+
+  const parsedLimit = limit ? Number.parseInt(limit, 10) : NaN;
+  const take = Number.isInteger(parsedLimit) && parsedLimit > 0 ? parsedLimit : undefined;
+
+  return { where, take };
+}
+
 function serializeSlot(slot: { id: string; startsAt: Date; durationMin: number; status: string } | null | undefined) {
   if (!slot) return null;
   return { id: slot.id, startsAt: slot.startsAt.toISOString(), durationMin: slot.durationMin, status: slot.status };
@@ -99,9 +133,10 @@ export async function bookingRoutes(fastify: FastifyInstance) {
     const therapist = await resolveTherapist(fastify, token);
     if (!therapist) return reply.status(403).send({ error: 'Only therapists can manage slots' });
 
-    const { from, to } = request.query as { from?: string; to?: string };
+    const { from, to, status } = request.query as { from?: string; to?: string; status?: string };
     const fromDate = from ? new Date(from) : new Date();
     const toDate = to ? new Date(to) : new Date(Date.now() + 60 * 24 * 60 * 60 * 1000);
+    const statuses = parseSlotStatusFilter(status);
 
     const slots = await fastify.prisma.therapistSlot.findMany({
       where: {
@@ -110,6 +145,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
           { startsAt: { gte: fromDate, lte: toDate } },
           { status: 'BOOKED', booking: { status: 'PENDING' } },
         ],
+        ...(statuses.length > 0 ? { status: { in: statuses } } : {}),
       },
       include: { booking: { select: { id: true, patientName: true, patientEmail: true, patientPhone: true, status: true } } },
       orderBy: { startsAt: 'asc' },
@@ -393,13 +429,16 @@ export async function bookingRoutes(fastify: FastifyInstance) {
 
     await expireStaleBookings(fastify, { patientUserId: patient.id });
 
+    const { where: listFilters, take } = parseBookingListQuery(request.query as Record<string, unknown>);
+
     const bookings = await fastify.prisma.bookingRequest.findMany({
-      where: { patientUserId: patient.id },
+      where: { patientUserId: patient.id, ...listFilters },
       include: {
         slot: true,
         therapist: { select: { id: true, fullName: true, professionalTitle: true, city: true, photo: true, phone: true } },
       },
       orderBy: { createdAt: 'desc' },
+      ...(take ? { take } : {}),
     });
 
     return reply.send(bookings.map((b) => ({ ...b, slot: serializeSlot(b.slot) })));
@@ -414,10 +453,13 @@ export async function bookingRoutes(fastify: FastifyInstance) {
 
     await expireStaleBookings(fastify, { therapistId: therapist.id });
 
+    const { where: listFilters, take } = parseBookingListQuery(request.query as Record<string, unknown>);
+
     const bookings = await fastify.prisma.bookingRequest.findMany({
-      where: { therapistId: therapist.id },
+      where: { therapistId: therapist.id, ...listFilters },
       include: { slot: true },
       orderBy: { createdAt: 'desc' },
+      ...(take ? { take } : {}),
     });
 
     return reply.send(bookings.map((b) => ({ ...b, slot: serializeSlot(b.slot) })));

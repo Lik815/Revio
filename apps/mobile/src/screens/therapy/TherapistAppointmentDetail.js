@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator, Linking, Pressable, ScrollView, Text, View,
 } from 'react-native';
@@ -8,6 +8,7 @@ import { STATUS_COLORS } from './AppointmentCards';
 import { TabHeader } from '../../components/TabHeader';
 import { useConfigOptions } from '../../hooks/use-config-options';
 import { DeclineBookingModal } from '../../modals/DeclineBookingModal';
+import { markMounted } from '../../utils/perf-log';
 
 function formatDateParts(appointment) {
   const slotDate = appointment?.slot?.startsAt ?? appointment?.confirmedSlotAt ?? null;
@@ -46,6 +47,11 @@ export function TherapistAppointmentDetail({
     : null;
   const hasMessage = typeof appointment?.message === 'string' && appointment.message.trim().length > 0;
   const isPending = appointment?.status === 'PENDING';
+
+  // First content is the appointment/patient passed in via props — no fetch gates the initial paint.
+  useEffect(() => {
+    markMounted(appointment?.id, 'TherapistAppointmentDetail (no blocking fetch)');
+  }, []);
 
   const handleRespond = async (action, declinedReason) => {
     if (!onRespond || !appointment?.id) return;

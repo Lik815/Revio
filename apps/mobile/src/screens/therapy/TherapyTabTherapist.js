@@ -1,11 +1,10 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Image, Pressable, RefreshControl, ScrollView,
   Text, View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { getBaseUrl, TUNNEL_HEADERS } from '../../utils/app-utils';
 import { TherapistTimeline } from '../../components/SlotComposer';
 import { HeilmittelSelectModal } from '../../modals/HeilmittelSelectModal';
 import { PatientTherapistToggle } from '../../components/PatientTherapistToggle';
@@ -33,10 +32,10 @@ function StatBlock({ c, value, label, valueColor, onPress, style, children }) {
 }
 
 export function TherapyTabTherapist({
-  authToken, mySlots, slotsLoading, incomingBookings, incomingBookingsLoading,
+  mySlots, slotsLoading, incomingBookings, incomingBookingsLoading,
   deletingSlotIds, activeFilterTherapist, setActiveFilterTherapist,
   therapyRefreshing, slotsLastLoadedAt, incomingBookingsLastLoadedAt,
-  onRefresh, onLoadMySlots, onLoadIncomingBookings, onOpenTherapistById,
+  onRefresh, onRespond, onOpenTherapistById,
   onCancelSlot, onTherapistCancelRequest, onSelectTherapistDetailBooking, setShowSlotComposerModal,
   loggedInTherapist,
   onActivateBookingRequests,
@@ -51,23 +50,12 @@ export function TherapyTabTherapist({
   const [activationLoading, setActivationLoading] = useState(false);
   const [activationError, setActivationError] = useState('');
   const [showHeilmittelModal, setShowHeilmittelModal] = useState(false);
-  const pendingIncomingBookings = incomingBookings.filter((r) => r.status === 'PENDING');
-  const freeSlots = mySlots.filter(s => s.status === 'AVAILABLE');
-  const bookedSlots = mySlots.filter(s => s.status === 'BOOKED');
-
-  const handleRespond = async (id, body) => {
-    const res = await fetch(`${getBaseUrl()}/bookings/${id}/respond`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      throw new Error(data?.error ?? `Fehler ${res.status}`);
-    }
-    onLoadIncomingBookings(authToken);
-    onLoadMySlots(authToken);
-  };
+  const pendingIncomingBookings = useMemo(
+    () => incomingBookings.filter((r) => r.status === 'PENDING'),
+    [incomingBookings],
+  );
+  const freeSlots = useMemo(() => mySlots.filter(s => s.status === 'AVAILABLE'), [mySlots]);
+  const bookedSlots = useMemo(() => mySlots.filter(s => s.status === 'BOOKED'), [mySlots]);
 
   const handleTherapistCancel = (bookingId) => {
     onTherapistCancelRequest(bookingId);
@@ -103,7 +91,10 @@ export function TherapyTabTherapist({
     { key: 'pending', label: 'Anfragen' },
   ];
 
-  const nextFreeSlot = [...freeSlots].sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt))[0];
+  const nextFreeSlot = useMemo(
+    () => [...freeSlots].sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt))[0] ?? null,
+    [freeSlots],
+  );
   const nextFreeSlotDate = nextFreeSlot ? new Date(nextFreeSlot.startsAt) : null;
   const nextFreeSlotTime = nextFreeSlotDate
     ? nextFreeSlotDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
@@ -120,6 +111,55 @@ export function TherapyTabTherapist({
       ? `${nextFreeSlotTime} Uhr`
       : nextFreeSlotDateLabel;
 
+  // Shared between the "Termine" (ScrollView) and "Patienten" (FlatList) views,
+  // each of which owns its own single scroll root so the patient list can virtualize properly.
+  const summaryAndToggle = (
+    <>
+      <View style={{ flexDirection: 'row', backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.border, padding: 16, marginBottom: 12 }}>
+        <StatBlock
+          c={c}
+          value={freeSlots.length}
+          label="Frei"
+          valueColor={c.success ?? '#5A9E8E'}
+          style={{ paddingRight: 12, borderRightWidth: 1, borderRightColor: c.border }}
+          onPress={() => {
+            setTherapistView('termine');
+            setActiveFilterTherapist('free');
+          }}
+        />
+        <StatBlock
+          c={c}
+          value={bookedSlots.length}
+          label="Gebucht"
+          style={{ paddingHorizontal: 12, borderRightWidth: 1, borderRightColor: c.border }}
+          onPress={() => {
+            setTherapistView('termine');
+            setActiveFilterTherapist('booked');
+          }}
+        />
+        <View style={{ flex: 1.3, paddingLeft: 12 }}>
+          <Text style={{ fontSize: 11, fontWeight: '600', color: c.muted, textTransform: 'uppercase', letterSpacing: 0.4 }}>Nächster Slot</Text>
+          <Text
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.82}
+            style={{ fontSize: 16, fontWeight: '800', color: c.text, marginTop: 6 }}
+          >
+            {nextFreeSlotSummaryLabel}
+          </Text>
+        </View>
+      </View>
+
+      <PatientTherapistToggle
+        c={c}
+        value={therapistView}
+        onChange={setTherapistView}
+        terminCount={mySlots.length}
+        patientCount={patients.length}
+      />
+    </>
+  );
+
   return (
     <View style={{ flex: 1 }}>
       {/* ── Header ─────────────────────────────────────────────────── */}
@@ -130,58 +170,26 @@ export function TherapyTabTherapist({
         </View>
       </View>
 
-      <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: 90, paddingTop: 8 }]}
-        showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={therapyRefreshing} onRefresh={onRefresh} tintColor={c.primary} />}
-      >
-        {/* ── Summary-Card ───────────────────────────────────── */}
-        <View style={{ flexDirection: 'row', backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.border, padding: 16, marginBottom: 12 }}>
-          <StatBlock
-            c={c}
-            value={freeSlots.length}
-            label="Frei"
-            valueColor={c.success ?? '#5A9E8E'}
-            style={{ paddingRight: 12, borderRightWidth: 1, borderRightColor: c.border }}
-            onPress={() => {
-              setTherapistView('termine');
-              setActiveFilterTherapist('free');
-            }}
-          />
-          <StatBlock
-            c={c}
-            value={bookedSlots.length}
-            label="Gebucht"
-            style={{ paddingHorizontal: 12, borderRightWidth: 1, borderRightColor: c.border }}
-            onPress={() => {
-              setTherapistView('termine');
-              setActiveFilterTherapist('booked');
-            }}
-          />
-          <View style={{ flex: 1.3, paddingLeft: 12 }}>
-            <Text style={{ fontSize: 11, fontWeight: '600', color: c.muted, textTransform: 'uppercase', letterSpacing: 0.4 }}>Nächster Slot</Text>
-            <Text
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              minimumFontScale={0.82}
-              style={{ fontSize: 16, fontWeight: '800', color: c.text, marginTop: 6 }}
-            >
-              {nextFreeSlotSummaryLabel}
-            </Text>
-          </View>
-        </View>
-
-        {/* ── Termine / Patienten Toggle ───────────────────── */}
-        <PatientTherapistToggle
+      {therapistView === 'patients' ? (
+        <PatientsPane
+          patients={patients}
+          patientsLoading={patientsLoading}
+          patientsLastLoadedAt={patientsLastLoadedAt}
+          onSelectPatient={onSelectPatient}
           c={c}
-          value={therapistView}
-          onChange={setTherapistView}
-          terminCount={mySlots.length}
-          patientCount={patients.length}
+          headerContent={summaryAndToggle}
+          therapyRefreshing={therapyRefreshing}
+          onRefresh={onRefresh}
         />
+      ) : (
+        <ScrollView
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: 90, paddingTop: 8 }]}
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={therapyRefreshing} onRefresh={onRefresh} tintColor={c.primary} />}
+        >
+          {summaryAndToggle}
 
-        {therapistView === 'termine' ? (
-          slotBookingEnabled ? (
+          {slotBookingEnabled ? (
             <>
               {/* ── Segment-Tabs ──────────────────────────────────────── */}
               <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: c.border, marginBottom: 16 }}>
@@ -212,7 +220,7 @@ export function TherapyTabTherapist({
                 activeFilter={activeFilterTherapist}
                 deletingSlotIds={deletingSlotIds}
                 onCancelSlot={onCancelSlot}
-                onRespond={handleRespond}
+                onRespond={onRespond}
                 onTherapistCancel={handleTherapistCancel}
                 onOpenDetail={handleOpenDetail}
                 slotsLoading={shouldShowSectionLoading(slotsLoading, slotsLastLoadedAt)}
@@ -255,18 +263,9 @@ export function TherapyTabTherapist({
                 )}
               </View>
             </View>
-          )
-        ) : (
-          <PatientsPane
-            patients={patients}
-            patientsLoading={patientsLoading}
-            patientsLastLoadedAt={patientsLastLoadedAt}
-            onSelectPatient={onSelectPatient}
-            c={c}
-          />
-        )}
-
-      </ScrollView>
+          )}
+        </ScrollView>
+      )}
 
       {/* ── FAB ─────────────────────────────────────────────────────── */}
       {therapistView === 'termine' && slotBookingEnabled && (

@@ -1,6 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
-  ActivityIndicator, Pressable, Text, TextInput, View,
+  ActivityIndicator, FlatList, Pressable, RefreshControl, Text, TextInput, View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { RADIUS, SHADOW, SPACE } from '../../utils/app-utils';
@@ -21,11 +21,11 @@ function formatPatientMeta(patient) {
   return null;
 }
 
-function PatientListRow({ c, patient, onPress }) {
+const PatientListRow = React.memo(function PatientListRow({ c, patient, onSelect }) {
   const meta = formatPatientMeta(patient);
   return (
     <Pressable
-      onPress={onPress}
+      onPress={() => onSelect(patient.id)}
       style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: c.card, borderRadius: RADIUS.md, borderWidth: 1, borderColor: c.border, padding: SPACE.md, marginBottom: SPACE.sm, ...SHADOW.card }}
     >
       <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: c.primaryBg, alignItems: 'center', justifyContent: 'center' }}>
@@ -50,9 +50,12 @@ function PatientListRow({ c, patient, onPress }) {
       </View>
     </Pressable>
   );
-}
+});
 
-export function PatientsPane({ patients, patientsLoading, patientsLastLoadedAt, onSelectPatient, c }) {
+export function PatientsPane({
+  patients, patientsLoading, patientsLastLoadedAt, onSelectPatient, c,
+  headerContent = null, therapyRefreshing = false, onRefresh = null,
+}) {
   const [query, setQuery] = useState('');
   const [upcomingOnly, setUpcomingOnly] = useState(false);
   const showLoading = patientsLoading && patientsLastLoadedAt === 0;
@@ -72,6 +75,10 @@ export function PatientsPane({ patients, patientsLoading, patientsLastLoadedAt, 
         return new Date(a.nextAppointmentAt ?? 0) - new Date(b.nextAppointmentAt ?? 0);
       });
   }, [query, safePatients, upcomingOnly]);
+
+  const handleSelect = useCallback((patientId) => {
+    onSelectPatient(patientId);
+  }, [onSelectPatient]);
 
   const renderSearch = () => (
     <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: c.card, borderRadius: RADIUS.md, borderWidth: 1, borderColor: c.border, minHeight: 44, paddingLeft: 12, marginBottom: SPACE.md, ...SHADOW.card }}>
@@ -95,21 +102,23 @@ export function PatientsPane({ patients, patientsLoading, patientsLastLoadedAt, 
     </View>
   );
 
-  if (showLoading) {
-    return (
-      <>
-        {renderSearch()}
+  const renderHeader = () => (
+    <>
+      {headerContent}
+      {renderSearch()}
+    </>
+  );
+
+  const renderEmpty = () => {
+    if (showLoading) {
+      return (
         <View style={{ borderWidth: 1, borderColor: c.border, borderRadius: RADIUS.lg, paddingVertical: 32, alignItems: 'center' }}>
           <ActivityIndicator color={c.primary} />
         </View>
-      </>
-    );
-  }
-
-  if (safePatients.length === 0) {
-    return (
-      <>
-        {renderSearch()}
+      );
+    }
+    if (safePatients.length === 0) {
+      return (
         <View style={{ borderWidth: 1, borderColor: c.border, borderRadius: RADIUS.lg, paddingVertical: 32, paddingHorizontal: 20, alignItems: 'center', gap: 8 }}>
           <Ionicons name="people-outline" size={36} color={c.muted} />
           <Text style={{ fontSize: 16, fontWeight: '700', color: c.text, textAlign: 'center' }}>Noch keine Patienten</Text>
@@ -117,21 +126,25 @@ export function PatientsPane({ patients, patientsLoading, patientsLastLoadedAt, 
             Sobald jemand einen Termin bei dir bucht, erscheint die Person hier.
           </Text>
         </View>
-      </>
+      );
+    }
+    return (
+      <View style={{ borderWidth: 1, borderColor: c.border, borderRadius: RADIUS.lg, paddingVertical: 28, paddingHorizontal: 20, alignItems: 'center', gap: 8 }}>
+        <Ionicons name="search-outline" size={30} color={c.muted} />
+        <Text style={{ fontSize: 15, fontWeight: '700', color: c.text, textAlign: 'center' }}>Keine passenden Patienten</Text>
+      </View>
     );
-  }
+  };
 
   return (
-    <>
-      {renderSearch()}
-      {filteredPatients.length === 0 ? (
-        <View style={{ borderWidth: 1, borderColor: c.border, borderRadius: RADIUS.lg, paddingVertical: 28, paddingHorizontal: 20, alignItems: 'center', gap: 8 }}>
-          <Ionicons name="search-outline" size={30} color={c.muted} />
-          <Text style={{ fontSize: 15, fontWeight: '700', color: c.text, textAlign: 'center' }}>Keine passenden Patienten</Text>
-        </View>
-      ) : filteredPatients.map((patient) => (
-        <PatientListRow key={patient.id} c={c} patient={patient} onPress={() => onSelectPatient(patient.id)} />
-      ))}
-    </>
+    <FlatList
+      data={filteredPatients}
+      keyExtractor={(item) => item.id}
+      renderItem={({ item }) => <PatientListRow c={c} patient={item} onSelect={handleSelect} />}
+      ListHeaderComponent={renderHeader}
+      ListEmptyComponent={renderEmpty}
+      showsVerticalScrollIndicator={false}
+      refreshControl={onRefresh ? <RefreshControl refreshing={therapyRefreshing} onRefresh={onRefresh} tintColor={c.primary} /> : undefined}
+    />
   );
 }

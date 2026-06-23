@@ -6,6 +6,7 @@ import { COLORS } from './utils/app-utils';
 import { ThemeProvider } from './hooks/use-theme';
 import { AuthProvider } from './context/AuthContext';
 import { AuthBridge } from './context/AuthBridge';
+import { NotificationProvider } from './context/NotificationContext';
 import { TherapyProvider } from './context/TherapyContext';
 import { RootNavigator } from './navigation/RootNavigator';
 
@@ -71,11 +72,13 @@ export default function App() {
       <ErrorBoundary>
         <ThemeProvider>
           <AuthProvider>
-            <TherapyProvider>
-              <StatusBar style={statusBarStyle} />
-              <AuthBridge />
-              <RootNavigator />
-            </TherapyProvider>
+            <NotificationProvider>
+              <TherapyProvider>
+                <StatusBar style={statusBarStyle} />
+                <AuthBridge />
+                <RootNavigator />
+              </TherapyProvider>
+            </NotificationProvider>
           </AuthProvider>
         </ThemeProvider>
       </ErrorBoundary>

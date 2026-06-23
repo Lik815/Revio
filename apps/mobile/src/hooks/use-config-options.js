@@ -5,6 +5,7 @@ import {
   regSpecOptions,
   TUNNEL_HEADERS,
 } from '../utils/app-utils';
+import { timedFetch } from '../utils/perf-log';
 
 function normalizeOptions(options, fallback) {
   const source = Array.isArray(options) && options.length > 0 ? options : fallback;
@@ -31,26 +32,50 @@ const certificationFallback = normalizeOptions(fortbildungOptions, []);
 const specializationFallback = normalizeOptions(regSpecOptions, []);
 const heilmittelFallback = [];
 
+const defaultState = {
+  certificationOptions: certificationFallback,
+  specializationOptions: specializationFallback,
+  heilmittelOptions: heilmittelFallback,
+};
+
+// Module-level cache shared by every useConfigOptions() call site, so /config/options
+// is fetched at most once per app session instead of once per mounted component
+// (previously every appointment/patient row fetched it independently).
+let cachedState = null;
+let inFlightPromise = null;
+const listeners = new Set();
+
+function fetchConfigOptions() {
+  if (cachedState) return Promise.resolve(cachedState);
+  if (inFlightPromise) return inFlightPromise;
+
+  inFlightPromise = timedFetch('config/options', `${getBaseUrl()}/config/options`, { headers: TUNNEL_HEADERS })
+    .then((res) => (res.ok ? res.json() : null))
+    .then((data) => {
+      if (!data) return defaultState;
+      const next = {
+        certificationOptions: normalizeOptions(data.certifications, certificationFallback),
+        specializationOptions: normalizeOptions(data.specializations, specializationFallback),
+        heilmittelOptions: normalizeOptions(data.heilmittel, heilmittelFallback),
+      };
+      cachedState = next;
+      listeners.forEach((listener) => listener(next));
+      return next;
+    })
+    .catch(() => defaultState)
+    .finally(() => { inFlightPromise = null; });
+
+  return inFlightPromise;
+}
+
 export function useConfigOptions() {
-  const [certificationOptions, setCertificationOptions] = useState(certificationFallback);
-  const [specializationOptions, setSpecializationOptions] = useState(specializationFallback);
-  const [heilmittelOptions, setHeilmittelOptions] = useState(heilmittelFallback);
+  const [state, setState] = useState(cachedState ?? defaultState);
 
   useEffect(() => {
-    let cancelled = false;
-
-    fetch(`${getBaseUrl()}/config/options`, { headers: TUNNEL_HEADERS })
-      .then(async (res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (cancelled || !data) return;
-        setCertificationOptions(normalizeOptions(data.certifications, certificationFallback));
-        setSpecializationOptions(normalizeOptions(data.specializations, specializationFallback));
-        setHeilmittelOptions(normalizeOptions(data.heilmittel, heilmittelFallback));
-      })
-      .catch(() => {});
-
-    return () => { cancelled = true; };
+    listeners.add(setState);
+    if (!cachedState) fetchConfigOptions();
+    return () => { listeners.delete(setState); };
   }, []);
 
-  return { certificationOptions, specializationOptions, heilmittelOptions };
+  return state;
 }

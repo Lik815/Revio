@@ -20,6 +20,7 @@ import { SlotComposerModal } from '../../modals/SlotComposerModal';
 import { SlotCreatedModal } from '../../modals/SlotCreatedModal';
 import { useTherapyData } from '../../context/TherapyContext';
 import { useConfigOptions } from '../../hooks/use-config-options';
+import { markTap } from '../../utils/perf-log';
 
 const t = (key) => translations.de[key] ?? key;
 
@@ -35,9 +36,9 @@ export function TherapyTabScreen() {
   const { heilmittelOptions } = useConfigOptions();
 
   const {
-    myAppointments, myAppointmentsLoading, appointmentsLastLoadedAt,
-    incomingBookings, incomingBookingsLoading, incomingBookingsLastLoadedAt,
-    mySlots, slotsLoading, deletingSlotIds, slotsLastLoadedAt,
+    myAppointments, myAppointmentsLoading, appointmentsLastLoadedAt, setMyAppointments,
+    incomingBookings, incomingBookingsLoading, incomingBookingsLastLoadedAt, setIncomingBookings,
+    mySlots, slotsLoading, deletingSlotIds, slotsLastLoadedAt, setMySlots,
     patients, patientsLoading, patientsLastLoadedAt,
     therapyRefreshing,
     loadMyAppointments, loadIncomingBookings, loadMySlots, loadPatients,
@@ -49,7 +50,7 @@ export function TherapyTabScreen() {
   const [therapistView, setTherapistView] = useState('termine');
   const [selectedPatientId, setSelectedPatientId] = useState(null);
   const [activeFilterPatient, setActiveFilterPatient] = useState('all');
-  const [activeFilterTherapist, setActiveFilterTherapist] = useState('all');
+  const [activeFilterTherapist, setActiveFilterTherapist] = useState('booked');
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [showTherapistCancelModal, setShowTherapistCancelModal] = useState(false);
   const [therapistCancelBookingId, setTherapistCancelBookingId] = useState(null);
@@ -107,7 +108,10 @@ export function TherapyTabScreen() {
     } catch {}
   };
 
+  // Patches the local incoming-bookings/slots cache from the PATCH response instead of
+  // re-fetching both full lists — respond/cancel only ever change one booking + one slot.
   const handleTherapistRespond = async (bookingId, body) => {
+    const previousSlotId = incomingBookings.find((b) => b.id === bookingId)?.slot?.id ?? null;
     const res = await fetch(`${getBaseUrl()}/bookings/${bookingId}/respond`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
@@ -117,18 +121,38 @@ export function TherapyTabScreen() {
       const data = await res.json().catch(() => ({}));
       throw new Error(data?.error ?? `Fehler ${res.status}`);
     }
-    await loadIncomingBookings(authToken);
-    await loadMySlots(authToken);
+    const updated = await res.json();
+    setIncomingBookings((prev) => prev.map((b) => (b.id === updated.id ? { ...b, ...updated } : b)));
+    if (body.action === 'DECLINE') {
+      if (previousSlotId) {
+        setMySlots((prev) => prev.map((s) => (s.id === previousSlotId ? { ...s, status: 'AVAILABLE', bookingId: null, bookingStatus: null } : s)));
+      } else {
+        // Booking wasn't present in the local incoming-bookings cache (e.g. stale), so we
+        // don't know which slot to release locally — fall back to a single targeted refetch.
+        loadMySlots(authToken);
+      }
+    }
   };
 
   const handleTherapistCancelConfirm = async () => {
     setShowTherapistCancelModal(false);
     if (!therapistCancelBookingId) return;
+    const previousSlotId = incomingBookings.find((b) => b.id === therapistCancelBookingId)?.slot?.id ?? null;
     const res = await fetch(`${getBaseUrl()}/bookings/${therapistCancelBookingId}/therapist-cancel`, {
       method: 'PATCH',
       headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
     });
-    if (res.ok) { loadIncomingBookings(authToken); loadMySlots(authToken); }
+    if (res.ok) {
+      const updated = await res.json().catch(() => null);
+      setIncomingBookings((prev) => prev.map((b) => (
+        b.id === therapistCancelBookingId ? { ...b, ...(updated ?? { status: 'CANCELLED' }), slot: null } : b
+      )));
+      if (previousSlotId) {
+        setMySlots((prev) => prev.map((s) => (s.id === previousSlotId ? { ...s, status: 'AVAILABLE', bookingId: null, bookingStatus: null } : s)));
+      } else {
+        loadMySlots(authToken);
+      }
+    }
     setTherapistCancelBookingId(null);
   };
 
@@ -163,12 +187,18 @@ export function TherapyTabScreen() {
   const handlePatientCancelConfirm = async () => {
     if (!selectedAppointment) return;
     setShowCancelModal(false);
+    const appointmentId = selectedAppointment.id;
     try {
-      await fetch(`${getBaseUrl()}/bookings/${selectedAppointment.id}/cancel`, {
+      const res = await fetch(`${getBaseUrl()}/bookings/${appointmentId}/cancel`, {
         method: 'PATCH',
         headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
       });
-      await loadMyAppointments(authToken);
+      if (res.ok) {
+        const updated = await res.json().catch(() => null);
+        setMyAppointments((prev) => prev.map((a) => (
+          a.id === appointmentId ? { ...a, ...(updated ?? { status: 'CANCELLED' }) } : a
+        )));
+      }
       setSelectedAppointment(null);
     } catch {}
   };
@@ -220,7 +250,7 @@ export function TherapyTabScreen() {
           appointmentsLastLoadedAt={appointmentsLastLoadedAt}
           onRefresh={() => handleTherapyRefresh(authToken, accountType, loggedInTherapist)}
           onOpenTherapistById={openTherapistById}
-          onSelectAppointment={setSelectedAppointment}
+          onSelectAppointment={(appointment) => { markTap(appointment.id); setSelectedAppointment(appointment); }}
           c={c} t={t} styles={appStyles}
         />
       </>
@@ -234,7 +264,7 @@ export function TherapyTabScreen() {
           authToken={authToken}
           patientId={selectedPatientId}
           onBack={() => setSelectedPatientId(null)}
-          onSelectAppointment={(appointment, patient) => setSelectedTherapistPatientAppointment({ appointment, patient })}
+          onSelectAppointment={(appointment, patient) => { markTap(appointment.id); setSelectedTherapistPatientAppointment({ appointment, patient }); }}
           c={c}
         />
       );
@@ -243,7 +273,6 @@ export function TherapyTabScreen() {
     return (
       <>
         <TherapyTabTherapist
-          authToken={authToken}
           mySlots={mySlots}
           slotsLoading={slotsLoading}
           incomingBookings={incomingBookings}
@@ -255,8 +284,7 @@ export function TherapyTabScreen() {
           slotsLastLoadedAt={slotsLastLoadedAt}
           incomingBookingsLastLoadedAt={incomingBookingsLastLoadedAt}
           onRefresh={() => handleTherapyRefresh(authToken, accountType, loggedInTherapist)}
-          onLoadMySlots={loadMySlots}
-          onLoadIncomingBookings={loadIncomingBookings}
+          onRespond={handleTherapistRespond}
           onOpenTherapistById={openTherapistById}
           onCancelSlot={handleCancelSlot}
           onTherapistCancelRequest={(id) => { setTherapistCancelBookingId(id); setShowTherapistCancelModal(true); }}
@@ -270,7 +298,7 @@ export function TherapyTabScreen() {
           patients={patients}
           patientsLoading={patientsLoading}
           patientsLastLoadedAt={patientsLastLoadedAt}
-          onSelectPatient={setSelectedPatientId}
+          onSelectPatient={(patientId) => { markTap(patientId); setSelectedPatientId(patientId); }}
           c={c} t={t} styles={appStyles}
         />
         <TherapistCancelModal

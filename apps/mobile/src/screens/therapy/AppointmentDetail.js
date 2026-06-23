@@ -8,6 +8,7 @@ import { STATUS_COLORS } from './AppointmentCards';
 import { TabHeader } from '../../components/TabHeader';
 import { ReviewComposerModal } from '../../components/ReviewComposerModal';
 import { useConfigOptions } from '../../hooks/use-config-options';
+import { markMounted, timedFetch } from '../../utils/perf-log';
 
 export function AppointmentDetail({
   appointment,
@@ -54,10 +55,15 @@ export function AppointmentDetail({
   const [reviewEligibility, setReviewEligibility] = useState(null);
   const [showReviewModal, setShowReviewModal] = useState(false);
 
+  // First content is the appointment passed in via props — no fetch gates the initial paint.
+  useEffect(() => {
+    markMounted(appointment?.id, 'AppointmentDetail (no blocking fetch)');
+  }, []);
+
   useEffect(() => {
     if (!isPastConfirmed || !authToken || !appointment?.id) return;
     let cancelled = false;
-    fetch(`${getBaseUrl()}/bookings/${appointment.id}/review-eligibility`, {
+    timedFetch('bookings/:id/review-eligibility', `${getBaseUrl()}/bookings/${appointment.id}/review-eligibility`, {
       headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
     })
       .then((res) => (res.ok ? res.json() : null))
