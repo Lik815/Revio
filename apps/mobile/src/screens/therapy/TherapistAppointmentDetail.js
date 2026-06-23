@@ -1,0 +1,161 @@
+import React from 'react';
+import {
+  Linking, Pressable, ScrollView, Text, View,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { kassenartOptions, SHADOW, SPACE } from '../../utils/app-utils';
+import { STATUS_COLORS } from './AppointmentCards';
+import { TabHeader } from '../../components/TabHeader';
+import { useConfigOptions } from '../../hooks/use-config-options';
+
+function formatDateParts(appointment) {
+  const slotDate = appointment?.slot?.startsAt ?? appointment?.confirmedSlotAt ?? null;
+  const durationMin = appointment?.slot?.durationMin ?? 20;
+  const date = slotDate ? new Date(slotDate) : null;
+
+  return {
+    bigDateLabel: date
+      ? date.toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' })
+      : 'Termin',
+    weekdayDateLabel: date
+      ? date.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+      : 'Terminzeit wird noch abgestimmt',
+    timeLabel: date
+      ? `${date.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr (${durationMin} Min)`
+      : `${durationMin} Min`,
+  };
+}
+
+export function TherapistAppointmentDetail({
+  appointment,
+  patient,
+  onBack,
+  c,
+  styles,
+}) {
+  const badge = STATUS_COLORS[appointment?.status] ?? STATUS_COLORS.EXPIRED;
+  const { heilmittelOptions } = useConfigOptions();
+  const heilmittelLabel = heilmittelOptions.find((opt) => opt.key === appointment?.heilmittel)?.label ?? null;
+  const kassenartLabel = kassenartOptions.find((opt) => opt.key === appointment?.kassenart)?.label ?? null;
+  const hasMessage = typeof appointment?.message === 'string' && appointment.message.trim().length > 0;
+
+  const { bigDateLabel, weekdayDateLabel, timeLabel } = formatDateParts(appointment);
+
+  const statusIcon = appointment?.status === 'CONFIRMED'
+    ? 'checkmark-circle-outline'
+    : appointment?.status === 'PENDING'
+      ? 'time-outline'
+      : appointment?.status === 'CANCELLED'
+        ? 'ban-outline'
+        : 'close-circle-outline';
+
+  return (
+    <View style={{ flex: 1 }}>
+      <TabHeader c={c} title="Termin" />
+      <ScrollView
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: 12, paddingTop: SPACE.sm }]}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={{ gap: 10 }}>
+          <Pressable
+            onPress={onBack}
+            style={{ alignSelf: 'flex-start', paddingVertical: 4, flexDirection: 'row', alignItems: 'center', gap: 6 }}
+          >
+            <Ionicons name="chevron-back" size={16} color={c.primary} />
+            <Text style={{ fontSize: 14, fontWeight: '600', color: c.primary }}>Zurück</Text>
+          </Pressable>
+
+          <View style={{ backgroundColor: c.card, borderRadius: 24, padding: 18, borderWidth: 1, borderColor: c.border, gap: 14, ...SHADOW.card }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', backgroundColor: badge.bg, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 6, gap: 6 }}>
+              <Ionicons name={statusIcon} size={14} color={badge.text} />
+              <Text style={{ fontSize: 13, fontWeight: '700', color: badge.text }}>{badge.label}</Text>
+            </View>
+
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <View style={{ flex: 1, gap: 6 }}>
+                <Text style={{ fontSize: 26, fontWeight: '800', color: c.text, lineHeight: 30 }}>{bigDateLabel}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name="calendar-outline" size={14} color={c.muted} />
+                  <Text style={{ fontSize: 13, color: c.muted, fontWeight: '500' }}>{weekdayDateLabel}</Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name="time-outline" size={14} color={c.muted} />
+                  <Text style={{ fontSize: 13, color: c.muted, fontWeight: '500' }}>{timeLabel}</Text>
+                </View>
+              </View>
+              <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: c.primaryBg, alignItems: 'center', justifyContent: 'center', marginLeft: 12 }}>
+                <Ionicons name="calendar-outline" size={24} color={c.primary} />
+              </View>
+            </View>
+
+            <View style={{ height: 1, backgroundColor: c.border }} />
+
+            <View style={{ gap: 8 }}>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: c.muted, textTransform: 'uppercase', letterSpacing: 0.6 }}>Patient</Text>
+              <Text style={{ fontSize: 17, fontWeight: '700', color: c.text }}>{patient?.fullName ?? 'Patient'}</Text>
+
+              {patient?.phone ? (
+                <Pressable
+                  onPress={() => Linking.openURL(`tel:${patient.phone}`)}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}
+                >
+                  <Ionicons name="call" size={13} color={c.primary} />
+                  <Text style={{ fontSize: 13, color: c.primary, fontWeight: '600' }}>{patient.phone}</Text>
+                </Pressable>
+              ) : null}
+
+              {patient?.email ? (
+                <Pressable
+                  onPress={() => Linking.openURL(`mailto:${patient.email}`)}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}
+                >
+                  <Ionicons name="mail-outline" size={13} color={c.primary} />
+                  <Text style={{ fontSize: 13, color: c.primary, fontWeight: '600' }}>{patient.email}</Text>
+                </Pressable>
+              ) : null}
+
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 5 }}>
+                <Ionicons name="location-outline" size={13} color={c.muted} style={{ marginTop: 2 }} />
+                <Text style={{ fontSize: 13, color: c.muted }}>
+                  {patient?.addressLine ?? 'Adresse noch nicht verfügbar'}
+                </Text>
+              </View>
+            </View>
+
+            {hasMessage ? (
+              <>
+                <View style={{ height: 1, backgroundColor: c.border }} />
+                <View style={{ gap: 6 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '700', letterSpacing: 0.4, color: c.muted, textTransform: 'uppercase' }}>Nachricht</Text>
+                  <Text style={{ fontSize: 14, lineHeight: 21, color: c.muted, fontStyle: 'italic' }}>"{appointment.message.trim()}"</Text>
+                </View>
+              </>
+            ) : null}
+
+            {heilmittelLabel || kassenartLabel ? (
+              <>
+                <View style={{ height: 1, backgroundColor: c.border }} />
+                <View style={{ gap: 6 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '700', letterSpacing: 0.4, color: c.muted, textTransform: 'uppercase' }}>Heilmittel & Versicherung</Text>
+                  <Text style={{ fontSize: 14, lineHeight: 21, color: c.text }}>
+                    {[heilmittelLabel, kassenartLabel].filter(Boolean).join(' · ')}
+                  </Text>
+                </View>
+              </>
+            ) : null}
+
+            {appointment?.status === 'DECLINED' && appointment?.declinedReason ? (
+              <>
+                <View style={{ height: 1, backgroundColor: c.border }} />
+                <View style={{ gap: 6, backgroundColor: '#FEF2F2', borderRadius: 12, padding: 14 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '700', letterSpacing: 0.4, color: '#DC2626', textTransform: 'uppercase' }}>Grund der Absage</Text>
+                  <Text style={{ fontSize: 14, lineHeight: 20, color: '#7F1D1D' }}>{appointment.declinedReason}</Text>
+                </View>
+              </>
+            ) : null}
+          </View>
+        </View>
+      </ScrollView>
+    </View>
+  );
+}

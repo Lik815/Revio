@@ -12,6 +12,7 @@ import { TabHeader } from '../../components/TabHeader';
 import { TherapyTabPatient } from './TherapyTabPatient';
 import { TherapyTabTherapist } from './TherapyTabTherapist';
 import { AppointmentDetail } from './AppointmentDetail';
+import { TherapistAppointmentDetail } from './TherapistAppointmentDetail';
 import { TherapistPatientDetailScreen } from './TherapistPatientDetailScreen';
 import { CancelAppointmentModal } from '../../modals/CancelAppointmentModal';
 import { TherapistCancelModal } from '../../modals/TherapistCancelModal';
@@ -44,6 +45,7 @@ export function TherapyTabScreen() {
   } = useTherapyData();
 
   const [selectedAppointment, setSelectedAppointment] = useState(null);
+  const [selectedTherapistPatientAppointment, setSelectedTherapistPatientAppointment] = useState(null);
   const [therapistView, setTherapistView] = useState('termine');
   const [selectedPatientId, setSelectedPatientId] = useState(null);
   const [activeFilterPatient, setActiveFilterPatient] = useState('all');
@@ -171,6 +173,18 @@ export function TherapyTabScreen() {
     );
   }
 
+  if (selectedTherapistPatientAppointment) {
+    return (
+      <TherapistAppointmentDetail
+        appointment={selectedTherapistPatientAppointment.appointment}
+        patient={selectedTherapistPatientAppointment.patient}
+        onBack={() => setSelectedTherapistPatientAppointment(null)}
+        c={c}
+        styles={appStyles}
+      />
+    );
+  }
+
   if (accountType === 'patient') {
     return (
       <>
@@ -197,6 +211,7 @@ export function TherapyTabScreen() {
           authToken={authToken}
           patientId={selectedPatientId}
           onBack={() => setSelectedPatientId(null)}
+          onSelectAppointment={(appointment, patient) => setSelectedTherapistPatientAppointment({ appointment, patient })}
           c={c}
         />
       );

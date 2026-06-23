@@ -17,17 +17,23 @@ function formatAppointmentDate(appointment) {
   return `${date} · ${time} Uhr`;
 }
 
-function AppointmentRow({ c, appointment }) {
+function AppointmentRow({ c, appointment, onPress }) {
   const { heilmittelOptions } = useConfigOptions();
   const badge = STATUS_COLORS[appointment.status] ?? STATUS_COLORS.EXPIRED;
   const heilmittelLabel = heilmittelOptions.find((opt) => opt.key === appointment.heilmittel)?.label ?? null;
   const kassenartLabel = kassenartOptions.find((opt) => opt.key === appointment.kassenart)?.label ?? null;
   return (
-    <View style={{ backgroundColor: c.card, borderRadius: RADIUS.md, borderWidth: 1, borderColor: c.border, padding: SPACE.md, marginBottom: SPACE.sm }}>
+    <Pressable
+      onPress={onPress}
+      style={{ backgroundColor: c.card, borderRadius: RADIUS.md, borderWidth: 1, borderColor: c.border, padding: SPACE.md, marginBottom: SPACE.sm }}
+    >
       <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
         <Text style={{ fontSize: 14, fontWeight: '700', color: c.text, flex: 1 }}>{formatAppointmentDate(appointment)}</Text>
-        <View style={{ backgroundColor: badge.bg, borderRadius: 5, paddingHorizontal: 8, paddingVertical: 3 }}>
-          <Text style={{ fontSize: 11, fontWeight: '700', color: badge.text }}>{badge.label}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <View style={{ backgroundColor: badge.bg, borderRadius: 5, paddingHorizontal: 8, paddingVertical: 3 }}>
+            <Text style={{ fontSize: 11, fontWeight: '700', color: badge.text }}>{badge.label}</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={c.muted} />
         </View>
       </View>
       {heilmittelLabel || kassenartLabel ? (
@@ -41,11 +47,11 @@ function AppointmentRow({ c, appointment }) {
       {appointment.status === 'DECLINED' && appointment.declinedReason ? (
         <Text style={{ fontSize: 12, color: c.error, marginTop: 8 }}>Grund: {appointment.declinedReason}</Text>
       ) : null}
-    </View>
+    </Pressable>
   );
 }
 
-export function TherapistPatientDetailScreen({ authToken, patientId, onBack, c }) {
+export function TherapistPatientDetailScreen({ authToken, patientId, onBack, onSelectAppointment, c }) {
   const [detail, setDetail] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -127,7 +133,12 @@ export function TherapistPatientDetailScreen({ authToken, patientId, onBack, c }
               <Text style={{ fontSize: 13, color: c.muted }}>Noch keine Termine mit dieser Person.</Text>
             ) : (
               appointments.map((appointment) => (
-                <AppointmentRow key={appointment.id} c={c} appointment={appointment} />
+                <AppointmentRow
+                  key={appointment.id}
+                  c={c}
+                  appointment={appointment}
+                  onPress={() => onSelectAppointment?.(appointment, patient)}
+                />
               ))
             )}
           </>
