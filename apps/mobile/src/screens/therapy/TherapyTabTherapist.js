@@ -90,11 +90,13 @@ export function TherapyTabTherapist({
     setVisibleWeekStart(startOfWeek(today));
   };
 
+  // 'pending' is intentionally not a Liste filter anymore — the dedicated
+  // "Angefragt" tab (ScheduleModeTabs) replaced it, so the old chip + badge
+  // and the new tab + badge no longer both show the same count side by side.
   const FILTERS = [
     { key: 'all', label: 'Alle' },
     { key: 'booked', label: 'Gebucht' },
     { key: 'free', label: 'Frei' },
-    { key: 'pending', label: 'Anfragen' },
   ];
 
   const nextFreeSlot = useMemo(
@@ -202,11 +204,6 @@ export function TherapyTabTherapist({
                           style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, marginBottom: -1, borderBottomWidth: 2, borderBottomColor: active ? (c.success ?? '#5A9E8E') : 'transparent' }}
                         >
                           <Text style={{ fontSize: 14, fontWeight: active ? '700' : '500', color: active ? c.text : c.muted }}>{label}</Text>
-                          {key === 'pending' && pendingIncomingBookings.length > 0 && (
-                            <View style={{ minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4, backgroundColor: c.warning ?? '#8A6000', alignItems: 'center', justifyContent: 'center' }}>
-                              <Text style={{ fontSize: 11, fontWeight: '700', color: '#fff' }}>{pendingIncomingBookings.length}</Text>
-                            </View>
-                          )}
                         </Pressable>
                       );
                     })}

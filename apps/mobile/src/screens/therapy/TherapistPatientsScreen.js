@@ -144,6 +144,7 @@ export function PatientsPane({
       ListHeaderComponent={renderHeader}
       ListEmptyComponent={renderEmpty}
       showsVerticalScrollIndicator={false}
+      contentContainerStyle={{ paddingHorizontal: SPACE.xl, paddingTop: 8, paddingBottom: 32 }}
       refreshControl={onRefresh ? <RefreshControl refreshing={therapyRefreshing} onRefresh={onRefresh} tintColor={c.primary} /> : undefined}
     />
   );
