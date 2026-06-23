@@ -17,7 +17,7 @@ export function CustomTabBar({ state, descriptors, navigation, badgeCounts = {} 
   const { width } = useWindowDimensions();
   const t = translations.de;
   const isGuestTabBar = state.routes.length === 2;
-  const guestTabBarWidth = Math.min(360, Math.max(300, width * 0.43));
+  const guestTabBarWidth = Math.min(240, Math.max(196, width * 0.5));
 
   const [rowWidth, setRowWidth] = useState(0);
   const itemWidth = rowWidth / state.routes.length;
@@ -52,7 +52,8 @@ export function CustomTabBar({ state, descriptors, navigation, badgeCounts = {} 
           alignSelf: isGuestTabBar ? 'center' : 'stretch',
           backgroundColor: c.nav,
           borderRadius: RADIUS.lg,
-          paddingVertical: SPACE.sm,
+          paddingTop: SPACE.sm,
+          paddingBottom: isGuestTabBar ? SPACE.md : SPACE.sm,
           width: isGuestTabBar ? guestTabBarWidth : undefined,
           ...SHADOW.modal,
         }}
@@ -62,10 +63,11 @@ export function CustomTabBar({ state, descriptors, navigation, badgeCounts = {} 
             pointerEvents="none"
             style={{
               position: 'absolute',
-              top: 0,
-              bottom: 0,
+              top: isGuestTabBar ? SPACE.sm : 0,
+              bottom: isGuestTabBar ? undefined : 0,
               left: 0,
               width: PILL_SIZE,
+              height: isGuestTabBar ? PILL_SIZE : undefined,
               alignItems: 'center',
               justifyContent: 'center',
               transform: [{ translateX: pillX }],
@@ -153,7 +155,7 @@ export function CustomTabBar({ state, descriptors, navigation, badgeCounts = {} 
                     fontSize: 11,
                     fontWeight: focused ? '700' : '400',
                     color: focused ? c.primary : (c.textMuted ?? c.muted),
-                    marginTop: -SPACE.xs,
+                    marginTop: isGuestTabBar ? 3 : -SPACE.xs,
                   }}
                 >
                   {label}
