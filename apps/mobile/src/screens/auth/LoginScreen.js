@@ -10,9 +10,11 @@ import {
   View,
 } from 'react-native';
 import * as Notifications from 'expo-notifications';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   getBaseUrl,
   normalizeTherapistProfile,
+  SPACE,
   softenErrorMessage,
   TUNNEL_HEADERS,
 } from '../../utils/app-utils';
@@ -22,6 +24,8 @@ import { useTherapyData } from '../../context/TherapyContext';
 export function LoginScreen({ c, styles, t, onClose, bookingTargetTherapist, onBookingReady, showBackButton = true }) {
   const { loginAsTherapist, loginAsPatient } = useAuth();
   const { loadFavorites, loadMyAppointments, loadIncomingBookings } = useTherapyData();
+  const insets = useSafeAreaInsets();
+  const shellTopPadding = showBackButton ? 0 : insets.top + SPACE.md;
 
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
@@ -121,7 +125,7 @@ export function LoginScreen({ c, styles, t, onClose, bookingTargetTherapist, onB
   };
 
   return (
-    <AuthScreenShell c={c} t={t} onBack={showBackButton ? onClose : undefined} paddingHorizontal={20} paddingTop={0} grow>
+    <AuthScreenShell c={c} t={t} onBack={showBackButton ? onClose : undefined} paddingHorizontal={20} paddingTop={shellTopPadding} grow>
       <AuthHero
         align="center"
         title="Willkommen zurück"
