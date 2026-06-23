@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { StackActions } from '@react-navigation/native';
-import { Animated, Pressable, Text, View } from 'react-native';
+import { Animated, Pressable, Text, useWindowDimensions, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../hooks/use-theme';
@@ -14,7 +14,10 @@ const PILL_SIZE = 44;
 export function CustomTabBar({ state, descriptors, navigation, badgeCounts = {} }) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
   const t = translations.de;
+  const isGuestTabBar = state.routes.length === 2;
+  const guestTabBarWidth = Math.min(360, Math.max(300, width * 0.43));
 
   const [rowWidth, setRowWidth] = useState(0);
   const itemWidth = rowWidth / state.routes.length;
@@ -32,15 +35,25 @@ export function CustomTabBar({ state, descriptors, navigation, badgeCounts = {} 
   }, [state.index, itemWidth]);
 
   return (
-    <View style={{ backgroundColor: c.background, paddingHorizontal: SPACE.lg, paddingTop: SPACE.sm, paddingBottom: insets.bottom + SPACE.sm }}>
+    <View
+      style={{
+        alignItems: isGuestTabBar ? 'center' : 'stretch',
+        backgroundColor: c.background,
+        paddingHorizontal: isGuestTabBar ? 0 : SPACE.lg,
+        paddingTop: SPACE.sm,
+        paddingBottom: insets.bottom + SPACE.sm,
+      }}
+    >
       <View
         onLayout={(e) => setRowWidth(e.nativeEvent.layout.width)}
         style={{
           flexDirection: 'row',
           alignItems: 'center',
+          alignSelf: isGuestTabBar ? 'center' : 'stretch',
           backgroundColor: c.nav,
           borderRadius: RADIUS.lg,
           paddingVertical: SPACE.sm,
+          width: isGuestTabBar ? guestTabBarWidth : undefined,
           ...SHADOW.modal,
         }}
       >
