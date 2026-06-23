@@ -2,7 +2,6 @@ import { ReactNode } from 'react';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { AdminShell } from '../../components/admin-shell';
-import { logoutAdmin } from '../../lib/actions';
 import { getAdminSessionState } from '../../lib/api';
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {
@@ -27,7 +26,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   const adminUser = session.adminUser ?? cookieUser;
 
   return (
-    <AdminShell adminUser={adminUser} onLogout={logoutAdmin} apiUnavailable={!session.available}>
+    <AdminShell adminUser={adminUser} apiUnavailable={!session.available}>
       {children}
     </AdminShell>
   );

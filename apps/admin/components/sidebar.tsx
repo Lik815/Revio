@@ -23,11 +23,9 @@ const links = [
 
 export function Sidebar({
   adminUser,
-  onLogout,
   onNavigate,
 }: {
   adminUser: { name: string; email: string; role: string };
-  onLogout: () => Promise<void>;
   onNavigate?: () => void;
 }) {
   const pathname = usePathname();
@@ -73,7 +71,7 @@ export function Sidebar({
             <div className="admin-meta">{adminUser.role} · {adminUser.email}</div>
           </div>
         </div>
-        <form action={onLogout}>
+        <form action="/api/logout" method="post">
           <button className="logout-btn" type="submit">Abmelden</button>
         </form>
       </div>

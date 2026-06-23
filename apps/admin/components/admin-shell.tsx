@@ -6,12 +6,10 @@ import { Sidebar } from './sidebar';
 export function AdminShell({
   children,
   adminUser,
-  onLogout,
   apiUnavailable = false,
 }: {
   children: ReactNode;
   adminUser: { name: string; email: string; role: string };
-  onLogout: () => Promise<void>;
   apiUnavailable?: boolean;
 }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -24,7 +22,7 @@ export function AdminShell({
       />
 
       <div className={`sidebar-wrap ${mobileNavOpen ? 'sidebar-wrap--open' : ''}`}>
-        <Sidebar adminUser={adminUser} onLogout={onLogout} onNavigate={() => setMobileNavOpen(false)} />
+        <Sidebar adminUser={adminUser} onNavigate={() => setMobileNavOpen(false)} />
       </div>
 
       <main className="main">
