@@ -2750,6 +2750,83 @@ describe('Slot-based Booking', () => {
     expect(res.statusCode).toBe(400);
   });
 
+  it('POST /therapist/slots — mixed duplicate and valid batch returns partial success, not 409', async () => {
+    const existingSlot = await createFutureSlot();
+    const newStartsAt1 = new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString();
+    const newStartsAt2 = new Date(Date.now() + 96 * 60 * 60 * 1000).toISOString();
+
+    const res = await app.inject({
+      method: 'POST', url: '/therapist/slots',
+      headers: { authorization: `Bearer ${therapistToken}`, 'content-type': 'application/json' },
+      payload: { slots: [
+        { startsAt: existingSlot.startsAt.toISOString(), durationMin: 20 },
+        { startsAt: newStartsAt1, durationMin: 20 },
+        { startsAt: newStartsAt2, durationMin: 20 },
+      ] },
+    });
+
+    expect(res.statusCode).toBe(201);
+    const body = res.json();
+    expect(body.created).toHaveLength(2);
+    expect(body.skipped).toHaveLength(1);
+    expect(body.skipped[0].reason).toBe('duplicate');
+    expect(body.rejected).toHaveLength(0);
+  });
+
+  it('POST /therapist/slots — mixed past and future batch reports rejected, still creates future ones', async () => {
+    const pastStartsAt = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const futureStartsAt = new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString();
+
+    const res = await app.inject({
+      method: 'POST', url: '/therapist/slots',
+      headers: { authorization: `Bearer ${therapistToken}`, 'content-type': 'application/json' },
+      payload: { slots: [
+        { startsAt: pastStartsAt, durationMin: 20 },
+        { startsAt: futureStartsAt, durationMin: 20 },
+      ] },
+    });
+
+    expect(res.statusCode).toBe(201);
+    const body = res.json();
+    expect(body.created).toHaveLength(1);
+    expect(body.rejected).toHaveLength(1);
+    expect(body.rejected[0].reason).toBe('past');
+  });
+
+  it('POST /therapist/slots — all-duplicate batch returns 201 with empty created and full skipped', async () => {
+    const slotA = await createFutureSlot({ startsAt: new Date(Date.now() + 72 * 60 * 60 * 1000) });
+    const slotB = await createFutureSlot({ startsAt: new Date(Date.now() + 96 * 60 * 60 * 1000) });
+
+    const res = await app.inject({
+      method: 'POST', url: '/therapist/slots',
+      headers: { authorization: `Bearer ${therapistToken}`, 'content-type': 'application/json' },
+      payload: { slots: [
+        { startsAt: slotA.startsAt.toISOString(), durationMin: 20 },
+        { startsAt: slotB.startsAt.toISOString(), durationMin: 20 },
+      ] },
+    });
+
+    expect(res.statusCode).toBe(201);
+    const body = res.json();
+    expect(body.created).toHaveLength(0);
+    expect(body.skipped).toHaveLength(2);
+  });
+
+  it('POST /therapist/slots — still rejects more than 50 slots in one request', async () => {
+    const slots = Array.from({ length: 51 }, (_, i) => ({
+      startsAt: new Date(Date.now() + (i + 1) * 60 * 60 * 1000).toISOString(),
+      durationMin: 20,
+    }));
+
+    const res = await app.inject({
+      method: 'POST', url: '/therapist/slots',
+      headers: { authorization: `Bearer ${therapistToken}`, 'content-type': 'application/json' },
+      payload: { slots },
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
+
   it('GET /therapists/:id/slots — returns only future AVAILABLE slots', async () => {
     await createFutureSlot();
     await createFutureSlot({ status: 'BOOKED' });

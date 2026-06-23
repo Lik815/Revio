@@ -21,21 +21,21 @@ function resolveKassenartLabel(key) {
 }
 import { DeclineBookingModal } from '../modals/DeclineBookingModal';
 
-const SLOT_DURATIONS = [20, 30, 40, 50, 60];
-const TIME_HOURS = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19];
+export const SLOT_DURATIONS = [20, 30, 40, 50, 60];
+export const TIME_HOURS = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19];
 const TIME_ROW_HEIGHT = 46;
 
-function formatSlotDate(d) {
+export function formatSlotDate(d) {
   if (!d) return 'Datum wählen';
   return d.toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-function formatSlotTime(h, m) {
+export function formatSlotTime(h, m) {
   if (h === null) return 'Uhrzeit wählen';
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')} Uhr`;
 }
 
-function buildCalendar(year, month) {
+export function buildCalendar(year, month) {
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const offset = (firstDay + 6) % 7;

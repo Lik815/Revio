@@ -54,6 +54,12 @@ export interface TherapistSlot {
   createdAt: string;
 }
 
+export interface CreateTherapistSlotsResponse {
+  created: TherapistSlot[];
+  skipped: { startsAt: string; reason: 'duplicate' }[];
+  rejected: { startsAt: string; reason: 'past' }[];
+}
+
 export interface BookingRequest {
   id: string;
   therapistId: string;

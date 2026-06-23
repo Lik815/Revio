@@ -54,8 +54,9 @@ export function TherapyTabScreen() {
   const [showTherapistCancelModal, setShowTherapistCancelModal] = useState(false);
   const [therapistCancelBookingId, setTherapistCancelBookingId] = useState(null);
   const [showSlotComposer, setShowSlotComposer] = useState(false);
-  const [createdSlot, setCreatedSlot] = useState(null);
+  const [createdResult, setCreatedResult] = useState(null);
   const [showSlotCreated, setShowSlotCreated] = useState(false);
+  const [slotError, setSlotError] = useState('');
 
   useEffect(() => {
     if (!authToken) return;
@@ -71,21 +72,28 @@ export function TherapyTabScreen() {
     navigation.navigate(ROOT_ROUTES.THERAPIST_PROFILE, { therapistId: id, therapist: fallback });
   };
 
-  const handleAddSlot = async (slot) => {
-    if (!authToken) return;
+  const handleAddSlots = async (slots) => {
+    if (!authToken || slots.length === 0) return;
     try {
       const res = await fetch(`${getBaseUrl()}/therapist/slots`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
-        body: JSON.stringify({ slots: [slot] }),
+        body: JSON.stringify({ slots }),
       });
-      if (res.ok) {
+      const data = await res.json().catch(() => null);
+      if (res.ok && data) {
         setShowSlotComposer(false);
-        setCreatedSlot(slot);
+        setCreatedResult(data);
         setShowSlotCreated(true);
+        setSlotError('');
+      } else {
+        setSlotError(data?.error ?? 'Termine konnten nicht angelegt werden.');
       }
+    } catch {
+      setSlotError('Verbindungsfehler.');
+    } finally {
       await loadMySlots(authToken);
-    } catch {}
+    }
   };
 
   const handleCancelSlot = async (slotId) => {
@@ -259,14 +267,16 @@ export function TherapyTabScreen() {
         />
         <SlotComposerModal
           visible={showSlotComposer}
-          onClose={() => setShowSlotComposer(false)}
-          onAddSlot={handleAddSlot}
+          onClose={() => { setShowSlotComposer(false); setSlotError(''); }}
+          onAddSlot={(slot) => handleAddSlots([slot])}
+          onAddSlots={handleAddSlots}
+          error={slotError}
           c={c}
         />
         <SlotCreatedModal
           visible={showSlotCreated}
           onClose={() => setShowSlotCreated(false)}
-          slot={createdSlot}
+          result={createdResult}
           c={c}
         />
       </>

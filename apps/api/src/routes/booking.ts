@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import type { TherapistPatientListItem, TherapistPatientAppointment } from '@revio/shared';
+import type { TherapistPatientListItem, TherapistPatientAppointment, CreateTherapistSlotsResponse } from '@revio/shared';
 import { sendPushNotification } from '../utils/push.js';
 import { expireStaleBookings } from '../utils/booking-expiry.js';
 
@@ -151,27 +151,36 @@ export async function bookingRoutes(fastify: FastifyInstance) {
 
     const now = new Date();
     const future = parsed.data.slots.filter((s) => new Date(s.startsAt) > now);
-    if (future.length === 0) return reply.status(400).send({ error: 'All slots must be in the future' });
+    const rejected: CreateTherapistSlotsResponse['rejected'] = parsed.data.slots
+      .filter((s) => new Date(s.startsAt) <= now)
+      .map((s) => ({ startsAt: s.startsAt, reason: 'past' as const }));
 
     const futureDates = future.map((s) => new Date(s.startsAt));
     const existing = await fastify.prisma.therapistSlot.findMany({
       where: { therapistId: therapist.id, startsAt: { in: futureDates } },
       select: { startsAt: true },
     });
-    if (existing.length > 0) {
-      const duplicates = existing.map((s) => s.startsAt.toISOString()).join(', ');
-      return reply.status(409).send({ error: `Duplicate slot times: ${duplicates}` });
-    }
+    const existingTimes = new Set(existing.map((s) => s.startsAt.getTime()));
 
-    const created = await fastify.prisma.$transaction(
-      future.map((s) =>
+    const toCreate = future.filter((s) => !existingTimes.has(new Date(s.startsAt).getTime()));
+    const skipped: CreateTherapistSlotsResponse['skipped'] = future
+      .filter((s) => existingTimes.has(new Date(s.startsAt).getTime()))
+      .map((s) => ({ startsAt: s.startsAt, reason: 'duplicate' as const }));
+
+    const created = toCreate.length === 0 ? [] : await fastify.prisma.$transaction(
+      toCreate.map((s) =>
         fastify.prisma.therapistSlot.create({
           data: { therapistId: therapist.id, startsAt: new Date(s.startsAt), durationMin: s.durationMin ?? 20 },
         }),
       ),
     );
 
-    return reply.status(201).send({ created: created.map(serializeSlot) });
+    const response: CreateTherapistSlotsResponse = {
+      created: created.map(serializeSlot) as CreateTherapistSlotsResponse['created'],
+      skipped,
+      rejected,
+    };
+    return reply.status(201).send(response);
   });
 
   // PATCH /therapist/slots/:id — Slot stornieren (nur AVAILABLE)
