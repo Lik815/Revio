@@ -21,7 +21,9 @@ function AppointmentRow({ c, appointment, onPress }) {
   const { heilmittelOptions } = useConfigOptions();
   const badge = STATUS_COLORS[appointment.status] ?? STATUS_COLORS.EXPIRED;
   const heilmittelLabel = heilmittelOptions.find((opt) => opt.key === appointment.heilmittel)?.label ?? null;
-  const kassenartLabel = kassenartOptions.find((opt) => opt.key === appointment.kassenart)?.label ?? null;
+  const kassenartLabel = appointment.kassenart
+    ? kassenartOptions.find((opt) => opt.key === appointment.kassenart)?.label ?? null
+    : null;
   return (
     <Pressable
       onPress={onPress}

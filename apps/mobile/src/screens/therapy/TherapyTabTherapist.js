@@ -22,40 +22,35 @@ function HeaderBell({ c, count, onPress }) {
       onPress={onPress}
       hitSlop={10}
       style={{
-        width: 54,
-        height: 54,
-        borderRadius: 27,
+        width: 40,
+        height: 40,
+        borderRadius: 20,
         backgroundColor: c.card,
         borderWidth: 1,
         borderColor: c.border,
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: '#1C2B33',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.06,
-        shadowRadius: 14,
-        elevation: 3,
       }}
     >
-      <Ionicons name="notifications-outline" size={25} color={c.text} />
+      <Ionicons name="notifications-outline" size={18} color={c.text} />
       {count > 0 ? (
         <View
           style={{
             position: 'absolute',
-            top: -3,
-            right: -1,
-            minWidth: 24,
-            height: 24,
-            borderRadius: 12,
-            paddingHorizontal: count > 9 ? 5 : 0,
+            top: -2,
+            right: -2,
+            minWidth: 18,
+            height: 18,
+            borderRadius: 9,
+            paddingHorizontal: count > 9 ? 4 : 0,
             backgroundColor: c.primary,
-            borderWidth: 2,
+            borderWidth: 1.5,
             borderColor: c.card,
             alignItems: 'center',
             justifyContent: 'center',
           }}
         >
-          <Text style={{ color: '#fff', fontSize: 12, fontWeight: '800' }}>
+          <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>
             {count > 99 ? '99+' : count}
           </Text>
         </View>
@@ -64,20 +59,20 @@ function HeaderBell({ c, count, onPress }) {
   );
 }
 
-function StatBlock({ c, value, label, valueColor, onPress, children }) {
+function StatBlock({ c, value, label, valueColor, onPress, style, children }) {
   const content = children ?? (
     <>
-      <Text style={{ fontSize: 30, lineHeight: 34, fontWeight: '800', color: valueColor ?? c.text }}>
+      <Text style={{ fontSize: 24, fontWeight: '800', color: valueColor ?? c.text }}>
         {value}
       </Text>
-      <Text style={{ fontSize: 13, fontWeight: '700', color: c.textMuted ?? c.muted, textTransform: 'uppercase', marginTop: 8 }}>
+      <Text style={{ fontSize: 11, fontWeight: '600', color: c.muted, textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 2 }}>
         {label}
       </Text>
     </>
   );
 
   return (
-    <Pressable onPress={onPress} style={{ flex: 1, justifyContent: 'center' }}>
+    <Pressable onPress={onPress} style={[{ flex: 1 }, style]}>
       {content}
     </Pressable>
   );
@@ -171,17 +166,10 @@ export function TherapyTabTherapist({
   return (
     <View style={{ flex: 1 }}>
       {/* ── Header ─────────────────────────────────────────────────── */}
-      <View style={{ paddingHorizontal: 20, paddingTop: insets.top + 20, paddingBottom: 18, backgroundColor: c.background }}>
-        <View style={[styles.header, { marginBottom: 0, minHeight: 64, gap: 16 }]}>
-          <Image source={require('../../../assets/icon.png')} style={{ width: 54, height: 54, borderRadius: 14 }} />
-          <Text
-            numberOfLines={1}
-            adjustsFontSizeToFit
-            minimumFontScale={0.82}
-            style={{ color: c.text, flex: 1, fontSize: 28, lineHeight: 34, fontWeight: '800' }}
-          >
-            Meine Übersicht
-          </Text>
+      <View style={{ paddingHorizontal: 16, paddingTop: insets.top + 8, paddingBottom: 10, backgroundColor: c.background }}>
+        <View style={[styles.header, { marginBottom: 0 }]}>
+          <Image source={require('../../../assets/icon.png')} style={styles.logoMark} />
+          <Text style={[styles.headerTitle, { color: c.text, flex: 1 }]}>{'Meine Übersicht'}</Text>
           <HeaderBell
             c={c}
             count={unreadNotifications}
@@ -191,46 +179,43 @@ export function TherapyTabTherapist({
       </View>
 
       <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: 90, paddingTop: 10, gap: 22 }]}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: 90, paddingTop: 8 }]}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={therapyRefreshing} onRefresh={onRefresh} tintColor={c.primary} />}
       >
         {/* ── Summary-Card ───────────────────────────────────── */}
-        <View style={{ flexDirection: 'row', backgroundColor: c.card, borderRadius: 20, borderWidth: 1, borderColor: c.border, paddingVertical: 20, paddingHorizontal: 18, minHeight: 104, shadowColor: '#1C2B33', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.05, shadowRadius: 14, elevation: 2 }}>
+        <View style={{ flexDirection: 'row', backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.border, padding: 16, marginBottom: 12 }}>
           <StatBlock
             c={c}
             value={freeSlots.length}
             label="Frei"
             valueColor={c.success ?? '#5A9E8E'}
+            style={{ paddingRight: 12, borderRightWidth: 1, borderRightColor: c.border }}
             onPress={() => {
               setTherapistView('termine');
               setActiveFilterTherapist('free');
             }}
           />
-          <View style={{ width: 1, backgroundColor: c.border, marginHorizontal: 16 }} />
           <StatBlock
             c={c}
             value={bookedSlots.length}
             label="Gebucht"
+            style={{ paddingHorizontal: 12, borderRightWidth: 1, borderRightColor: c.border }}
             onPress={() => {
               setTherapistView('termine');
               setActiveFilterTherapist('booked');
             }}
           />
-          <View style={{ width: 1, backgroundColor: c.border, marginHorizontal: 16 }} />
-          <View style={{ flex: 1.45, justifyContent: 'center' }}>
-            <Text style={{ fontSize: 13, fontWeight: '800', color: c.textMuted ?? c.muted, textTransform: 'uppercase' }}>Nächster Slot</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 13 }}>
-              <Ionicons name="calendar-outline" size={20} color={c.muted} />
-              <Text
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.82}
-                style={{ flex: 1, fontSize: 20, lineHeight: 24, fontWeight: '800', color: c.success ?? c.primary }}
-              >
-                {nextFreeSlotSummaryLabel}
-              </Text>
-            </View>
+          <View style={{ flex: 1.3, paddingLeft: 12 }}>
+            <Text style={{ fontSize: 11, fontWeight: '600', color: c.muted, textTransform: 'uppercase', letterSpacing: 0.4 }}>Nächster Slot</Text>
+            <Text
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.82}
+              style={{ fontSize: 16, fontWeight: '800', color: c.text, marginTop: 6 }}
+            >
+              {nextFreeSlotSummaryLabel}
+            </Text>
           </View>
         </View>
 

@@ -29,7 +29,9 @@ export function AppointmentDetail({
   const isActive = appointment?.status === 'PENDING' || appointment?.status === 'CONFIRMED';
   const { heilmittelOptions } = useConfigOptions();
   const heilmittelLabel = heilmittelOptions.find((opt) => opt.key === appointment?.heilmittel)?.label ?? null;
-  const kassenartLabel = kassenartOptions.find((opt) => opt.key === appointment?.kassenart)?.label ?? null;
+  const kassenartLabel = appointment?.kassenart
+    ? kassenartOptions.find((opt) => opt.key === appointment.kassenart)?.label ?? null
+    : null;
 
   const date = slotDate ? new Date(slotDate) : null;
   const bigDateLabel = date

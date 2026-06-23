@@ -15,9 +15,8 @@ export function PatientTherapistToggle({ c, value, onChange, terminCount, patien
       borderWidth: 1,
       borderColor: c.border,
       borderRadius: RADIUS.full,
-      padding: 5,
-      marginBottom: 22,
-      minHeight: 64,
+      padding: 4,
+      marginBottom: 16,
     }}>
       {segments.map(({ key, label }) => {
         const active = value === key;
@@ -28,17 +27,12 @@ export function PatientTherapistToggle({ c, value, onChange, terminCount, patien
             style={{
               flex: 1,
               borderRadius: RADIUS.full,
-              paddingVertical: 14,
+              paddingVertical: 10,
               alignItems: 'center',
               backgroundColor: active ? c.primary : 'transparent',
-              shadowColor: active ? '#1C2B33' : 'transparent',
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: active ? 0.12 : 0,
-              shadowRadius: active ? 12 : 0,
-              elevation: active ? 3 : 0,
             }}
           >
-            <Text style={{ fontSize: 17, fontWeight: '800', color: active ? '#fff' : (c.textMuted ?? c.muted) }}>
+            <Text style={{ fontSize: 14, fontWeight: active ? '700' : '500', color: active ? '#fff' : (c.textMuted ?? c.muted) }}>
               {label}
             </Text>
           </Pressable>

@@ -18,6 +18,7 @@ import { useConfigOptions } from '../hooks/use-config-options';
 import { DeclineBookingModal } from '../modals/DeclineBookingModal';
 
 function resolveKassenartLabel(key) {
+  if (!key) return null;
   return kassenartOptions.find((opt) => opt.key === key)?.label ?? null;
 }
 
@@ -494,67 +495,61 @@ function PendingRequestCard({ c, slot, booking, onRespond }) {
     <View
       style={{
         backgroundColor: c.card,
-        borderRadius: 18,
+        borderRadius: 12,
         borderWidth: 1,
         borderColor: '#F2D79B',
-        padding: 16,
-        marginBottom: 18,
-        shadowColor: '#1C2B33',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.05,
-        shadowRadius: 14,
-        elevation: 2,
+        padding: 12,
+        marginBottom: 8,
       }}
     >
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
-        <View style={{ backgroundColor: c.warningBg ?? '#FEF5DC', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 }}>
-          <Text style={{ fontSize: 12, fontWeight: '800', color: c.warning ?? '#8A6000', textTransform: 'uppercase' }}>Neue Anfrage</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+        <View style={{ backgroundColor: c.warningBg ?? '#FEF5DC', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 }}>
+          <Text style={{ fontSize: 10, fontWeight: '700', color: c.warning ?? '#8A6000', textTransform: 'uppercase' }}>Neue Anfrage</Text>
         </View>
         {requestTime ? (
-          <Text style={{ fontSize: 14, fontWeight: '500', color: c.textMuted ?? c.muted }}>{requestTime}</Text>
+          <Text style={{ fontSize: 12, fontWeight: '500', color: c.muted }}>{requestTime}</Text>
         ) : null}
       </View>
 
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
-        <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: c.primaryBg, alignItems: 'center', justifyContent: 'center' }}>
-          <Text style={{ fontSize: 21, fontWeight: '800', color: c.primary }}>{initialsOf(patientName)}</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: c.primaryBg, alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ fontSize: 16, fontWeight: '700', color: c.primary }}>{initialsOf(patientName)}</Text>
         </View>
         <View style={{ flex: 1, minWidth: 0 }}>
-          <Text style={{ fontSize: 18, lineHeight: 23, fontWeight: '800', color: c.text }} numberOfLines={1}>{patientName}</Text>
+          <Text style={{ fontSize: 15, fontWeight: '700', color: c.text }} numberOfLines={1}>{patientName}</Text>
           {contact ? (
-            <Text style={{ fontSize: 15, color: c.textMuted ?? c.muted, marginTop: 3 }} numberOfLines={1}>{contact}</Text>
+            <Text style={{ fontSize: 12, color: c.muted, marginTop: 1 }} numberOfLines={1}>{contact}</Text>
           ) : null}
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 9 }}>
-            <Ionicons name="calendar-outline" size={17} color={c.muted} />
-            <Text style={{ flex: 1, fontSize: 15, color: c.text, fontWeight: '600' }} numberOfLines={1}>{slotLabel}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 }}>
+            <Ionicons name="calendar-outline" size={13} color={c.muted} />
+            <Text style={{ flex: 1, fontSize: 13, color: c.text, fontWeight: '600' }} numberOfLines={1}>{slotLabel}</Text>
           </View>
           {treatmentLabel ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 9 }}>
-              <Ionicons name="medkit-outline" size={17} color={c.muted} />
-              <Text style={{ flex: 1, fontSize: 15, color: c.text, fontWeight: '600' }} numberOfLines={1}>{treatmentLabel}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 5 }}>
+              <Ionicons name="medkit-outline" size={13} color={c.muted} />
+              <Text style={{ flex: 1, fontSize: 13, color: c.text, fontWeight: '600' }} numberOfLines={1}>{treatmentLabel}</Text>
             </View>
           ) : null}
           {booking?.message ? (
-            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginTop: 9 }}>
-              <Ionicons name="chatbubble-outline" size={17} color={c.muted} />
-              <Text style={{ flex: 1, fontSize: 14, color: c.textMuted ?? c.muted, fontStyle: 'italic' }}>„{booking.message}"</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 5 }}>
+              <Ionicons name="chatbubble-outline" size={13} color={c.muted} />
+              <Text style={{ flex: 1, fontSize: 12, color: c.muted, fontStyle: 'italic' }}>„{booking.message}"</Text>
             </View>
           ) : null}
         </View>
-        <Ionicons name="chevron-forward" size={24} color={c.muted} />
       </View>
 
       {!!error && !showDeclineModal ? (
-        <Text style={{ fontSize: 13, color: c.error ?? '#DC2626', marginTop: 12 }}>{error}</Text>
+        <Text style={{ fontSize: 12, color: c.error ?? '#DC2626', marginTop: 8 }}>{error}</Text>
       ) : null}
 
-      <View style={{ flexDirection: 'row', gap: 12, marginTop: 20 }}>
+      <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
         <Pressable
           onPress={() => setShowDeclineModal(true)}
           disabled={loading}
           style={{
             flex: 1,
-            minHeight: 54,
+            paddingVertical: 8,
             borderRadius: 8,
             borderWidth: 1,
             borderColor: c.border,
@@ -563,14 +558,14 @@ function PendingRequestCard({ c, slot, booking, onRespond }) {
             opacity: loading ? 0.65 : 1,
           }}
         >
-          <Text style={{ fontSize: 17, fontWeight: '800', color: '#C11818' }}>Ablehnen</Text>
+          <Text style={{ fontSize: 13, fontWeight: '600', color: c.muted }}>Ablehnen</Text>
         </Pressable>
         <Pressable
           onPress={() => handleRespond('CONFIRM')}
           disabled={loading}
           style={{
             flex: 1,
-            minHeight: 54,
+            paddingVertical: 8,
             borderRadius: 8,
             backgroundColor: c.primary,
             alignItems: 'center',
@@ -581,7 +576,7 @@ function PendingRequestCard({ c, slot, booking, onRespond }) {
           {loading ? (
             <ActivityIndicator size="small" color="#fff" />
           ) : (
-            <Text style={{ fontSize: 17, fontWeight: '800', color: '#fff' }}>Bestätigen</Text>
+            <Text style={{ fontSize: 13, fontWeight: '600', color: '#fff' }}>Bestätigen</Text>
           )}
         </Pressable>
       </View>

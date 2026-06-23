@@ -26,42 +26,27 @@ function PatientListRow({ c, patient, onPress }) {
   return (
     <Pressable
       onPress={onPress}
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 18,
-        backgroundColor: c.card,
-        borderRadius: RADIUS.lg,
-        borderWidth: 1,
-        borderColor: c.border,
-        paddingVertical: 22,
-        paddingHorizontal: 18,
-        marginBottom: 16,
-        ...SHADOW.card,
-      }}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: c.card, borderRadius: RADIUS.md, borderWidth: 1, borderColor: c.border, padding: SPACE.md, marginBottom: SPACE.sm, ...SHADOW.card }}
     >
-      <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: c.primaryBg, alignItems: 'center', justifyContent: 'center' }}>
-        <Text style={{ fontSize: 21, fontWeight: '800', color: c.primary }}>{initialsOf(patient.fullName)}</Text>
+      <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: c.primaryBg, alignItems: 'center', justifyContent: 'center' }}>
+        <Text style={{ fontSize: 16, fontWeight: '700', color: c.primary }}>{initialsOf(patient.fullName)}</Text>
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>
-        <Text style={{ fontSize: 18, lineHeight: 23, fontWeight: '800', color: c.text }} numberOfLines={1}>{patient.fullName}</Text>
+        <Text style={{ fontSize: 15, fontWeight: '700', color: c.text }} numberOfLines={1}>{patient.fullName}</Text>
         {patient.phone ? (
-          <Text style={{ fontSize: 14, color: c.textMuted ?? c.muted, marginTop: 3 }} numberOfLines={1}>{patient.phone}</Text>
+          <Text style={{ fontSize: 12, color: c.muted, marginTop: 2 }} numberOfLines={1}>{patient.phone}</Text>
         ) : patient.email ? (
-          <Text style={{ fontSize: 14, color: c.textMuted ?? c.muted, marginTop: 3 }} numberOfLines={1}>{patient.email}</Text>
+          <Text style={{ fontSize: 12, color: c.muted, marginTop: 2 }} numberOfLines={1}>{patient.email}</Text>
         ) : null}
         {meta ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 }}>
-            <Ionicons name="calendar-outline" size={15} color={c.muted} />
-            <Text style={{ fontSize: 14, color: c.primary, fontWeight: '700' }} numberOfLines={1}>{meta}</Text>
-          </View>
+          <Text style={{ fontSize: 12, color: c.primary, fontWeight: '600', marginTop: 3 }} numberOfLines={1}>{meta}</Text>
         ) : null}
       </View>
-      <View style={{ alignItems: 'flex-end', gap: 14 }}>
-        <Text style={{ fontSize: 15, color: c.textMuted ?? c.muted, fontWeight: '600' }}>
+      <View style={{ alignItems: 'flex-end', gap: 4 }}>
+        <Text style={{ fontSize: 11, color: c.muted, fontWeight: '600' }}>
           {patient.bookingCount} {patient.bookingCount === 1 ? 'Termin' : 'Termine'}
         </Text>
-        <Ionicons name="chevron-forward" size={24} color={c.muted} />
+        <Ionicons name="chevron-forward" size={16} color={c.muted} />
       </View>
     </Pressable>
   );
@@ -89,23 +74,23 @@ export function PatientsPane({ patients, patientsLoading, patientsLastLoadedAt, 
   }, [query, safePatients, upcomingOnly]);
 
   const renderSearch = () => (
-    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: c.card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: c.border, minHeight: 66, paddingLeft: 18, marginBottom: 22, ...SHADOW.card }}>
-      <Ionicons name="search-outline" size={26} color={c.textMuted ?? c.muted} />
+    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: c.card, borderRadius: RADIUS.md, borderWidth: 1, borderColor: c.border, minHeight: 44, paddingLeft: 12, marginBottom: SPACE.md, ...SHADOW.card }}>
+      <Ionicons name="search-outline" size={18} color={c.muted} />
       <TextInput
         value={query}
         onChangeText={setQuery}
         placeholder="Patienten suchen..."
-        placeholderTextColor={c.textMuted ?? c.muted}
-        style={{ flex: 1, color: c.text, fontSize: 18, fontWeight: '500', paddingHorizontal: 14, paddingVertical: 0 }}
+        placeholderTextColor={c.muted}
+        style={{ flex: 1, color: c.text, fontSize: 14, paddingHorizontal: 10, paddingVertical: 0 }}
         autoCapitalize="none"
         autoCorrect={false}
       />
       <Pressable
         onPress={() => setUpcomingOnly((value) => !value)}
         hitSlop={8}
-        style={{ width: 64, alignSelf: 'stretch', borderLeftWidth: 1, borderLeftColor: c.border, alignItems: 'center', justifyContent: 'center', borderTopRightRadius: RADIUS.lg, borderBottomRightRadius: RADIUS.lg, backgroundColor: upcomingOnly ? c.primaryBg : 'transparent' }}
+        style={{ width: 44, alignSelf: 'stretch', borderLeftWidth: 1, borderLeftColor: c.border, alignItems: 'center', justifyContent: 'center', borderTopRightRadius: RADIUS.md, borderBottomRightRadius: RADIUS.md, backgroundColor: upcomingOnly ? c.primaryBg : 'transparent' }}
       >
-        <Ionicons name="options-outline" size={25} color={upcomingOnly ? c.primary : c.text} />
+        <Ionicons name="options-outline" size={18} color={upcomingOnly ? c.primary : c.text} />
       </Pressable>
     </View>
   );
