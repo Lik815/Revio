@@ -15,6 +15,7 @@ import { CustomTabBar } from './CustomTabBar';
 import { TAB_TRANSLATION_KEYS } from './tab-config';
 import { appStoreSelectors, useAppStore } from '../store/useStore';
 import { useNotificationPolling } from '../hooks/use-notification-polling';
+import { TabBadgeProvider } from '../context/TabBadgeContext';
 
 const Tab = createBottomTabNavigator();
 const ProfileStack = createNativeStackNavigator();
@@ -50,40 +51,42 @@ export function AppTabs() {
   const unreadNotifications = notifications.filter((n) => !dismissedNotifIds.has(n.id)).length;
 
   return (
-    <Tab.Navigator
-      tabBar={(props) => (
-        <CustomTabBar
-          {...props}
-          badgeCounts={{ [TAB_ROUTES.NOTIFICATIONS]: unreadNotifications }}
+    <TabBadgeProvider unreadNotifications={unreadNotifications}>
+      <Tab.Navigator
+        tabBar={(props) => (
+          <CustomTabBar
+            {...props}
+            badgeCounts={{ [TAB_ROUTES.NOTIFICATIONS]: unreadNotifications }}
+          />
+        )}
+        screenOptions={{ headerShown: false }}
+      >
+        <Tab.Screen
+          component={DiscoverStack}
+          name={TAB_ROUTES.DISCOVER}
+          options={{ title: t[TAB_TRANSLATION_KEYS[TAB_ROUTES.DISCOVER]] }}
         />
-      )}
-      screenOptions={{ headerShown: false }}
-    >
-      <Tab.Screen
-        component={DiscoverStack}
-        name={TAB_ROUTES.DISCOVER}
-        options={{ title: t[TAB_TRANSLATION_KEYS[TAB_ROUTES.DISCOVER]] }}
-      />
-      <Tab.Screen
-        component={FavoritesStack}
-        name={TAB_ROUTES.FAVORITES}
-        options={{ title: t[TAB_TRANSLATION_KEYS[TAB_ROUTES.FAVORITES]] }}
-      />
-      <Tab.Screen
-        component={TherapyStack}
-        name={TAB_ROUTES.THERAPY}
-        options={{ title: t[TAB_TRANSLATION_KEYS[TAB_ROUTES.THERAPY]] }}
-      />
-      <Tab.Screen
-        component={NotificationsStack}
-        name={TAB_ROUTES.NOTIFICATIONS}
-        options={{ title: t[TAB_TRANSLATION_KEYS[TAB_ROUTES.NOTIFICATIONS]] }}
-      />
-      <Tab.Screen
-        component={OptionsStack}
-        name={TAB_ROUTES.OPTIONS}
-        options={{ title: t[TAB_TRANSLATION_KEYS[TAB_ROUTES.OPTIONS]] }}
-      />
-    </Tab.Navigator>
+        <Tab.Screen
+          component={FavoritesStack}
+          name={TAB_ROUTES.FAVORITES}
+          options={{ title: t[TAB_TRANSLATION_KEYS[TAB_ROUTES.FAVORITES]] }}
+        />
+        <Tab.Screen
+          component={TherapyStack}
+          name={TAB_ROUTES.THERAPY}
+          options={{ title: t[TAB_TRANSLATION_KEYS[TAB_ROUTES.THERAPY]] }}
+        />
+        <Tab.Screen
+          component={NotificationsStack}
+          name={TAB_ROUTES.NOTIFICATIONS}
+          options={{ title: t[TAB_TRANSLATION_KEYS[TAB_ROUTES.NOTIFICATIONS]] }}
+        />
+        <Tab.Screen
+          component={OptionsStack}
+          name={TAB_ROUTES.OPTIONS}
+          options={{ title: t[TAB_TRANSLATION_KEYS[TAB_ROUTES.OPTIONS]] }}
+        />
+      </Tab.Navigator>
+    </TabBadgeProvider>
   );
 }

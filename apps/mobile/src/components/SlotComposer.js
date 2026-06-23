@@ -15,11 +15,11 @@ import {
   kassenartOptions,
 } from '../utils/app-utils';
 import { useConfigOptions } from '../hooks/use-config-options';
+import { DeclineBookingModal } from '../modals/DeclineBookingModal';
 
 function resolveKassenartLabel(key) {
   return kassenartOptions.find((opt) => opt.key === key)?.label ?? null;
 }
-import { DeclineBookingModal } from '../modals/DeclineBookingModal';
 
 export const SLOT_DURATIONS = [20, 30, 40, 50, 60];
 export const TIME_HOURS = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19];
@@ -33,6 +33,41 @@ export function formatSlotDate(d) {
 export function formatSlotTime(h, m) {
   if (h === null) return 'Uhrzeit wählen';
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')} Uhr`;
+}
+
+function initialsOf(name) {
+  return (name ?? '?')
+    .split(' ')
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+}
+
+function formatRequestCreatedAt(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const now = new Date();
+  const time = date.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+  if (date.toDateString() === now.toDateString()) return `Heute, ${time}`;
+
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (date.toDateString() === yesterday.toDateString()) return `Gestern, ${time}`;
+
+  return `${date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}, ${time}`;
+}
+
+function formatRequestSlot(slot, booking) {
+  const slotDate = slot?.startsAt ?? booking?.confirmedSlotAt ?? null;
+  if (!slotDate) return 'Terminzeit offen';
+  const date = new Date(slotDate);
+  if (Number.isNaN(date.getTime())) return 'Terminzeit offen';
+  const day = date.toLocaleDateString('de-DE', { day: 'numeric', month: 'long' });
+  const time = date.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+  return `${day} · ${time} Uhr · ${slot?.durationMin ?? 20} Min`;
 }
 
 export function buildCalendar(year, month) {
@@ -392,7 +427,7 @@ export function TherapistSlotManagerCard({ c, deletingSlotIds = [], mySlots, onA
 }
 
 // ─── TherapistTimeline ────────────────────────────────────────────────────────
-// Chronologische Timeline: freie Slots + gebuchte Termine + Anfragen nach Tag
+// Chronologische Timeline: freie Slots + gebuchte Termine; Anfragen bekommen eine eigene Liste.
 
 function getDayKey(isoString) {
   return formatDayHeader(isoString);
@@ -425,11 +460,146 @@ function FreeSlotCard({ c, slot, onCancelSlot, deletingSlotIds }) {
   );
 }
 
-function BookedSlotCard({ c, slot, booking, onRespond, onTherapistCancel, onOpenDetail }) {
+function PendingRequestCard({ c, slot, booking, onRespond }) {
   const { heilmittelOptions } = useConfigOptions();
   const [loading, setLoading] = useState(false);
   const [showDeclineModal, setShowDeclineModal] = useState(false);
   const [error, setError] = useState('');
+  const patientName = booking?.patientName || 'Patient';
+  const contact = booking?.patientPhone || booking?.patientEmail || '';
+  const requestTime = formatRequestCreatedAt(booking?.createdAt);
+  const slotLabel = formatRequestSlot(slot, booking);
+  const heilmittelLabel = heilmittelOptions.find((opt) => opt.key === booking?.heilmittel)?.label ?? null;
+  const kassenartLabel = resolveKassenartLabel(booking?.kassenart);
+  const treatmentLabel = [heilmittelLabel, kassenartLabel].filter(Boolean).join(' · ');
+
+  const handleRespond = async (action, declinedReason) => {
+    if (!onRespond || !booking) return;
+    setError('');
+    setLoading(true);
+    try {
+      const body = action === 'CONFIRM'
+        ? { action: 'CONFIRM' }
+        : { action: 'DECLINE', declinedReason: declinedReason?.trim() || undefined };
+      await onRespond(booking.id, body);
+      if (action === 'DECLINE') setShowDeclineModal(false);
+    } catch (e) {
+      setError(e?.message ?? 'Fehler beim Speichern.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <View
+      style={{
+        backgroundColor: c.card,
+        borderRadius: 18,
+        borderWidth: 1,
+        borderColor: '#F2D79B',
+        padding: 16,
+        marginBottom: 18,
+        shadowColor: '#1C2B33',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.05,
+        shadowRadius: 14,
+        elevation: 2,
+      }}
+    >
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+        <View style={{ backgroundColor: c.warningBg ?? '#FEF5DC', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 }}>
+          <Text style={{ fontSize: 12, fontWeight: '800', color: c.warning ?? '#8A6000', textTransform: 'uppercase' }}>Neue Anfrage</Text>
+        </View>
+        {requestTime ? (
+          <Text style={{ fontSize: 14, fontWeight: '500', color: c.textMuted ?? c.muted }}>{requestTime}</Text>
+        ) : null}
+      </View>
+
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+        <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: c.primaryBg, alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ fontSize: 21, fontWeight: '800', color: c.primary }}>{initialsOf(patientName)}</Text>
+        </View>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={{ fontSize: 18, lineHeight: 23, fontWeight: '800', color: c.text }} numberOfLines={1}>{patientName}</Text>
+          {contact ? (
+            <Text style={{ fontSize: 15, color: c.textMuted ?? c.muted, marginTop: 3 }} numberOfLines={1}>{contact}</Text>
+          ) : null}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 9 }}>
+            <Ionicons name="calendar-outline" size={17} color={c.muted} />
+            <Text style={{ flex: 1, fontSize: 15, color: c.text, fontWeight: '600' }} numberOfLines={1}>{slotLabel}</Text>
+          </View>
+          {treatmentLabel ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 9 }}>
+              <Ionicons name="medkit-outline" size={17} color={c.muted} />
+              <Text style={{ flex: 1, fontSize: 15, color: c.text, fontWeight: '600' }} numberOfLines={1}>{treatmentLabel}</Text>
+            </View>
+          ) : null}
+          {booking?.message ? (
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginTop: 9 }}>
+              <Ionicons name="chatbubble-outline" size={17} color={c.muted} />
+              <Text style={{ flex: 1, fontSize: 14, color: c.textMuted ?? c.muted, fontStyle: 'italic' }}>„{booking.message}"</Text>
+            </View>
+          ) : null}
+        </View>
+        <Ionicons name="chevron-forward" size={24} color={c.muted} />
+      </View>
+
+      {!!error && !showDeclineModal ? (
+        <Text style={{ fontSize: 13, color: c.error ?? '#DC2626', marginTop: 12 }}>{error}</Text>
+      ) : null}
+
+      <View style={{ flexDirection: 'row', gap: 12, marginTop: 20 }}>
+        <Pressable
+          onPress={() => setShowDeclineModal(true)}
+          disabled={loading}
+          style={{
+            flex: 1,
+            minHeight: 54,
+            borderRadius: 8,
+            borderWidth: 1,
+            borderColor: c.border,
+            alignItems: 'center',
+            justifyContent: 'center',
+            opacity: loading ? 0.65 : 1,
+          }}
+        >
+          <Text style={{ fontSize: 17, fontWeight: '800', color: '#C11818' }}>Ablehnen</Text>
+        </Pressable>
+        <Pressable
+          onPress={() => handleRespond('CONFIRM')}
+          disabled={loading}
+          style={{
+            flex: 1,
+            minHeight: 54,
+            borderRadius: 8,
+            backgroundColor: c.primary,
+            alignItems: 'center',
+            justifyContent: 'center',
+            opacity: loading ? 0.75 : 1,
+          }}
+        >
+          {loading ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Text style={{ fontSize: 17, fontWeight: '800', color: '#fff' }}>Bestätigen</Text>
+          )}
+        </Pressable>
+      </View>
+
+      <DeclineBookingModal
+        visible={showDeclineModal}
+        onClose={() => { setShowDeclineModal(false); setError(''); }}
+        onConfirm={(reason) => handleRespond('DECLINE', reason)}
+        booking={booking}
+        loading={loading}
+        error={error}
+        c={c}
+      />
+    </View>
+  );
+}
+
+function BookedSlotCard({ c, slot, booking, onRespond, onOpenDetail }) {
   const d = new Date(slot.startsAt);
   const timeStr = d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
   const isPending = booking?.status === 'PENDING';
@@ -448,22 +618,16 @@ function BookedSlotCard({ c, slot, booking, onRespond, onTherapistCancel, onOpen
     );
   }
 
-  const handleRespond = async (action, declinedReason) => {
-    if (!onRespond || !booking) return;
-    setError(''); setLoading(true);
-    try {
-      const body = action === 'CONFIRM' ? { action: 'CONFIRM' } : { action: 'DECLINE', declinedReason: declinedReason?.trim() || undefined };
-      await onRespond(booking.id, body);
-      if (action === 'DECLINE') setShowDeclineModal(false);
-    } catch (e) {
-      setError(e?.message ?? 'Fehler beim Speichern.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const accentColor = isPending ? (c.warning ?? '#8A6000') : (c.primary);
-  const accentBg = isPending ? (c.warningBg ?? '#FEF5DC') : (c.primaryBg);
+  if (isPending) {
+    return (
+      <PendingRequestCard
+        c={c}
+        slot={slot}
+        booking={booking}
+        onRespond={onRespond}
+      />
+    );
+  }
 
   // CONFIRMED → kompakte tappable Zeile
   if (isConfirmed) {
@@ -491,80 +655,18 @@ function BookedSlotCard({ c, slot, booking, onRespond, onTherapistCancel, onOpen
   }
 
   return (
-    <View style={{
-      flexDirection: 'row', backgroundColor: c.card, borderRadius: 10, borderWidth: 1,
-      borderColor: c.border, marginBottom: 8, overflow: 'hidden',
-    }}>
-      <View style={{ width: 4, backgroundColor: accentColor }} />
-      <View style={{ flex: 1, padding: 12 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 6 }}>
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 14, fontWeight: '700', color: c.text }}>{timeStr} Uhr · {slot.durationMin} Min</Text>
-            {booking?.patientName ? (
-              <Text style={{ fontSize: 13, color: c.text, marginTop: 2 }}>{booking.patientName}</Text>
-            ) : null}
-            {booking?.patientPhone ? (
-              <Text style={{ fontSize: 12, color: c.muted, marginTop: 1 }}>{booking.patientPhone}</Text>
-            ) : null}
-            {booking?.heilmittel || booking?.kassenart ? (
-              <Text style={{ fontSize: 12, color: c.muted, marginTop: 1 }}>
-                {[
-                  heilmittelOptions.find((opt) => opt.key === booking.heilmittel)?.label,
-                  resolveKassenartLabel(booking.kassenart),
-                ].filter(Boolean).join(' · ')}
-              </Text>
-            ) : null}
-            {booking?.message ? (
-              <Text style={{ fontSize: 12, color: c.muted, fontStyle: 'italic', marginTop: 3 }}>„{booking.message}"</Text>
-            ) : null}
-          </View>
-          <View style={{ backgroundColor: accentBg, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 }}>
-            <Text style={{ fontSize: 10, fontWeight: '700', color: accentColor }}>
-              {isPending ? 'ANFRAGE' : 'BESTÄTIGT'}
-            </Text>
-          </View>
+    <View style={{ flexDirection: 'row', backgroundColor: c.card, borderRadius: 10, borderWidth: 1, borderColor: c.border, marginBottom: 8, overflow: 'hidden' }}>
+      <View style={{ width: 4, backgroundColor: c.muted }} />
+      <View style={{ flex: 1, padding: 12, flexDirection: 'row', alignItems: 'center' }}>
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: 14, fontWeight: '700', color: c.text }}>{timeStr} Uhr · {slot.durationMin} Min</Text>
+          {booking.patientName ? <Text style={{ fontSize: 13, color: c.text, marginTop: 2 }}>{booking.patientName}</Text> : null}
+          {booking.patientPhone ? <Text style={{ fontSize: 12, color: c.muted, marginTop: 1 }}>{booking.patientPhone}</Text> : null}
         </View>
-
-        {!!error && !showDeclineModal && <Text style={{ fontSize: 12, color: c.error ?? '#DC2626', marginBottom: 6 }}>{error}</Text>}
-
-        {isPending && onRespond && (
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <Pressable
-              onPress={() => setShowDeclineModal(true)}
-              disabled={loading}
-              style={{ flex: 1, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: c.border, alignItems: 'center' }}
-            >
-              <Text style={{ fontSize: 13, fontWeight: '600', color: c.muted }}>Ablehnen</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => handleRespond('CONFIRM')}
-              disabled={loading}
-              style={{ flex: 1, paddingVertical: 8, borderRadius: 8, backgroundColor: c.primary, alignItems: 'center' }}
-            >
-              {loading ? <ActivityIndicator size="small" color="#fff" /> : <Text style={{ fontSize: 13, fontWeight: '600', color: '#fff' }}>Bestätigen</Text>}
-            </Pressable>
-          </View>
-        )}
-
-        {isConfirmed && onTherapistCancel && (
-          <Pressable
-            onPress={() => onTherapistCancel(booking.id)}
-            style={{ paddingVertical: 6, alignItems: 'center' }}
-          >
-            <Text style={{ fontSize: 12, color: c.muted }}>Termin absagen</Text>
-          </Pressable>
-        )}
+        <View style={{ backgroundColor: c.mutedBg, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 }}>
+          <Text style={{ fontSize: 10, fontWeight: '700', color: c.muted }}>{booking.status ?? 'GEBUCHT'}</Text>
+        </View>
       </View>
-
-      <DeclineBookingModal
-        visible={showDeclineModal}
-        onClose={() => { setShowDeclineModal(false); setError(''); }}
-        onConfirm={(reason) => handleRespond('DECLINE', reason)}
-        booking={booking}
-        loading={loading}
-        error={error}
-        c={c}
-      />
     </View>
   );
 }
@@ -595,7 +697,25 @@ export function TherapistTimeline({ c, mySlots, incomingBookings, activeFilter, 
     return groups;
   }, [mySlots, incomingBookings, activeFilter]);
 
+  const pendingItems = activeFilter === 'pending'
+    ? Object.values(items)
+      .reduce((all, dayItems) => all.concat(dayItems), [])
+      .sort((a, b) => {
+        const aDate = a.booking?.createdAt ?? a.slot.startsAt;
+        const bDate = b.booking?.createdAt ?? b.slot.startsAt;
+        return new Date(bDate) - new Date(aDate);
+      })
+    : [];
+
   if (slotsLoading && (!Array.isArray(mySlots) || mySlots.length === 0)) {
+    return (
+      <View style={{ alignItems: 'center', paddingVertical: 24 }}>
+        <ActivityIndicator color={c.primary} />
+      </View>
+    );
+  }
+
+  if (activeFilter === 'pending' && incomingLoading && pendingItems.length === 0) {
     return (
       <View style={{ alignItems: 'center', paddingVertical: 24 }}>
         <ActivityIndicator color={c.primary} />
@@ -615,6 +735,46 @@ export function TherapistTimeline({ c, mySlots, incomingBookings, activeFilter, 
           {activeFilter === 'free' ? 'Lege neue Slots über den + Button an.' : 'Neue Einträge erscheinen hier automatisch.'}
         </Text>
       </View>
+    );
+  }
+
+  if (activeFilter === 'pending') {
+    return (
+      <>
+        <Text style={{ fontSize: 22, fontWeight: '800', color: c.text, marginBottom: 14 }}>
+          Anfragen
+        </Text>
+        {pendingItems.map(({ slot, booking }) => (
+          <BookedSlotCard
+            key={slot.id}
+            c={c}
+            slot={slot}
+            booking={booking}
+            onRespond={onRespond}
+            onOpenDetail={onOpenDetail}
+          />
+        ))}
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 10,
+            backgroundColor: c.card,
+            borderRadius: 14,
+            borderWidth: 1,
+            borderColor: c.border,
+            paddingVertical: 14,
+            paddingHorizontal: 16,
+            marginTop: 10,
+            marginBottom: 8,
+          }}
+        >
+          <Ionicons name="information-circle-outline" size={18} color={c.muted} />
+          <Text style={{ flex: 1, fontSize: 14, lineHeight: 20, color: c.textMuted ?? c.muted }}>
+            Anfragen sind noch nicht in deinem Kalender bestätigt.
+          </Text>
+        </View>
+      </>
     );
   }
 

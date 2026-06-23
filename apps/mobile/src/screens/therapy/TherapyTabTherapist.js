@@ -4,14 +4,84 @@ import {
   Text, View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getBaseUrl, TUNNEL_HEADERS } from '../../utils/app-utils';
 import { TherapistTimeline } from '../../components/SlotComposer';
 import { HeilmittelSelectModal } from '../../modals/HeilmittelSelectModal';
 import { PatientTherapistToggle } from '../../components/PatientTherapistToggle';
 import { PatientsPane } from './TherapistPatientsScreen';
+import { TAB_ROUTES } from '../../navigation/route-names';
+import { useTabBadges } from '../../context/TabBadgeContext';
 
 const shouldShowSectionLoading = (isLoading, lastLoadedAt) => isLoading && lastLoadedAt === 0;
+
+function HeaderBell({ c, count, onPress }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      hitSlop={10}
+      style={{
+        width: 54,
+        height: 54,
+        borderRadius: 27,
+        backgroundColor: c.card,
+        borderWidth: 1,
+        borderColor: c.border,
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: '#1C2B33',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.06,
+        shadowRadius: 14,
+        elevation: 3,
+      }}
+    >
+      <Ionicons name="notifications-outline" size={25} color={c.text} />
+      {count > 0 ? (
+        <View
+          style={{
+            position: 'absolute',
+            top: -3,
+            right: -1,
+            minWidth: 24,
+            height: 24,
+            borderRadius: 12,
+            paddingHorizontal: count > 9 ? 5 : 0,
+            backgroundColor: c.primary,
+            borderWidth: 2,
+            borderColor: c.card,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Text style={{ color: '#fff', fontSize: 12, fontWeight: '800' }}>
+            {count > 99 ? '99+' : count}
+          </Text>
+        </View>
+      ) : null}
+    </Pressable>
+  );
+}
+
+function StatBlock({ c, value, label, valueColor, onPress, children }) {
+  const content = children ?? (
+    <>
+      <Text style={{ fontSize: 30, lineHeight: 34, fontWeight: '800', color: valueColor ?? c.text }}>
+        {value}
+      </Text>
+      <Text style={{ fontSize: 13, fontWeight: '700', color: c.textMuted ?? c.muted, textTransform: 'uppercase', marginTop: 8 }}>
+        {label}
+      </Text>
+    </>
+  );
+
+  return (
+    <Pressable onPress={onPress} style={{ flex: 1, justifyContent: 'center' }}>
+      {content}
+    </Pressable>
+  );
+}
 
 export function TherapyTabTherapist({
   authToken, mySlots, slotsLoading, incomingBookings, incomingBookingsLoading,
@@ -26,7 +96,9 @@ export function TherapyTabTherapist({
   patients, patientsLoading, patientsLastLoadedAt, onSelectPatient,
   c, t, styles,
 }) {
+  const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+  const { unreadNotifications } = useTabBadges();
   const slotBookingEnabled = loggedInTherapist?.bookingMode === 'FIRST_APPOINTMENT_REQUEST';
   const reviewApproved = loggedInTherapist?.reviewStatus === 'APPROVED';
   const [activationLoading, setActivationLoading] = useState(false);
@@ -86,63 +158,83 @@ export function TherapyTabTherapist({
 
   const nextFreeSlot = [...freeSlots].sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt))[0];
   const nextFreeSlotDate = nextFreeSlot ? new Date(nextFreeSlot.startsAt) : null;
-  const nextFreeSlotIsToday = nextFreeSlotDate ? nextFreeSlotDate.toDateString() === new Date().toDateString() : false;
   const nextFreeSlotTime = nextFreeSlotDate
     ? nextFreeSlotDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
     : null;
-  const nextFreeSlotDay = nextFreeSlotDate
-    ? nextFreeSlotDate.toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short' })
-    : null;
+  const nextFreeSlotDateLabel = nextFreeSlotDate
+    ? nextFreeSlotDate.toLocaleDateString('de-DE', { day: 'numeric', month: 'long' })
+    : '–';
+  const nextFreeSlotSummaryLabel = nextFreeSlotDate && nextFreeSlotTime
+    ? `${nextFreeSlotDateLabel} · ${nextFreeSlotTime} Uhr`
+    : nextFreeSlotDateLabel;
 
   return (
     <View style={{ flex: 1 }}>
       {/* ── Header ─────────────────────────────────────────────────── */}
-      <View style={{ paddingHorizontal: 16, paddingTop: insets.top + 8, paddingBottom: 10, backgroundColor: c.background }}>
-        <View style={[styles.header, { marginBottom: 0 }]}>
-          <Image source={require('../../../assets/icon.png')} style={styles.logoMark} />
-          <Text style={[styles.headerTitle, { color: c.text, flex: 1 }]}>{'Meine Übersicht'}</Text>
+      <View style={{ paddingHorizontal: 20, paddingTop: insets.top + 20, paddingBottom: 18, backgroundColor: c.background }}>
+        <View style={[styles.header, { marginBottom: 0, minHeight: 64, gap: 16 }]}>
+          <Image source={require('../../../assets/icon.png')} style={{ width: 54, height: 54, borderRadius: 14 }} />
+          <Text
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.82}
+            style={{ color: c.text, flex: 1, fontSize: 28, lineHeight: 34, fontWeight: '800' }}
+          >
+            Meine Übersicht
+          </Text>
+          <HeaderBell
+            c={c}
+            count={unreadNotifications}
+            onPress={() => navigation.navigate(TAB_ROUTES.NOTIFICATIONS)}
+          />
         </View>
       </View>
 
       <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: 90, paddingTop: 8 }]}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: 90, paddingTop: 10, gap: 22 }]}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={therapyRefreshing} onRefresh={onRefresh} tintColor={c.primary} />}
       >
         {/* ── Summary-Card ───────────────────────────────────── */}
-        <View style={{ flexDirection: 'row', backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.border, padding: 16, marginBottom: 12 }}>
-          <Pressable
-            onPress={() => setActiveFilterTherapist('free')}
-            style={{ flex: 1, paddingRight: 12, borderRightWidth: 1, borderRightColor: c.border }}
-          >
-            <Text style={{ fontSize: 24, fontWeight: '800', color: c.success ?? '#5A9E8E' }}>{freeSlots.length}</Text>
-            <Text style={{ fontSize: 11, fontWeight: '600', color: c.muted, textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 2 }}>Frei</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => setActiveFilterTherapist('booked')}
-            style={{ flex: 1, paddingHorizontal: 12, borderRightWidth: 1, borderRightColor: c.border }}
-          >
-            <Text style={{ fontSize: 24, fontWeight: '800', color: c.text }}>{bookedSlots.length}</Text>
-            <Text style={{ fontSize: 11, fontWeight: '600', color: c.muted, textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 2 }}>Gebucht</Text>
-          </Pressable>
-          <View style={{ flex: 1.3, paddingLeft: 12 }}>
-            <Text style={{ fontSize: 11, fontWeight: '600', color: c.muted, textTransform: 'uppercase', letterSpacing: 0.4 }}>Nächster Slot</Text>
-            {nextFreeSlotTime ? (
-              nextFreeSlotIsToday ? (
-                <Text style={{ fontSize: 18, fontWeight: '800', color: c.text, marginTop: 6 }}>{nextFreeSlotTime} Uhr</Text>
-              ) : (
-                <>
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: c.muted, marginTop: 4 }}>{nextFreeSlotDay}</Text>
-                  <Text style={{ fontSize: 16, fontWeight: '800', color: c.text, marginTop: 1 }}>{nextFreeSlotTime} Uhr</Text>
-                </>
-              )
-            ) : (
-              <Text style={{ fontSize: 18, fontWeight: '800', color: c.text, marginTop: 6 }}>–</Text>
-            )}
+        <View style={{ flexDirection: 'row', backgroundColor: c.card, borderRadius: 20, borderWidth: 1, borderColor: c.border, paddingVertical: 20, paddingHorizontal: 18, minHeight: 104, shadowColor: '#1C2B33', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.05, shadowRadius: 14, elevation: 2 }}>
+          <StatBlock
+            c={c}
+            value={freeSlots.length}
+            label="Frei"
+            valueColor={c.success ?? '#5A9E8E'}
+            onPress={() => {
+              setTherapistView('termine');
+              setActiveFilterTherapist('free');
+            }}
+          />
+          <View style={{ width: 1, backgroundColor: c.border, marginHorizontal: 16 }} />
+          <StatBlock
+            c={c}
+            value={bookedSlots.length}
+            label="Gebucht"
+            onPress={() => {
+              setTherapistView('termine');
+              setActiveFilterTherapist('booked');
+            }}
+          />
+          <View style={{ width: 1, backgroundColor: c.border, marginHorizontal: 16 }} />
+          <View style={{ flex: 1.45, justifyContent: 'center' }}>
+            <Text style={{ fontSize: 13, fontWeight: '800', color: c.textMuted ?? c.muted, textTransform: 'uppercase' }}>Nächster Slot</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 13 }}>
+              <Ionicons name="calendar-outline" size={20} color={c.muted} />
+              <Text
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.82}
+                style={{ flex: 1, fontSize: 20, lineHeight: 24, fontWeight: '800', color: c.success ?? c.primary }}
+              >
+                {nextFreeSlotSummaryLabel}
+              </Text>
+            </View>
           </View>
         </View>
 
-        {/* ── Termine / Patient:innen Toggle ───────────────────── */}
+        {/* ── Termine / Patienten Toggle ───────────────────── */}
         <PatientTherapistToggle
           c={c}
           value={therapistView}

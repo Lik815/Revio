@@ -26,7 +26,7 @@ export function DeclineBookingModal({ visible, onClose, onConfirm, booking, load
             {booking ? (
               <View style={{ backgroundColor: c.mutedBg, borderRadius: 12, padding: 14, gap: 4 }}>
                 <Text style={{ fontSize: 15, fontWeight: '700', color: c.text }}>
-                  {booking.patientName ?? 'Patient:in'}
+                  {booking.patientName ?? 'Patient'}
                 </Text>
                 {booking.patientPhone ? (
                   <Text style={{ fontSize: 13, color: c.muted }}>{booking.patientPhone}</Text>
