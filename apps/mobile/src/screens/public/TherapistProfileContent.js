@@ -22,6 +22,7 @@ import {
   getBaseUrl,
   getLangLabel,
   getPracticeInitials,
+  getPublicTherapistUrl,
   resolveMediaUrl,
   TUNNEL_HEADERS,
 } from '../../utils/app-utils';
@@ -91,6 +92,7 @@ export function TherapistProfileContent(props) {
   const [showReviewModal, setShowReviewModal] = useState(false);
 
   const therapistName = typeof th?.fullName === 'string' && th.fullName.trim() ? th.fullName.trim() : 'Profil';
+  const therapistPublicUrl = th?.id ? getPublicTherapistUrl(th.id) : 'https://www.my-revio.de';
   const therapistLanguages = Array.isArray(th?.languages) ? th.languages : [];
   const therapistSpecializations = Array.isArray(th?.specializations) ? th.specializations : [];
   const therapistAreasRaw = Array.isArray(th?.behandlungsbereiche) ? th.behandlungsbereiche : [];
@@ -174,8 +176,8 @@ export function TherapistProfileContent(props) {
           <Pressable
             onPress={() => sharePublicLink({
               title: therapistName,
-              url: `https://revio.app/t/${th.id}`,
-              message: `${therapistName} – ${th.professionalTitle ?? ''}\nhttps://revio.app/t/${th.id}`,
+              url: therapistPublicUrl,
+              message: `${therapistName} – ${th.professionalTitle ?? ''}\n${therapistPublicUrl}`,
             })}
             hitSlop={iconHitSlop}
             style={{ paddingHorizontal: 12, paddingVertical: 10 }}

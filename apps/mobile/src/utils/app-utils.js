@@ -186,12 +186,19 @@ const radiusOptions = [1, 3, 5, 10, 25];
 const GENERIC_SEARCH_LABELS = ['physiotherapie', 'physio', 'therapeut', 'physiotherapeut', 'krankengymnastik'];
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://api.my-revio.de';
+const PUBLIC_WEB_URL = (process.env.EXPO_PUBLIC_WEB_URL ?? 'https://www.my-revio.de').replace(/\/$/, '');
 const REG_STEPS = 6;
 const languageOptions = Object.keys(LANGUAGE_MAP);
 const COMPLIANCE_STATUS_VALUES = ['yes', 'no', 'in_progress'];
 const HEALTH_AUTHORITY_STATUS_VALUES = ['yes', 'no', 'in_progress', 'unknown'];
 
 const getBaseUrl = () => BASE_URL;
+
+const getPublicTherapistUrl = (id) =>
+  `${PUBLIC_WEB_URL}/therapeut/${encodeURIComponent(id)}`;
+
+const getPublicPracticeUrl = (id) =>
+  `${PUBLIC_WEB_URL}/praxis/${encodeURIComponent(id)}`;
 
 const resolveMediaUrl = (value) => {
   if (!value || typeof value !== 'string') return value ?? null;
@@ -432,6 +439,8 @@ export {
   formatDist,
   formatMissingProfileFields,
   getBaseUrl,
+  getPublicPracticeUrl,
+  getPublicTherapistUrl,
   TUNNEL_HEADERS,
   getLangLabel,
   getPracticeInitials,

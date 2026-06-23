@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import {
   getPracticeInitials,
+  getPublicPracticeUrl,
   RADIUS,
   resolveMediaUrl,
   softenErrorMessage,
@@ -57,6 +58,7 @@ export function PracticeProfileContent(props) {
 
   const practiceName = typeof practice?.name === 'string' && practice.name.trim() ? practice.name.trim() : 'Praxis';
   const practiceCity = typeof practice?.city === 'string' ? practice.city : '';
+  const practicePublicUrl = practice?.id ? getPublicPracticeUrl(practice.id) : 'https://www.my-revio.de';
   const therapists = Array.isArray(selectedPracticeTherapists) ? selectedPracticeTherapists : [];
   const practicePhotos = Array.isArray(practice?.photos) ? practice.photos.filter(Boolean) : [];
   const iconHitSlop = { top: 10, bottom: 10, left: 10, right: 10 };
@@ -74,8 +76,8 @@ export function PracticeProfileContent(props) {
           <Pressable
             onPress={() => sharePublicLink({
               title: practiceName,
-              url: `https://revio.app/p/${practice?.id}`,
-              message: `${practiceName} – ${practiceCity}\nhttps://revio.app/p/${practice?.id}`,
+              url: practicePublicUrl,
+              message: `${practiceName} – ${practiceCity}\n${practicePublicUrl}`,
             })}
             hitSlop={iconHitSlop}
             style={{ paddingHorizontal: 12, paddingVertical: 10 }}
