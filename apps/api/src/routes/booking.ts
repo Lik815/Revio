@@ -143,7 +143,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
       slots: z.array(z.object({
         startsAt: z.string().datetime(),
         durationMin: z.number().int().min(5).max(120).optional(),
-      })).min(1).max(50),
+      })).min(1).max(200),
     });
 
     const parsed = schema.safeParse(request.body);

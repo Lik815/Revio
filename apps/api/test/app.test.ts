@@ -2812,8 +2812,8 @@ describe('Slot-based Booking', () => {
     expect(body.skipped).toHaveLength(2);
   });
 
-  it('POST /therapist/slots — still rejects more than 50 slots in one request', async () => {
-    const slots = Array.from({ length: 51 }, (_, i) => ({
+  it('POST /therapist/slots — still rejects more than 200 slots in one request', async () => {
+    const slots = Array.from({ length: 201 }, (_, i) => ({
       startsAt: new Date(Date.now() + (i + 1) * 60 * 60 * 1000).toISOString(),
       durationMin: 20,
     }));
