@@ -1,9 +1,10 @@
-import React, { useMemo } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import React, { useMemo, useRef } from 'react';
+import { PanResponder, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { RADIUS, addDays, isSameDay, startOfDay } from '../utils/app-utils';
 
 const WEEKDAY_LABELS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+const SWIPE_THRESHOLD = 40;
 
 export function TherapistWeekStrip({
   c, selectedDate, visibleWeekStart, mySlots,
@@ -13,6 +14,22 @@ export function TherapistWeekStrip({
     () => Array.from({ length: 7 }, (_, i) => addDays(visibleWeekStart, i)),
     [visibleWeekStart],
   );
+
+  const onPrevWeekRef = useRef(onPrevWeek);
+  onPrevWeekRef.current = onPrevWeek;
+  const onNextWeekRef = useRef(onNextWeek);
+  onNextWeekRef.current = onNextWeek;
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_evt, gesture) =>
+        Math.abs(gesture.dx) > 10 && Math.abs(gesture.dx) > Math.abs(gesture.dy) * 2,
+      onPanResponderRelease: (_evt, gesture) => {
+        if (gesture.dx <= -SWIPE_THRESHOLD) onNextWeekRef.current();
+        else if (gesture.dx >= SWIPE_THRESHOLD) onPrevWeekRef.current();
+      },
+    }),
+  ).current;
 
   const hasActivity = useMemo(() => {
     const activeDays = (Array.isArray(mySlots) ? mySlots : [])
@@ -29,7 +46,10 @@ export function TherapistWeekStrip({
         <Ionicons name="chevron-back" size={18} color={c.muted} />
       </Pressable>
 
-      <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between' }}>
+      <View
+        style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between' }}
+        {...panResponder.panHandlers}
+      >
         {days.map((day) => {
           const isSelected = isSameDay(day, selectedDate);
           const isToday = isSameDay(day, today);
