@@ -70,6 +70,7 @@ export function CustomTabBar({ state, descriptors, navigation, badgeCounts = {} 
           const label = options.title ?? t[TAB_TRANSLATION_KEYS[route.name]] ?? route.name;
           const nestedState = route.state;
           const badgeCount = Number(badgeCounts[route.name] ?? 0);
+          const showLabel = !focused || state.routes.length <= 2;
 
           const onPress = () => {
             const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
@@ -132,8 +133,18 @@ export function CustomTabBar({ state, descriptors, navigation, badgeCounts = {} 
                   </View>
                 ) : null}
               </View>
-              {!focused && (
-                <Text numberOfLines={1} style={{ fontSize: 11, color: c.textMuted ?? c.muted, marginTop: -SPACE.xs }}>{label}</Text>
+              {showLabel && (
+                <Text
+                  numberOfLines={1}
+                  style={{
+                    fontSize: 11,
+                    fontWeight: focused ? '700' : '400',
+                    color: focused ? c.primary : (c.textMuted ?? c.muted),
+                    marginTop: -SPACE.xs,
+                  }}
+                >
+                  {label}
+                </Text>
               )}
             </Pressable>
           );

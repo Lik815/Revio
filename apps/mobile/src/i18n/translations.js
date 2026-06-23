@@ -50,6 +50,7 @@ export const translations = {
     tabTherapist: 'Profil',
     tabProfile: 'Profil',
     tabOptions: 'Optionen',
+    tabLogin: 'Anmelden',
     favoritesTitle: 'Favoriten',
     favoritesEmpty: 'Noch keine Favoriten',
     favoritesEmptyBody: 'Tippe auf das Herz bei einem Therapeuten, um ihn zu speichern.',

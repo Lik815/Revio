@@ -14,4 +14,5 @@ export const TAB_ROUTES = {
   FAVORITES:  'FavoritesTab',
   NOTIFICATIONS: 'NotificationsTab',
   OPTIONS:    'OptionsTab',
+  AUTH:       'AuthTab',
 };

@@ -6,6 +6,7 @@ export const TAB_ICON_BY_ROUTE = {
   [TAB_ROUTES.FAVORITES]:  'heart',
   [TAB_ROUTES.NOTIFICATIONS]: 'notifications',
   [TAB_ROUTES.OPTIONS]:    'settings',
+  [TAB_ROUTES.AUTH]:       'log-in',
 };
 
 export const TAB_TRANSLATION_KEYS = {
@@ -14,6 +15,7 @@ export const TAB_TRANSLATION_KEYS = {
   [TAB_ROUTES.FAVORITES]:  'tabFavorites',
   [TAB_ROUTES.NOTIFICATIONS]: 'tabNotifications',
   [TAB_ROUTES.OPTIONS]:    'tabOptions',
+  [TAB_ROUTES.AUTH]:       'tabLogin',
 };
 
 // Home screen name within each tab's nested stack (see withProfileScreens
