@@ -434,31 +434,50 @@ function getDayKey(isoString) {
   return formatDayHeader(isoString);
 }
 
-function FreeSlotCard({ c, slot, onCancelSlot, deletingSlotIds }) {
+function FreeSlotCard({ c, slot, onCancelSlot, deletingSlotIds, selectionMode, isSelected, onToggleSelect }) {
   const d = new Date(slot.startsAt);
   const timeStr = d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
   const isDeleting = deletingSlotIds.includes(slot.id);
-  return (
-    <View style={{
-      flexDirection: 'row', alignItems: 'center',
-      borderWidth: 1, borderColor: c.border, borderRadius: 10,
-      backgroundColor: c.card,
-      paddingVertical: 12, paddingHorizontal: 14, marginBottom: 8,
-    }}>
+
+  const containerStyle = {
+    flexDirection: 'row', alignItems: 'center',
+    borderWidth: 1, borderColor: selectionMode && isSelected ? c.primary : c.border, borderRadius: 10,
+    backgroundColor: selectionMode && isSelected ? (c.primaryBg ?? c.card) : c.card,
+    paddingVertical: 12, paddingHorizontal: 14, marginBottom: 8,
+  };
+
+  const content = (
+    <>
       <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: c.success ?? '#5A9E8E', marginRight: 10 }} />
       <View style={{ flex: 1 }}>
         <Text style={{ fontSize: 14, fontWeight: '600', color: c.text }}>{timeStr} Uhr</Text>
         <Text style={{ fontSize: 11, color: c.muted, marginTop: 1 }}>{slot.durationMin} Min · Frei</Text>
       </View>
-      {isDeleting ? (
+      {selectionMode ? (
+        <Ionicons
+          name={isSelected ? 'checkmark-circle' : 'ellipse-outline'}
+          size={22}
+          color={isSelected ? c.primary : c.muted}
+        />
+      ) : isDeleting ? (
         <ActivityIndicator size="small" color={c.muted} />
       ) : (
         <Pressable onPress={() => onCancelSlot(slot.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Ionicons name="close-outline" size={16} color={c.muted} />
         </Pressable>
       )}
-    </View>
+    </>
   );
+
+  if (selectionMode) {
+    return (
+      <Pressable onPress={() => onToggleSelect(slot.id)} style={containerStyle}>
+        {content}
+      </Pressable>
+    );
+  }
+
+  return <View style={containerStyle}>{content}</View>;
 }
 
 function PendingRequestCard({ c, slot, booking, onRespond }) {
@@ -666,7 +685,10 @@ function BookedSlotCard({ c, slot, booking, onRespond, onOpenDetail }) {
   );
 }
 
-export function TherapistTimeline({ c, mySlots, incomingBookings, activeFilter, deletingSlotIds, onCancelSlot, onRespond, onTherapistCancel, slotsLoading, incomingLoading, onOpenDetail }) {
+export function TherapistTimeline({
+  c, mySlots, incomingBookings, activeFilter, deletingSlotIds, onCancelSlot, onRespond, onTherapistCancel, slotsLoading, incomingLoading, onOpenDetail,
+  selectionMode, selectedSlotIds, onToggleSelect,
+}) {
   const items = useMemo(() => {
     if (!Array.isArray(mySlots)) return {};
     const bookingBySlotId = {};
@@ -780,7 +802,14 @@ export function TherapistTimeline({ c, mySlots, incomingBookings, activeFilter, 
           <Text style={{ fontSize: 11, fontWeight: '700', letterSpacing: 0.5, color: c.muted, textTransform: 'uppercase', marginBottom: 8 }}>{day}</Text>
           {items[day].map(({ slot, booking }) => (
             slot.status === 'AVAILABLE'
-              ? <FreeSlotCard key={slot.id} c={c} slot={slot} onCancelSlot={onCancelSlot} deletingSlotIds={deletingSlotIds} />
+              ? (
+                <FreeSlotCard
+                  key={slot.id} c={c} slot={slot} onCancelSlot={onCancelSlot} deletingSlotIds={deletingSlotIds}
+                  selectionMode={selectionMode}
+                  isSelected={!!selectedSlotIds?.includes(slot.id)}
+                  onToggleSelect={onToggleSelect}
+                />
+              )
               : <BookedSlotCard key={slot.id} c={c} slot={slot} booking={booking} onRespond={onRespond} onTherapistCancel={onTherapistCancel} onOpenDetail={onOpenDetail} />
           ))}
         </View>

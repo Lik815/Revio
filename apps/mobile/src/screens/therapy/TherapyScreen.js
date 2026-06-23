@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { Ionicons, } from '@expo/vector-icons';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { appStoreSelectors, useAppStore } from '../../store/useStore';
 import { useTheme } from '../../hooks/use-theme';
 import { appStyles } from '../../styles/app-styles';
 import { translations } from '../../i18n/translations';
-import { ROOT_ROUTES } from '../../navigation/route-names';
+import { ROOT_ROUTES, TAB_ROUTES } from '../../navigation/route-names';
 import { getBaseUrl, normalizeTherapistProfile, TUNNEL_HEADERS } from '../../utils/app-utils';
 import { TabHeader } from '../../components/TabHeader';
 import { TherapyTabPatient } from './TherapyTabPatient';
@@ -112,6 +112,29 @@ export function TherapyTabScreen() {
     finally {
       setDeletingSlotIds((prev) => prev.filter((id) => id !== slotId));
     }
+  };
+
+  const handleBulkDeleteSlots = async (slotIds) => {
+    if (!authToken || !slotIds?.length) return;
+    try {
+      const res = await fetch(`${getBaseUrl()}/therapist/slots/bulk-delete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({ slotIds }),
+      });
+      if (!res.ok) return;
+      const data = await res.json().catch(() => null);
+      const deletedIds = new Set(data?.deletedIds ?? slotIds);
+      setMySlots((prev) => prev.filter((s) => !deletedIds.has(s.id)));
+
+      const bookedCount = (data?.skipped ?? []).filter((s) => s.reason === 'booked').length;
+      if (bookedCount > 0) {
+        Alert.alert(
+          'Hinweis',
+          `${bookedCount} ${bookedCount === 1 ? 'Termin wurde' : 'Termine wurden'} inzwischen gebucht und nicht gelöscht.`,
+        );
+      }
+    } catch {}
   };
 
   // Patches the local incoming-bookings/slots cache from the PATCH response instead of
@@ -316,6 +339,7 @@ export function TherapyTabScreen() {
           onRespond={handleTherapistRespond}
           onOpenTherapistById={openTherapistById}
           onCancelSlot={handleCancelSlot}
+          onBulkDeleteSlots={handleBulkDeleteSlots}
           onTherapistCancelRequest={(id) => { setTherapistCancelBookingId(id); setShowTherapistCancelModal(true); }}
           onSelectTherapistDetailBooking={(booking) => { setTherapistCancelBookingId(booking.id); setShowTherapistCancelModal(true); }}
           onOpenBookingDetail={handleOpenBookingDetail}
@@ -370,7 +394,7 @@ export function TherapyTabScreen() {
           {t('therapyLoginRequiredBody')}
         </Text>
         <Pressable
-          onPress={() => navigation.navigate(ROOT_ROUTES.LOGIN)}
+          onPress={() => navigation.navigate(ROOT_ROUTES.MAIN_TABS, { screen: TAB_ROUTES.AUTH })}
           style={[appStyles.registerBtn, { backgroundColor: c.primary, paddingHorizontal: 40 }]}
         >
           <Text style={appStyles.registerBtnText}>{t('loginAction')}</Text>

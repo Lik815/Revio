@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import {
-  Image, Pressable, RefreshControl, ScrollView,
+  ActivityIndicator, Alert, Image, Pressable, RefreshControl, ScrollView,
   Text, View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -23,7 +23,7 @@ export function TherapyTabTherapist({
   therapyRefreshing, slotsLastLoadedAt, incomingBookingsLastLoadedAt,
   onRefresh, onRespond, onOpenTherapistById,
   onCancelSlot, onTherapistCancelRequest, onSelectTherapistDetailBooking, setShowSlotComposerModal,
-  onOpenBookingDetail,
+  onOpenBookingDetail, onBulkDeleteSlots,
   loggedInTherapist,
   onActivateBookingRequests,
   heilmittelOptions,
@@ -40,6 +40,9 @@ export function TherapyTabTherapist({
   const [selectedDate, setSelectedDate] = useState(() => startOfDay(new Date()));
   const [visibleWeekStart, setVisibleWeekStart] = useState(() => startOfWeek(new Date()));
   const [scheduleView, setScheduleView] = useState('timeline');
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedSlotIds, setSelectedSlotIds] = useState([]);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   const pendingIncomingBookings = useMemo(
     () => incomingBookings.filter((r) => r.status === 'PENDING'),
@@ -88,6 +91,46 @@ export function TherapyTabTherapist({
     const today = new Date();
     setSelectedDate(startOfDay(today));
     setVisibleWeekStart(startOfWeek(today));
+  };
+
+  const handleToggleSelect = (slotId) => {
+    setSelectedSlotIds((prev) => (
+      prev.includes(slotId) ? prev.filter((id) => id !== slotId) : [...prev, slotId]
+    ));
+  };
+
+  const handleToggleSelectAll = () => {
+    setSelectedSlotIds((prev) => (prev.length === freeSlots.length ? [] : freeSlots.map((s) => s.id)));
+  };
+
+  const handleCancelSelection = () => {
+    setSelectionMode(false);
+    setSelectedSlotIds([]);
+  };
+
+  const handleConfirmBulkDelete = () => {
+    const count = selectedSlotIds.length;
+    if (count === 0 || !onBulkDeleteSlots) return;
+    Alert.alert(
+      `${count} freie ${count === 1 ? 'Termin' : 'Termine'} löschen?`,
+      'Diese Aktion kann nicht rückgängig gemacht werden.',
+      [
+        { text: 'Abbrechen', style: 'cancel' },
+        {
+          text: 'Löschen',
+          style: 'destructive',
+          onPress: async () => {
+            setBulkDeleting(true);
+            try {
+              await onBulkDeleteSlots(selectedSlotIds);
+            } finally {
+              setBulkDeleting(false);
+              handleCancelSelection();
+            }
+          },
+        },
+      ],
+    );
   };
 
   // 'pending' is intentionally not a Liste filter anymore — the dedicated
@@ -187,27 +230,59 @@ export function TherapyTabTherapist({
               <ScheduleModeTabs
                 c={c}
                 value={scheduleView}
-                onChange={setScheduleView}
+                onChange={(next) => { setScheduleView(next); handleCancelSelection(); }}
                 pendingCount={pendingIncomingBookings.length}
               />
 
               {scheduleView === 'list' ? (
                 <>
-                  {/* ── Segment-Tabs ──────────────────────────────────────── */}
-                  <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: c.border, marginBottom: 16 }}>
-                    {FILTERS.map(({ key, label }) => {
-                      const active = activeFilterTherapist === key;
-                      return (
-                        <Pressable
-                          key={key}
-                          onPress={() => setActiveFilterTherapist(key)}
-                          style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, marginBottom: -1, borderBottomWidth: 2, borderBottomColor: active ? (c.success ?? '#5A9E8E') : 'transparent' }}
-                        >
-                          <Text style={{ fontSize: 14, fontWeight: active ? '700' : '500', color: active ? c.text : c.muted }}>{label}</Text>
+                  {/* ── Segment-Tabs / Auswahl-Toolbar ──────────────────────── */}
+                  {selectionMode ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 16 }}>
+                      <Pressable onPress={handleCancelSelection} hitSlop={8}>
+                        <Text style={{ fontSize: 14, fontWeight: '600', color: c.muted }}>Abbrechen</Text>
+                      </Pressable>
+                      <Text style={{ flex: 1, fontSize: 14, fontWeight: '700', color: c.text, textAlign: 'center' }}>
+                        {selectedSlotIds.length} ausgewählt
+                      </Text>
+                      <Pressable onPress={handleToggleSelectAll} hitSlop={8}>
+                        <Text style={{ fontSize: 14, fontWeight: '600', color: c.primary }}>
+                          {selectedSlotIds.length === freeSlots.length ? 'Keine' : 'Alle'}
+                        </Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={handleConfirmBulkDelete}
+                        disabled={selectedSlotIds.length === 0 || bulkDeleting}
+                        style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, backgroundColor: selectedSlotIds.length === 0 ? c.border : (c.error ?? '#DC2626') }}
+                      >
+                        {bulkDeleting ? (
+                          <ActivityIndicator size="small" color="#fff" />
+                        ) : (
+                          <Text style={{ fontSize: 13, fontWeight: '700', color: '#fff' }}>Löschen</Text>
+                        )}
+                      </Pressable>
+                    </View>
+                  ) : (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: c.border, marginBottom: 16 }}>
+                      {FILTERS.map(({ key, label }) => {
+                        const active = activeFilterTherapist === key;
+                        return (
+                          <Pressable
+                            key={key}
+                            onPress={() => setActiveFilterTherapist(key)}
+                            style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, marginBottom: -1, borderBottomWidth: 2, borderBottomColor: active ? (c.success ?? '#5A9E8E') : 'transparent' }}
+                          >
+                            <Text style={{ fontSize: 14, fontWeight: active ? '700' : '500', color: active ? c.text : c.muted }}>{label}</Text>
+                          </Pressable>
+                        );
+                      })}
+                      {activeFilterTherapist === 'free' && freeSlots.length > 0 && (
+                        <Pressable onPress={() => setSelectionMode(true)} hitSlop={8} style={{ paddingHorizontal: 4, paddingBottom: 10 }}>
+                          <Text style={{ fontSize: 13, fontWeight: '600', color: c.primary }}>Auswählen</Text>
                         </Pressable>
-                      );
-                    })}
-                  </View>
+                      )}
+                    </View>
+                  )}
 
                   <TherapistTimeline
                     c={c}
@@ -221,6 +296,9 @@ export function TherapyTabTherapist({
                     onOpenDetail={handleOpenDetail}
                     slotsLoading={shouldShowSectionLoading(slotsLoading, slotsLastLoadedAt)}
                     incomingLoading={shouldShowSectionLoading(incomingBookingsLoading, incomingBookingsLastLoadedAt)}
+                    selectionMode={selectionMode}
+                    selectedSlotIds={selectedSlotIds}
+                    onToggleSelect={handleToggleSelect}
                   />
                 </>
               ) : scheduleView === 'timeline' ? (

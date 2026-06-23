@@ -3027,6 +3027,77 @@ describe('Slot-based Booking', () => {
     expect(res.statusCode).toBe(409);
   });
 
+  it('POST /therapist/slots/bulk-delete — deletes multiple AVAILABLE slots in one call', async () => {
+    const slotA = await createFutureSlot({ startsAt: new Date(Date.now() + 24 * 60 * 60 * 1000) });
+    const slotB = await createFutureSlot({ startsAt: new Date(Date.now() + 48 * 60 * 60 * 1000) });
+    const slotC = await createFutureSlot({ startsAt: new Date(Date.now() + 72 * 60 * 60 * 1000) });
+
+    const res = await app.inject({
+      method: 'POST', url: '/therapist/slots/bulk-delete',
+      headers: { authorization: `Bearer ${therapistToken}`, 'content-type': 'application/json' },
+      payload: { slotIds: [slotA.id, slotB.id, slotC.id] },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.deletedIds.sort()).toEqual([slotA.id, slotB.id, slotC.id].sort());
+    expect(body.skipped).toHaveLength(0);
+
+    const remaining = await prisma.therapistSlot.findMany({ where: { therapistId } });
+    expect(remaining).toHaveLength(0);
+  });
+
+  it('POST /therapist/slots/bulk-delete — skips a BOOKED slot but still deletes the rest', async () => {
+    const free = await createFutureSlot({ startsAt: new Date(Date.now() + 24 * 60 * 60 * 1000) });
+    const booked = await createFutureSlot({ startsAt: new Date(Date.now() + 48 * 60 * 60 * 1000), status: 'BOOKED' });
+
+    const res = await app.inject({
+      method: 'POST', url: '/therapist/slots/bulk-delete',
+      headers: { authorization: `Bearer ${therapistToken}`, 'content-type': 'application/json' },
+      payload: { slotIds: [free.id, booked.id] },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.deletedIds).toEqual([free.id]);
+    expect(body.skipped).toEqual([{ id: booked.id, reason: 'booked' }]);
+
+    const stillThere = await prisma.therapistSlot.findUnique({ where: { id: booked.id } });
+    expect(stillThere).not.toBeNull();
+  });
+
+  it("POST /therapist/slots/bulk-delete — skips slot ids that aren't this therapist's", async () => {
+    const own = await createFutureSlot({ startsAt: new Date(Date.now() + 24 * 60 * 60 * 1000) });
+    const otherTherapist = await prisma.therapist.create({
+      data: {
+        email: 'other-slot-therapist@test.de', fullName: 'Andere Therapeutin',
+        professionalTitle: 'Physiotherapeutin', city: 'Berlin',
+        specializations: 'Sport', languages: 'Deutsch',
+        reviewStatus: 'APPROVED', isVisible: true,
+        bookingMode: 'FIRST_APPOINTMENT_REQUEST', sessionToken: 'other-slot-therapist-token',
+      },
+    });
+    const notMine = await prisma.therapistSlot.create({
+      data: { therapistId: otherTherapist.id, startsAt: new Date(Date.now() + 24 * 60 * 60 * 1000), status: 'AVAILABLE' },
+    });
+
+    const res = await app.inject({
+      method: 'POST', url: '/therapist/slots/bulk-delete',
+      headers: { authorization: `Bearer ${therapistToken}`, 'content-type': 'application/json' },
+      payload: { slotIds: [own.id, notMine.id, 'does-not-exist'] },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.deletedIds).toEqual([own.id]);
+    expect(body.skipped.sort((a: { id: string }, b: { id: string }) => a.id.localeCompare(b.id))).toEqual(
+      [{ id: notMine.id, reason: 'not_found' }, { id: 'does-not-exist', reason: 'not_found' }].sort((a, b) => a.id.localeCompare(b.id)),
+    );
+
+    const otherSlotStillThere = await prisma.therapistSlot.findUnique({ where: { id: notMine.id } });
+    expect(otherSlotStillThere).not.toBeNull();
+  });
+
   it('Legacy booking without slotId remains readable', async () => {
     const legacy = await prisma.bookingRequest.create({
       data: {

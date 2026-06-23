@@ -269,6 +269,41 @@ export async function bookingRoutes(fastify: FastifyInstance) {
     return { deleted: true };
   });
 
+  // POST /therapist/slots/bulk-delete — Mehrere Slots auf einmal löschen (nur nicht-gebuchte)
+  fastify.post('/therapist/slots/bulk-delete', async (request, reply) => {
+    const token = request.headers.authorization?.replace('Bearer ', '');
+    if (!token) return reply.status(401).send({ error: 'Unauthorized' });
+    const therapist = await resolveTherapist(fastify, token);
+    if (!therapist) return reply.status(403).send({ error: 'Only therapists can delete slots' });
+
+    const schema = z.object({
+      slotIds: z.array(z.string()).min(1).max(500),
+    });
+    const parsed = schema.safeParse(request.body);
+    if (!parsed.success) return reply.status(400).send({ error: 'Invalid request', details: parsed.error.flatten() });
+
+    const { slotIds } = parsed.data;
+    const slots = await fastify.prisma.therapistSlot.findMany({
+      where: { id: { in: slotIds }, therapistId: therapist.id },
+      select: { id: true, status: true },
+    });
+    const foundIds = new Set(slots.map((s) => s.id));
+
+    const deletableIds = slots.filter((s) => s.status !== 'BOOKED').map((s) => s.id);
+    const skipped: { id: string; reason: 'booked' | 'not_found' }[] = [
+      ...slots.filter((s) => s.status === 'BOOKED').map((s) => ({ id: s.id, reason: 'booked' as const })),
+      // Covers both "doesn't exist" and "belongs to another therapist" — scoped out by
+      // the findMany's therapistId filter already, so we never leak which case it was.
+      ...slotIds.filter((id) => !foundIds.has(id)).map((id) => ({ id, reason: 'not_found' as const })),
+    ];
+
+    if (deletableIds.length > 0) {
+      await fastify.prisma.therapistSlot.deleteMany({ where: { id: { in: deletableIds } } });
+    }
+
+    return reply.send({ deletedIds: deletableIds, skipped });
+  });
+
   // GET /therapist/patients — Eigene Patient:innen auflisten (dedupliziert über Buchungen)
   fastify.get('/therapist/patients', async (request, reply) => {
     const token = request.headers.authorization?.replace('Bearer ', '');
