@@ -53,7 +53,7 @@ export function CustomTabBar({ state, descriptors, navigation, badgeCounts = {} 
           backgroundColor: c.nav,
           borderRadius: RADIUS.lg,
           paddingTop: SPACE.sm,
-          paddingBottom: isGuestTabBar ? SPACE.md : SPACE.sm,
+          paddingBottom: SPACE.sm,
           width: isGuestTabBar ? guestTabBarWidth : undefined,
           ...SHADOW.modal,
         }}
@@ -63,11 +63,10 @@ export function CustomTabBar({ state, descriptors, navigation, badgeCounts = {} 
             pointerEvents="none"
             style={{
               position: 'absolute',
-              top: isGuestTabBar ? SPACE.sm : 0,
-              bottom: isGuestTabBar ? undefined : 0,
+              top: 0,
+              bottom: 0,
               left: 0,
               width: PILL_SIZE,
-              height: isGuestTabBar ? PILL_SIZE : undefined,
               alignItems: 'center',
               justifyContent: 'center',
               transform: [{ translateX: pillX }],
@@ -85,7 +84,7 @@ export function CustomTabBar({ state, descriptors, navigation, badgeCounts = {} 
           const label = options.title ?? t[TAB_TRANSLATION_KEYS[route.name]] ?? route.name;
           const nestedState = route.state;
           const badgeCount = Number(badgeCounts[route.name] ?? 0);
-          const showLabel = !focused || state.routes.length <= 2;
+          const showLabel = !focused;
 
           const onPress = () => {
             const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
@@ -155,7 +154,7 @@ export function CustomTabBar({ state, descriptors, navigation, badgeCounts = {} 
                     fontSize: 11,
                     fontWeight: focused ? '700' : '400',
                     color: focused ? c.primary : (c.textMuted ?? c.muted),
-                    marginTop: isGuestTabBar ? 3 : -SPACE.xs,
+                    marginTop: -SPACE.xs,
                   }}
                 >
                   {label}
