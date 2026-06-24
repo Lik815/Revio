@@ -17,11 +17,22 @@ export function CustomTabBar({ state, descriptors, navigation, badgeCounts = {} 
   const { width } = useWindowDimensions();
   const t = translations.de;
   const isGuestTabBar = state.routes.length === 2;
-  const guestTabBarWidth = Math.min(240, Math.max(196, width * 0.5));
+  const compactWidth = Math.min(240, Math.max(196, width * 0.5));
+
+  // Outer padding is constant across guest/logged-in so the measured
+  // container width doesn't itself jump when isGuestTabBar flips — only the
+  // inner nav's animated width changes. Falls back to the window width
+  // (matches how compactWidth is derived) until the first onLayout lands,
+  // so we never animate from/to a bogus 0.
+  const [containerWidth, setContainerWidth] = useState(0);
+  const fullWidth = containerWidth > 0 ? containerWidth - SPACE.lg * 2 : Math.max(0, width - SPACE.lg * 2);
+  const targetNavWidth = isGuestTabBar ? compactWidth : fullWidth;
 
   const [rowWidth, setRowWidth] = useState(0);
   const itemWidth = rowWidth / state.routes.length;
   const pillX = useRef(new Animated.Value(0)).current;
+  const navWidth = useRef(new Animated.Value(targetNavWidth)).current;
+  const prevIsGuestTabBarRef = useRef(isGuestTabBar);
 
   useEffect(() => {
     if (!itemWidth) return;
@@ -34,27 +45,48 @@ export function CustomTabBar({ state, descriptors, navigation, badgeCounts = {} 
     }).start();
   }, [state.index, itemWidth]);
 
+  // Only the guest<->logged-in transition itself should spring-animate the
+  // width; layout-only changes (e.g. the container's first measurement,
+  // or a rotation) snap straight to the new target so there's no
+  // unintended bounce on mount or resize.
+  useEffect(() => {
+    const loginStateChanged = prevIsGuestTabBarRef.current !== isGuestTabBar;
+    prevIsGuestTabBarRef.current = isGuestTabBar;
+
+    if (loginStateChanged) {
+      Animated.spring(navWidth, {
+        toValue: targetNavWidth,
+        useNativeDriver: false,
+        speed: 18,
+        bounciness: 6,
+      }).start();
+    } else {
+      navWidth.setValue(targetNavWidth);
+    }
+  }, [targetNavWidth, isGuestTabBar]);
+
   return (
     <View
+      onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}
       style={{
-        alignItems: isGuestTabBar ? 'center' : 'stretch',
+        alignItems: 'center',
         backgroundColor: c.background,
-        paddingHorizontal: isGuestTabBar ? 0 : SPACE.lg,
+        paddingHorizontal: SPACE.lg,
         paddingTop: SPACE.sm,
         paddingBottom: insets.bottom + SPACE.sm,
       }}
     >
-      <View
+      <Animated.View
         onLayout={(e) => setRowWidth(e.nativeEvent.layout.width)}
         style={{
           flexDirection: 'row',
           alignItems: 'center',
-          alignSelf: isGuestTabBar ? 'center' : 'stretch',
+          alignSelf: 'center',
           backgroundColor: c.nav,
           borderRadius: RADIUS.lg,
           paddingTop: SPACE.sm,
           paddingBottom: SPACE.sm,
-          width: isGuestTabBar ? guestTabBarWidth : undefined,
+          width: navWidth,
           ...SHADOW.modal,
         }}
       >
@@ -163,7 +195,7 @@ export function CustomTabBar({ state, descriptors, navigation, badgeCounts = {} 
             </Pressable>
           );
         })}
-      </View>
+      </Animated.View>
     </View>
   );
 }
