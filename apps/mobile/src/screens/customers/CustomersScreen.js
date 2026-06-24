@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useTherapyData } from '../../context/TherapyContext';
 import { useTheme } from '../../hooks/use-theme';
 import { translations } from '../../i18n/translations';
-import { TabHeader } from '../../components/TabHeader';
+import { AccountHeader } from '../../components/AccountHeader';
 import { PatientsPane } from '../therapy/TherapistPatientsScreen';
 import { TherapistPatientDetailScreen } from '../therapy/TherapistPatientDetailScreen';
 
@@ -43,7 +43,7 @@ export function CustomersTabScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      <TabHeader c={c} title={t('customersTitle')} />
+      <AccountHeader c={c} subtitle={t('customersTitle')} />
       <PatientsPane
         patients={patients}
         patientsLoading={patientsLoading}

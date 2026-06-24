@@ -22,6 +22,7 @@ import {
   SPACE,
   TYPE,
 } from '../../utils/app-utils';
+import { AccountHeader } from '../../components/AccountHeader';
 
 function formatNextSlot(isoString) {
   if (!isoString) return null;
@@ -417,15 +418,18 @@ export function DiscoverContent(props) {
 
     return (
       <View style={{ flex: 1, backgroundColor: c.background }}>
+        {authToken && <AccountHeader c={c} subtitle="Suche" style={{ zIndex: 10 }} />}
         {/* Fixed header + search bar */}
-        <View style={{ paddingHorizontal: 16, paddingTop: insets.top + 8, paddingBottom: 10, backgroundColor: c.background, zIndex: 10, gap: SPACE.sm }}>
-          <View style={[styles.header, { justifyContent: 'space-between', marginBottom: 0 }]}>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Image source={require('../../../assets/icon.png')} style={styles.logoMark} />
-              <Text style={[styles.brandName, { color: c.text }]}>evio</Text>
+        <View style={{ paddingHorizontal: 16, paddingTop: authToken ? 0 : insets.top + 8, paddingBottom: 10, backgroundColor: c.background, zIndex: 10, gap: SPACE.sm }}>
+          {!authToken && (
+            <View style={[styles.header, { justifyContent: 'space-between', marginBottom: 0 }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Image source={require('../../../assets/icon.png')} style={styles.logoMark} />
+                <Text style={[styles.brandName, { color: c.text }]}>evio</Text>
+              </View>
+              <View style={{ width: 40 }} />
             </View>
-            <View style={{ width: 40 }} />
-          </View>
+          )}
           <View style={[styles.searchBox, { backgroundColor: c.card, borderColor: c.border }]}>
             <Ionicons name="search-outline" size={18} color={c.muted} />
             <TextInput
@@ -588,15 +592,18 @@ export function DiscoverContent(props) {
 
   return (
     <View style={{ flex: 1, backgroundColor: c.background }}>
+      {authToken && <AccountHeader c={c} subtitle="Suche" style={{ zIndex: 10 }} />}
       {/* Sticky header — logo, search, chips, location, filters */}
-      <View style={{ backgroundColor: c.background, paddingHorizontal: 16, paddingTop: insets.top + 8, paddingBottom: 10, zIndex: 10, gap: SPACE.sm }}>
-        <View style={[styles.header, { justifyContent: 'space-between' }]}>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Image source={require('../../../assets/icon.png')} style={styles.logoMark} />
-            <Text style={[styles.brandName, { color: c.text }]}>evio</Text>
+      <View style={{ backgroundColor: c.background, paddingHorizontal: 16, paddingTop: authToken ? 0 : insets.top + 8, paddingBottom: 10, zIndex: 10, gap: SPACE.sm }}>
+        {!authToken && (
+          <View style={[styles.header, { justifyContent: 'space-between' }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Image source={require('../../../assets/icon.png')} style={styles.logoMark} />
+              <Text style={[styles.brandName, { color: c.text }]}>evio</Text>
+            </View>
+            <View style={{ width: 40 }} />
           </View>
-          <View style={{ width: 40 }} />
-        </View>
+        )}
 
         {!searched && (
           <View style={styles.hero}>

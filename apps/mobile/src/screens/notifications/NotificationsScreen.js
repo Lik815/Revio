@@ -8,7 +8,7 @@ import { translations } from '../../i18n/translations';
 import { NotificationCard } from '../../components/NotificationCard';
 import { ReviewNotificationModal } from '../../modals/ReviewNotificationModal';
 import { ROOT_ROUTES, TAB_ROUTES } from '../../navigation/route-names';
-import { TabHeader } from '../../components/TabHeader';
+import { AccountHeader } from '../../components/AccountHeader';
 
 const t = (key) => translations.de[key] ?? key;
 
@@ -49,7 +49,7 @@ export function NotificationsTabScreen() {
   return (
     <>
       <View style={{ flex: 1, backgroundColor: c.background }}>
-        <TabHeader c={c} title={t('notificationsTitle')} />
+        <AccountHeader c={c} subtitle={t('notificationsTitle')} />
         {items.length === 0 ? (
           <View style={[appStyles.emptyState, { backgroundColor: c.card, borderColor: c.border, margin: 24, paddingVertical: 32 }]}>
             <Text style={[appStyles.emptyTitle, { color: c.text }]}>Keine neuen Mitteilungen</Text>

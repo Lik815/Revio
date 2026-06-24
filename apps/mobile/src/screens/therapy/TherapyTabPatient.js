@@ -1,11 +1,11 @@
 import React, { useMemo } from 'react';
 import {
-  ActivityIndicator, Image, Pressable, RefreshControl, SectionList,
+  ActivityIndicator, Pressable, RefreshControl, SectionList,
   Text, View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { formatDayHeader } from '../../utils/app-utils';
+import { AccountHeader } from '../../components/AccountHeader';
 import { PatientAppointmentCard, PatientNextAppointmentCard } from './AppointmentCards';
 
 const shouldShowSectionLoading = (isLoading, lastLoadedAt) => isLoading && lastLoadedAt === 0;
@@ -27,7 +27,6 @@ export function TherapyTabPatient({
   onRefresh, onOpenTherapistById, onSelectAppointment,
   c, t, styles,
 }) {
-  const insets = useSafeAreaInsets();
   const getDate = (a) => new Date(a.slot?.startsAt ?? a.confirmedSlotAt ?? 0);
 
   const { kommend, vergangen } = useMemo(() => {
@@ -71,13 +70,7 @@ export function TherapyTabPatient({
 
   return (
     <View style={{ flex: 1 }}>
-      {/* ── Header ─────────────────────────────────────────────────── */}
-      <View style={{ paddingHorizontal: 16, paddingTop: insets.top + 8, paddingBottom: 10, backgroundColor: c.background }}>
-        <View style={[styles.header, { marginBottom: 0 }]}>
-          <Image source={require('../../../assets/icon.png')} style={styles.logoMark} />
-          <Text style={[styles.headerTitle, { color: c.text, flex: 1 }]}>Meine Termine</Text>
-        </View>
-      </View>
+      <AccountHeader c={c} subtitle="Termine" />
 
       <SectionList
         sections={sections}

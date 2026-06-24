@@ -1,8 +1,8 @@
 import React from 'react';
 import { Image, Pressable, ScrollView, Switch, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SPACE, getBaseUrl } from '../../utils/app-utils';
+import { AccountHeader } from '../../components/AccountHeader';
 
 export function OptionsContent({
   loggedInTherapist, loggedInPatient,
@@ -12,7 +12,6 @@ export function OptionsContent({
   onNavigateToProfile, onShowDebug,
   c, t, styles,
 }) {
-  const insets = useSafeAreaInsets();
   const [debugTapCount, setDebugTapCount] = React.useState(0);
 const renderOptions = () => {
   const isLoggedIn = Boolean(loggedInTherapist || loggedInPatient);
@@ -64,15 +63,7 @@ const renderOptions = () => {
 
   return (
     <View style={{ flex: 1 }}>
-      <View style={{ paddingHorizontal: 16, paddingTop: insets.top + 8, paddingBottom: 10, backgroundColor: c.background }}>
-        <View style={[styles.header, { marginBottom: 0 }]}>
-          <Image source={require('../../../assets/icon.png')} style={styles.logoMark} />
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.headerTitle, { color: c.text }]}>{t('optionsTitle')}</Text>
-            <Text style={[styles.headerSub, { color: c.muted }]}>{t('optionsSubtitle')}</Text>
-          </View>
-        </View>
-      </View>
+      <AccountHeader c={c} subtitle={t('optionsSubtitle')} />
       <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 32, paddingTop: SPACE.sm }]} showsVerticalScrollIndicator={false}>
 
         {/* ── Mein Profil ── */}
