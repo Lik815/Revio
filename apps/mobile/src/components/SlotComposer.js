@@ -758,9 +758,6 @@ export function TherapistTimeline({
   if (activeFilter === 'pending') {
     return (
       <>
-        <Text style={{ fontSize: 22, fontWeight: '800', color: c.text, marginBottom: 14 }}>
-          Anfragen
-        </Text>
         {pendingItems.map(({ slot, booking }) => (
           <BookedSlotCard
             key={slot.id}
