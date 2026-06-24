@@ -1,22 +1,32 @@
 import React, { useMemo, useState } from 'react';
 import {
-  Image, Pressable, RefreshControl, ScrollView,
+  Pressable, RefreshControl, ScrollView,
   Text, View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { addDays, startOfDay, startOfWeek } from '../../utils/app-utils';
+import { AccountHeader } from '../../components/AccountHeader';
 import { HeilmittelSelectModal } from '../../modals/HeilmittelSelectModal';
 import { TherapistSummaryCard } from '../../components/TherapistSummaryCard';
 import { TherapistWeekStrip } from '../../components/TherapistWeekStrip';
 import { TherapistDayTimeline } from '../../components/TherapistDayTimeline';
+import { TherapistTimeline } from '../../components/SlotComposer';
+
+const shouldShowSectionLoading = (isLoading, lastLoadedAt) => isLoading && lastLoadedAt === 0;
+
+const FILTER_LIST_TITLES = {
+  free: 'Freie Termine',
+  booked: 'Gebuchte Termine',
+  pending: 'Anfragen',
+};
 
 export function TherapyTabTherapist({
   mySlots, slotsLoading, incomingBookings, incomingBookingsLoading,
   deletingSlotIds,
   therapyRefreshing, slotsLastLoadedAt, incomingBookingsLastLoadedAt,
   onRefresh, onOpenTherapistById,
-  onCancelSlot, setShowSlotComposerModal,
+  onCancelSlot, onRespond, onTherapistCancelRequest, onSelectTherapistDetailBooking, setShowSlotComposerModal,
   onOpenBookingDetail,
   loggedInTherapist,
   onActivateBookingRequests,
@@ -31,6 +41,7 @@ export function TherapyTabTherapist({
   const [showHeilmittelModal, setShowHeilmittelModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState(() => startOfDay(new Date()));
   const [visibleWeekStart, setVisibleWeekStart] = useState(() => startOfWeek(new Date()));
+  const [filterListKind, setFilterListKind] = useState(null); // null | 'free' | 'booked' | 'pending'
 
   const pendingIncomingBookings = useMemo(
     () => incomingBookings.filter((r) => r.status === 'PENDING'),
@@ -66,42 +77,54 @@ export function TherapyTabTherapist({
     setVisibleWeekStart(startOfWeek(today));
   };
 
-  // Stats-card taps jump the week strip + selected day to the next upcoming
-  // day that actually has a slot of that kind — there's no separate filtered
-  // list view to land on anymore, so "focus free/booked/Anfragen" means this.
-  const jumpToNextDayWithKind = (kind) => {
-    const bookingBySlotId = {};
-    incomingBookings.forEach((b) => { if (b.slotId) bookingBySlotId[b.slotId] = b; });
-    const today = startOfDay(new Date());
-
-    const matchingDates = mySlots
-      .filter((s) => {
-        if (s.status === 'CANCELLED') return false;
-        if (kind === 'free') return s.status === 'AVAILABLE';
-        const booking = bookingBySlotId[s.id];
-        if (kind === 'booked') return s.status === 'BOOKED' && booking?.status === 'CONFIRMED';
-        if (kind === 'pending') return s.status === 'BOOKED' && booking?.status === 'PENDING';
-        return false;
-      })
-      .map((s) => startOfDay(new Date(s.startsAt)))
-      .filter((d) => d >= today)
-      .sort((a, b) => a - b);
-
-    const target = matchingDates[0];
-    if (!target) return;
-    setSelectedDate(target);
-    setVisibleWeekStart(startOfWeek(target));
+  const handleTherapistCancel = (bookingId) => {
+    onTherapistCancelRequest(bookingId);
   };
+
+  const handleOpenDetail = (booking) => {
+    onSelectTherapistDetailBooking(booking);
+    onTherapistCancelRequest(booking.id);
+  };
+
+  if (filterListKind) {
+    return (
+      <View style={{ flex: 1 }}>
+        <View style={{ paddingHorizontal: 16, paddingTop: insets.top + 8, paddingBottom: 10, backgroundColor: c.background }}>
+          <Pressable
+            onPress={() => setFilterListKind(null)}
+            style={{ alignSelf: 'flex-start', paddingVertical: 4, marginBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }}
+          >
+            <Ionicons name="chevron-back" size={16} color={c.primary} />
+            <Text style={{ fontSize: 14, fontWeight: '600', color: c.primary }}>Zurück</Text>
+          </Pressable>
+          <Text style={[styles.headerTitle, { color: c.text }]}>{FILTER_LIST_TITLES[filterListKind]}</Text>
+        </View>
+
+        <ScrollView
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: 32, paddingTop: 8 }]}
+          showsVerticalScrollIndicator={false}
+        >
+          <TherapistTimeline
+            c={c}
+            mySlots={mySlots}
+            incomingBookings={incomingBookings}
+            activeFilter={filterListKind}
+            deletingSlotIds={deletingSlotIds}
+            onCancelSlot={onCancelSlot}
+            onRespond={onRespond}
+            onTherapistCancel={handleTherapistCancel}
+            onOpenDetail={handleOpenDetail}
+            slotsLoading={shouldShowSectionLoading(slotsLoading, slotsLastLoadedAt)}
+            incomingLoading={shouldShowSectionLoading(incomingBookingsLoading, incomingBookingsLastLoadedAt)}
+          />
+        </ScrollView>
+      </View>
+    );
+  }
 
   return (
     <View style={{ flex: 1 }}>
-      {/* ── Header ─────────────────────────────────────────────────── */}
-      <View style={{ paddingHorizontal: 16, paddingTop: insets.top + 8, paddingBottom: 10, backgroundColor: c.background }}>
-        <View style={[styles.header, { marginBottom: 0 }]}>
-          <Image source={require('../../../assets/icon.png')} style={styles.logoMark} />
-          <Text style={[styles.headerTitle, { color: c.text, flex: 1 }]}>{'Meine Übersicht'}</Text>
-        </View>
-      </View>
+      <AccountHeader c={c} subtitle="Termine" />
 
       <ScrollView
         contentContainerStyle={[styles.scrollContent, { paddingBottom: 90, paddingTop: 8 }]}
@@ -113,9 +136,9 @@ export function TherapyTabTherapist({
           freeCount={freeSlots.length}
           confirmedCount={confirmedBookingsCount}
           pendingCount={pendingIncomingBookings.length}
-          onPressFree={() => jumpToNextDayWithKind('free')}
-          onPressBooked={() => jumpToNextDayWithKind('booked')}
-          onPressPending={() => jumpToNextDayWithKind('pending')}
+          onPressFree={() => setFilterListKind('free')}
+          onPressBooked={() => setFilterListKind('booked')}
+          onPressPending={() => setFilterListKind('pending')}
         />
 
         {slotBookingEnabled ? (
