@@ -3,7 +3,7 @@ import { Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { getNotificationPresentation } from '../utils/notification-presentation';
 
-export function NotificationCard({ notification, onPress, onDismiss, c }) {
+export function NotificationCard({ notification, onPress, c, isRead = false }) {
   const pres = getNotificationPresentation(notification.type, c);
 
   const date = new Date(notification.createdAt);
@@ -27,7 +27,7 @@ export function NotificationCard({ notification, onPress, onDismiss, c }) {
         paddingVertical: 14,
         borderBottomWidth: 1,
         borderBottomColor: c.border,
-        opacity: pressed ? 0.65 : 1,
+        opacity: pressed ? 0.65 : isRead ? 0.6 : 1,
       })}
     >
       {/* Status-Icon */}
@@ -50,31 +50,27 @@ export function NotificationCard({ notification, onPress, onDismiss, c }) {
 
       {/* Text */}
       <View style={{ flex: 1, gap: 3 }}>
-        <Text
-          style={{ fontSize: 14, lineHeight: 20, color: c.text, fontWeight: '500' }}
-        >
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <Text style={{ flex: 1, fontSize: 14, lineHeight: 19, color: c.text, fontWeight: isRead ? '600' : '700' }} numberOfLines={1}>
+            {pres.title}
+          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Text style={{ fontSize: 12, color: c.muted }}>{timeLabel}</Text>
+            {!isRead ? <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: c.success ?? '#5A9E8E' }} /> : null}
+          </View>
+        </View>
+        <Text style={{ fontSize: 12, color: c.muted }}>{dateLabel}</Text>
+        <Text style={{ fontSize: 13, lineHeight: 18, color: c.text, marginTop: 1 }}>
           {notification.message}
         </Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <Text style={{ fontSize: 12, color: c.muted }}>
-            {dateLabel}, {timeLabel}
+        {notification.actionLabel ? (
+          <Text style={{ fontSize: 12, color: pres.iconColor, fontWeight: '600', marginTop: 1 }}>
+            {notification.actionLabel}
           </Text>
-          {notification.actionLabel ? (
-            <Text style={{ fontSize: 12, color: pres.iconColor, fontWeight: '600' }}>
-              {notification.actionLabel}
-            </Text>
-          ) : null}
-        </View>
+        ) : null}
       </View>
 
-      {/* Dismiss */}
-      <Pressable
-        onPress={(e) => { e.stopPropagation?.(); onDismiss(); }}
-        hitSlop={12}
-        style={{ paddingTop: 2, paddingLeft: 4 }}
-      >
-        <Ionicons name="close-outline" size={20} color={c.muted} />
-      </Pressable>
+      <Ionicons name="chevron-forward" size={16} color={c.muted} style={{ marginTop: 3 }} />
     </Pressable>
   );
 }

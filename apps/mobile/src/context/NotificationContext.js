@@ -29,7 +29,7 @@ const NotificationContext = createContext(null);
 export function NotificationProvider({ children }) {
   const { authToken, accountType, setLoggedInTherapist } = useAuth();
   const [notifications, setNotifications] = useState([]);
-  const [dismissedNotifIds, setDismissedNotifIds] = useState(new Set());
+  const [readNotifIds, setReadNotifIds] = useState(new Set());
   const [showReviewNotificationModal, setShowReviewNotificationModal] = useState(false);
   const [reviewNotification, setReviewNotification] = useState(null);
   const pollRef = useRef(null);
@@ -82,9 +82,9 @@ export function NotificationProvider({ children }) {
       } catch {}
     };
 
-    AsyncStorage.getItem('revio_dismissed_notif_ids').then((raw) => {
+    AsyncStorage.getItem('revio_read_notif_ids').then((raw) => {
       if (!raw || cancelled) return;
-      try { setDismissedNotifIds(new Set(JSON.parse(raw))); } catch {}
+      try { setReadNotifIds(new Set(JSON.parse(raw))); } catch {}
     });
 
     fetchNotifications();
@@ -103,17 +103,17 @@ export function NotificationProvider({ children }) {
     };
   }, [authToken, accountType, setLoggedInTherapist]);
 
-  const dismissNotification = async (id) => {
-    const next = new Set(dismissedNotifIds);
+  const markNotificationRead = async (id) => {
+    const next = new Set(readNotifIds);
     next.add(id);
-    setDismissedNotifIds(next);
-    await AsyncStorage.setItem('revio_dismissed_notif_ids', JSON.stringify([...next]));
+    setReadNotifIds(next);
+    await AsyncStorage.setItem('revio_read_notif_ids', JSON.stringify([...next]));
   };
 
-  const dismissAllNotifications = async () => {
+  const markAllNotificationsRead = async () => {
     const allIds = new Set(notifications.map((n) => n.id));
-    setDismissedNotifIds(allIds);
-    await AsyncStorage.setItem('revio_dismissed_notif_ids', JSON.stringify([...allIds]));
+    setReadNotifIds(allIds);
+    await AsyncStorage.setItem('revio_read_notif_ids', JSON.stringify([...allIds]));
   };
 
   const markReviewNotificationSeen = async (notification = reviewNotification) => {
@@ -136,11 +136,11 @@ export function NotificationProvider({ children }) {
   return (
     <NotificationContext.Provider value={{
       notifications, setNotifications,
-      dismissedNotifIds, setDismissedNotifIds,
+      readNotifIds, setReadNotifIds,
       showReviewNotificationModal, setShowReviewNotificationModal,
       reviewNotification, setReviewNotification,
-      dismissNotification,
-      dismissAllNotifications,
+      markNotificationRead,
+      markAllNotificationsRead,
       markReviewNotificationSeen,
     }}>
       {children}
