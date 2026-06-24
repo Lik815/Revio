@@ -12,6 +12,7 @@ export const TAB_ROUTES = {
   DISCOVER:   'DiscoverTab',
   THERAPY:    'TherapyTab',
   FAVORITES:  'FavoritesTab',
+  CUSTOMERS:  'CustomersTab',
   NOTIFICATIONS: 'NotificationsTab',
   OPTIONS:    'OptionsTab',
   AUTH:       'AuthTab',

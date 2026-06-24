@@ -45,6 +45,8 @@ export const translations = {
     callPractice: 'Praxis anrufen',
     tabSearch: 'Suchen',
     tabFavorites: 'Favoriten',
+    tabCustomers: 'Kunden',
+    customersTitle: 'Kunden',
     tabTherapy: 'Therapie',
     tabNotifications: 'Mitteilungen',
     tabTherapist: 'Profil',

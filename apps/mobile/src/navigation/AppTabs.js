@@ -5,6 +5,7 @@ import { ROOT_ROUTES, TAB_ROUTES } from './route-names';
 import { DiscoverTabScreen } from '../screens/discover/DiscoverScreen';
 import { TherapyTabScreen } from '../screens/therapy/TherapyScreen';
 import { FavoritesTabScreen } from '../screens/favorites/FavoritesScreen';
+import { CustomersTabScreen } from '../screens/customers/CustomersScreen';
 import { NotificationsTabScreen } from '../screens/notifications/NotificationsScreen';
 import { OptionsTabScreen } from '../screens/options/OptionsScreen';
 import { ProfileTabScreen } from '../screens/profile/ProfileScreen';
@@ -63,14 +64,15 @@ function AuthTabScreen({ navigation }) {
 
 export function AppTabs() {
   const t = translations.de;
-  const { authToken } = useAuth();
+  const { authToken, accountType } = useAuth();
   const { notifications, dismissedNotifIds } = useNotifications();
   const isLoggedIn = Boolean(authToken);
+  const isTherapist = accountType === 'therapist';
   const unreadNotifications = notifications.filter((n) => !dismissedNotifIds.has(n.id)).length;
 
   return (
     <Tab.Navigator
-      key={isLoggedIn ? 'signed-in-tabs' : 'guest-tabs'}
+      key={!isLoggedIn ? 'guest-tabs' : isTherapist ? 'signed-in-therapist-tabs' : 'signed-in-patient-tabs'}
       tabBar={(props) => (
         <CustomTabBar
           {...props}
@@ -86,11 +88,19 @@ export function AppTabs() {
       />
       {isLoggedIn ? (
         <>
-          <Tab.Screen
-            component={FavoritesStack}
-            name={TAB_ROUTES.FAVORITES}
-            options={{ title: t[TAB_TRANSLATION_KEYS[TAB_ROUTES.FAVORITES]] }}
-          />
+          {isTherapist ? (
+            <Tab.Screen
+              component={CustomersTabScreen}
+              name={TAB_ROUTES.CUSTOMERS}
+              options={{ title: t[TAB_TRANSLATION_KEYS[TAB_ROUTES.CUSTOMERS]] }}
+            />
+          ) : (
+            <Tab.Screen
+              component={FavoritesStack}
+              name={TAB_ROUTES.FAVORITES}
+              options={{ title: t[TAB_TRANSLATION_KEYS[TAB_ROUTES.FAVORITES]] }}
+            />
+          )}
           <Tab.Screen
             component={TherapyStack}
             name={TAB_ROUTES.THERAPY}
