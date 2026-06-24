@@ -5,7 +5,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import { getBaseUrl } from '../utils/app-utils';
-import { ROOT_ROUTES, TAB_ROUTES } from '../navigation/route-names';
+import { ROOT_ROUTES } from '../navigation/route-names';
 
 const AVATAR_SIZE = 52;
 const HIT_SLOP = { top: 10, bottom: 10, left: 10, right: 10 };
@@ -30,11 +30,14 @@ function initialsFromName(name) {
  *   c             — COLORS[scheme] theme object (required)
  *   subtitle      — small text under the name, e.g. 'Suche', 'Favoriten'
  *   titleOverride — replaces the auth-derived name, e.g. 'Mein Konto'
- *   onPressAccount — defaults to opening the Options tab
+ *   onPressAccount — defaults to opening the profile screen
+ *   showEdit       — shows the pencil icon; default false (only the
+ *                    Optionen/Settings screen has a contextual reason to
+ *                    offer an edit shortcut from this header)
  *   onPressEdit    — defaults to opening the profile screen
  *   style          — merged onto the outer wrapper (e.g. to add zIndex)
  */
-export function AccountHeader({ c, subtitle, titleOverride, onPressAccount, onPressEdit, style }) {
+export function AccountHeader({ c, subtitle, titleOverride, onPressAccount, showEdit = false, onPressEdit, style }) {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const { loggedInTherapist, loggedInPatient } = useAuth();
@@ -47,7 +50,7 @@ export function AccountHeader({ c, subtitle, titleOverride, onPressAccount, onPr
   const initials = photo ? null : initialsFromName(loggedInTherapist?.fullName || patientName);
 
   const handlePressAccount = onPressAccount
-    ?? (() => navigation.navigate(ROOT_ROUTES.MAIN_TABS, { screen: TAB_ROUTES.OPTIONS }));
+    ?? (() => navigation.navigate(ROOT_ROUTES.PROFILE));
   const handlePressEdit = onPressEdit
     ?? (() => navigation.navigate(ROOT_ROUTES.PROFILE));
 
@@ -69,9 +72,11 @@ export function AccountHeader({ c, subtitle, titleOverride, onPressAccount, onPr
           {subtitle ? <Text style={{ fontSize: 13, color: c.muted, marginTop: 2 }}>{subtitle}</Text> : null}
         </Pressable>
 
-        <Pressable onPress={handlePressEdit} hitSlop={HIT_SLOP} style={{ padding: 4 }}>
-          <Ionicons name="pencil-outline" size={22} color={c.accent ?? c.primary} />
-        </Pressable>
+        {showEdit ? (
+          <Pressable onPress={handlePressEdit} hitSlop={HIT_SLOP} style={{ padding: 4 }}>
+            <Ionicons name="pencil-outline" size={22} color={c.accent ?? c.primary} />
+          </Pressable>
+        ) : null}
       </View>
     </View>
   );

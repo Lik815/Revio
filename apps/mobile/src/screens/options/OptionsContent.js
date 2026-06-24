@@ -1,7 +1,7 @@
 import React from 'react';
-import { Image, Pressable, ScrollView, Switch, Text, View } from 'react-native';
+import { Pressable, ScrollView, Switch, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { SPACE, getBaseUrl } from '../../utils/app-utils';
+import { SPACE } from '../../utils/app-utils';
 import { AccountHeader } from '../../components/AccountHeader';
 
 export function OptionsContent({
@@ -9,7 +9,7 @@ export function OptionsContent({
   themeMode, setThemeMode,
   onShowLogin, onShowRegister,
   onShowFeedback, onShowChangePassword, onDeleteAccount, onLogout,
-  onNavigateToProfile, onShowDebug,
+  onShowDebug,
   c, t, styles,
 }) {
   const [debugTapCount, setDebugTapCount] = React.useState(0);
@@ -63,54 +63,8 @@ const renderOptions = () => {
 
   return (
     <View style={{ flex: 1 }}>
-      <AccountHeader c={c} subtitle={t('optionsSubtitle')} />
+      <AccountHeader c={c} subtitle={t('optionsSubtitle')} showEdit />
       <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 32, paddingTop: SPACE.sm }]} showsVerticalScrollIndicator={false}>
-
-        {/* ── Mein Profil ── */}
-        {loggedInTherapist && (
-          <>
-            <SectionHeader title="Mein Profil" />
-            <OptionGroup>
-              <Pressable onPress={onNavigateToProfile} style={[styles.optionRow, { backgroundColor: c.card, borderColor: 'transparent' }]}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
-                  <View style={{ width: 44, height: 44, borderRadius: 999, backgroundColor: c.mutedBg, overflow: 'hidden', justifyContent: 'center', alignItems: 'center' }}>
-                    {loggedInTherapist.photo
-                      ? <Image source={{ uri: loggedInTherapist.photo.startsWith('http') ? loggedInTherapist.photo : `${getBaseUrl()}${loggedInTherapist.photo}` }} style={{ width: 44, height: 44, borderRadius: 999 }} />
-                      : <Text style={{ fontSize: 18, fontWeight: '700', color: c.muted }}>{(loggedInTherapist.fullName ?? '?')[0].toUpperCase()}</Text>
-                    }
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 15, fontWeight: '600', color: c.text }}>{loggedInTherapist.fullName ?? '—'}</Text>
-                    <Text style={{ fontSize: 12, color: loggedInTherapist.isVisible && loggedInTherapist.reviewStatus === 'APPROVED' ? c.success : c.muted }}>
-                      {loggedInTherapist.isVisible && loggedInTherapist.reviewStatus === 'APPROVED' ? t('publiclyVisible') : t('notYetPublic')}
-                    </Text>
-                  </View>
-                </View>
-                <Ionicons name="chevron-forward" size={18} color={c.muted} />
-              </Pressable>
-            </OptionGroup>
-          </>
-        )}
-
-        {loggedInPatient && (
-          <>
-            <SectionHeader title="Mein Profil" />
-            <OptionGroup>
-              <Pressable onPress={onNavigateToProfile} style={[styles.optionRow, { backgroundColor: c.card, borderColor: 'transparent' }]}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
-                  <View style={{ width: 44, height: 44, borderRadius: 999, backgroundColor: c.primary, alignItems: 'center', justifyContent: 'center' }}>
-                    <Text style={{ fontSize: 16, fontWeight: '700', color: '#fff' }}>{((loggedInPatient.firstName?.[0] ?? '') + (loggedInPatient.lastName?.[0] ?? '')).toUpperCase() || '?'}</Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 15, fontWeight: '600', color: c.text }}>{loggedInPatient.firstName} {loggedInPatient.lastName}</Text>
-                    <Text style={{ fontSize: 12, color: c.muted }}>{t('patientRoleLabel')}</Text>
-                  </View>
-                </View>
-                <Ionicons name="chevron-forward" size={18} color={c.muted} />
-              </Pressable>
-            </OptionGroup>
-          </>
-        )}
 
         {/* ── App-Einstellungen ── */}
         <SectionHeader title="App-Einstellungen" />

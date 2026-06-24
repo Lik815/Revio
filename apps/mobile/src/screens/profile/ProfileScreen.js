@@ -96,7 +96,7 @@ export function ProfileTabScreen() {
     return (
       <>
         <View style={{ flex: 1 }}>
-          <TabHeader c={c} title="Mein Profil" />
+          <TabHeader c={c} title="Mein Profil" showLogo={false} />
           <PatientDashboardScreen
             c={c} t={t} styles={appStyles}
             loggedInPatient={loggedInPatient}
@@ -129,7 +129,7 @@ export function ProfileTabScreen() {
     return (
       <>
         <View style={{ flex: 1 }}>
-          <TabHeader c={c} title="Mein Profil" />
+          <TabHeader c={c} title="Mein Profil" showLogo={false} />
           <TherapistDashboardScreen
             c={c} t={t} styles={appStyles}
             certificationOptions={certificationOptions}

@@ -47,10 +47,6 @@ export function OptionsTabScreen() {
     showLoginTab(navigation);
   };
 
-  const handleNavigateToProfile = () => {
-    navigation.navigate(ROOT_ROUTES.PROFILE);
-  };
-
   return (
     <>
       <OptionsContent
@@ -64,7 +60,6 @@ export function OptionsTabScreen() {
         onShowChangePassword={() => setShowChangePassword(true)}
         onDeleteAccount={() => setShowDeleteAccount(true)}
         onLogout={handleLogout}
-        onNavigateToProfile={handleNavigateToProfile}
         onShowDebug={() => setShowDebug(true)}
         c={c}
         t={t}

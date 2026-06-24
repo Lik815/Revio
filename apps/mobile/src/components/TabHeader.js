@@ -32,13 +32,14 @@ const styles = {
  *   title          — screen title string; omit for wordmark-only mode
  *   sub            — optional subtitle string below title
  *   wordmark       — if true, renders "evio" wordmark instead of title
+ *   showLogo       — if false, omits the logo mark; default true
  */
-export function TabHeader({ c, title, sub, wordmark = false }) {
+export function TabHeader({ c, title, sub, wordmark = false, showLogo = true }) {
   const insets = useSafeAreaInsets();
   return (
     <View style={[styles.wrapper, { backgroundColor: c.background, paddingTop: insets.top + 8 }]}>
       <View style={styles.row}>
-        <Image source={require('../../assets/icon.png')} style={styles.logoMark} />
+        {showLogo ? <Image source={require('../../assets/icon.png')} style={styles.logoMark} /> : null}
 
         {wordmark ? (
           <Text style={[styles.wordmark, { color: c.text }]}>evio</Text>
