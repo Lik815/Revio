@@ -7,7 +7,7 @@ import { MAX_SLOTS as SERIES_MAX_SLOTS, SeriesSlotComposer } from '../components
 
 export function SlotComposerModal({ visible, onClose, onAddSlot, onAddSlots, error, c }) {
   const [mode, setMode] = useState('single');
-  const [seriesState, setSeriesState] = useState({ canSubmit: false, count: 0, overLimit: false });
+  const [seriesState, setSeriesState] = useState({ canSubmit: false, count: 0, overLimit: false, ctaLabel: 'Serie anlegen' });
   const seriesRef = useRef(null);
 
   useEffect(() => {
@@ -51,7 +51,7 @@ export function SlotComposerModal({ visible, onClose, onAddSlot, onAddSlots, err
             </View>
           )}
 
-          <ScrollView style={{ maxHeight: '65%' }} contentContainerStyle={{ paddingHorizontal: 20 }} showsVerticalScrollIndicator={false}>
+          <ScrollView style={{ maxHeight: '72%' }} contentContainerStyle={{ paddingHorizontal: 20 }} showsVerticalScrollIndicator={false}>
             {mode === 'single' ? (
               <TherapistSlotComposer c={c} onAddSlot={onAddSlot} />
             ) : (
@@ -60,19 +60,9 @@ export function SlotComposerModal({ visible, onClose, onAddSlot, onAddSlots, err
           </ScrollView>
 
           {mode === 'series' && (
-            <View style={{ paddingHorizontal: 20, paddingTop: 12, gap: 10 }}>
-              <View style={{ backgroundColor: c.primaryBg, borderRadius: RADIUS.sm, padding: 10, alignItems: 'center' }}>
-                <Text style={{ fontSize: 13, fontWeight: '600', color: c.primary }}>
-                  {seriesState.count === 0
-                    ? 'Keine Termine in diesem Zeitraum'
-                    : seriesState.count === 1
-                    ? '1 Termin wird angelegt'
-                    : `${seriesState.count} Termine werden angelegt`}
-                </Text>
-              </View>
-
+            <View style={{ paddingHorizontal: 20, paddingTop: 10, gap: 8 }}>
               {seriesState.overLimit ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: c.errorBg ?? '#FEF2F2', borderRadius: RADIUS.sm, padding: 10 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: c.errorBg ?? '#FEF2F2', borderRadius: RADIUS.sm, padding: 8 }}>
                   <Ionicons name="alert-circle-outline" size={14} color={c.error} />
                   <Text style={{ fontSize: 12, color: c.error, flex: 1 }}>Maximal {SERIES_MAX_SLOTS} Termine pro Serie — bitte Zeitraum eingrenzen.</Text>
                 </View>
@@ -84,7 +74,7 @@ export function SlotComposerModal({ visible, onClose, onAddSlot, onAddSlots, err
                 style={{ backgroundColor: seriesState.canSubmit ? c.primary : c.border, borderRadius: RADIUS.sm, paddingVertical: 12, alignItems: 'center' }}
               >
                 <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600' }}>
-                  {seriesState.canSubmit ? `Serie anlegen · ${seriesState.count} Termine` : 'Serie anlegen'}
+                  {seriesState.ctaLabel}
                 </Text>
               </Pressable>
             </View>

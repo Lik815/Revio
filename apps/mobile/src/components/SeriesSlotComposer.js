@@ -24,6 +24,12 @@ const INTERVAL_PRESETS = [1, 2, 3, 4];
 const TAKT_PRESETS = [15, 20, 30, 40, 45, 60];
 export const MAX_SLOTS = 200;
 
+function startOfToday() {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
 // Inclusive of both ends: if intervalMin divides evenly into the range, a
 // time exactly at `to` is included (matches how Dauer is already treated
 // elsewhere in this component — no slot-must-end-before-closing rule exists).
@@ -147,7 +153,7 @@ function SingleTimePickerModal({ visible, onClose, c, selected, onSelect }) {
 }
 
 export const SeriesSlotComposer = forwardRef(function SeriesSlotComposer({ c, onAddSlots, onStateChange }, ref) {
-  const [startDate, setStartDate] = useState(null);
+  const [startDate, setStartDate] = useState(() => startOfToday());
   const [endMode, setEndMode] = useState('weeks');
   const [endDate, setEndDate] = useState(null);
   const [weeksCount, setWeeksCount] = useState(4);
@@ -213,8 +219,16 @@ export const SeriesSlotComposer = forwardRef(function SeriesSlotComposer({ c, on
 
   const count = generatedSlots.length;
   const overLimit = count > MAX_SLOTS;
-  const canSubmit = !!startDate && !!resolvedEndDate && selectedWeekdays.length > 0
-    && selectedTimes.length > 0 && count > 0 && !overLimit;
+  const hasSelections = selectedWeekdays.length > 0 && selectedTimes.length > 0;
+  const canSubmit = !!startDate && !!resolvedEndDate && hasSelections && count > 0 && !overLimit;
+
+  const ctaLabel = !hasSelections
+    ? 'Serie anlegen'
+    : count === 0
+      ? 'Keine Termine in diesem Zeitraum'
+      : count === 1
+        ? '1 neuen Termin anlegen'
+        : `${count} neue Termine anlegen`;
 
   const handleSubmit = () => {
     if (!canSubmit) return;
@@ -224,16 +238,16 @@ export const SeriesSlotComposer = forwardRef(function SeriesSlotComposer({ c, on
   useImperativeHandle(ref, () => ({ submit: handleSubmit }), [handleSubmit]);
 
   useEffect(() => {
-    onStateChange?.({ canSubmit, count, overLimit });
-  }, [canSubmit, count, overLimit]);
+    onStateChange?.({ canSubmit, count, overLimit, ctaLabel });
+  }, [canSubmit, count, overLimit, ctaLabel]);
 
   return (
-    <View style={{ gap: 16 }}>
-      <View style={{ gap: 10 }}>
+    <View style={{ gap: 12 }}>
+      <View style={{ gap: 8 }}>
         <Text style={{ fontSize: 11, fontWeight: '700', color: c.muted, letterSpacing: 0.5 }}>STARTDATUM</Text>
         <Pressable
           onPress={() => setShowStartPicker(true)}
-          style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: c.mutedBg, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: startDate ? c.primary : c.border, paddingHorizontal: 12, paddingVertical: 10 }}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: c.mutedBg, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: startDate ? c.primary : c.border, paddingHorizontal: 12, paddingVertical: 9 }}
         >
           <Ionicons name="calendar-outline" size={16} color={startDate ? c.primary : c.muted} />
           <Text style={{ fontSize: 14, color: startDate ? c.text : c.muted, flex: 1 }}>{formatSlotDate(startDate)}</Text>
@@ -241,7 +255,7 @@ export const SeriesSlotComposer = forwardRef(function SeriesSlotComposer({ c, on
         </Pressable>
       </View>
 
-      <View style={{ gap: 10 }}>
+      <View style={{ gap: 8 }}>
         <Text style={{ fontSize: 11, fontWeight: '700', color: c.muted, letterSpacing: 0.5 }}>ENDE</Text>
         <View style={{ flexDirection: 'row', backgroundColor: c.card, borderRadius: RADIUS.full, borderWidth: 1, borderColor: c.border, padding: 4 }}>
           {[{ key: 'weeks', label: 'Anzahl Wochen' }, { key: 'date', label: 'Enddatum' }].map(({ key, label }) => {
@@ -250,7 +264,7 @@ export const SeriesSlotComposer = forwardRef(function SeriesSlotComposer({ c, on
               <Pressable
                 key={key}
                 onPress={() => setEndMode(key)}
-                style={{ flex: 1, borderRadius: RADIUS.full, paddingVertical: 10, alignItems: 'center', backgroundColor: active ? c.primary : 'transparent' }}
+                style={{ flex: 1, borderRadius: RADIUS.full, paddingVertical: 8, alignItems: 'center', backgroundColor: active ? c.primary : 'transparent' }}
               >
                 <Text style={{ fontSize: 13, fontWeight: active ? '700' : '500', color: active ? '#fff' : c.muted }}>{label}</Text>
               </Pressable>
@@ -266,7 +280,7 @@ export const SeriesSlotComposer = forwardRef(function SeriesSlotComposer({ c, on
                 <Pressable
                   key={w}
                   onPress={() => setWeeksCount(w)}
-                  style={{ flex: 1, paddingVertical: 8, borderRadius: RADIUS.sm, alignItems: 'center', borderWidth: 1.5, borderColor: active ? c.primary : c.border, backgroundColor: active ? c.primaryBg : c.mutedBg }}
+                  style={{ flex: 1, paddingVertical: 7, borderRadius: RADIUS.sm, alignItems: 'center', borderWidth: 1.5, borderColor: active ? c.primary : c.border, backgroundColor: active ? c.primaryBg : c.mutedBg }}
                 >
                   <Text style={{ fontSize: 13, fontWeight: active ? '700' : '400', color: active ? c.primary : c.muted }}>{w} Wo.</Text>
                 </Pressable>
@@ -276,7 +290,7 @@ export const SeriesSlotComposer = forwardRef(function SeriesSlotComposer({ c, on
         ) : (
           <Pressable
             onPress={() => setShowEndPicker(true)}
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: c.mutedBg, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: endDate ? c.primary : c.border, paddingHorizontal: 12, paddingVertical: 10 }}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: c.mutedBg, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: endDate ? c.primary : c.border, paddingHorizontal: 12, paddingVertical: 9 }}
           >
             <Ionicons name="calendar-outline" size={16} color={endDate ? c.primary : c.muted} />
             <Text style={{ fontSize: 14, color: endDate ? c.text : c.muted, flex: 1 }}>{formatSlotDate(endDate)}</Text>
@@ -285,25 +299,43 @@ export const SeriesSlotComposer = forwardRef(function SeriesSlotComposer({ c, on
         )}
       </View>
 
-      <View style={{ gap: 10 }}>
-        <Text style={{ fontSize: 11, fontWeight: '700', color: c.muted, letterSpacing: 0.5 }}>WOCHENTAGE</Text>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-          {WEEKDAY_OPTIONS.map(({ key, label }) => {
-            const active = selectedWeekdays.includes(key);
+      <View style={{ gap: 8 }}>
+        <Text style={{ fontSize: 11, fontWeight: '700', color: c.muted, letterSpacing: 0.5 }}>DAUER</Text>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          {SLOT_DURATIONS.map((dur) => {
+            const active = duration === dur;
             return (
               <Pressable
-                key={key}
-                onPress={() => toggleWeekday(key)}
-                style={{ paddingVertical: 8, paddingHorizontal: 14, borderRadius: RADIUS.sm, alignItems: 'center', borderWidth: 1.5, borderColor: active ? c.primary : c.border, backgroundColor: active ? c.primaryBg : c.mutedBg }}
+                key={dur}
+                onPress={() => setDuration(dur)}
+                style={{ flex: 1, paddingVertical: 7, borderRadius: RADIUS.sm, alignItems: 'center', borderWidth: 1.5, borderColor: active ? c.primary : c.border, backgroundColor: active ? c.primaryBg : c.mutedBg }}
               >
-                <Text style={{ fontSize: 13, fontWeight: active ? '700' : '400', color: active ? c.primary : c.muted }}>{label}</Text>
+                <Text style={{ fontSize: 13, fontWeight: active ? '700' : '400', color: active ? c.primary : c.muted }}>{dur}'</Text>
               </Pressable>
             );
           })}
         </View>
       </View>
 
-      <View style={{ gap: 10 }}>
+      <View style={{ gap: 8 }}>
+        <Text style={{ fontSize: 11, fontWeight: '700', color: c.muted, letterSpacing: 0.5 }}>WOCHENTAGE</Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'nowrap', gap: 6 }}>
+          {WEEKDAY_OPTIONS.map(({ key, label }) => {
+            const active = selectedWeekdays.includes(key);
+            return (
+              <Pressable
+                key={key}
+                onPress={() => toggleWeekday(key)}
+                style={{ flex: 1, paddingVertical: 8, borderRadius: RADIUS.sm, alignItems: 'center', borderWidth: 1.5, borderColor: active ? c.primary : c.border, backgroundColor: active ? c.primaryBg : c.mutedBg }}
+              >
+                <Text style={{ fontSize: 12, fontWeight: active ? '700' : '400', color: active ? c.primary : c.muted }}>{label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+
+      <View style={{ gap: 8 }}>
         <Text style={{ fontSize: 11, fontWeight: '700', color: c.muted, letterSpacing: 0.5 }}>UHRZEITEN</Text>
 
         <View style={{ flexDirection: 'row', backgroundColor: c.card, borderRadius: RADIUS.full, borderWidth: 1, borderColor: c.border, padding: 4 }}>
@@ -313,7 +345,7 @@ export const SeriesSlotComposer = forwardRef(function SeriesSlotComposer({ c, on
               <Pressable
                 key={key}
                 onPress={() => setTimesMode(key)}
-                style={{ flex: 1, borderRadius: RADIUS.full, paddingVertical: 10, alignItems: 'center', backgroundColor: active ? c.primary : 'transparent' }}
+                style={{ flex: 1, borderRadius: RADIUS.full, paddingVertical: 8, alignItems: 'center', backgroundColor: active ? c.primary : 'transparent' }}
               >
                 <Text style={{ fontSize: 13, fontWeight: active ? '700' : '500', color: active ? '#fff' : c.muted }}>{label}</Text>
               </Pressable>
@@ -327,7 +359,7 @@ export const SeriesSlotComposer = forwardRef(function SeriesSlotComposer({ c, on
               <Pressable
                 key={`${t.hour}-${t.minute}`}
                 onPress={() => toggleTime(t.hour, t.minute)}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, paddingHorizontal: 12, borderRadius: RADIUS.sm, borderWidth: 1.5, borderColor: c.primary, backgroundColor: c.primaryBg }}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 7, paddingHorizontal: 12, borderRadius: RADIUS.sm, borderWidth: 1.5, borderColor: c.primary, backgroundColor: c.primaryBg }}
               >
                 <Text style={{ fontSize: 13, fontWeight: '600', color: c.primary }}>{formatSlotTime(t.hour, t.minute)}</Text>
                 <Ionicons name="close" size={14} color={c.primary} />
@@ -339,17 +371,17 @@ export const SeriesSlotComposer = forwardRef(function SeriesSlotComposer({ c, on
         {timesMode === 'einzeln' ? (
           <Pressable
             onPress={() => setShowTimePicker(true)}
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, paddingHorizontal: 12, borderRadius: RADIUS.sm, borderWidth: 1.5, borderColor: c.border, backgroundColor: c.mutedBg, alignSelf: 'flex-start' }}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 7, paddingHorizontal: 12, borderRadius: RADIUS.sm, borderWidth: 1.5, borderColor: c.border, backgroundColor: c.mutedBg, alignSelf: 'flex-start' }}
           >
             <Ionicons name="add" size={14} color={c.muted} />
             <Text style={{ fontSize: 13, color: c.muted }}>Uhrzeit hinzufügen</Text>
           </Pressable>
         ) : (
-          <View style={{ gap: 10 }}>
+          <View style={{ gap: 8 }}>
             <View style={{ flexDirection: 'row', gap: 8 }}>
               <Pressable
                 onPress={() => setShowBlockFromPicker(true)}
-                style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: c.mutedBg, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: blockFrom ? c.primary : c.border, paddingHorizontal: 12, paddingVertical: 10 }}
+                style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: c.mutedBg, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: blockFrom ? c.primary : c.border, paddingHorizontal: 12, paddingVertical: 9 }}
               >
                 <Text style={{ fontSize: 11, color: c.muted }}>Von</Text>
                 <Text style={{ fontSize: 14, color: blockFrom ? c.text : c.muted, flex: 1 }}>
@@ -358,7 +390,7 @@ export const SeriesSlotComposer = forwardRef(function SeriesSlotComposer({ c, on
               </Pressable>
               <Pressable
                 onPress={() => setShowBlockToPicker(true)}
-                style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: c.mutedBg, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: blockTo ? c.primary : c.border, paddingHorizontal: 12, paddingVertical: 10 }}
+                style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: c.mutedBg, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: blockTo ? c.primary : c.border, paddingHorizontal: 12, paddingVertical: 9 }}
               >
                 <Text style={{ fontSize: 11, color: c.muted }}>Bis</Text>
                 <Text style={{ fontSize: 14, color: blockTo ? c.text : c.muted, flex: 1 }}>
@@ -375,7 +407,7 @@ export const SeriesSlotComposer = forwardRef(function SeriesSlotComposer({ c, on
                   <Pressable
                     key={mins}
                     onPress={() => setBlockInterval(mins)}
-                    style={{ paddingVertical: 8, paddingHorizontal: 14, borderRadius: RADIUS.sm, alignItems: 'center', borderWidth: 1.5, borderColor: active ? c.primary : c.border, backgroundColor: active ? c.primaryBg : c.mutedBg }}
+                    style={{ paddingVertical: 7, paddingHorizontal: 14, borderRadius: RADIUS.sm, alignItems: 'center', borderWidth: 1.5, borderColor: active ? c.primary : c.border, backgroundColor: active ? c.primaryBg : c.mutedBg }}
                   >
                     <Text style={{ fontSize: 13, fontWeight: active ? '700' : '400', color: active ? c.primary : c.muted }}>{mins} Min.</Text>
                   </Pressable>
@@ -390,7 +422,7 @@ export const SeriesSlotComposer = forwardRef(function SeriesSlotComposer({ c, on
             <Pressable
               onPress={handleApplyBlock}
               disabled={blockTimes.length === 0}
-              style={{ paddingVertical: 10, borderRadius: RADIUS.sm, alignItems: 'center', backgroundColor: blockTimes.length > 0 ? c.primary : c.border }}
+              style={{ paddingVertical: 9, borderRadius: RADIUS.sm, alignItems: 'center', backgroundColor: blockTimes.length > 0 ? c.primary : c.border }}
             >
               <Text style={{ fontSize: 13, fontWeight: '600', color: '#fff' }}>
                 {blockTimes.length > 0
@@ -402,25 +434,7 @@ export const SeriesSlotComposer = forwardRef(function SeriesSlotComposer({ c, on
         )}
       </View>
 
-      <View style={{ gap: 10 }}>
-        <Text style={{ fontSize: 11, fontWeight: '700', color: c.muted, letterSpacing: 0.5 }}>DAUER</Text>
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          {SLOT_DURATIONS.map((dur) => {
-            const active = duration === dur;
-            return (
-              <Pressable
-                key={dur}
-                onPress={() => setDuration(dur)}
-                style={{ flex: 1, paddingVertical: 8, borderRadius: RADIUS.sm, alignItems: 'center', borderWidth: 1.5, borderColor: active ? c.primary : c.border, backgroundColor: active ? c.primaryBg : c.mutedBg }}
-              >
-                <Text style={{ fontSize: 13, fontWeight: active ? '700' : '400', color: active ? c.primary : c.muted }}>{dur}'</Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      </View>
-
-      <View style={{ gap: 10 }}>
+      <View style={{ gap: 8 }}>
         <Text style={{ fontSize: 11, fontWeight: '700', color: c.muted, letterSpacing: 0.5 }}>WIEDERHOLUNG</Text>
         <View style={{ flexDirection: 'row', gap: 8 }}>
           {INTERVAL_PRESETS.map((n) => {
@@ -429,7 +443,7 @@ export const SeriesSlotComposer = forwardRef(function SeriesSlotComposer({ c, on
               <Pressable
                 key={n}
                 onPress={() => setIntervalWeeks(n)}
-                style={{ flex: 1, paddingVertical: 8, borderRadius: RADIUS.sm, alignItems: 'center', borderWidth: 1.5, borderColor: active ? c.primary : c.border, backgroundColor: active ? c.primaryBg : c.mutedBg }}
+                style={{ flex: 1, paddingVertical: 7, borderRadius: RADIUS.sm, alignItems: 'center', borderWidth: 1.5, borderColor: active ? c.primary : c.border, backgroundColor: active ? c.primaryBg : c.mutedBg }}
               >
                 <Text style={{ fontSize: 13, fontWeight: active ? '700' : '400', color: active ? c.primary : c.muted }}>
                   {n === 1 ? 'Jede Woche' : `Alle ${n} Wo.`}
@@ -439,7 +453,6 @@ export const SeriesSlotComposer = forwardRef(function SeriesSlotComposer({ c, on
           })}
         </View>
       </View>
-
 
       <CalendarPickerModal
         visible={showStartPicker}

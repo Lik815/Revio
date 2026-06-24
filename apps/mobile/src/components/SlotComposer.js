@@ -195,31 +195,7 @@ export function TherapistSlotComposer({ c, onAddSlot }) {
 
   return (
     <>
-      <View style={{ marginBottom: 16, gap: 10 }}>
-        <View>
-          <Text style={{ fontSize: 11, fontWeight: '700', color: c.muted, letterSpacing: 0.5, marginBottom: 4 }}>DATUM</Text>
-          <Pressable
-            onPress={() => setShowDatePicker(true)}
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: c.mutedBg, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: slotPickerDate ? c.primary : c.border, paddingHorizontal: 12, paddingVertical: 10 }}
-          >
-            <Ionicons name="calendar-outline" size={16} color={slotPickerDate ? c.primary : c.muted} />
-            <Text style={{ fontSize: 14, color: slotPickerDate ? c.text : c.muted, flex: 1 }}>{formatSlotDate(slotPickerDate)}</Text>
-            {slotPickerDate ? <Ionicons name="checkmark-circle" size={16} color={c.primary} /> : null}
-          </Pressable>
-        </View>
-
-        <View>
-          <Text style={{ fontSize: 11, fontWeight: '700', color: c.muted, letterSpacing: 0.5, marginBottom: 4 }}>UHRZEIT</Text>
-          <Pressable
-            onPress={handleShowTimePicker}
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: c.mutedBg, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: slotPickerHour !== null ? c.primary : c.border, paddingHorizontal: 12, paddingVertical: 10 }}
-          >
-            <Ionicons name="time-outline" size={16} color={slotPickerHour !== null ? c.primary : c.muted} />
-            <Text style={{ fontSize: 14, color: slotPickerHour !== null ? c.text : c.muted, flex: 1 }}>{formatSlotTime(slotPickerHour, slotPickerMinute)}</Text>
-            {slotPickerHour !== null ? <Ionicons name="checkmark-circle" size={16} color={c.primary} /> : null}
-          </Pressable>
-        </View>
-
+      <View style={{ marginBottom: 16, gap: 8 }}>
         <View>
           <Text style={{ fontSize: 11, fontWeight: '700', color: c.muted, letterSpacing: 0.5, marginBottom: 4 }}>DAUER</Text>
           <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -236,6 +212,30 @@ export function TherapistSlotComposer({ c, onAddSlot }) {
               );
             })}
           </View>
+        </View>
+
+        <View>
+          <Text style={{ fontSize: 11, fontWeight: '700', color: c.muted, letterSpacing: 0.5, marginBottom: 4 }}>DATUM</Text>
+          <Pressable
+            onPress={() => setShowDatePicker(true)}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: c.mutedBg, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: slotPickerDate ? c.primary : c.border, paddingHorizontal: 12, paddingVertical: 9 }}
+          >
+            <Ionicons name="calendar-outline" size={16} color={slotPickerDate ? c.primary : c.muted} />
+            <Text style={{ fontSize: 14, color: slotPickerDate ? c.text : c.muted, flex: 1 }}>{formatSlotDate(slotPickerDate)}</Text>
+            {slotPickerDate ? <Ionicons name="checkmark-circle" size={16} color={c.primary} /> : null}
+          </Pressable>
+        </View>
+
+        <View>
+          <Text style={{ fontSize: 11, fontWeight: '700', color: c.muted, letterSpacing: 0.5, marginBottom: 4 }}>UHRZEIT</Text>
+          <Pressable
+            onPress={handleShowTimePicker}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: c.mutedBg, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: slotPickerHour !== null ? c.primary : c.border, paddingHorizontal: 12, paddingVertical: 9 }}
+          >
+            <Ionicons name="time-outline" size={16} color={slotPickerHour !== null ? c.primary : c.muted} />
+            <Text style={{ fontSize: 14, color: slotPickerHour !== null ? c.text : c.muted, flex: 1 }}>{formatSlotTime(slotPickerHour, slotPickerMinute)}</Text>
+            {slotPickerHour !== null ? <Ionicons name="checkmark-circle" size={16} color={c.primary} /> : null}
+          </Pressable>
         </View>
 
         {slotPickerDate !== null && slotPickerHour !== null && slotIsInFuture === null ? (
