@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { appStoreSelectors, useAppStore } from '../../store/useStore';
 import { useTheme } from '../../hooks/use-theme';
@@ -12,7 +13,6 @@ import { translations } from '../../i18n/translations';
 import { ROOT_ROUTES, TAB_ROUTES } from '../../navigation/route-names';
 import { getBaseUrl, TUNNEL_HEADERS } from '../../utils/app-utils';
 import { useConfigOptions } from '../../hooks/use-config-options';
-import { TabHeader } from '../../components/TabHeader';
 import { ToastOverlay } from '../../components/ToastOverlay';
 import { ProfileSavedModal } from '../../modals/ProfileSavedModal';
 import { ReviewNotificationModal } from '../../modals/ReviewNotificationModal';
@@ -26,6 +26,7 @@ const t = (key) => translations.de[key] ?? key;
 
 export function ProfileTabScreen() {
   const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
 
   const authToken = useAppStore(appStoreSelectors.authToken);
   const accountType = useAppStore(appStoreSelectors.accountType);
@@ -96,7 +97,7 @@ export function ProfileTabScreen() {
     return (
       <>
         <View style={{ flex: 1 }}>
-          <TabHeader c={c} title="Mein Profil" showLogo={false} />
+          <View style={{ paddingTop: insets.top, backgroundColor: c.background }} />
           <PatientDashboardScreen
             c={c} t={t} styles={appStyles}
             loggedInPatient={loggedInPatient}
@@ -129,7 +130,7 @@ export function ProfileTabScreen() {
     return (
       <>
         <View style={{ flex: 1 }}>
-          <TabHeader c={c} title="Mein Profil" showLogo={false} />
+          <View style={{ paddingTop: insets.top, backgroundColor: c.background }} />
           <TherapistDashboardScreen
             c={c} t={t} styles={appStyles}
             certificationOptions={certificationOptions}
