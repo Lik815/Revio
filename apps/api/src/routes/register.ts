@@ -277,7 +277,7 @@ export const registerRoutes: FastifyPluginAsync = async (fastify) => {
           email: data.email,
           userId: user.id,
           fullName,
-          professionalTitle: 'Physiotherapeut/in',
+          professionalTitle: 'Physiotherapeut',
           city: data.city ?? '',
           postalCode: data.postalCode ?? null,
           street: data.street ?? null,

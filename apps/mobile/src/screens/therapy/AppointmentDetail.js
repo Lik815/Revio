@@ -23,8 +23,8 @@ export function AppointmentDetail({
   const durationMin = appointment?.slot?.durationMin ?? 20;
   const badge = STATUS_COLORS[appointment?.status] ?? STATUS_COLORS.EXPIRED;
   const therapist = appointment?.therapist ?? null;
-  const therapistName = therapist?.fullName ?? 'Therapeut:in';
-  const therapistTitle = therapist?.professionalTitle ?? 'Physiotherapeut:in';
+  const therapistName = therapist?.fullName ?? 'Therapeut';
+  const therapistTitle = therapist?.professionalTitle ?? 'Physiotherapeut';
   const therapistPhoto = resolveMediaUrl(therapist?.photo);
   const hasMessage = typeof appointment?.message === 'string' && appointment.message.trim().length > 0;
   const isActive = appointment?.status === 'PENDING' || appointment?.status === 'CONFIRMED';
