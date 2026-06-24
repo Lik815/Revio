@@ -52,27 +52,21 @@ export const STATUS_COLORS = {
 
 // ─── PatientNextAppointmentCard ────────────────────────────────────────────────
 
-function PatientStatsRow({ c, kommend, vergangen, onSelectKommend, onSelectVergangen }) {
+function PatientStatsRow({ c, kommend, vergangen }) {
   return (
     <View style={{ flexDirection: 'row' }}>
-      <Pressable
-        onPress={onSelectKommend}
-        style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, paddingRight: 14, borderRightWidth: 1, borderRightColor: c.border }}
-      >
+      <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, paddingRight: 14, borderRightWidth: 1, borderRightColor: c.border }}>
         <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: c.successBg ?? '#EAF4F1', alignItems: 'center', justifyContent: 'center' }}>
           <Text style={{ fontSize: 14, fontWeight: '800', color: c.success ?? '#5A9E8E' }}>{kommend}</Text>
         </View>
         <Text style={{ fontSize: 13, fontWeight: '600', color: c.text }}>Kommend</Text>
-      </Pressable>
-      <Pressable
-        onPress={onSelectVergangen}
-        style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, paddingLeft: 14 }}
-      >
+      </View>
+      <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, paddingLeft: 14 }}>
         <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: c.mutedBg ?? '#EDF2F4', alignItems: 'center', justifyContent: 'center' }}>
           <Text style={{ fontSize: 14, fontWeight: '800', color: c.muted }}>{vergangen}</Text>
         </View>
         <Text style={{ fontSize: 13, fontWeight: '600', color: c.text }}>Vergangen</Text>
-      </Pressable>
+      </View>
     </View>
   );
 }
@@ -84,24 +78,16 @@ export function PatientNextAppointmentCard({
   vergangenCount,
   onOpenDetail,
   onViewTherapist,
-  onSelectKommend,
-  onSelectVergangen,
 }) {
   const slotDate = appointment ? (appointment.slot?.startsAt ?? appointment.confirmedSlotAt ?? null) : null;
 
   if (!appointment || !slotDate) {
     return (
-      <View style={{ backgroundColor: c.card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: c.border, padding: SPACE.lg, marginBottom: SPACE.md }}>
+      <View style={{ backgroundColor: c.card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: c.border, padding: SPACE.lg, marginBottom: SPACE.md, ...SHADOW.card }}>
         <Text style={{ fontSize: 11, fontWeight: '600', color: c.muted, textTransform: 'uppercase', letterSpacing: 0.4 }}>Nächster Termin</Text>
         <Text style={{ fontSize: 16, fontWeight: '700', color: c.text, marginTop: 6 }}>Kein bevorstehender Termin</Text>
         <View style={{ height: 1, backgroundColor: c.border, marginVertical: 14 }} />
-        <PatientStatsRow
-          c={c}
-          kommend={kommendCount}
-          vergangen={vergangenCount}
-          onSelectKommend={onSelectKommend}
-          onSelectVergangen={onSelectVergangen}
-        />
+        <PatientStatsRow c={c} kommend={kommendCount} vergangen={vergangenCount} />
       </View>
     );
   }
@@ -128,7 +114,7 @@ export function PatientNextAppointmentCard({
   }
 
   return (
-    <View style={{ backgroundColor: c.card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: c.border, padding: SPACE.lg, marginBottom: SPACE.md }}>
+    <View style={{ backgroundColor: c.card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: c.border, padding: SPACE.lg, marginBottom: SPACE.md, ...SHADOW.card }}>
       <Pressable onPress={onOpenDetail} style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
         <Pressable onPress={onViewTherapist} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
           <TherapistAvatar therapist={therapist} size={56} c={c} />
@@ -136,6 +122,9 @@ export function PatientNextAppointmentCard({
         <View style={{ flex: 1 }}>
           <Text style={{ fontSize: 11, fontWeight: '600', color: c.muted, textTransform: 'uppercase', letterSpacing: 0.4 }}>Nächster Termin</Text>
           <Text style={{ fontSize: 18, fontWeight: '800', color: c.text, marginTop: 2 }}>{dateStr} · {timeStr}</Text>
+          {therapist?.fullName ? (
+            <Text style={{ fontSize: 13, color: c.muted, marginTop: 2 }}>bei {therapist.fullName}</Text>
+          ) : null}
           {countdown && <Text style={{ fontSize: 13, fontWeight: '600', color: c.success ?? '#5A9E8E', marginTop: 2 }}>{countdown}</Text>}
         </View>
         <Ionicons name="chevron-forward" size={18} color={c.muted} />
@@ -143,74 +132,69 @@ export function PatientNextAppointmentCard({
 
       <View style={{ height: 1, backgroundColor: c.border, marginVertical: 14 }} />
 
-      <PatientStatsRow
-        c={c}
-        kommend={kommendCount}
-        vergangen={vergangenCount}
-        onSelectKommend={onSelectKommend}
-        onSelectVergangen={onSelectVergangen}
-      />
+      <PatientStatsRow c={c} kommend={kommendCount} vergangen={vergangenCount} />
     </View>
   );
 }
 
-// ─── PatientAppointmentCard ────────────────────────────────────────────────────
+// ─── PatientAppointmentCard (Timeline-Zeile) ───────────────────────────────────
 
-export const PatientAppointmentCard = React.memo(function PatientAppointmentCard({ c, appointment, onOpenDetail, onViewTherapist, isPast = false }) {
+// Colon-gendered "Therapeut:innen-Login" form lives in STATUS_COLORS too, but
+// "Storniert" there is shared with the therapist-facing booking cards — only
+// override the label for this patient-facing card, not the shared constant.
+const PATIENT_STATUS_LABEL_OVERRIDES = { CANCELLED: 'Abgesagt' };
+
+export const PatientAppointmentCard = React.memo(function PatientAppointmentCard({
+  c, appointment, onOpenDetail, isPast = false, isFirst = false, isLast = false,
+}) {
   const { status, therapist, slot, confirmedSlotAt } = appointment;
   const badge = STATUS_COLORS[status] ?? STATUS_COLORS.EXPIRED;
+  const badgeLabel = PATIENT_STATUS_LABEL_OVERRIDES[status] ?? badge.label;
   const slotDate = slot?.startsAt ?? confirmedSlotAt ?? null;
   const durationMin = slot?.durationMin ?? 20;
   const isActive = (status === 'CONFIRMED' || status === 'PENDING') && !isPast;
-  const accentColor = isActive ? badge.text : c.border;
   const dotColor = isActive ? (c.success ?? '#5A9E8E') : c.muted;
+  const d = slotDate ? new Date(slotDate) : null;
+  const dateStr = d ? d.toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'long' }) : '—';
+  const timeStr = d ? d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : '';
 
   return (
-    <Pressable
-      onPress={onOpenDetail}
-      style={{ flexDirection: 'row', backgroundColor: c.card, borderRadius: RADIUS.md, borderWidth: 1, borderColor: c.border, marginBottom: 8, overflow: 'hidden' }}
-    >
-      {/* Akzentkante */}
-      <View style={{ width: 4, backgroundColor: accentColor }} />
+    <View style={{ flexDirection: 'row', marginBottom: 10, opacity: isPast ? 0.7 : 1 }}>
+      {/* Timeline-Spur */}
+      <View style={{ width: 18, alignItems: 'center' }}>
+        <View style={{ width: 2, flex: 1, backgroundColor: isFirst ? 'transparent' : c.border }} />
+        <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: dotColor, borderWidth: 2, borderColor: c.background }} />
+        <View style={{ width: 2, flex: 1, backgroundColor: isLast ? 'transparent' : c.border }} />
+      </View>
 
-      <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: SPACE.md, paddingVertical: 12 }}>
-        {/* Zeit + Dauer */}
-        <View style={{ minWidth: 60 }}>
-          {slotDate && (
-            <>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: dotColor }} />
-                <Text style={{ fontSize: 16, fontWeight: '800', color: isActive ? c.text : c.muted }}>
-                  {new Date(slotDate).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
-                </Text>
-              </View>
-              <Text style={{ fontSize: 11, color: c.muted, marginTop: 1, marginLeft: 11 }}>{durationMin} Min</Text>
-            </>
-          )}
+      <Pressable
+        onPress={onOpenDetail}
+        style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12, marginLeft: 8, backgroundColor: c.card, borderRadius: RADIUS.md, borderWidth: 1, borderColor: c.border, paddingHorizontal: SPACE.md, paddingVertical: 12 }}
+      >
+        {/* Datum + Zeit + Dauer */}
+        <View style={{ minWidth: 64 }}>
+          <Text style={{ fontSize: 12, fontWeight: '700', color: isActive ? c.text : c.muted }} numberOfLines={1}>{dateStr}</Text>
+          <Text style={{ fontSize: 15, fontWeight: '800', color: isActive ? c.text : c.muted, marginTop: 1 }}>{timeStr}</Text>
+          <Text style={{ fontSize: 11, color: c.muted, marginTop: 1 }}>{durationMin} Min</Text>
         </View>
 
-        {/* Avatar */}
-        <Pressable onPress={onViewTherapist} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-          <TherapistAvatar therapist={therapist} size={40} c={c} />
-        </Pressable>
-
-        {/* Therapeut:in */}
+        {/* Therapeut */}
         <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: 13, fontWeight: '600', color: c.text }}>{therapist?.fullName ?? '—'}</Text>
+          <Text style={{ fontSize: 13, fontWeight: '600', color: c.text }} numberOfLines={1}>{therapist?.fullName ?? '—'}</Text>
           {therapist?.professionalTitle ? (
-            <Text style={{ fontSize: 12, color: c.muted, marginTop: 1 }}>{therapist.professionalTitle}</Text>
+            <Text style={{ fontSize: 12, color: c.muted, marginTop: 1 }} numberOfLines={1}>{therapist.professionalTitle}</Text>
           ) : null}
         </View>
 
         {/* Status + Chevron */}
-        <View style={{ alignItems: 'flex-end', gap: 4 }}>
+        <View style={{ alignItems: 'flex-end', gap: 6 }}>
           <View style={{ backgroundColor: badge.bg, borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2 }}>
-            <Text style={{ fontSize: 10, fontWeight: '700', color: badge.text }}>{badge.label}</Text>
+            <Text style={{ fontSize: 10, fontWeight: '700', color: badge.text }}>{badgeLabel}</Text>
           </View>
           <Ionicons name="chevron-forward" size={14} color={c.muted} />
         </View>
-      </View>
-    </Pressable>
+      </Pressable>
+    </View>
   );
 });
 

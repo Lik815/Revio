@@ -49,7 +49,6 @@ export function TherapyTabScreen() {
   const [selectedTherapistPatientAppointment, setSelectedTherapistPatientAppointment] = useState(null);
   const [therapistView, setTherapistView] = useState('termine');
   const [selectedPatientId, setSelectedPatientId] = useState(null);
-  const [activeFilterPatient, setActiveFilterPatient] = useState('all');
   const [activeFilterTherapist, setActiveFilterTherapist] = useState('booked');
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [showTherapistCancelModal, setShowTherapistCancelModal] = useState(false);
@@ -296,8 +295,6 @@ export function TherapyTabScreen() {
         <TherapyTabPatient
           myAppointments={myAppointments}
           myAppointmentsLoading={myAppointmentsLoading}
-          activeFilterPatient={activeFilterPatient}
-          setActiveFilterPatient={setActiveFilterPatient}
           therapyRefreshing={therapyRefreshing}
           appointmentsLastLoadedAt={appointmentsLastLoadedAt}
           onRefresh={() => handleTherapyRefresh(authToken, accountType, loggedInTherapist)}
