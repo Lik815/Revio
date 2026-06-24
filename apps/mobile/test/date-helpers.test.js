@@ -1,7 +1,7 @@
 process.env.TZ = 'Europe/Berlin';
 
 import { describe, test, expect } from 'vitest';
-import { isSameDay, startOfDay, startOfWeek, addDays } from '../src/utils/app-utils.js';
+import { isSameDay, startOfDay, startOfWeek, addDays, getIsoWeekNumber } from '../src/utils/app-utils.js';
 
 describe('isSameDay', () => {
   test('true for the same calendar day at different times', () => {
@@ -45,6 +45,30 @@ describe('startOfWeek', () => {
   test('a Monday returns the same day', () => {
     const monday = new Date(2026, 5, 22);
     expect(startOfWeek(monday).getDate()).toBe(22);
+  });
+});
+
+describe('getIsoWeekNumber', () => {
+  test('Jan 4 is always in week 1 by ISO definition', () => {
+    expect(getIsoWeekNumber(new Date(2026, 0, 4))).toBe(1);
+  });
+
+  test('matches a known reference week', () => {
+    // Mi, 28. Mai 2025 falls in ISO week 22.
+    expect(getIsoWeekNumber(new Date(2025, 4, 28))).toBe(22);
+  });
+
+  test('every day in the same Mo-So week reports the same week number', () => {
+    const monday = startOfWeek(new Date(2026, 5, 24));
+    const week = getIsoWeekNumber(monday);
+    for (let i = 1; i < 7; i += 1) {
+      expect(getIsoWeekNumber(addDays(monday, i))).toBe(week);
+    }
+  });
+
+  test('late-December dates can belong to week 1 of the next ISO year', () => {
+    // Do, 31. Dezember 2026 is in the same ISO week as Fr, 1. Januar 2027.
+    expect(getIsoWeekNumber(new Date(2026, 11, 31))).toBe(getIsoWeekNumber(new Date(2027, 0, 1)));
   });
 });
 

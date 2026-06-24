@@ -466,6 +466,7 @@ export {
   startOfDay,
   startOfWeek,
   addDays,
+  getIsoWeekNumber,
 };
 
 function formatDayHeader(isoString, locale = 'de-DE') {
@@ -504,4 +505,15 @@ function addDays(d, n) {
   const copy = new Date(d);
   copy.setDate(copy.getDate() + n);
   return copy;
+}
+
+// Standard ISO-8601 week number (the week containing that week's Thursday
+// determines the year/week count), for the "Woche NN" heading.
+function getIsoWeekNumber(d) {
+  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const dayNum = (date.getUTCDay() + 6) % 7; // Mo=0..So=6
+  date.setUTCDate(date.getUTCDate() - dayNum + 3); // nearest Thursday
+  const firstThursday = new Date(Date.UTC(date.getUTCFullYear(), 0, 4));
+  const diffDays = (date - firstThursday) / (24 * 60 * 60 * 1000);
+  return 1 + Math.round(diffDays / 7);
 }
