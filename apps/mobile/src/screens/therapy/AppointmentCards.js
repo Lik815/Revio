@@ -52,21 +52,29 @@ export const STATUS_COLORS = {
 
 // ─── PatientNextAppointmentCard ────────────────────────────────────────────────
 
-function PatientStatsRow({ c, kommend, vergangen }) {
+function PatientStatsRow({ c, kommend, vergangen, activeView, onSelectKommend, onSelectVergangen }) {
+  const kommendActive = activeView === 'kommend';
+  const vergangenActive = activeView === 'vergangen';
   return (
     <View style={{ flexDirection: 'row' }}>
-      <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, paddingRight: 14, borderRightWidth: 1, borderRightColor: c.border }}>
+      <Pressable
+        onPress={onSelectKommend}
+        style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, paddingRight: 14, paddingVertical: 4, borderRightWidth: 1, borderRightColor: c.border, opacity: kommendActive ? 1 : 0.55 }}
+      >
         <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: c.successBg ?? '#EAF4F1', alignItems: 'center', justifyContent: 'center' }}>
           <Text style={{ fontSize: 14, fontWeight: '800', color: c.success ?? '#5A9E8E' }}>{kommend}</Text>
         </View>
-        <Text style={{ fontSize: 13, fontWeight: '600', color: c.text }}>Kommend</Text>
-      </View>
-      <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, paddingLeft: 14 }}>
+        <Text style={{ fontSize: 13, fontWeight: kommendActive ? '800' : '600', color: c.text }}>Kommend</Text>
+      </Pressable>
+      <Pressable
+        onPress={onSelectVergangen}
+        style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, paddingLeft: 14, paddingVertical: 4, opacity: vergangenActive ? 1 : 0.55 }}
+      >
         <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: c.mutedBg ?? '#EDF2F4', alignItems: 'center', justifyContent: 'center' }}>
           <Text style={{ fontSize: 14, fontWeight: '800', color: c.muted }}>{vergangen}</Text>
         </View>
-        <Text style={{ fontSize: 13, fontWeight: '600', color: c.text }}>Vergangen</Text>
-      </View>
+        <Text style={{ fontSize: 13, fontWeight: vergangenActive ? '800' : '600', color: c.text }}>Vergangen</Text>
+      </Pressable>
     </View>
   );
 }
@@ -78,6 +86,9 @@ export function PatientNextAppointmentCard({
   vergangenCount,
   onOpenDetail,
   onViewTherapist,
+  activeView,
+  onSelectKommend,
+  onSelectVergangen,
 }) {
   const slotDate = appointment ? (appointment.slot?.startsAt ?? appointment.confirmedSlotAt ?? null) : null;
 
@@ -87,7 +98,14 @@ export function PatientNextAppointmentCard({
         <Text style={{ fontSize: 11, fontWeight: '600', color: c.muted, textTransform: 'uppercase', letterSpacing: 0.4 }}>Nächster Termin</Text>
         <Text style={{ fontSize: 16, fontWeight: '700', color: c.text, marginTop: 6 }}>Kein bevorstehender Termin</Text>
         <View style={{ height: 1, backgroundColor: c.border, marginVertical: 14 }} />
-        <PatientStatsRow c={c} kommend={kommendCount} vergangen={vergangenCount} />
+        <PatientStatsRow
+          c={c}
+          kommend={kommendCount}
+          vergangen={vergangenCount}
+          activeView={activeView}
+          onSelectKommend={onSelectKommend}
+          onSelectVergangen={onSelectVergangen}
+        />
       </View>
     );
   }
@@ -132,7 +150,14 @@ export function PatientNextAppointmentCard({
 
       <View style={{ height: 1, backgroundColor: c.border, marginVertical: 14 }} />
 
-      <PatientStatsRow c={c} kommend={kommendCount} vergangen={vergangenCount} />
+      <PatientStatsRow
+        c={c}
+        kommend={kommendCount}
+        vergangen={vergangenCount}
+        activeView={activeView}
+        onSelectKommend={onSelectKommend}
+        onSelectVergangen={onSelectVergangen}
+      />
     </View>
   );
 }
