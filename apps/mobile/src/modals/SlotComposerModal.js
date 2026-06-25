@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Modal, Pressable, ScrollView, View, Text } from 'react-native';
+import { Modal, Pressable, ScrollView, useWindowDimensions, View, Text } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { RADIUS } from '../utils/app-utils';
 import { TherapistSlotComposer } from '../components/SlotComposer';
@@ -9,6 +10,12 @@ export function SlotComposerModal({ visible, onClose, onAddSlot, onAddSlots, err
   const [mode, setMode] = useState('single');
   const [seriesState, setSeriesState] = useState({ canSubmit: false, count: 0, overLimit: false, ctaLabel: 'Serie anlegen' });
   const seriesRef = useRef(null);
+  const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
+  // Precise pixel cap instead of a guessed '88%' — leaves a small peek of
+  // the screen behind the sheet, accounting for the actual notch/safe area
+  // instead of a flat percentage that doesn't scale with screen height.
+  const sheetMaxHeight = windowHeight - insets.top - 24;
 
   useEffect(() => {
     if (!visible) setMode('single');
@@ -17,7 +24,7 @@ export function SlotComposerModal({ visible, onClose, onAddSlot, onAddSlots, err
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' }} onPress={onClose}>
-        <Pressable onPress={() => {}} style={{ backgroundColor: c.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 32, maxHeight: '88%' }}>
+        <Pressable onPress={() => {}} style={{ backgroundColor: c.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: insets.bottom + 16, maxHeight: sheetMaxHeight }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 20, paddingBottom: 8 }}>
             <Text style={{ fontSize: 18, fontWeight: '700', color: c.text, flex: 1 }}>
               {mode === 'single' ? 'Neuen Termin anlegen' : 'Serie anlegen'}
@@ -51,7 +58,7 @@ export function SlotComposerModal({ visible, onClose, onAddSlot, onAddSlots, err
             </View>
           )}
 
-          <ScrollView style={{ maxHeight: '72%' }} contentContainerStyle={{ paddingHorizontal: 20 }} showsVerticalScrollIndicator={false}>
+          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 20 }} showsVerticalScrollIndicator={false}>
             {mode === 'single' ? (
               <TherapistSlotComposer c={c} onAddSlot={onAddSlot} />
             ) : (

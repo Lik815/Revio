@@ -242,8 +242,8 @@ export const SeriesSlotComposer = forwardRef(function SeriesSlotComposer({ c, on
   }, [canSubmit, count, overLimit, ctaLabel]);
 
   return (
-    <View style={{ gap: 12 }}>
-      <View style={{ gap: 8 }}>
+    <View style={{ gap: 10 }}>
+      <View style={{ gap: 6 }}>
         <Text style={{ fontSize: 11, fontWeight: '700', color: c.muted, letterSpacing: 0.5 }}>STARTDATUM</Text>
         <Pressable
           onPress={() => setShowStartPicker(true)}
@@ -255,7 +255,7 @@ export const SeriesSlotComposer = forwardRef(function SeriesSlotComposer({ c, on
         </Pressable>
       </View>
 
-      <View style={{ gap: 8 }}>
+      <View style={{ gap: 6 }}>
         <Text style={{ fontSize: 11, fontWeight: '700', color: c.muted, letterSpacing: 0.5 }}>ENDE</Text>
         <View style={{ flexDirection: 'row', backgroundColor: c.card, borderRadius: RADIUS.full, borderWidth: 1, borderColor: c.border, padding: 4 }}>
           {[{ key: 'weeks', label: 'Anzahl Wochen' }, { key: 'date', label: 'Enddatum' }].map(({ key, label }) => {
@@ -299,7 +299,7 @@ export const SeriesSlotComposer = forwardRef(function SeriesSlotComposer({ c, on
         )}
       </View>
 
-      <View style={{ gap: 8 }}>
+      <View style={{ gap: 6 }}>
         <Text style={{ fontSize: 11, fontWeight: '700', color: c.muted, letterSpacing: 0.5 }}>DAUER</Text>
         <View style={{ flexDirection: 'row', gap: 8 }}>
           {SLOT_DURATIONS.map((dur) => {
@@ -317,7 +317,7 @@ export const SeriesSlotComposer = forwardRef(function SeriesSlotComposer({ c, on
         </View>
       </View>
 
-      <View style={{ gap: 8 }}>
+      <View style={{ gap: 6 }}>
         <Text style={{ fontSize: 11, fontWeight: '700', color: c.muted, letterSpacing: 0.5 }}>WOCHENTAGE</Text>
         <View style={{ flexDirection: 'row', flexWrap: 'nowrap', gap: 6 }}>
           {WEEKDAY_OPTIONS.map(({ key, label }) => {
@@ -335,7 +335,7 @@ export const SeriesSlotComposer = forwardRef(function SeriesSlotComposer({ c, on
         </View>
       </View>
 
-      <View style={{ gap: 8 }}>
+      <View style={{ gap: 6 }}>
         <Text style={{ fontSize: 11, fontWeight: '700', color: c.muted, letterSpacing: 0.5 }}>UHRZEITEN</Text>
 
         <View style={{ flexDirection: 'row', backgroundColor: c.card, borderRadius: RADIUS.full, borderWidth: 1, borderColor: c.border, padding: 4 }}>
@@ -377,7 +377,7 @@ export const SeriesSlotComposer = forwardRef(function SeriesSlotComposer({ c, on
             <Text style={{ fontSize: 13, color: c.muted }}>Uhrzeit hinzufügen</Text>
           </Pressable>
         ) : (
-          <View style={{ gap: 8 }}>
+          <View style={{ gap: 6 }}>
             <View style={{ flexDirection: 'row', gap: 8 }}>
               <Pressable
                 onPress={() => setShowBlockFromPicker(true)}
@@ -434,7 +434,7 @@ export const SeriesSlotComposer = forwardRef(function SeriesSlotComposer({ c, on
         )}
       </View>
 
-      <View style={{ gap: 8 }}>
+      <View style={{ gap: 6 }}>
         <Text style={{ fontSize: 11, fontWeight: '700', color: c.muted, letterSpacing: 0.5 }}>WIEDERHOLUNG</Text>
         <View style={{ flexDirection: 'row', gap: 8 }}>
           {INTERVAL_PRESETS.map((n) => {
