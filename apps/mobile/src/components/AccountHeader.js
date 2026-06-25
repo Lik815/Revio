@@ -35,9 +35,12 @@ function initialsFromName(name) {
  *                    Optionen/Settings screen has a contextual reason to
  *                    offer an edit shortcut from this header)
  *   onPressEdit    — defaults to opening the profile screen
+ *   rightSlot      — custom element rendered on the right instead of the
+ *                    pencil icon (e.g. a screen-specific action button);
+ *                    takes priority over showEdit when provided
  *   style          — merged onto the outer wrapper (e.g. to add zIndex)
  */
-export function AccountHeader({ c, subtitle, titleOverride, onPressAccount, showEdit = false, onPressEdit, style }) {
+export function AccountHeader({ c, subtitle, titleOverride, onPressAccount, showEdit = false, onPressEdit, rightSlot, style }) {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const { loggedInTherapist, loggedInPatient } = useAuth();
@@ -72,11 +75,11 @@ export function AccountHeader({ c, subtitle, titleOverride, onPressAccount, show
           {subtitle ? <Text style={{ fontSize: 13, color: c.muted, marginTop: 2 }}>{subtitle}</Text> : null}
         </Pressable>
 
-        {showEdit ? (
+        {rightSlot ?? (showEdit ? (
           <Pressable onPress={handlePressEdit} hitSlop={HIT_SLOP} style={{ padding: 4 }}>
             <Ionicons name="pencil-outline" size={22} color={c.accent ?? c.primary} />
           </Pressable>
-        ) : null}
+        ) : null)}
       </View>
     </View>
   );

@@ -124,10 +124,22 @@ export function TherapyTabTherapist({
 
   return (
     <View style={{ flex: 1 }}>
-      <AccountHeader c={c} subtitle="Termine" />
+      <AccountHeader
+        c={c}
+        subtitle="Termine"
+        rightSlot={slotBookingEnabled ? (
+          <Pressable
+            onPress={() => setShowSlotComposerModal(true)}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: c.success ?? '#5A9E8E', borderRadius: 999, paddingVertical: 10, paddingHorizontal: 14 }}
+          >
+            <Ionicons name="calendar-outline" size={15} color="#fff" />
+            <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>+ Termin</Text>
+          </Pressable>
+        ) : null}
+      />
 
       <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: 90, paddingTop: 8 }]}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: 32, paddingTop: 8 }]}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={therapyRefreshing} onRefresh={onRefresh} tintColor={c.primary} />}
       >
@@ -206,16 +218,6 @@ export function TherapyTabTherapist({
           </View>
         )}
       </ScrollView>
-
-      {/* ── FAB ─────────────────────────────────────────────────────── */}
-      {slotBookingEnabled && (
-        <Pressable
-          onPress={() => setShowSlotComposerModal(true)}
-          style={{ position: 'absolute', bottom: 24, right: 20, width: 54, height: 54, borderRadius: 27, backgroundColor: c.success ?? '#5A9E8E', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.2, shadowRadius: 6, elevation: 6 }}
-        >
-          <Ionicons name="add" size={28} color="#fff" />
-        </Pressable>
-      )}
 
       <HeilmittelSelectModal
         visible={showHeilmittelModal}
