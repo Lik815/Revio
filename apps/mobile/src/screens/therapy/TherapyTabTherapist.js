@@ -11,6 +11,7 @@ import { HeilmittelSelectModal } from '../../modals/HeilmittelSelectModal';
 import { TherapistSummaryCard } from '../../components/TherapistSummaryCard';
 import { TherapistWeekStrip } from '../../components/TherapistWeekStrip';
 import { TherapistDayTimeline } from '../../components/TherapistDayTimeline';
+import { TherapistMonthCalendar } from '../../components/TherapistMonthCalendar';
 import { TherapistTimeline } from '../../components/SlotComposer';
 
 const shouldShowSectionLoading = (isLoading, lastLoadedAt) => isLoading && lastLoadedAt === 0;
@@ -42,6 +43,11 @@ export function TherapyTabTherapist({
   const [selectedDate, setSelectedDate] = useState(() => startOfDay(new Date()));
   const [visibleWeekStart, setVisibleWeekStart] = useState(() => startOfWeek(new Date()));
   const [filterListKind, setFilterListKind] = useState(null); // null | 'free' | 'booked' | 'pending'
+  const [viewMode, setViewMode] = useState('list'); // 'list' | 'calendar'
+  const [visibleMonth, setVisibleMonth] = useState(() => ({
+    year: startOfDay(new Date()).getFullYear(),
+    month: startOfDay(new Date()).getMonth(),
+  }));
 
   const pendingIncomingBookings = useMemo(
     () => incomingBookings.filter((r) => r.status === 'PENDING'),
@@ -71,10 +77,28 @@ export function TherapyTabTherapist({
     setShowHeilmittelModal(false);
   };
 
-  const handleJumpToToday = () => {
-    const today = new Date();
-    setSelectedDate(startOfDay(today));
-    setVisibleWeekStart(startOfWeek(today));
+  const handleOpenCalendar = () => {
+    setVisibleMonth({ year: selectedDate.getFullYear(), month: selectedDate.getMonth() });
+    setViewMode('calendar');
+  };
+
+  const handleSelectCalendarDate = (date) => {
+    setSelectedDate(startOfDay(date));
+    setVisibleWeekStart(startOfWeek(date));
+  };
+
+  const handlePrevMonth = () => {
+    setVisibleMonth((prev) => {
+      const d = new Date(prev.year, prev.month - 1);
+      return { year: d.getFullYear(), month: d.getMonth() };
+    });
+  };
+
+  const handleNextMonth = () => {
+    setVisibleMonth((prev) => {
+      const d = new Date(prev.year, prev.month + 1);
+      return { year: d.getFullYear(), month: d.getMonth() };
+    });
   };
 
   const handleTherapistCancel = (bookingId) => {
@@ -154,32 +178,50 @@ export function TherapyTabTherapist({
         />
 
         {slotBookingEnabled ? (
-          <>
-            <TherapistWeekStrip
+          viewMode === 'calendar' ? (
+            <TherapistMonthCalendar
               c={c}
-              selectedDate={selectedDate}
-              visibleWeekStart={visibleWeekStart}
-              mySlots={mySlots}
-              onSelectDate={setSelectedDate}
-              onPrevWeek={() => setVisibleWeekStart((prev) => addDays(prev, -7))}
-              onNextWeek={() => setVisibleWeekStart((prev) => addDays(prev, 7))}
-              onPressCalendar={handleJumpToToday}
-            />
-
-            <TherapistDayTimeline
-              c={c}
-              selectedDate={selectedDate}
               mySlots={mySlots}
               incomingBookings={incomingBookings}
-              slotsLoading={slotsLoading}
-              slotsLastLoadedAt={slotsLastLoadedAt}
-              incomingBookingsLoading={incomingBookingsLoading}
-              incomingBookingsLastLoadedAt={incomingBookingsLastLoadedAt}
-              deletingSlotIds={deletingSlotIds}
+              selectedDate={selectedDate}
+              onSelectDate={handleSelectCalendarDate}
+              visibleMonth={visibleMonth}
+              onPrevMonth={handlePrevMonth}
+              onNextMonth={handleNextMonth}
+              onPressList={() => setViewMode('list')}
               onOpenBooking={onOpenBookingDetail}
               onCancelSlot={onCancelSlot}
+              deletingSlotIds={deletingSlotIds}
+              onAddSlot={() => setShowSlotComposerModal(true)}
             />
-          </>
+          ) : (
+            <>
+              <TherapistWeekStrip
+                c={c}
+                selectedDate={selectedDate}
+                visibleWeekStart={visibleWeekStart}
+                mySlots={mySlots}
+                onSelectDate={setSelectedDate}
+                onPrevWeek={() => setVisibleWeekStart((prev) => addDays(prev, -7))}
+                onNextWeek={() => setVisibleWeekStart((prev) => addDays(prev, 7))}
+                onPressCalendar={handleOpenCalendar}
+              />
+
+              <TherapistDayTimeline
+                c={c}
+                selectedDate={selectedDate}
+                mySlots={mySlots}
+                incomingBookings={incomingBookings}
+                slotsLoading={slotsLoading}
+                slotsLastLoadedAt={slotsLastLoadedAt}
+                incomingBookingsLoading={incomingBookingsLoading}
+                incomingBookingsLastLoadedAt={incomingBookingsLastLoadedAt}
+                deletingSlotIds={deletingSlotIds}
+                onOpenBooking={onOpenBookingDetail}
+                onCancelSlot={onCancelSlot}
+              />
+            </>
+          )
         ) : (
           <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
             <View style={[styles.emptyState, { backgroundColor: c.card, borderColor: c.border, paddingVertical: 20 }]}>
