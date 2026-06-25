@@ -73,17 +73,19 @@ export const notificationRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
 
-      // New booking requests (last 7 days)
-      const pendingBookings = await fastify.prisma.bookingRequest.findMany({
+      // Booking requests received in the last 7 days — kept visible by time
+      // window regardless of current status (matches the patient side,
+      // which keys off respondedAt rather than status), so responding to a
+      // request doesn't make its notification vanish.
+      const recentBookingRequests = await fastify.prisma.bookingRequest.findMany({
         where: {
           therapistId: therapist.id,
-          status: 'PENDING',
           createdAt: { gte: sevenDaysAgo },
         },
         include: { patientUser: { select: { firstName: true, lastName: true } } },
         orderBy: { createdAt: 'desc' },
       });
-      for (const b of pendingBookings) {
+      for (const b of recentBookingRequests) {
         const patientFullName = [b.patientUser?.firstName, b.patientUser?.lastName]
           .filter(Boolean)
           .join(' ');
