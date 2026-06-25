@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import {
-  Pressable, RefreshControl, ScrollView,
+  Alert, Pressable, RefreshControl, ScrollView,
   Text, View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -27,7 +27,7 @@ export function TherapyTabTherapist({
   deletingSlotIds,
   therapyRefreshing, slotsLastLoadedAt, incomingBookingsLastLoadedAt,
   onRefresh, onOpenTherapistById,
-  onCancelSlot, onRespond, onTherapistCancelRequest, onSelectTherapistDetailBooking, setShowSlotComposerModal,
+  onCancelSlot, onBulkDeleteSlots, onRespond, onTherapistCancelRequest, onSelectTherapistDetailBooking, setShowSlotComposerModal,
   onOpenBookingDetail,
   loggedInTherapist,
   onActivateBookingRequests,
@@ -110,6 +110,19 @@ export function TherapyTabTherapist({
     onTherapistCancelRequest(booking.id);
   };
 
+  const handleDeleteAllFreeSlots = () => {
+    const ids = freeSlots.map((s) => s.id);
+    if (ids.length === 0) return;
+    Alert.alert(
+      'Alle freien Termine löschen',
+      `Möchtest du wirklich alle ${ids.length} freien Termine löschen? Das kann nicht rückgängig gemacht werden.`,
+      [
+        { text: 'Abbrechen', style: 'cancel' },
+        { text: 'Löschen', style: 'destructive', onPress: () => onBulkDeleteSlots?.(ids) },
+      ],
+    );
+  };
+
   if (filterListKind) {
     return (
       <View style={{ flex: 1 }}>
@@ -121,7 +134,14 @@ export function TherapyTabTherapist({
             <Ionicons name="chevron-back" size={16} color={c.primary} />
             <Text style={{ fontSize: 14, fontWeight: '600', color: c.primary }}>Zurück</Text>
           </Pressable>
-          <Text style={[styles.headerTitle, { color: c.text }]}>{FILTER_LIST_TITLES[filterListKind]}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Text style={[styles.headerTitle, { color: c.text }]}>{FILTER_LIST_TITLES[filterListKind]}</Text>
+            {filterListKind === 'free' && freeSlots.length > 0 ? (
+              <Pressable onPress={handleDeleteAllFreeSlots} hitSlop={8}>
+                <Text style={{ fontSize: 13, fontWeight: '600', color: c.error }}>Alle löschen</Text>
+              </Pressable>
+            ) : null}
+          </View>
         </View>
 
         <ScrollView
