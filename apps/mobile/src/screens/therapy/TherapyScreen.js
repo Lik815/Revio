@@ -57,6 +57,7 @@ export function TherapyTabScreen() {
   const [createdResult, setCreatedResult] = useState(null);
   const [showSlotCreated, setShowSlotCreated] = useState(false);
   const [slotError, setSlotError] = useState('');
+  const [isAddingSlots, setIsAddingSlots] = useState(false);
 
   useEffect(() => {
     if (!authToken) return;
@@ -73,7 +74,8 @@ export function TherapyTabScreen() {
   };
 
   const handleAddSlots = async (slots) => {
-    if (!authToken || slots.length === 0) return;
+    if (!authToken || slots.length === 0 || isAddingSlots) return;
+    setIsAddingSlots(true);
     try {
       const res = await fetch(`${getBaseUrl()}/therapist/slots`, {
         method: 'POST',
@@ -93,6 +95,7 @@ export function TherapyTabScreen() {
       setSlotError('Verbindungsfehler.');
     } finally {
       await loadMySlots(authToken);
+      setIsAddingSlots(false);
     }
   };
 
@@ -365,6 +368,7 @@ export function TherapyTabScreen() {
           onAddSlot={(slot) => handleAddSlots([slot])}
           onAddSlots={handleAddSlots}
           error={slotError}
+          loading={isAddingSlots}
           c={c}
         />
         <SlotCreatedModal

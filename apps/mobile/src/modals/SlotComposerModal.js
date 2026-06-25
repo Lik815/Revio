@@ -1,12 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Modal, Pressable, ScrollView, useWindowDimensions, View, Text } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, ScrollView, useWindowDimensions, View, Text } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { RADIUS } from '../utils/app-utils';
 import { TherapistSlotComposer } from '../components/SlotComposer';
 import { MAX_SLOTS as SERIES_MAX_SLOTS, SeriesSlotComposer } from '../components/SeriesSlotComposer';
 
-export function SlotComposerModal({ visible, onClose, onAddSlot, onAddSlots, error, c }) {
+export function SlotComposerModal({ visible, onClose, onAddSlot, onAddSlots, error, loading = false, c }) {
   const [mode, setMode] = useState('single');
   const [seriesState, setSeriesState] = useState({ canSubmit: false, count: 0, overLimit: false, ctaLabel: 'Serie anlegen' });
   const seriesRef = useRef(null);
@@ -73,7 +73,7 @@ export function SlotComposerModal({ visible, onClose, onAddSlot, onAddSlots, err
 
           <ScrollView style={{ maxHeight: scrollMaxHeight }} contentContainerStyle={{ paddingHorizontal: 20 }} showsVerticalScrollIndicator={false}>
             {mode === 'single' ? (
-              <TherapistSlotComposer c={c} onAddSlot={onAddSlot} />
+              <TherapistSlotComposer c={c} onAddSlot={onAddSlot} loading={loading} />
             ) : (
               <SeriesSlotComposer ref={seriesRef} c={c} onAddSlots={onAddSlots} onStateChange={setSeriesState} />
             )}
@@ -90,11 +90,12 @@ export function SlotComposerModal({ visible, onClose, onAddSlot, onAddSlots, err
 
               <Pressable
                 onPress={() => seriesRef.current?.submit()}
-                disabled={!seriesState.canSubmit}
-                style={{ backgroundColor: seriesState.canSubmit ? c.primary : c.border, borderRadius: RADIUS.sm, paddingVertical: 12, alignItems: 'center' }}
+                disabled={!seriesState.canSubmit || loading}
+                style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, backgroundColor: seriesState.canSubmit && !loading ? c.primary : c.border, borderRadius: RADIUS.sm, paddingVertical: 12 }}
               >
+                {loading ? <ActivityIndicator size="small" color="#fff" /> : null}
                 <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600' }}>
-                  {seriesState.ctaLabel}
+                  {loading ? 'Wird angelegt…' : seriesState.ctaLabel}
                 </Text>
               </Pressable>
             </View>

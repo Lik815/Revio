@@ -145,7 +145,7 @@ function renderSlotRow({ c, deletingSlotIds, slot, onCancelSlot }) {
   );
 }
 
-export function TherapistSlotComposer({ c, onAddSlot }) {
+export function TherapistSlotComposer({ c, onAddSlot, loading = false }) {
   const [slotPickerDate, setSlotPickerDate] = useState(null);
   const [slotPickerHour, setSlotPickerHour] = useState(null);
   const [slotPickerMinute, setSlotPickerMinute] = useState(null);
@@ -185,7 +185,7 @@ export function TherapistSlotComposer({ c, onAddSlot }) {
   const slotReady = slotIsInFuture !== null;
 
   const handleAddSlot = () => {
-    if (!slotReady) return;
+    if (!slotReady || loading) return;
     onAddSlot({ startsAt: slotIsInFuture.toISOString(), durationMin: slotPickerDuration });
     setSlotPickerDate(null);
     setSlotPickerHour(null);
@@ -247,13 +247,16 @@ export function TherapistSlotComposer({ c, onAddSlot }) {
 
         <Pressable
           onPress={handleAddSlot}
-          disabled={!slotReady}
-          style={{ backgroundColor: slotReady ? c.primary : c.border, borderRadius: RADIUS.sm, paddingVertical: 12, alignItems: 'center', marginTop: 2 }}
+          disabled={!slotReady || loading}
+          style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, backgroundColor: slotReady && !loading ? c.primary : c.border, borderRadius: RADIUS.sm, paddingVertical: 12, marginTop: 2 }}
         >
+          {loading ? <ActivityIndicator size="small" color="#fff" /> : null}
           <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600' }}>
-            {slotReady
-              ? `Termin anlegen · ${formatSlotDate(slotPickerDate)}, ${formatSlotTime(slotPickerHour, slotPickerMinute)}`
-              : '+ Termin anlegen'}
+            {loading
+              ? 'Wird angelegt…'
+              : slotReady
+                ? `Termin anlegen · ${formatSlotDate(slotPickerDate)}, ${formatSlotTime(slotPickerHour, slotPickerMinute)}`
+                : '+ Termin anlegen'}
           </Text>
         </Pressable>
       </View>
