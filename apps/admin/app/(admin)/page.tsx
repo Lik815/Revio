@@ -37,7 +37,7 @@ export default async function HomePage() {
   const totalTherapists = stats.therapists.approved + stats.therapists.pending_review + stats.therapists.draft + stats.therapists.rejected + stats.therapists.changes_requested + stats.therapists.suspended;
 
   const cards = [
-    { kicker: 'Therapeut:innen', label: 'Offene Reviews', value: stats.therapists.pending_review, href: '/therapists?status=PENDING_REVIEW' },
+    { kicker: 'Therapeuten', label: 'Offene Reviews', value: stats.therapists.pending_review, href: '/therapists?status=PENDING_REVIEW' },
     { kicker: 'Sichtbarkeit', label: 'Profile mit offenen Punkten', value: visibilityIssues.count, href: '/therapists?status=APPROVED' },
     { kicker: 'Review', label: 'Änderungen oder Ablehnung', value: stats.therapists.changes_requested + stats.therapists.rejected, href: '/therapists' },
   ];
@@ -103,7 +103,7 @@ export default async function HomePage() {
             ))}
             {visibilityIssues.count > 5 && (
               <div className="table-note" style={{ padding: '8px 2px 0' }}>
-                + {visibilityIssues.count - 5} weitere unter <Link href="/therapists?status=APPROVED">Therapeut:innen → Freigegeben</Link>
+                + {visibilityIssues.count - 5} weitere unter <Link href="/therapists?status=APPROVED">Therapeuten → Freigegeben</Link>
               </div>
             )}
           </div>

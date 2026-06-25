@@ -14,7 +14,7 @@ export default async function HeilmittelPage() {
   return (
     <PageShell
       title="Heilmittel"
-      description="Verwalte die verordnungsfähigen Heilmittel-Kategorien, die Therapeut:innen bei der Aktivierung von Terminanfragen auswählen können. Getrennt von Fortbildungen — Heilmittel sind Leistungskategorien, keine Zusatzqualifikationen."
+      description="Verwalte die verordnungsfähigen Heilmittel-Kategorien, die Therapeuten bei der Aktivierung von Terminanfragen auswählen können. Getrennt von Fortbildungen — Heilmittel sind Leistungskategorien, keine Zusatzqualifikationen."
       eyebrow="Katalog"
       actions={<div className="hero-pill">{activeCount} aktiv</div>}
     >

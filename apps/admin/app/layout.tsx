@@ -6,7 +6,7 @@ import { SpeedInsights } from '@vercel/speed-insights/next';
 
 export const metadata: Metadata = {
   title: 'Revio Admin-Dashboard',
-  description: 'Internes Dashboard zur Prüfung von Therapeut:innen- und Praxis-Einreichungen.',
+  description: 'Internes Dashboard zur Prüfung von Therapeuten- und Praxis-Einreichungen.',
   robots: {
     index: false,
     follow: false,

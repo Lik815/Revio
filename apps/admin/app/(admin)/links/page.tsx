@@ -63,7 +63,7 @@ export default async function LinksPage({ searchParams }: { searchParams: Search
   return (
     <PageShell
       title="Verknüpfungsübersicht"
-      description="Prüfe vorgeschlagene und umstrittene Verknüpfungen zwischen Therapeut:innen und Praxen, damit nur bestätigte Beziehungen in der öffentlichen Suche sichtbar werden."
+      description="Prüfe vorgeschlagene und umstrittene Verknüpfungen zwischen Therapeuten und Praxen, damit nur bestätigte Beziehungen in der öffentlichen Suche sichtbar werden."
       eyebrow="Review-Konflikte"
       actions={
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -96,12 +96,12 @@ export default async function LinksPage({ searchParams }: { searchParams: Search
         <div className="notice-box notice-box--warning">
           <strong>⚠️ Blockierte Sichtbarkeit:</strong>{' '}
           {brokenChains.length} Verknüpfung{brokenChains.length !== 1 ? 'en sind' : ' ist'} noch nicht bestätigt,
-          obwohl Therapeut:in und Praxis bereits freigegeben sind — diese Einträge erscheinen noch nicht in der Suche.
+          obwohl Therapeut und Praxis bereits freigegeben sind — diese Einträge erscheinen noch nicht in der Suche.
         </div>
       )}
 
       <form className="toolbar toolbar--compact" action="/links">
-        <input name="q" defaultValue={params.q ?? ''} className="toolbar-input" placeholder="Nach Therapeut:in oder Praxis suchen" />
+        <input name="q" defaultValue={params.q ?? ''} className="toolbar-input" placeholder="Nach Therapeut oder Praxis suchen" />
         <select name="status" defaultValue={statusFilter} className="toolbar-select">
           <option value="ALL">Alle Status</option>
           <option value="DISPUTED">Umstritten</option>
@@ -123,7 +123,7 @@ export default async function LinksPage({ searchParams }: { searchParams: Search
         <thead>
           <tr>
             <th>Priorität</th>
-            <th>Therapeut:in</th>
+            <th>Therapeut</th>
             <th>Praxis</th>
             <th>Link-Status</th>
             <th>Eingereicht</th>

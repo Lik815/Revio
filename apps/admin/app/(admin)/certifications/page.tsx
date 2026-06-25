@@ -14,7 +14,7 @@ export default async function CertificationsPage() {
   return (
     <PageShell
       title="Fortbildungen"
-      description="Verwalte die Fortbildungsoptionen, die Therapeut:innen in der App auswählen können."
+      description="Verwalte die Fortbildungsoptionen, die Therapeuten in der App auswählen können."
       eyebrow="Katalog"
       actions={<div className="hero-pill">{activeCount} aktiv</div>}
     >

@@ -65,7 +65,7 @@ export default async function TherapistsPage({ searchParams }: { searchParams: S
 
   return (
     <PageShell
-      title="Therapeut:innen"
+      title="Therapeuten"
       description="Review-Queue, Sichtbarkeit und die nächste sinnvolle Entscheidung in einer Arbeitsansicht."
       eyebrow="Reviews"
       actions={<div className="hero-pill">{filtered.length} Profile in der Ansicht</div>}
@@ -131,7 +131,7 @@ export default async function TherapistsPage({ searchParams }: { searchParams: S
       {filtered.length === 0 ? (
         <AdminEmptyState
           icon="🗂️"
-          title="Keine Therapeut:innen für diese Filter"
+          title="Keine Therapeuten für diese Filter"
           description="Versuche einen anderen Status, entferne Suchbegriffe oder prüfe die gesamte Queue ohne Stadtfilter."
           compact
           action={<Link href="/therapists" className="secondary-btn secondary-btn--compact">Alle Profile anzeigen</Link>}

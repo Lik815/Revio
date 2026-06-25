@@ -26,6 +26,27 @@ export function AdminShell({
       </div>
 
       <main className="main">
+        <div className="desktop-commandbar">
+          <div>
+            <div className="command-eyebrow">
+              <span className="command-live-dot" />
+              Admin Bereich
+            </div>
+            <div className="command-title">Revio Verwaltung</div>
+          </div>
+          <div className="command-search" aria-hidden="true">
+            <span>Suche, Profile, Einstellungen</span>
+            <kbd>/</kbd>
+          </div>
+          <div className="command-user">
+            <span>{adminUser.name.slice(0, 1)}</span>
+            <div>
+              <strong>{adminUser.name}</strong>
+              <small>{adminUser.role}</small>
+            </div>
+          </div>
+        </div>
+
         {apiUnavailable ? (
           <div className="status-banner status-banner--warning">
             Die Admin-API ist aktuell nicht erreichbar. Inhalte koennen unvollstaendig sein, bis die Verbindung wieder steht.

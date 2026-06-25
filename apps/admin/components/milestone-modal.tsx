@@ -69,16 +69,16 @@ export function MilestoneModal({ total, preview }: { total: number; preview?: nu
           {milestone >= 2000 ? '👑' : milestone >= 1000 ? '🏆' : '🎉'}
         </div>
         <h2 className="milestone-title">
-          {milestone.toLocaleString('de-DE')} Therapeut:innen!
+          {milestone.toLocaleString('de-DE')} Therapeuten!
         </h2>
         <p className="milestone-body">
           {milestone === 500
             ? 'Die 500er-Marke ist geknackt — Revio wächst! Halbzeit auf dem Weg zur ersten Tausend.'
             : milestone === 1000
-            ? 'Unglaublich — 1.000 Therapeut:innen auf Revio! Ein riesiger Meilenstein für die Plattform.'
+            ? 'Unglaublich — 1.000 Therapeuten auf Revio! Ein riesiger Meilenstein für die Plattform.'
             : milestone === 1500
-            ? 'Bereits 1.500 Therapeut:innen! Die Community wächst schneller als je zuvor.'
-            : 'Wow — 2.000 Therapeut:innen! Revio ist jetzt eine der größten Plattformen seiner Art.'}
+            ? 'Bereits 1.500 Therapeuten! Die Community wächst schneller als je zuvor.'
+            : 'Wow — 2.000 Therapeuten! Revio ist jetzt eine der größten Plattformen seiner Art.'}
         </p>
         <button className="milestone-btn" onClick={dismiss} autoFocus>
           Weiter geht's 🚀

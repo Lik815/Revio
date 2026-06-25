@@ -4,7 +4,7 @@ export default function ProfilesPage() {
   return (
     <PageShell
       title="Alle Profile"
-      description="Diese Suchansicht wird Therapeut:innen und Praxen über alle Prüfzustände hinweg zusammenführen, damit sich Profile leichter finden und bei Bedarf später sperren lassen."
+      description="Diese Suchansicht wird Therapeuten und Praxen über alle Prüfzustände hinweg zusammenführen, damit sich Profile leichter finden und bei Bedarf später sperren lassen."
       eyebrow="Explorer"
       actions={<div className="hero-pill">Geplantes Kernfeature</div>}
     >
@@ -13,7 +13,7 @@ export default function ProfilesPage() {
         <div className="kicker">Nächster Ausbauschritt</div>
         <h3>Übergreifende Suche mit Sofortfiltern</h3>
         <p>
-          Hier sollte als Nächstes eine globale Suche für Therapeut:innen, Praxen und Status entstehen – inklusive Schnellfiltern, Bulk-Aktionen und Detailvorschau.
+          Hier sollte als Nächstes eine globale Suche für Therapeuten, Praxen und Status entstehen – inklusive Schnellfiltern, Bulk-Aktionen und Detailvorschau.
         </p>
       </div>
     </PageShell>

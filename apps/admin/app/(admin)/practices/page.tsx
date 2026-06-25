@@ -70,7 +70,7 @@ export default async function PracticesPage({ searchParams }: { searchParams: Se
   return (
     <PageShell
       title="Praxis-Warteschlange"
-      description="Behalte Praxiseinreichungen im Blick, die auf Freigabe warten, und prüfe verknüpfte Therapeut:innen-Aktivitäten, bevor etwas veröffentlicht wird."
+      description="Behalte Praxiseinreichungen im Blick, die auf Freigabe warten, und prüfe verknüpfte Therapeuten-Aktivitäten, bevor etwas veröffentlicht wird."
       eyebrow="Reviews"
       actions={<div className="hero-pill">{filtered.length} Ergebnisse</div>}
     >
@@ -119,7 +119,7 @@ export default async function PracticesPage({ searchParams }: { searchParams: Se
             <th>Priorität</th>
             <th>Ort</th>
             <th>Adresse</th>
-            <th>Verknüpfte Therapeut:innen</th>
+            <th>Verknüpfte Therapeuten</th>
             <th>Eingereicht</th>
             <th>Frist (48h)</th>
             <th>Status</th>
@@ -151,7 +151,7 @@ export default async function PracticesPage({ searchParams }: { searchParams: Se
               </td>
               <td data-label="Ort">{p.city}</td>
               <td data-label="Adresse" style={{ color: 'var(--muted)', fontSize: 13 }}>{p.address ?? '—'}</td>
-              <td data-label="Verknüpfte Therapeut:innen">{p.links?.length ?? 0}</td>
+              <td data-label="Verknüpfte Therapeuten">{p.links?.length ?? 0}</td>
               <td data-label="Eingereicht">{formatDate(p.createdAt)}</td>
               <td data-label="Frist (48h)">
                 <DeadlineTimer createdAt={p.createdAt} status={p.reviewStatus} />
