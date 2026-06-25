@@ -133,7 +133,7 @@ export function TherapyTabTherapist({
             style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: c.success ?? '#5A9E8E', borderRadius: 999, paddingVertical: 10, paddingHorizontal: 14 }}
           >
             <Ionicons name="calendar-outline" size={15} color="#fff" />
-            <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>+ Termin</Text>
+            <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>+ Slot</Text>
           </Pressable>
         ) : null}
       />

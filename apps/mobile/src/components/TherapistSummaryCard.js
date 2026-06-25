@@ -1,15 +1,28 @@
 import React from 'react';
 import { Pressable, Text, View } from 'react-native';
+import { RADIUS } from '../utils/app-utils';
 
-function StatBlock({ c, value, label, valueColor, onPress, style }) {
+function StatChip({ c, value, label, dotColor, onPress }) {
   return (
-    <Pressable onPress={onPress} style={[{ flex: 1 }, style]}>
-      <Text style={{ fontSize: 24, fontWeight: '800', color: valueColor ?? c.text }}>
-        {value}
-      </Text>
-      <Text style={{ fontSize: 11, fontWeight: '600', color: c.muted, textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 2 }}>
-        {label}
-      </Text>
+    <Pressable
+      onPress={onPress}
+      style={{
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 7,
+        backgroundColor: c.card,
+        borderWidth: 1,
+        borderColor: c.border,
+        borderRadius: RADIUS.full,
+        paddingVertical: 10,
+        paddingHorizontal: 10,
+      }}
+    >
+      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: dotColor }} />
+      <Text style={{ fontSize: 15, fontWeight: '800', color: c.text }}>{value}</Text>
+      <Text style={{ fontSize: 13, fontWeight: '600', color: c.text }}>{label}</Text>
     </Pressable>
   );
 }
@@ -18,30 +31,10 @@ export function TherapistSummaryCard({
   c, freeCount, confirmedCount, pendingCount, onPressFree, onPressBooked, onPressPending,
 }) {
   return (
-    <View style={{ flexDirection: 'row', backgroundColor: c.card, borderRadius: 14, borderWidth: 1, borderColor: c.border, padding: 16, marginBottom: 12 }}>
-      <StatBlock
-        c={c}
-        value={freeCount}
-        label="Frei"
-        valueColor={c.success ?? '#5A9E8E'}
-        style={{ paddingRight: 12, borderRightWidth: 1, borderRightColor: c.border }}
-        onPress={onPressFree}
-      />
-      <StatBlock
-        c={c}
-        value={confirmedCount}
-        label="Gebucht"
-        style={{ paddingHorizontal: 12, borderRightWidth: 1, borderRightColor: c.border }}
-        onPress={onPressBooked}
-      />
-      <StatBlock
-        c={c}
-        value={pendingCount}
-        label="Anfragen"
-        valueColor={c.warning ?? '#B78700'}
-        style={{ paddingLeft: 12 }}
-        onPress={onPressPending}
-      />
+    <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
+      <StatChip c={c} value={freeCount} label="Frei" dotColor={c.success ?? '#5A9E8E'} onPress={onPressFree} />
+      <StatChip c={c} value={confirmedCount} label="Gebucht" dotColor={c.primary} onPress={onPressBooked} />
+      <StatChip c={c} value={pendingCount} label="Anfragen" dotColor={c.warning ?? '#B78700'} onPress={onPressPending} />
     </View>
   );
 }
