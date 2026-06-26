@@ -40,9 +40,18 @@ export function BookingRequestForm({ c, t, therapist, authToken, availableSlots,
   const [rejectedSlotId, setRejectedSlotId] = useState(null);
   const [rejectedSlotLabel, setRejectedSlotLabel] = useState('');
 
-  const availableHeilmittel = heilmittelOptions.filter(
-    (opt) => Array.isArray(therapist?.heilmittel) && therapist.heilmittel.includes(opt.key),
-  );
+  // Wer schon eine bestätigte Telefonnummer im Profil hat, muss sie bei einer
+  // (erneuten) Buchung nicht noch einmal doppelt eingeben — die Bestätigung
+  // ist nur dort nötig, wo tatsächlich eine neue/geänderte Nummer erfasst wird.
+  const storedPhone = (loggedInPatient?.phone ?? '').trim();
+  const phoneConfirmNeeded = !storedPhone || phone.trim() !== storedPhone;
+
+  const availableHeilmittel = (Array.isArray(therapist?.heilmittel) ? therapist.heilmittel : [])
+    .map((item) => {
+      const option = heilmittelOptions.find((opt) => opt.key === item || opt.label === item);
+      return option ?? { key: item, label: item };
+    })
+    .filter((option, index, arr) => option?.key && arr.findIndex((candidate) => candidate.key === option.key) === index);
   const insuranceOptions = kassenartOptions.filter((opt) => opt.key != null);
 
   const slots = (Array.isArray(availableSlots) ? availableSlots : []).filter(s => s?.id !== rejectedSlotId).reduce((acc, slot) => {
@@ -82,7 +91,7 @@ export function BookingRequestForm({ c, t, therapist, authToken, availableSlots,
     if (availableHeilmittel.length > 0 && !selectedHeilmittel) { setError('Bitte wähle ein Heilmittel aus.'); return; }
     if (!selectedKassenart) { setError('Bitte gib an, wie du versichert bist.'); return; }
     if (!phone.trim()) { setError('Bitte gib deine Telefonnummer ein.'); return; }
-    if (phone.trim() !== phoneConfirm.trim()) { setError('Die Telefonnummern stimmen nicht überein.'); return; }
+    if (phoneConfirmNeeded && phone.trim() !== phoneConfirm.trim()) { setError('Die Telefonnummern stimmen nicht überein.'); return; }
     if (!consent) { setError('Bitte stimme der Datenschutzerklärung zu.'); return; }
     setError('');
     setLoading(true);
@@ -339,22 +348,26 @@ export function BookingRequestForm({ c, t, therapist, authToken, availableSlots,
           style={{
             borderWidth: 1, borderColor: c.border, borderRadius: RADIUS.sm,
             backgroundColor: c.mutedBg, color: c.text, fontSize: 15,
-            padding: 12, marginBottom: SPACE.sm,
+            padding: 12, marginBottom: phoneConfirmNeeded ? SPACE.sm : 0,
           }}
         />
-        <Text style={{ ...TYPE.label, color: c.text, marginBottom: SPACE.xs }}>Telefonnummer bestätigen</Text>
-        <TextInput
-          value={phoneConfirm}
-          onChangeText={setPhoneConfirm}
-          placeholder={t('phonePlaceholder') ?? '+49 …'}
-          placeholderTextColor={c.muted}
-          keyboardType="phone-pad"
-          style={{
-            borderWidth: 1, borderColor: c.border, borderRadius: RADIUS.sm,
-            backgroundColor: c.mutedBg, color: c.text, fontSize: 15,
-            padding: 12,
-          }}
-        />
+        {phoneConfirmNeeded ? (
+          <>
+            <Text style={{ ...TYPE.label, color: c.text, marginBottom: SPACE.xs }}>Telefonnummer bestätigen</Text>
+            <TextInput
+              value={phoneConfirm}
+              onChangeText={setPhoneConfirm}
+              placeholder={t('phonePlaceholder') ?? '+49 …'}
+              placeholderTextColor={c.muted}
+              keyboardType="phone-pad"
+              style={{
+                borderWidth: 1, borderColor: c.border, borderRadius: RADIUS.sm,
+                backgroundColor: c.mutedBg, color: c.text, fontSize: 15,
+                padding: 12,
+              }}
+            />
+          </>
+        ) : null}
       </View>
 
       {/* Message */}
