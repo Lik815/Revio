@@ -144,6 +144,9 @@ function WorkingHoursBlockCard({ c, block, onChange, onRemove, canRemove }) {
             );
           })}
         </View>
+        {block.weekdays.length === 0 ? (
+          <Text style={{ fontSize: 12, color: c.error }}>Wähle mindestens einen Wochentag.</Text>
+        ) : null}
       </View>
 
       <View style={{ gap: 8 }}>

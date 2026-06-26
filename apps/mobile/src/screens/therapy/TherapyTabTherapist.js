@@ -13,7 +13,6 @@ import { TherapistWeekStrip } from '../../components/TherapistWeekStrip';
 import { TherapistDayTimeline } from '../../components/TherapistDayTimeline';
 import { TherapistMonthCalendar } from '../../components/TherapistMonthCalendar';
 import { TherapistTimeline } from '../../components/SlotComposer';
-import { WorkingHoursScreen } from './WorkingHoursScreen';
 
 const shouldShowSectionLoading = (isLoading, lastLoadedAt) => isLoading && lastLoadedAt === 0;
 
@@ -163,7 +162,6 @@ export function TherapyTabTherapist({
   const [visibleWeekStart, setVisibleWeekStart] = useState(() => startOfWeek(new Date()));
   const [filterListKind, setFilterListKind] = useState(null); // null | 'free' | 'booked' | 'pending'
   const [viewMode, setViewMode] = useState('list'); // 'list' | 'calendar'
-  const [showWorkingHours, setShowWorkingHours] = useState(false);
   const [showDeleteFreeSlotsModal, setShowDeleteFreeSlotsModal] = useState(false);
   const [deleteFreeSlotsLoading, setDeleteFreeSlotsLoading] = useState(false);
   const [visibleMonth, setVisibleMonth] = useState(() => ({
@@ -249,12 +247,6 @@ export function TherapyTabTherapist({
     }
   };
 
-  if (showWorkingHours) {
-    return (
-      <WorkingHoursScreen c={c} authToken={authToken} onBack={() => setShowWorkingHours(false)} />
-    );
-  }
-
   if (filterListKind) {
     return (
       <View style={{ flex: 1 }}>
@@ -317,13 +309,6 @@ export function TherapyTabTherapist({
         subtitle="Termine"
         rightSlot={slotBookingEnabled ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Pressable
-              onPress={() => setShowWorkingHours(true)}
-              hitSlop={8}
-              style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: c.mutedBg, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' }}
-            >
-              <Ionicons name="time-outline" size={16} color={c.primary} />
-            </Pressable>
             <Pressable
               onPress={() => setShowSlotComposerModal(true)}
               style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: c.primary, borderRadius: 999, paddingVertical: 10, paddingHorizontal: 14 }}

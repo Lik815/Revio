@@ -36,6 +36,7 @@ import {
 import { ProfileChecklist } from '../../components/ProfileChecklist';
 import { ProfileCompletionWizard } from '../../components/ProfileCompletionWizard';
 import { useAuth } from '../../context/AuthContext';
+import { WorkingHoursScreen } from '../therapy/WorkingHoursScreen';
 
 const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024;
 
@@ -144,6 +145,7 @@ export function TherapistDashboardScreen({ c, t, styles, certificationOptions, s
   const [showSlotModal, setShowSlotModal] = useState(false);
   const [adminExpanded, setAdminExpanded] = useState(false);
   const [showWizard, setShowWizard] = useState(false);
+  const [showWorkingHours, setShowWorkingHours] = useState(false);
 
   // Load documents on mount / token change
   useEffect(() => {
@@ -325,6 +327,12 @@ export function TherapistDashboardScreen({ c, t, styles, certificationOptions, s
     await refreshProfile();
     onProfileSaved(t('alertHint') ?? 'Eingereicht', 'Dein Profil wurde zur Prüfung eingereicht.');
   };
+
+  if (showWorkingHours) {
+    return (
+      <WorkingHoursScreen c={c} authToken={authToken} onBack={() => setShowWorkingHours(false)} />
+    );
+  }
 
   const th = loggedInTherapist;
   if (!th) return null;
@@ -697,6 +705,21 @@ export function TherapistDashboardScreen({ c, t, styles, certificationOptions, s
         </View>
       ) : (
         <>
+          {/* ── Arbeitszeiten ────────────────────────────────────────── */}
+          {th.bookingMode === 'FIRST_APPOINTMENT_REQUEST' && (
+            <Pressable
+              onPress={() => setShowWorkingHours(true)}
+              style={{ backgroundColor: c.card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: c.border, padding: SPACE.lg, marginBottom: SPACE.md, flexDirection: 'row', alignItems: 'center', gap: SPACE.sm }}
+            >
+              <Ionicons name="time-outline" size={20} color={c.muted} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 15, fontWeight: '700', color: c.text }}>Arbeitszeiten</Text>
+                <Text style={{ fontSize: 12, color: c.muted, marginTop: 2 }}>Wiederkehrende Arbeitszeiten festlegen</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={c.muted} />
+            </Pressable>
+          )}
+
           {/* ── Kontakt ──────────────────────────────────────────────── */}
           <View style={{ backgroundColor: c.card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: c.border, padding: SPACE.lg, marginBottom: SPACE.md }}>
             <Text style={{ fontSize: 15, fontWeight: '700', color: c.text, marginBottom: SPACE.md }}>Kontakt</Text>

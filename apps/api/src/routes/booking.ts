@@ -195,7 +195,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
     const therapist = await resolveTherapist(fastify, token);
     if (!therapist) return reply.status(403).send({ error: 'Only therapists can create slots' });
     if (!canUseBookingMode(therapist)) {
-      return reply.status(400).send({ error: 'Booking requests can only be activated after profile approval' });
+      return reply.status(400).send({ error: 'Terminanfragen können erst nach der Profilprüfung aktiviert werden.' });
     }
 
     const schema = z.object({
@@ -352,7 +352,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
     const therapist = await resolveTherapist(fastify, token);
     if (!therapist) return reply.status(403).send({ error: 'Only therapists can manage working hours' });
     if (!canUseBookingMode(therapist)) {
-      return reply.status(400).send({ error: 'Booking requests can only be activated after profile approval' });
+      return reply.status(400).send({ error: 'Terminanfragen können erst nach der Profilprüfung aktiviert werden.' });
     }
 
     const ruleSchema = z.object({
