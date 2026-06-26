@@ -80,12 +80,27 @@ export function TherapyProvider({ children }) {
     if (!token) return;
     if (!background || slotsLastLoadedAt === 0) setSlotsLoading(true);
     try {
-      const res = await timedFetch('therapist/slots', `${getBaseUrl()}/therapist/slots`, {
-        headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setMySlots(Array.isArray(data.slots) ? data.slots : []);
+      const pastFrom = new Date();
+      pastFrom.setFullYear(pastFrom.getFullYear() - 1);
+      const now = new Date();
+      const headers = { ...TUNNEL_HEADERS, Authorization: `Bearer ${token}` };
+      const [futureRes, pastBookedRes] = await Promise.all([
+        timedFetch('therapist/slots', `${getBaseUrl()}/therapist/slots`, { headers }),
+        timedFetch(
+          'therapist/slots past booked',
+          `${getBaseUrl()}/therapist/slots?status=BOOKED&from=${encodeURIComponent(pastFrom.toISOString())}&to=${encodeURIComponent(now.toISOString())}`,
+          { headers },
+        ),
+      ]);
+      if (futureRes.ok || pastBookedRes.ok) {
+        const futureData = futureRes.ok ? await futureRes.json().catch(() => ({})) : {};
+        const pastBookedData = pastBookedRes.ok ? await pastBookedRes.json().catch(() => ({})) : {};
+        const merged = new Map();
+        [...(Array.isArray(futureData.slots) ? futureData.slots : []), ...(Array.isArray(pastBookedData.slots) ? pastBookedData.slots : [])]
+          .forEach((slot) => {
+            if (slot?.id) merged.set(slot.id, slot);
+          });
+        setMySlots([...merged.values()].sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt)));
         setSlotsLastLoadedAt(Date.now());
       }
     } catch {} finally { setSlotsLoading(false); }
