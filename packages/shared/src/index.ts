@@ -60,6 +60,39 @@ export interface CreateTherapistSlotsResponse {
   rejected: { startsAt: string; reason: 'past' }[];
 }
 
+// Recurring weekly working hours ("Arbeitszeiten"). See
+// docs/claude-therapist-working-hours-plan.md for the full design. One rule
+// covers a single contiguous time block on a single weekday — a weekday with
+// a lunch gap is two rules with the same weekday, not a different shape.
+export interface TherapistWorkingHoursRule {
+  id: string;
+  weekday: number; // 0-6, JS Date#getDay() convention (0=So..6=Sa)
+  startMinute: number;
+  endMinute: number;
+  durationMin: number;
+  intervalMin: number | null;
+  effectiveFrom: string | null;
+  effectiveUntil: string | null;
+  isActive: boolean;
+}
+
+export interface TherapistWorkingHoursRuleInput {
+  weekday: number;
+  startMinute: number;
+  endMinute: number;
+  durationMin: number;
+  intervalMin?: number | null;
+  effectiveFrom?: string | null;
+  effectiveUntil?: string | null;
+  isActive?: boolean;
+}
+
+export interface PutWorkingHoursResponse {
+  rules: TherapistWorkingHoursRule[];
+  materialized: { created: number; skipped: number };
+  pruned: number;
+}
+
 export interface BookingRequest {
   id: string;
   therapistId: string;

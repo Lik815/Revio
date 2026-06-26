@@ -19,6 +19,7 @@ import { bookingRoutes } from './routes/booking.js';
 import { reviewRoutes } from './routes/reviews.js';
 import { feedbackRoutes } from './routes/feedback.js';
 import { notificationRoutes } from './routes/notifications.js';
+import { materializeWorkingHours } from './utils/working-hours.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -79,6 +80,32 @@ export async function buildApp() {
     };
 
     setInterval(runExpiry, 5 * 60 * 1000);
+  });
+
+  // ── Scheduled materialization: keep each therapist's working-hours rolling
+  // window topped up as time passes (PUT /therapist/working-hours already
+  // materializes synchronously on save — this just extends the window
+  // forward for rules saved long ago).
+  app.addHook('onReady', () => {
+    const runWorkingHoursTopUp = async () => {
+      try {
+        const active = await app.prisma.therapistWorkingHoursRule.findMany({
+          where: { isActive: true },
+          select: { therapistId: true },
+          distinct: ['therapistId'],
+        });
+        for (const { therapistId } of active) {
+          await materializeWorkingHours(app, therapistId);
+        }
+        if (active.length > 0) {
+          app.log.info(`[working-hours] Topped up rolling window for ${active.length} therapist(s)`);
+        }
+      } catch (err) {
+        app.log.error({ err }, '[working-hours] Failed to top up rolling window');
+      }
+    };
+
+    setInterval(runWorkingHoursTopUp, 6 * 60 * 60 * 1000);
   });
 
   return app;

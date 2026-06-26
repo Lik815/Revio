@@ -353,6 +353,7 @@ export function TherapyTabScreen() {
           patientsLoading={patientsLoading}
           patientsLastLoadedAt={patientsLastLoadedAt}
           onSelectPatient={(patientId) => { markTap(patientId); setSelectedPatientId(patientId); }}
+          authToken={authToken}
           c={c} t={t} styles={appStyles}
         />
         <TherapistCancelModal

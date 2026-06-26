@@ -4,6 +4,7 @@ import { prisma } from '../src/plugins/prisma.js';
 import { hashPassword } from '../src/routes/auth-utils.js';
 import { getProfileStatus } from '../src/utils/profile-completeness.js';
 import { sha256 } from '../src/utils/hash.js';
+import { materializeWorkingHours } from '../src/utils/working-hours.js';
 
 process.env.DATABASE_URL ??= 'file:./prisma/test.db';
 process.env.REVIO_ADMIN_TOKEN ??= 'test-token';
@@ -3120,6 +3121,194 @@ describe('Slot-based Booking', () => {
     const found = res.json().find((b: { id: string }) => b.id === legacy.id);
     expect(found).toBeTruthy();
     expect(found.slot).toBeNull();
+  });
+});
+
+// ─── Therapist Working Hours ───────────────────────────────────────────────────
+
+describe('Therapist Working Hours', () => {
+  let therapistToken: string;
+  let therapistId: string;
+
+  beforeEach(async () => {
+    const therapist = await prisma.therapist.create({
+      data: {
+        email: 'working-hours-therapist@test.de',
+        fullName: 'Arbeitszeiten Therapeutin',
+        professionalTitle: 'Physiotherapeutin',
+        city: 'Berlin',
+        specializations: 'Rückenschmerzen',
+        languages: 'Deutsch',
+        reviewStatus: 'APPROVED',
+        isVisible: true,
+        bookingMode: 'FIRST_APPOINTMENT_REQUEST',
+        sessionToken: 'working-hours-therapist-token',
+      },
+    });
+    therapistToken = 'working-hours-therapist-token';
+    therapistId = therapist.id;
+  });
+
+  afterEach(async () => {
+    await prisma.bookingRequest.deleteMany();
+    await prisma.therapistSlot.deleteMany();
+    await prisma.therapistWorkingHoursRule.deleteMany();
+  });
+
+  function mondayRule(overrides: Record<string, unknown> = {}) {
+    return {
+      weekday: 1,
+      startMinute: 9 * 60,
+      endMinute: 9 * 60,
+      durationMin: 20,
+      ...overrides,
+    };
+  }
+
+  it('GET /therapist/working-hours — returns an empty list for a therapist with no rules', async () => {
+    const res = await app.inject({
+      method: 'GET', url: '/therapist/working-hours',
+      headers: { authorization: `Bearer ${therapistToken}` },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().rules).toEqual([]);
+  });
+
+  it('PUT /therapist/working-hours — saves rules and materializes future AVAILABLE slots', async () => {
+    const res = await app.inject({
+      method: 'PUT', url: '/therapist/working-hours',
+      headers: { authorization: `Bearer ${therapistToken}`, 'content-type': 'application/json' },
+      payload: { rules: [mondayRule()] },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.rules).toHaveLength(1);
+    expect(body.materialized.created).toBeGreaterThan(0);
+
+    const slots = await prisma.therapistSlot.findMany({ where: { therapistId } });
+    expect(slots.length).toBe(body.materialized.created);
+    slots.forEach((s) => {
+      expect(s.source).toBe('WORKING_HOURS');
+      expect(s.status).toBe('AVAILABLE');
+      expect(s.workingHoursRuleId).toBe(body.rules[0].id);
+    });
+  });
+
+  it('PUT /therapist/working-hours — rejects therapists without an approved/active booking mode', async () => {
+    await prisma.therapist.update({ where: { id: therapistId }, data: { reviewStatus: 'PENDING_REVIEW' } });
+    const res = await app.inject({
+      method: 'PUT', url: '/therapist/working-hours',
+      headers: { authorization: `Bearer ${therapistToken}`, 'content-type': 'application/json' },
+      payload: { rules: [mondayRule()] },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('PUT /therapist/working-hours — rejects an invalid rule (endMinute before startMinute)', async () => {
+    const res = await app.inject({
+      method: 'PUT', url: '/therapist/working-hours',
+      headers: { authorization: `Bearer ${therapistToken}`, 'content-type': 'application/json' },
+      payload: { rules: [mondayRule({ startMinute: 600, endMinute: 480 })] },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('PUT /therapist/working-hours — re-saving the same rules converges to the same slot count', async () => {
+    const first = await app.inject({
+      method: 'PUT', url: '/therapist/working-hours',
+      headers: { authorization: `Bearer ${therapistToken}`, 'content-type': 'application/json' },
+      payload: { rules: [mondayRule()] },
+    });
+    const firstCount = await prisma.therapistSlot.count({ where: { therapistId } });
+
+    // Each PUT prunes its own previously-generated AVAILABLE slots before
+    // regenerating, so re-saving identical rules must land on the exact same
+    // resulting slot count rather than accumulating duplicates.
+    const second = await app.inject({
+      method: 'PUT', url: '/therapist/working-hours',
+      headers: { authorization: `Bearer ${therapistToken}`, 'content-type': 'application/json' },
+      payload: { rules: [mondayRule()] },
+    });
+    const secondCount = await prisma.therapistSlot.count({ where: { therapistId } });
+
+    expect(first.statusCode).toBe(200);
+    expect(second.statusCode).toBe(200);
+    expect(secondCount).toBe(firstCount);
+  });
+
+  it('PUT /therapist/working-hours — changing rules never touches an already-BOOKED slot', async () => {
+    await app.inject({
+      method: 'PUT', url: '/therapist/working-hours',
+      headers: { authorization: `Bearer ${therapistToken}`, 'content-type': 'application/json' },
+      payload: { rules: [mondayRule()] },
+    });
+
+    const aSlot = await prisma.therapistSlot.findFirst({ where: { therapistId, source: 'WORKING_HOURS' } });
+    expect(aSlot).toBeTruthy();
+    await prisma.therapistSlot.update({ where: { id: aSlot!.id }, data: { status: 'BOOKED' } });
+
+    // Replace with a completely different rule (Tuesday instead of Monday) —
+    // the old Monday-derived slot must survive untouched because it's BOOKED.
+    const res = await app.inject({
+      method: 'PUT', url: '/therapist/working-hours',
+      headers: { authorization: `Bearer ${therapistToken}`, 'content-type': 'application/json' },
+      payload: { rules: [mondayRule({ weekday: 2 })] },
+    });
+    expect(res.statusCode).toBe(200);
+
+    const stillThere = await prisma.therapistSlot.findUnique({ where: { id: aSlot!.id } });
+    expect(stillThere).not.toBeNull();
+    expect(stillThere?.status).toBe('BOOKED');
+  });
+
+  it('PUT /therapist/working-hours — empty rules array clears rules and prunes future AVAILABLE slots, but keeps BOOKED ones', async () => {
+    await app.inject({
+      method: 'PUT', url: '/therapist/working-hours',
+      headers: { authorization: `Bearer ${therapistToken}`, 'content-type': 'application/json' },
+      payload: { rules: [mondayRule()] },
+    });
+
+    const generated = await prisma.therapistSlot.findMany({ where: { therapistId, source: 'WORKING_HOURS' } });
+    expect(generated.length).toBeGreaterThan(1);
+    const booked = generated[0];
+    await prisma.therapistSlot.update({ where: { id: booked.id }, data: { status: 'BOOKED' } });
+
+    const res = await app.inject({
+      method: 'PUT', url: '/therapist/working-hours',
+      headers: { authorization: `Bearer ${therapistToken}`, 'content-type': 'application/json' },
+      payload: { rules: [] },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().rules).toEqual([]);
+
+    const remaining = await prisma.therapistSlot.findMany({ where: { therapistId } });
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0].id).toBe(booked.id);
+    expect(remaining[0].status).toBe('BOOKED');
+
+    const remainingRules = await prisma.therapistWorkingHoursRule.findMany({ where: { therapistId } });
+    expect(remainingRules).toEqual([]);
+  });
+
+  it('materializeWorkingHours — re-running without pruning does not duplicate already-materialized slots', async () => {
+    await prisma.therapistWorkingHoursRule.create({
+      data: { therapistId, weekday: 1, startMinute: 9 * 60, endMinute: 9 * 60, durationMin: 20 },
+    });
+
+    const first = await materializeWorkingHours(app, therapistId);
+    expect(first.created).toBeGreaterThan(0);
+    const countAfterFirst = await prisma.therapistSlot.count({ where: { therapistId } });
+    expect(countAfterFirst).toBe(first.created);
+
+    // Simulates the periodic top-up job running again later without a
+    // preceding prune — must recognize the already-materialized slots and
+    // skip them rather than failing or duplicating.
+    const second = await materializeWorkingHours(app, therapistId);
+    const countAfterSecond = await prisma.therapistSlot.count({ where: { therapistId } });
+
+    expect(second.created).toBe(0);
+    expect(second.skipped).toBe(first.created);
+    expect(countAfterSecond).toBe(countAfterFirst);
   });
 });
 

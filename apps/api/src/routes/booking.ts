@@ -1,8 +1,12 @@
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import type { TherapistPatientListItem, TherapistPatientAppointment, CreateTherapistSlotsResponse } from '@revio/shared';
+import type {
+  TherapistPatientListItem, TherapistPatientAppointment, CreateTherapistSlotsResponse,
+  TherapistWorkingHoursRule, PutWorkingHoursResponse,
+} from '@revio/shared';
 import { sendPushNotification } from '../utils/push.js';
 import { expireStaleBookings } from '../utils/booking-expiry.js';
+import { materializeWorkingHours, pruneFutureWorkingHoursSlots } from '../utils/working-hours.js';
 
 async function resolvePatient(fastify: FastifyInstance, token: string) {
   const user = await fastify.prisma.user.findUnique({ where: { sessionToken: token } });
@@ -65,6 +69,23 @@ function parseBookingListQuery(query: Record<string, unknown>) {
 function serializeSlot(slot: { id: string; startsAt: Date; durationMin: number; status: string } | null | undefined) {
   if (!slot) return null;
   return { id: slot.id, startsAt: slot.startsAt.toISOString(), durationMin: slot.durationMin, status: slot.status };
+}
+
+function serializeWorkingHoursRule(rule: {
+  id: string; weekday: number; startMinute: number; endMinute: number; durationMin: number;
+  intervalMin: number | null; effectiveFrom: Date | null; effectiveUntil: Date | null; isActive: boolean;
+}): TherapistWorkingHoursRule {
+  return {
+    id: rule.id,
+    weekday: rule.weekday,
+    startMinute: rule.startMinute,
+    endMinute: rule.endMinute,
+    durationMin: rule.durationMin,
+    intervalMin: rule.intervalMin,
+    effectiveFrom: rule.effectiveFrom ? rule.effectiveFrom.toISOString() : null,
+    effectiveUntil: rule.effectiveUntil ? rule.effectiveUntil.toISOString() : null,
+    isActive: rule.isActive,
+  };
 }
 
 type PatientBooking = {
@@ -302,6 +323,87 @@ export async function bookingRoutes(fastify: FastifyInstance) {
     }
 
     return reply.send({ deletedIds: deletableIds, skipped });
+  });
+
+  // GET /therapist/working-hours — Eigene Arbeitszeiten-Regeln auflisten
+  fastify.get('/therapist/working-hours', async (request, reply) => {
+    const token = request.headers.authorization?.replace('Bearer ', '');
+    if (!token) return reply.status(401).send({ error: 'Unauthorized' });
+    const therapist = await resolveTherapist(fastify, token);
+    if (!therapist) return reply.status(403).send({ error: 'Only therapists can manage working hours' });
+
+    const rules = await fastify.prisma.therapistWorkingHoursRule.findMany({
+      where: { therapistId: therapist.id },
+      orderBy: [{ weekday: 'asc' }, { startMinute: 'asc' }],
+    });
+
+    return { rules: rules.map(serializeWorkingHoursRule) };
+  });
+
+  // PUT /therapist/working-hours — Arbeitszeiten-Regeln vollständig ersetzen
+  // und für das rollierende Fenster neu materialisieren. Ersetzt die
+  // komplette Regelmenge (kein Teil-Update einzelner Regeln) — passend zu
+  // einem einzelnen "Arbeitszeiten speichern"-CTA in der App.
+  fastify.put('/therapist/working-hours', async (request, reply) => {
+    const token = request.headers.authorization?.replace('Bearer ', '');
+    if (!token) return reply.status(401).send({ error: 'Unauthorized' });
+    const therapist = await resolveTherapist(fastify, token);
+    if (!therapist) return reply.status(403).send({ error: 'Only therapists can manage working hours' });
+    if (!canUseBookingMode(therapist)) {
+      return reply.status(400).send({ error: 'Booking requests can only be activated after profile approval' });
+    }
+
+    const ruleSchema = z.object({
+      weekday: z.number().int().min(0).max(6),
+      startMinute: z.number().int().min(0).max(1439),
+      endMinute: z.number().int().min(0).max(1439),
+      durationMin: z.number().int().min(5).max(120),
+      intervalMin: z.number().int().min(5).max(120).nullable().optional(),
+      effectiveFrom: z.string().datetime().nullable().optional(),
+      effectiveUntil: z.string().datetime().nullable().optional(),
+      isActive: z.boolean().optional(),
+    }).refine((r) => r.endMinute >= r.startMinute, { message: 'endMinute must be >= startMinute' });
+
+    const schema = z.object({ rules: z.array(ruleSchema).max(50) });
+    const parsed = schema.safeParse(request.body);
+    if (!parsed.success) return reply.status(400).send({ error: 'Invalid request', details: parsed.error.flatten() });
+
+    const now = new Date();
+
+    // BOOKED slots are never touched — pruning only ever targets future,
+    // still-AVAILABLE slots that the materializer itself created.
+    const pruned = await pruneFutureWorkingHoursSlots(fastify, therapist.id, now);
+
+    await fastify.prisma.therapistWorkingHoursRule.deleteMany({ where: { therapistId: therapist.id } });
+
+    const created = parsed.data.rules.length > 0
+      ? await fastify.prisma.$transaction(
+          parsed.data.rules.map((r) =>
+            fastify.prisma.therapistWorkingHoursRule.create({
+              data: {
+                therapistId: therapist.id,
+                weekday: r.weekday,
+                startMinute: r.startMinute,
+                endMinute: r.endMinute,
+                durationMin: r.durationMin,
+                intervalMin: r.intervalMin ?? null,
+                effectiveFrom: r.effectiveFrom ? new Date(r.effectiveFrom) : null,
+                effectiveUntil: r.effectiveUntil ? new Date(r.effectiveUntil) : null,
+                isActive: r.isActive ?? true,
+              },
+            }),
+          ),
+        )
+      : [];
+
+    const materialized = await materializeWorkingHours(fastify, therapist.id, { now });
+
+    const response: PutWorkingHoursResponse = {
+      rules: created.map(serializeWorkingHoursRule),
+      materialized,
+      pruned,
+    };
+    return reply.send(response);
   });
 
   // GET /therapist/patients — Eigene Patient:innen auflisten (dedupliziert über Buchungen)

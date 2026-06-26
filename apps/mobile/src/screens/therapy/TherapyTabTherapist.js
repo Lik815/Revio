@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import {
-  Alert, Pressable, RefreshControl, ScrollView,
+  ActivityIndicator, Modal, Pressable, RefreshControl, ScrollView,
   Text, View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,6 +13,7 @@ import { TherapistWeekStrip } from '../../components/TherapistWeekStrip';
 import { TherapistDayTimeline } from '../../components/TherapistDayTimeline';
 import { TherapistMonthCalendar } from '../../components/TherapistMonthCalendar';
 import { TherapistTimeline } from '../../components/SlotComposer';
+import { WorkingHoursScreen } from './WorkingHoursScreen';
 
 const shouldShowSectionLoading = (isLoading, lastLoadedAt) => isLoading && lastLoadedAt === 0;
 
@@ -21,6 +22,123 @@ const FILTER_LIST_TITLES = {
   booked: 'Gebuchte Termine',
   pending: 'Anfragen',
 };
+
+function DeleteFreeSlotsModal({ visible, count, loading, onClose, onConfirm, c }) {
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: 'rgba(16, 37, 49, 0.42)',
+          justifyContent: 'center',
+          padding: 22,
+        }}
+      >
+        <Pressable
+          disabled={loading}
+          onPress={onClose}
+          style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}
+        />
+        <View
+          style={{
+            backgroundColor: c.card,
+            borderRadius: 30,
+            padding: 22,
+            gap: 18,
+            borderWidth: 1,
+            borderColor: c.border,
+            shadowColor: '#102531',
+            shadowOpacity: 0.18,
+            shadowRadius: 28,
+            shadowOffset: { width: 0, height: 16 },
+            elevation: 18,
+          }}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 14 }}>
+            <View
+              style={{
+                width: 54,
+                height: 54,
+                borderRadius: 18,
+                backgroundColor: '#FFF1F1',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Ionicons name="trash-outline" size={26} color={c.error} />
+            </View>
+            <View style={{ flex: 1, gap: 6 }}>
+              <Text style={{ fontSize: 22, lineHeight: 27, fontWeight: '800', color: c.text }}>
+                Freie Termine löschen?
+              </Text>
+              <Text style={{ fontSize: 15, lineHeight: 22, color: c.muted }}>
+                Du löschst alle aktuell freien Termine. Gebuchte Termine bleiben bestehen.
+              </Text>
+            </View>
+          </View>
+
+          <View
+            style={{
+              borderRadius: 18,
+              backgroundColor: c.mutedBg,
+              borderWidth: 1,
+              borderColor: c.border,
+              padding: 16,
+              gap: 4,
+            }}
+          >
+            <Text style={{ fontSize: 13, fontWeight: '700', letterSpacing: 0.4, color: c.muted, textTransform: 'uppercase' }}>
+              Betroffen
+            </Text>
+            <Text style={{ fontSize: 28, fontWeight: '800', color: c.text }}>
+              {count} freie Termine
+            </Text>
+            <Text style={{ fontSize: 13, lineHeight: 19, color: c.muted }}>
+              Diese Aktion kann nicht rückgängig gemacht werden.
+            </Text>
+          </View>
+
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <Pressable
+              disabled={loading}
+              onPress={onClose}
+              style={{
+                flex: 1,
+                minHeight: 54,
+                borderRadius: 18,
+                backgroundColor: c.mutedBg,
+                alignItems: 'center',
+                justifyContent: 'center',
+                opacity: loading ? 0.55 : 1,
+              }}
+            >
+              <Text style={{ fontSize: 16, fontWeight: '800', color: c.text }}>Abbrechen</Text>
+            </Pressable>
+            <Pressable
+              disabled={loading}
+              onPress={onConfirm}
+              style={{
+                flex: 1,
+                minHeight: 54,
+                borderRadius: 18,
+                backgroundColor: c.error,
+                alignItems: 'center',
+                justifyContent: 'center',
+                opacity: loading ? 0.72 : 1,
+              }}
+            >
+              {loading ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text style={{ fontSize: 16, fontWeight: '800', color: '#fff' }}>Löschen</Text>
+              )}
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
 
 export function TherapyTabTherapist({
   mySlots, slotsLoading, incomingBookings, incomingBookingsLoading,
@@ -32,6 +150,7 @@ export function TherapyTabTherapist({
   loggedInTherapist,
   onActivateBookingRequests,
   heilmittelOptions,
+  authToken,
   c, t, styles,
 }) {
   const insets = useSafeAreaInsets();
@@ -44,6 +163,9 @@ export function TherapyTabTherapist({
   const [visibleWeekStart, setVisibleWeekStart] = useState(() => startOfWeek(new Date()));
   const [filterListKind, setFilterListKind] = useState(null); // null | 'free' | 'booked' | 'pending'
   const [viewMode, setViewMode] = useState('list'); // 'list' | 'calendar'
+  const [showWorkingHours, setShowWorkingHours] = useState(false);
+  const [showDeleteFreeSlotsModal, setShowDeleteFreeSlotsModal] = useState(false);
+  const [deleteFreeSlotsLoading, setDeleteFreeSlotsLoading] = useState(false);
   const [visibleMonth, setVisibleMonth] = useState(() => ({
     year: startOfDay(new Date()).getFullYear(),
     month: startOfDay(new Date()).getMonth(),
@@ -111,21 +233,39 @@ export function TherapyTabTherapist({
   };
 
   const handleDeleteAllFreeSlots = () => {
-    const ids = freeSlots.map((s) => s.id);
-    if (ids.length === 0) return;
-    Alert.alert(
-      'Alle freien Termine löschen',
-      `Möchtest du wirklich alle ${ids.length} freien Termine löschen? Das kann nicht rückgängig gemacht werden.`,
-      [
-        { text: 'Abbrechen', style: 'cancel' },
-        { text: 'Löschen', style: 'destructive', onPress: () => onBulkDeleteSlots?.(ids) },
-      ],
-    );
+    if (freeSlots.length === 0) return;
+    setShowDeleteFreeSlotsModal(true);
   };
+
+  const handleConfirmDeleteAllFreeSlots = async () => {
+    const ids = freeSlots.map((s) => s.id);
+    if (ids.length === 0 || deleteFreeSlotsLoading) return;
+    setDeleteFreeSlotsLoading(true);
+    try {
+      await onBulkDeleteSlots?.(ids);
+      setShowDeleteFreeSlotsModal(false);
+    } finally {
+      setDeleteFreeSlotsLoading(false);
+    }
+  };
+
+  if (showWorkingHours) {
+    return (
+      <WorkingHoursScreen c={c} authToken={authToken} onBack={() => setShowWorkingHours(false)} />
+    );
+  }
 
   if (filterListKind) {
     return (
       <View style={{ flex: 1 }}>
+        <DeleteFreeSlotsModal
+          visible={showDeleteFreeSlotsModal}
+          count={freeSlots.length}
+          loading={deleteFreeSlotsLoading}
+          onClose={() => setShowDeleteFreeSlotsModal(false)}
+          onConfirm={handleConfirmDeleteAllFreeSlots}
+          c={c}
+        />
         <View style={{ paddingHorizontal: 16, paddingTop: insets.top + 8, paddingBottom: 10, backgroundColor: c.background }}>
           <Pressable
             onPress={() => setFilterListKind(null)}
@@ -137,7 +277,11 @@ export function TherapyTabTherapist({
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
             <Text style={[styles.headerTitle, { color: c.text }]}>{FILTER_LIST_TITLES[filterListKind]}</Text>
             {filterListKind === 'free' && freeSlots.length > 0 ? (
-              <Pressable onPress={handleDeleteAllFreeSlots} hitSlop={8}>
+              <Pressable
+                onPress={handleDeleteAllFreeSlots}
+                hitSlop={{ top: 14, right: 14, bottom: 14, left: 14 }}
+                style={{ minHeight: 40, paddingLeft: 14, alignItems: 'center', justifyContent: 'center' }}
+              >
                 <Text style={{ fontSize: 13, fontWeight: '600', color: c.error }}>Alle löschen</Text>
               </Pressable>
             ) : null}
@@ -172,13 +316,22 @@ export function TherapyTabTherapist({
         c={c}
         subtitle="Termine"
         rightSlot={slotBookingEnabled ? (
-          <Pressable
-            onPress={() => setShowSlotComposerModal(true)}
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: c.primary, borderRadius: 999, paddingVertical: 10, paddingHorizontal: 14 }}
-          >
-            <Ionicons name="calendar-outline" size={15} color="#fff" />
-            <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>+ Termin</Text>
-          </Pressable>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Pressable
+              onPress={() => setShowWorkingHours(true)}
+              hitSlop={8}
+              style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: c.mutedBg, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' }}
+            >
+              <Ionicons name="time-outline" size={16} color={c.primary} />
+            </Pressable>
+            <Pressable
+              onPress={() => setShowSlotComposerModal(true)}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: c.primary, borderRadius: 999, paddingVertical: 10, paddingHorizontal: 14 }}
+            >
+              <Ionicons name="calendar-outline" size={15} color="#fff" />
+              <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>+ Termin</Text>
+            </Pressable>
+          </View>
         ) : null}
       />
 
