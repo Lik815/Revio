@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import { AuthHero } from '../../components/auth/AuthHero';
 import { AuthPrimaryButton } from '../../components/auth/AuthPrimaryButton';
 import { AuthScreenShell } from '../../components/auth/AuthScreenShell';
@@ -20,8 +21,10 @@ import {
 } from '../../utils/app-utils';
 import { useAuth } from '../../context/AuthContext';
 import { useTherapyData } from '../../context/TherapyContext';
+import { ROOT_ROUTES } from '../../navigation/route-names';
 
 export function LoginScreen({ c, styles, t, onClose, bookingTargetTherapist, onBookingReady, showBackButton = true }) {
+  const navigation = useNavigation();
   const { loginAsTherapist, loginAsPatient } = useAuth();
   const { loadFavorites, loadMyAppointments, loadIncomingBookings } = useTherapyData();
   const insets = useSafeAreaInsets();
@@ -198,6 +201,13 @@ export function LoginScreen({ c, styles, t, onClose, bookingTargetTherapist, onB
         styles={styles}
         style={{ marginTop: 24 }}
       />
+
+      <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 18 }}>
+        <Text style={{ fontSize: 14, color: c.muted }}>Noch kein Konto?</Text>
+        <Pressable onPress={() => navigation.navigate(ROOT_ROUTES.REGISTRATION)} hitSlop={8}>
+          <Text style={{ fontSize: 14, fontWeight: '700', color: c.primary }}>{t('registerBtn')}</Text>
+        </Pressable>
+      </View>
 
       {/* Demo logins */}
       <View style={{ marginTop: 28 }}>
