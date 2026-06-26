@@ -27,11 +27,13 @@ export function CustomTabBar({ state, descriptors, navigation, badgeCounts = {} 
   const [containerWidth, setContainerWidth] = useState(0);
   const fullWidth = containerWidth > 0 ? containerWidth - SPACE.lg * 2 : Math.max(0, width - SPACE.lg * 2);
   const targetNavWidth = isGuestTabBar ? compactWidth : fullWidth;
+  const contentWidth = targetNavWidth;
 
   const [rowWidth, setRowWidth] = useState(0);
   const itemWidth = rowWidth / state.routes.length;
   const pillX = useRef(new Animated.Value(0)).current;
   const navWidth = useRef(new Animated.Value(targetNavWidth)).current;
+  const contentOpacity = useRef(new Animated.Value(1)).current;
   const prevIsGuestTabBarRef = useRef(isGuestTabBar);
 
   useEffect(() => {
@@ -54,14 +56,26 @@ export function CustomTabBar({ state, descriptors, navigation, badgeCounts = {} 
     prevIsGuestTabBarRef.current = isGuestTabBar;
 
     if (loginStateChanged) {
-      Animated.spring(navWidth, {
-        toValue: targetNavWidth,
-        useNativeDriver: false,
-        speed: 18,
-        bounciness: 6,
-      }).start();
+      contentOpacity.setValue(0);
+      Animated.parallel([
+        Animated.spring(navWidth, {
+          toValue: targetNavWidth,
+          useNativeDriver: false,
+          speed: 16,
+          bounciness: 4,
+        }),
+        Animated.sequence([
+          Animated.delay(70),
+          Animated.timing(contentOpacity, {
+            toValue: 1,
+            duration: 180,
+            useNativeDriver: true,
+          }),
+        ]),
+      ]).start();
     } else {
       navWidth.setValue(targetNavWidth);
+      contentOpacity.setValue(1);
     }
   }, [targetNavWidth, isGuestTabBar]);
 
@@ -77,10 +91,7 @@ export function CustomTabBar({ state, descriptors, navigation, badgeCounts = {} 
       }}
     >
       <Animated.View
-        onLayout={(e) => setRowWidth(e.nativeEvent.layout.width)}
         style={{
-          flexDirection: 'row',
-          alignItems: 'center',
           alignSelf: 'center',
           backgroundColor: c.nav,
           borderRadius: RADIUS.lg,
@@ -91,111 +102,121 @@ export function CustomTabBar({ state, descriptors, navigation, badgeCounts = {} 
           ...SHADOW.modal,
         }}
       >
-        {rowWidth > 0 && (
-          <Animated.View
-            pointerEvents="none"
-            style={{
-              position: 'absolute',
-              top: 0,
-              bottom: 0,
-              left: 0,
-              width: PILL_SIZE,
-              alignItems: 'center',
-              justifyContent: 'center',
-              transform: [{ translateX: pillX }],
-            }}
-          >
-            <View style={{ width: PILL_SIZE, height: PILL_SIZE, borderRadius: RADIUS.md, backgroundColor: c.primary }} />
-          </Animated.View>
-        )}
-
-        {state.routes.map((route, index) => {
-          const { options } = descriptors[route.key];
-          const focused = state.index === index;
-          const baseIcon = TAB_ICON_BY_ROUTE[route.name] ?? 'ellipse';
-          const iconName = focused ? baseIcon : `${baseIcon}-outline`;
-          const label = options.title ?? t[TAB_TRANSLATION_KEYS[route.name]] ?? route.name;
-          const nestedState = route.state;
-          const badgeCount = Number(badgeCounts[route.name] ?? 0);
-          const showLabel = !focused;
-
-          const onPress = () => {
-            const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
-            if (event.defaultPrevented) return;
-            const homeRoute = TAB_HOME_ROUTES[route.name];
-            if (!focused) {
-              navigation.navigate(route.name, homeRoute ? { screen: homeRoute } : undefined);
-            } else if (homeRoute) {
-              if (nestedState?.key) {
-                navigation.dispatch({ ...StackActions.popToTop(), target: nestedState.key });
-              }
-              if (route.name === TAB_ROUTES.DISCOVER) {
-                navigation.navigate(route.name, {
-                  screen: homeRoute,
-                  params: { resetToHomeAt: Date.now() },
-                });
-              }
-            }
-          };
-
-          return (
-            <Pressable
-              key={route.key}
-              accessibilityRole="button"
-              accessibilityState={focused ? { selected: true } : {}}
-              onPress={onPress}
-              style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
+        <Animated.View
+          onLayout={(e) => setRowWidth(e.nativeEvent.layout.width)}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            opacity: contentOpacity,
+            width: contentWidth,
+          }}
+        >
+          {rowWidth > 0 && (
+            <Animated.View
+              pointerEvents="none"
+              style={{
+                position: 'absolute',
+                top: 0,
+                bottom: 0,
+                left: 0,
+                width: PILL_SIZE,
+                alignItems: 'center',
+                justifyContent: 'center',
+                transform: [{ translateX: pillX }],
+              }}
             >
-              <View style={{ width: PILL_SIZE, height: PILL_SIZE, alignItems: 'center', justifyContent: 'center' }}>
-                <Ionicons
-                  name={iconName}
-                  size={focused ? 27 : 20}
-                  color={focused ? '#FFFFFF' : (c.textMuted ?? c.muted)}
-                  style={{ includeFontPadding: false, textAlignVertical: 'center', textAlign: 'center' }}
-                />
-                {badgeCount > 0 ? (
-                  <View
-                    style={{
-                      position: 'absolute',
-                      top: 6,
-                      right: 4,
-                      minWidth: 16,
-                      height: 16,
-                      paddingHorizontal: badgeCount > 9 ? 4 : 0,
-                      borderRadius: 8,
-                      backgroundColor: focused ? '#FFFFFF' : c.error,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <Text
+              <View style={{ width: PILL_SIZE, height: PILL_SIZE, borderRadius: RADIUS.md, backgroundColor: c.primary }} />
+            </Animated.View>
+          )}
+
+          {state.routes.map((route, index) => {
+            const { options } = descriptors[route.key];
+            const focused = state.index === index;
+            const baseIcon = TAB_ICON_BY_ROUTE[route.name] ?? 'ellipse';
+            const iconName = focused ? baseIcon : `${baseIcon}-outline`;
+            const label = options.title ?? t[TAB_TRANSLATION_KEYS[route.name]] ?? route.name;
+            const nestedState = route.state;
+            const badgeCount = Number(badgeCounts[route.name] ?? 0);
+            const showLabel = !focused;
+
+            const onPress = () => {
+              const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+              if (event.defaultPrevented) return;
+              const homeRoute = TAB_HOME_ROUTES[route.name];
+              if (!focused) {
+                navigation.navigate(route.name, homeRoute ? { screen: homeRoute } : undefined);
+              } else if (homeRoute) {
+                if (nestedState?.key) {
+                  navigation.dispatch({ ...StackActions.popToTop(), target: nestedState.key });
+                }
+                if (route.name === TAB_ROUTES.DISCOVER) {
+                  navigation.navigate(route.name, {
+                    screen: homeRoute,
+                    params: { resetToHomeAt: Date.now() },
+                  });
+                }
+              }
+            };
+
+            return (
+              <Pressable
+                key={route.key}
+                accessibilityRole="button"
+                accessibilityState={focused ? { selected: true } : {}}
+                onPress={onPress}
+                style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
+              >
+                <View style={{ width: PILL_SIZE, height: PILL_SIZE, alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons
+                    name={iconName}
+                    size={focused ? 27 : 20}
+                    color={focused ? '#FFFFFF' : (c.textMuted ?? c.muted)}
+                    style={{ includeFontPadding: false, textAlignVertical: 'center', textAlign: 'center' }}
+                  />
+                  {badgeCount > 0 ? (
+                    <View
                       style={{
-                        fontSize: 10,
-                        fontWeight: '700',
-                        color: focused ? c.primary : '#FFFFFF',
+                        position: 'absolute',
+                        top: 6,
+                        right: 4,
+                        minWidth: 16,
+                        height: 16,
+                        paddingHorizontal: badgeCount > 9 ? 4 : 0,
+                        borderRadius: 8,
+                        backgroundColor: focused ? '#FFFFFF' : c.error,
+                        alignItems: 'center',
+                        justifyContent: 'center',
                       }}
                     >
-                      {badgeCount > 99 ? '99+' : badgeCount}
-                    </Text>
-                  </View>
-                ) : null}
-              </View>
-              {showLabel && (
-                <Text
-                  numberOfLines={1}
-                  style={{
-                    fontSize: 11,
-                    fontWeight: focused ? '700' : '400',
-                    color: focused ? c.primary : (c.textMuted ?? c.muted),
-                    marginTop: -SPACE.xs,
-                  }}
-                >
-                  {label}
-                </Text>
-              )}
-            </Pressable>
-          );
-        })}
+                      <Text
+                        style={{
+                          fontSize: 10,
+                          fontWeight: '700',
+                          color: focused ? c.primary : '#FFFFFF',
+                        }}
+                      >
+                        {badgeCount > 99 ? '99+' : badgeCount}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+                {showLabel && (
+                  <Text
+                    numberOfLines={1}
+                    style={{
+                      fontSize: 11,
+                      fontWeight: focused ? '700' : '400',
+                      color: focused ? c.primary : (c.textMuted ?? c.muted),
+                      marginTop: -SPACE.xs,
+                    }}
+                  >
+                    {label}
+                  </Text>
+                )}
+              </Pressable>
+            );
+          })}
+        </Animated.View>
       </Animated.View>
     </View>
   );
