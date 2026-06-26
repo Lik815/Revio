@@ -98,6 +98,7 @@ type PatientBooking = {
   heilmittel: string | null;
   kassenart: string | null;
   declinedReason: string | null;
+  cancelReason: string | null;
   patientPhone: string | null;
   slot: { id: string; startsAt: Date; durationMin: number; status: string } | null;
 };
@@ -140,6 +141,7 @@ function serializePatientAppointment(booking: PatientBooking): TherapistPatientA
     heilmittel: booking.heilmittel,
     kassenart: booking.kassenart,
     declinedReason: booking.declinedReason,
+    cancelReason: booking.cancelReason,
   };
 }
 
@@ -701,8 +703,22 @@ export async function bookingRoutes(fastify: FastifyInstance) {
     if (booking.patientUserId !== patient.id) return reply.status(403).send({ error: 'Not your booking' });
     if (booking.status !== 'PENDING' && booking.status !== 'CONFIRMED') return reply.status(400).send({ error: 'Only pending or confirmed bookings can be cancelled' });
 
+    // Reason is only required once a booking was actually CONFIRMED — a
+    // still-PENDING request never became a real appointment, so there is
+    // nothing to explain yet.
+    const cancelSchema = z.object({ cancelReason: z.string().trim().max(500).optional() });
+    const parsedCancel = cancelSchema.safeParse(request.body ?? {});
+    if (!parsedCancel.success) return reply.status(400).send({ error: 'Invalid request', details: parsedCancel.error.flatten() });
+    const cancelReason = parsedCancel.data.cancelReason || null;
+    if (booking.status === 'CONFIRMED' && !cancelReason) {
+      return reply.status(400).send({ error: 'Bitte gib einen Grund an.' });
+    }
+
     const updated = await fastify.prisma.$transaction(async (tx) => {
-      const u = await tx.bookingRequest.update({ where: { id }, data: { status: 'CANCELLED', respondedAt: new Date(), slotId: null } });
+      const u = await tx.bookingRequest.update({
+        where: { id },
+        data: { status: 'CANCELLED', respondedAt: new Date(), slotId: null, cancelReason, cancelledBy: 'PATIENT', cancelledAt: new Date() },
+      });
       if (booking.slotId) {
         await tx.therapistSlot.update({ where: { id: booking.slotId }, data: { status: 'AVAILABLE' } });
       }
@@ -716,7 +732,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
         booking.therapist.expoPushToken,
         isConfirmed ? 'Termin storniert' : 'Terminanfrage storniert',
         isConfirmed
-          ? `${patientName} hat den bestätigten Termin storniert.`
+          ? `${patientName} hat den bestätigten Termin storniert. Der Grund ist in den Termindetails sichtbar.`
           : `${patientName} hat die Buchungsanfrage storniert.`,
         { bookingId: booking.id, screen: 'bookings' },
       );
@@ -738,8 +754,20 @@ export async function bookingRoutes(fastify: FastifyInstance) {
     if (booking.therapistId !== therapist.id) return reply.status(403).send({ error: 'Not your booking' });
     if (booking.status !== 'CONFIRMED') return reply.status(400).send({ error: 'Only confirmed bookings can be cancelled this way' });
 
+    // This endpoint only ever cancels CONFIRMED bookings, so the reason is
+    // unconditionally required (no PENDING case to exempt, unlike /cancel).
+    const therapistCancelSchema = z.object({ cancelReason: z.string().trim().max(500) });
+    const parsedTherapistCancel = therapistCancelSchema.safeParse(request.body ?? {});
+    if (!parsedTherapistCancel.success || !parsedTherapistCancel.data.cancelReason) {
+      return reply.status(400).send({ error: 'Bitte gib einen Grund an.' });
+    }
+    const cancelReason = parsedTherapistCancel.data.cancelReason;
+
     const updated = await fastify.prisma.$transaction(async (tx) => {
-      const u = await tx.bookingRequest.update({ where: { id }, data: { status: 'CANCELLED', respondedAt: new Date(), slotId: null } });
+      const u = await tx.bookingRequest.update({
+        where: { id },
+        data: { status: 'CANCELLED', respondedAt: new Date(), slotId: null, cancelReason, cancelledBy: 'THERAPIST', cancelledAt: new Date() },
+      });
       if (booking.slotId) {
         await tx.therapistSlot.update({ where: { id: booking.slotId }, data: { status: 'AVAILABLE' } });
       }
@@ -753,7 +781,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
       sendPushNotification(
         patientUser.expoPushToken,
         'Termin abgesagt',
-        `${therapist.fullName} musste deinen Termin leider absagen.`,
+        `${therapist.fullName} musste deinen Termin leider absagen. Der Grund ist in den Termindetails sichtbar.`,
         { bookingId: booking.id, screen: 'bookings' },
       );
     }

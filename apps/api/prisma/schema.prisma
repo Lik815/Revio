@@ -76,6 +76,11 @@ enum TherapistReviewStatus {
   REPORTED
 }
 
+enum CancelledBy {
+  PATIENT
+  THERAPIST
+}
+
 model User {
   id                     String                  @id @default(cuid())
   email                  String                  @unique
@@ -312,6 +317,9 @@ model BookingRequest {
   heilmittel           String?
   kassenart            String?
   declinedReason       String?
+  cancelReason         String?
+  cancelledBy          CancelledBy?
+  cancelledAt          DateTime?
   consentAcceptedAt    DateTime
   createdAt            DateTime             @default(now())
   responseDueAt        DateTime

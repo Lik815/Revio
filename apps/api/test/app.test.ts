@@ -2941,6 +2941,134 @@ describe('Slot-based Booking', () => {
     expect(updatedSlot?.status).toBe('AVAILABLE');
   });
 
+  it('PATCH /bookings/:id/cancel — PENDING cancel needs no reason, even with no body at all', async () => {
+    const slot = await createFutureSlot();
+    const bookRes = await app.inject({
+      method: 'POST', url: '/bookings',
+      headers: { authorization: `Bearer ${patientToken}`, 'content-type': 'application/json' },
+      payload: { therapistId, slotId: slot.id, consentAccepted: true },
+    });
+
+    const cancelRes = await app.inject({
+      method: 'PATCH', url: `/bookings/${bookRes.json().id}/cancel`,
+      headers: { authorization: `Bearer ${patientToken}` },
+    });
+    expect(cancelRes.statusCode).toBe(200);
+  });
+
+  it('PATCH /bookings/:id/cancel — CONFIRMED cancel without a reason is rejected', async () => {
+    const slot = await createFutureSlot();
+    const bookRes = await app.inject({
+      method: 'POST', url: '/bookings',
+      headers: { authorization: `Bearer ${patientToken}`, 'content-type': 'application/json' },
+      payload: { therapistId, slotId: slot.id, consentAccepted: true },
+    });
+    await app.inject({
+      method: 'PATCH', url: `/bookings/${bookRes.json().id}/respond`,
+      headers: { authorization: `Bearer ${therapistToken}`, 'content-type': 'application/json' },
+      payload: { action: 'CONFIRM' },
+    });
+
+    const cancelRes = await app.inject({
+      method: 'PATCH', url: `/bookings/${bookRes.json().id}/cancel`,
+      headers: { authorization: `Bearer ${patientToken}` },
+    });
+    expect(cancelRes.statusCode).toBe(400);
+
+    const stillConfirmed = await prisma.bookingRequest.findUnique({ where: { id: bookRes.json().id } });
+    expect(stillConfirmed?.status).toBe('CONFIRMED');
+  });
+
+  it('PATCH /bookings/:id/cancel — CONFIRMED cancel with a reason stores it and surfaces it on GET /bookings/my', async () => {
+    const slot = await createFutureSlot();
+    const bookRes = await app.inject({
+      method: 'POST', url: '/bookings',
+      headers: { authorization: `Bearer ${patientToken}`, 'content-type': 'application/json' },
+      payload: { therapistId, slotId: slot.id, consentAccepted: true },
+    });
+    await app.inject({
+      method: 'PATCH', url: `/bookings/${bookRes.json().id}/respond`,
+      headers: { authorization: `Bearer ${therapistToken}`, 'content-type': 'application/json' },
+      payload: { action: 'CONFIRM' },
+    });
+
+    const cancelRes = await app.inject({
+      method: 'PATCH', url: `/bookings/${bookRes.json().id}/cancel`,
+      headers: { authorization: `Bearer ${patientToken}`, 'content-type': 'application/json' },
+      payload: { cancelReason: 'Ich bin verhindert' },
+    });
+    expect(cancelRes.statusCode).toBe(200);
+    expect(cancelRes.json().cancelReason).toBe('Ich bin verhindert');
+    expect(cancelRes.json().cancelledBy).toBe('PATIENT');
+    expect(cancelRes.json().cancelledAt).toBeTruthy();
+
+    const myBookings = await app.inject({
+      method: 'GET', url: '/bookings/my',
+      headers: { authorization: `Bearer ${patientToken}` },
+    });
+    const mine = myBookings.json().find((b: { id: string }) => b.id === bookRes.json().id);
+    expect(mine.cancelReason).toBe('Ich bin verhindert');
+  });
+
+  it('PATCH /bookings/:id/therapist-cancel — rejects without a reason', async () => {
+    const slot = await createFutureSlot();
+    const bookRes = await app.inject({
+      method: 'POST', url: '/bookings',
+      headers: { authorization: `Bearer ${patientToken}`, 'content-type': 'application/json' },
+      payload: { therapistId, slotId: slot.id, consentAccepted: true },
+    });
+    await app.inject({
+      method: 'PATCH', url: `/bookings/${bookRes.json().id}/respond`,
+      headers: { authorization: `Bearer ${therapistToken}`, 'content-type': 'application/json' },
+      payload: { action: 'CONFIRM' },
+    });
+
+    const cancelRes = await app.inject({
+      method: 'PATCH', url: `/bookings/${bookRes.json().id}/therapist-cancel`,
+      headers: { authorization: `Bearer ${therapistToken}` },
+    });
+    expect(cancelRes.statusCode).toBe(400);
+  });
+
+  it('PATCH /bookings/:id/therapist-cancel — with a reason stores it and surfaces it on /bookings/incoming and /therapist/patients/:id', async () => {
+    const slot = await createFutureSlot();
+    const bookRes = await app.inject({
+      method: 'POST', url: '/bookings',
+      headers: { authorization: `Bearer ${patientToken}`, 'content-type': 'application/json' },
+      payload: { therapistId, slotId: slot.id, consentAccepted: true },
+    });
+    const bookingId = bookRes.json().id;
+    await app.inject({
+      method: 'PATCH', url: `/bookings/${bookingId}/respond`,
+      headers: { authorization: `Bearer ${therapistToken}`, 'content-type': 'application/json' },
+      payload: { action: 'CONFIRM' },
+    });
+
+    const cancelRes = await app.inject({
+      method: 'PATCH', url: `/bookings/${bookingId}/therapist-cancel`,
+      headers: { authorization: `Bearer ${therapistToken}`, 'content-type': 'application/json' },
+      payload: { cancelReason: 'Krankheitsbedingt' },
+    });
+    expect(cancelRes.statusCode).toBe(200);
+    expect(cancelRes.json().cancelReason).toBe('Krankheitsbedingt');
+    expect(cancelRes.json().cancelledBy).toBe('THERAPIST');
+
+    const incoming = await app.inject({
+      method: 'GET', url: '/bookings/incoming',
+      headers: { authorization: `Bearer ${therapistToken}` },
+    });
+    const incomingBooking = incoming.json().find((b: { id: string }) => b.id === bookingId);
+    expect(incomingBooking.cancelReason).toBe('Krankheitsbedingt');
+
+    const patientUser = await prisma.user.findUnique({ where: { email: 'slot-patient@test.de' } });
+    const patientDetail = await app.inject({
+      method: 'GET', url: `/therapist/patients/${patientUser!.id}`,
+      headers: { authorization: `Bearer ${therapistToken}` },
+    });
+    const appointment = patientDetail.json().appointments.find((a: { id: string }) => a.id === bookingId);
+    expect(appointment.cancelReason).toBe('Krankheitsbedingt');
+  });
+
   it('PATCH /bookings/:id/respond CONFIRM — booking confirmed, slot stays BOOKED', async () => {
     const slot = await createFutureSlot();
     const bookRes = await app.inject({

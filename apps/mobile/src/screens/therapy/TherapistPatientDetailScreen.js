@@ -51,6 +51,9 @@ const AppointmentRow = React.memo(function AppointmentRow({ c, appointment, onSe
       {appointment.status === 'DECLINED' && appointment.declinedReason ? (
         <Text style={{ fontSize: 12, color: c.error, marginTop: 8 }}>Grund: {appointment.declinedReason}</Text>
       ) : null}
+      {appointment.status === 'CANCELLED' && appointment.cancelReason ? (
+        <Text style={{ fontSize: 12, color: c.error, marginTop: 8 }}>Grund: {appointment.cancelReason}</Text>
+      ) : null}
     </Pressable>
   );
 });

@@ -110,6 +110,9 @@ export interface BookingRequest {
   message?: string | null;
   heilmittel?: string | null;
   kassenart?: string | null;
+  cancelReason?: string | null;
+  cancelledBy?: 'PATIENT' | 'THERAPIST' | null;
+  cancelledAt?: string | null;
   createdAt: string;
   responseDueAt: string;
   respondedAt?: string | null;
@@ -355,6 +358,7 @@ export interface TherapistPatientAppointment {
   heilmittel?: string | null;
   kassenart?: string | null;
   declinedReason?: string | null;
+  cancelReason?: string | null;
 }
 
 export interface TherapistPatientDetail {

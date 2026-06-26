@@ -1,9 +1,16 @@
-import React from 'react';
-import { Modal, Pressable, View, Text } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Modal, Pressable, TextInput, View, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 export function CancelAppointmentModal({ visible, onClose, onConfirm, appointment, c }) {
   const isConfirmed = appointment?.status === 'CONFIRMED';
+  const [reason, setReason] = useState('');
+
+  useEffect(() => {
+    if (!visible) setReason('');
+  }, [visible]);
+
+  const canConfirm = !isConfirmed || reason.trim().length > 0;
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -20,13 +27,28 @@ export function CancelAppointmentModal({ visible, onClose, onConfirm, appointmen
             </View>
             <Text style={{ fontSize: 14, color: c.muted, textAlign: 'center', lineHeight: 21 }}>
               {isConfirmed
-                ? 'Möchtest du diesen bestätigten Termin wirklich stornieren? Der Therapeut wird benachrichtigt.'
+                ? 'Warum möchtest du den Termin stornieren? Der Therapeut wird benachrichtigt.'
                 : 'Möchtest du diese Anfrage wirklich stornieren?'}
             </Text>
+            {isConfirmed ? (
+              <TextInput
+                value={reason}
+                onChangeText={setReason}
+                placeholder="Grund der Stornierung"
+                placeholderTextColor={c.muted}
+                multiline
+                style={{
+                  borderWidth: 1, borderColor: c.border, borderRadius: 12,
+                  backgroundColor: c.mutedBg, color: c.text, fontSize: 14,
+                  padding: 12, minHeight: 70, textAlignVertical: 'top',
+                }}
+              />
+            ) : null}
             <View style={{ gap: 10 }}>
               <Pressable
-                style={{ backgroundColor: '#DC2626', borderRadius: 14, paddingVertical: 14, alignItems: 'center' }}
-                onPress={onConfirm}
+                disabled={!canConfirm}
+                style={{ backgroundColor: '#DC2626', borderRadius: 14, paddingVertical: 14, alignItems: 'center', opacity: canConfirm ? 1 : 0.4 }}
+                onPress={() => onConfirm(reason.trim())}
               >
                 <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>Stornieren</Text>
               </Pressable>

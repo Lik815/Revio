@@ -23,6 +23,7 @@ import { useConfigOptions } from '../../hooks/use-config-options';
 import { markTap } from '../../utils/perf-log';
 
 const t = (key) => translations.de[key] ?? key;
+const BULK_DELETE_SLOT_BATCH_SIZE = 500;
 
 export function TherapyTabScreen() {
   const navigation = useNavigation();
@@ -118,25 +119,35 @@ export function TherapyTabScreen() {
 
   const handleBulkDeleteSlots = async (slotIds) => {
     if (!authToken || !slotIds?.length) return;
+    const deletedIds = new Set();
+    let bookedCount = 0;
     try {
-      const res = await fetch(`${getBaseUrl()}/therapist/slots/bulk-delete`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
-        body: JSON.stringify({ slotIds }),
-      });
-      if (!res.ok) return;
-      const data = await res.json().catch(() => null);
-      const deletedIds = new Set(data?.deletedIds ?? slotIds);
+      for (let i = 0; i < slotIds.length; i += BULK_DELETE_SLOT_BATCH_SIZE) {
+        const batch = slotIds.slice(i, i + BULK_DELETE_SLOT_BATCH_SIZE);
+        const res = await fetch(`${getBaseUrl()}/therapist/slots/bulk-delete`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
+          body: JSON.stringify({ slotIds: batch }),
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok) {
+          throw new Error(data?.error ?? 'Freie Termine konnten nicht gelöscht werden.');
+        }
+        (data?.deletedIds ?? batch).forEach((id) => deletedIds.add(id));
+        bookedCount += (data?.skipped ?? []).filter((s) => s.reason === 'booked').length;
+      }
       setMySlots((prev) => prev.filter((s) => !deletedIds.has(s.id)));
 
-      const bookedCount = (data?.skipped ?? []).filter((s) => s.reason === 'booked').length;
       if (bookedCount > 0) {
         Alert.alert(
           'Hinweis',
           `${bookedCount} ${bookedCount === 1 ? 'Termin wurde' : 'Termine wurden'} inzwischen gebucht und nicht gelöscht.`,
         );
       }
-    } catch {}
+    } catch (error) {
+      Alert.alert('Löschen fehlgeschlagen', error?.message ?? 'Bitte versuche es erneut.');
+      throw error;
+    }
   };
 
   // Patches the local incoming-bookings/slots cache from the PATCH response instead of
@@ -165,13 +176,14 @@ export function TherapyTabScreen() {
     }
   };
 
-  const handleTherapistCancelConfirm = async () => {
+  const handleTherapistCancelConfirm = async (reason) => {
     setShowTherapistCancelModal(false);
     if (!therapistCancelBookingId) return;
     const previousSlotId = incomingBookings.find((b) => b.id === therapistCancelBookingId)?.slot?.id ?? null;
     const res = await fetch(`${getBaseUrl()}/bookings/${therapistCancelBookingId}/therapist-cancel`, {
       method: 'PATCH',
-      headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
+      headers: { 'Content-Type': 'application/json', ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
+      body: JSON.stringify({ cancelReason: reason }),
     });
     if (res.ok) {
       const updated = await res.json().catch(() => null);
@@ -183,6 +195,9 @@ export function TherapyTabScreen() {
       } else {
         loadMySlots(authToken);
       }
+    } else {
+      const data = await res.json().catch(() => ({}));
+      Alert.alert('Absagen fehlgeschlagen', data.error ?? 'Bitte versuche es erneut.');
     }
     if (selectedTherapistPatientAppointment?.appointment?.id === therapistCancelBookingId) {
       setSelectedTherapistPatientAppointment(null);
@@ -234,23 +249,29 @@ export function TherapyTabScreen() {
     }
   };
 
-  const handlePatientCancelConfirm = async () => {
+  const handlePatientCancelConfirm = async (reason) => {
     if (!selectedAppointment) return;
     setShowCancelModal(false);
     const appointmentId = selectedAppointment.id;
     try {
       const res = await fetch(`${getBaseUrl()}/bookings/${appointmentId}/cancel`, {
         method: 'PATCH',
-        headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
+        headers: { 'Content-Type': 'application/json', ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({ cancelReason: reason || undefined }),
       });
       if (res.ok) {
         const updated = await res.json().catch(() => null);
         setMyAppointments((prev) => prev.map((a) => (
           a.id === appointmentId ? { ...a, ...(updated ?? { status: 'CANCELLED' }) } : a
         )));
+        setSelectedAppointment(null);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        Alert.alert('Stornieren fehlgeschlagen', data.error ?? 'Bitte versuche es erneut.');
       }
-      setSelectedAppointment(null);
-    } catch {}
+    } catch {
+      Alert.alert('Verbindungsfehler', 'Bitte versuche es erneut.');
+    }
   };
 
   if (selectedAppointment) {

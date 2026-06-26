@@ -188,6 +188,16 @@ export function TherapistAppointmentDetail({
               </>
             ) : null}
 
+            {appointment?.status === 'CANCELLED' && appointment?.cancelReason ? (
+              <>
+                <View style={{ height: 1, backgroundColor: c.border }} />
+                <View style={{ gap: 6, backgroundColor: '#FEF2F2', borderRadius: 12, padding: 14 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '700', letterSpacing: 0.4, color: '#DC2626', textTransform: 'uppercase' }}>Grund der Stornierung</Text>
+                  <Text style={{ fontSize: 14, lineHeight: 20, color: '#7F1D1D' }}>{appointment.cancelReason}</Text>
+                </View>
+              </>
+            ) : null}
+
             {isPending ? (
               <>
                 <View style={{ height: 1, backgroundColor: c.border }} />
