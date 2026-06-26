@@ -208,14 +208,20 @@ export const SeriesSlotComposer = forwardRef(function SeriesSlotComposer({ c, on
     return d;
   }, [endMode, endDate, startDate, weeksCount]);
 
+  // In Zeitblock mode, Takt already defines both the spacing between
+  // generated times and each appointment's length — a separate Dauer control
+  // would just duplicate that one number, so Dauer is hidden and Takt drives
+  // durationMin directly in that mode.
+  const effectiveDuration = timesMode === 'block' ? blockInterval : duration;
+
   const generatedSlots = useMemo(() => generateRecurringSlots({
     startDate,
     endDate: resolvedEndDate,
     weekdays: selectedWeekdays,
     times: selectedTimes,
-    durationMin: duration,
+    durationMin: effectiveDuration,
     intervalWeeks,
-  }), [startDate, resolvedEndDate, selectedWeekdays, selectedTimes, duration, intervalWeeks]);
+  }), [startDate, resolvedEndDate, selectedWeekdays, selectedTimes, effectiveDuration, intervalWeeks]);
 
   const count = generatedSlots.length;
   const overLimit = count > MAX_SLOTS;
@@ -299,23 +305,25 @@ export const SeriesSlotComposer = forwardRef(function SeriesSlotComposer({ c, on
         )}
       </View>
 
-      <View style={{ gap: 6 }}>
-        <Text style={{ fontSize: 11, fontWeight: '700', color: c.muted, letterSpacing: 0.5 }}>DAUER</Text>
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          {SLOT_DURATIONS.map((dur) => {
-            const active = duration === dur;
-            return (
-              <Pressable
-                key={dur}
-                onPress={() => setDuration(dur)}
-                style={{ flex: 1, paddingVertical: 7, borderRadius: RADIUS.sm, alignItems: 'center', borderWidth: 1.5, borderColor: active ? c.primary : c.border, backgroundColor: active ? c.primaryBg : c.mutedBg }}
-              >
-                <Text style={{ fontSize: 13, fontWeight: active ? '700' : '400', color: active ? c.primary : c.muted }}>{dur}'</Text>
-              </Pressable>
-            );
-          })}
+      {timesMode === 'einzeln' ? (
+        <View style={{ gap: 6 }}>
+          <Text style={{ fontSize: 11, fontWeight: '700', color: c.muted, letterSpacing: 0.5 }}>DAUER</Text>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            {SLOT_DURATIONS.map((dur) => {
+              const active = duration === dur;
+              return (
+                <Pressable
+                  key={dur}
+                  onPress={() => setDuration(dur)}
+                  style={{ flex: 1, paddingVertical: 7, borderRadius: RADIUS.sm, alignItems: 'center', borderWidth: 1.5, borderColor: active ? c.primary : c.border, backgroundColor: active ? c.primaryBg : c.mutedBg }}
+                >
+                  <Text style={{ fontSize: 13, fontWeight: active ? '700' : '400', color: active ? c.primary : c.muted }}>{dur}'</Text>
+                </Pressable>
+              );
+            })}
+          </View>
         </View>
-      </View>
+      ) : null}
 
       <View style={{ gap: 6 }}>
         <Text style={{ fontSize: 11, fontWeight: '700', color: c.muted, letterSpacing: 0.5 }}>WOCHENTAGE</Text>
