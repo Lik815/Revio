@@ -11,8 +11,9 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { getBaseUrl, kassenartOptions, RADIUS, SPACE, TYPE } from '../../utils/app-utils';
+import { getBaseUrl, kassenartOptions, RADIUS, SPACE, TUNNEL_HEADERS, TYPE } from '../../utils/app-utils';
 import { useConfigOptions } from '../../hooks/use-config-options';
+import { useAuth } from '../../context/AuthContext';
 
 function formatSlot(startsAt, durationMin) {
   if (!startsAt) return '—';
@@ -25,9 +26,12 @@ function formatSlot(startsAt, durationMin) {
 export function BookingRequestForm({ c, t, therapist, authToken, availableSlots, slotsLoading, onSuccess, onClose, onReloadSlots }) {
   const insets = useSafeAreaInsets();
   const { heilmittelOptions } = useConfigOptions();
+  const { loggedInPatient, setLoggedInPatient } = useAuth();
   const [selectedSlotId, setSelectedSlotId] = useState(therapist?.selectedSlotId ?? null);
   const [message, setMessage] = useState('');
   const [consent, setConsent] = useState(false);
+  const [phone, setPhone] = useState(loggedInPatient?.phone ?? '');
+  const [phoneConfirm, setPhoneConfirm] = useState(loggedInPatient?.phone ?? '');
   const [selectedHeilmittel, setSelectedHeilmittel] = useState(null);
   const [selectedKassenart, setSelectedKassenart] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -77,10 +81,31 @@ export function BookingRequestForm({ c, t, therapist, authToken, availableSlots,
     if (!selectedSlotId) { setError('Bitte wähle einen Termin aus.'); return; }
     if (availableHeilmittel.length > 0 && !selectedHeilmittel) { setError('Bitte wähle ein Heilmittel aus.'); return; }
     if (!selectedKassenart) { setError('Bitte gib an, wie du versichert bist.'); return; }
+    if (!phone.trim()) { setError('Bitte gib deine Telefonnummer ein.'); return; }
+    if (phone.trim() !== phoneConfirm.trim()) { setError('Die Telefonnummern stimmen nicht überein.'); return; }
     if (!consent) { setError('Bitte stimme der Datenschutzerklärung zu.'); return; }
     setError('');
     setLoading(true);
     try {
+      // The booking endpoint reads patientPhone straight from the stored
+      // profile, not from the request body — so a new/changed number has to
+      // land on the profile first, or the booking would silently carry the
+      // old (or no) number.
+      if (phone.trim() !== (loggedInPatient?.phone ?? '')) {
+        const phoneRes = await fetch(`${getBaseUrl()}/auth/me`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
+          body: JSON.stringify({ phone: phone.trim() }),
+        });
+        const phoneData = await phoneRes.json().catch(() => ({}));
+        if (!phoneRes.ok) {
+          setError(phoneData.message ?? 'Telefonnummer konnte nicht gespeichert werden.');
+          setLoading(false);
+          return;
+        }
+        setLoggedInPatient((prev) => ({ ...prev, phone: phoneData.phone ?? phone.trim() }));
+      }
+
       const res = await fetch(`${getBaseUrl()}/bookings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
@@ -300,6 +325,36 @@ export function BookingRequestForm({ c, t, therapist, authToken, availableSlots,
             );
           })}
         </View>
+      </View>
+
+      {/* Telefonnummer */}
+      <View style={{ marginBottom: SPACE.md }}>
+        <Text style={{ ...TYPE.label, color: c.text, marginBottom: SPACE.xs }}>Telefonnummer</Text>
+        <TextInput
+          value={phone}
+          onChangeText={setPhone}
+          placeholder={t('phonePlaceholder') ?? '+49 …'}
+          placeholderTextColor={c.muted}
+          keyboardType="phone-pad"
+          style={{
+            borderWidth: 1, borderColor: c.border, borderRadius: RADIUS.sm,
+            backgroundColor: c.mutedBg, color: c.text, fontSize: 15,
+            padding: 12, marginBottom: SPACE.sm,
+          }}
+        />
+        <Text style={{ ...TYPE.label, color: c.text, marginBottom: SPACE.xs }}>Telefonnummer bestätigen</Text>
+        <TextInput
+          value={phoneConfirm}
+          onChangeText={setPhoneConfirm}
+          placeholder={t('phonePlaceholder') ?? '+49 …'}
+          placeholderTextColor={c.muted}
+          keyboardType="phone-pad"
+          style={{
+            borderWidth: 1, borderColor: c.border, borderRadius: RADIUS.sm,
+            backgroundColor: c.mutedBg, color: c.text, fontSize: 15,
+            padding: 12,
+          }}
+        />
       </View>
 
       {/* Message */}
