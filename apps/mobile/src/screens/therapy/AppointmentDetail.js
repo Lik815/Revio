@@ -14,6 +14,7 @@ export function AppointmentDetail({
   appointment,
   onBack,
   onOpenTherapist,
+  onBookAgain,
   onCancelRequest,
   authToken,
   c, t, styles,
@@ -206,6 +207,17 @@ export function AppointmentDetail({
 
         {/* CTAs */}
         <View style={{ gap: 8 }}>
+          {therapist?.id && onBookAgain ? (
+            <Pressable
+              onPress={() => onBookAgain(therapist)}
+              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: c.primary, borderRadius: 999, paddingVertical: 12, gap: 8 }}
+            >
+              <Ionicons name="calendar-outline" size={18} color="#fff" />
+              <Text style={{ fontSize: 16, fontWeight: '700', color: '#fff' }}>Neuen Termin buchen</Text>
+              <Ionicons name="chevron-forward" size={16} color="#fff" />
+            </Pressable>
+          ) : null}
+
           {therapist ? (
             <Pressable
               onPress={() => {
@@ -213,11 +225,11 @@ export function AppointmentDetail({
                 if (therapist?.id) onOpenTherapist(therapist.id, therapist);
                 else setSelectedTherapist(therapist);
               }}
-              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: c.primary, borderRadius: 999, paddingVertical: 12, gap: 8 }}
+              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: c.mutedBg, borderRadius: 999, paddingVertical: 12, gap: 8, borderWidth: 1, borderColor: c.border }}
             >
-              <Ionicons name="person-outline" size={18} color="#fff" />
-              <Text style={{ fontSize: 16, fontWeight: '700', color: '#fff' }}>Profil ansehen</Text>
-              <Ionicons name="chevron-forward" size={16} color="#fff" />
+              <Ionicons name="person-outline" size={18} color={c.primary} />
+              <Text style={{ fontSize: 16, fontWeight: '700', color: c.primary }}>Profil ansehen</Text>
+              <Ionicons name="chevron-forward" size={16} color={c.primary} />
             </Pressable>
           ) : null}
 

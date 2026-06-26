@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { Ionicons, } from '@expo/vector-icons';
-import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
+import { Alert, Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { appStoreSelectors, useAppStore } from '../../store/useStore';
 import { useTheme } from '../../hooks/use-theme';
 import { appStyles } from '../../styles/app-styles';
 import { translations } from '../../i18n/translations';
 import { ROOT_ROUTES, TAB_ROUTES } from '../../navigation/route-names';
-import { getBaseUrl, normalizeTherapistProfile, TUNNEL_HEADERS } from '../../utils/app-utils';
+import { getBaseUrl, mapApiTherapist, normalizeTherapistProfile, TUNNEL_HEADERS } from '../../utils/app-utils';
 import { TabHeader } from '../../components/TabHeader';
 import { TherapyTabPatient } from './TherapyTabPatient';
 import { TherapyTabTherapist } from './TherapyTabTherapist';
@@ -18,6 +18,7 @@ import { CancelAppointmentModal } from '../../modals/CancelAppointmentModal';
 import { TherapistCancelModal } from '../../modals/TherapistCancelModal';
 import { SlotComposerModal } from '../../modals/SlotComposerModal';
 import { SlotCreatedModal } from '../../modals/SlotCreatedModal';
+import { BookingRequestForm } from '../public/BookingRequestForm';
 import { useTherapyData } from '../../context/TherapyContext';
 import { useConfigOptions } from '../../hooks/use-config-options';
 import { markTap } from '../../utils/perf-log';
@@ -59,6 +60,10 @@ export function TherapyTabScreen() {
   const [showSlotCreated, setShowSlotCreated] = useState(false);
   const [slotError, setSlotError] = useState('');
   const [isAddingSlots, setIsAddingSlots] = useState(false);
+  const [repeatBookingTherapist, setRepeatBookingTherapist] = useState(null);
+  const [repeatBookingSlots, setRepeatBookingSlots] = useState([]);
+  const [repeatBookingSlotsLoading, setRepeatBookingSlotsLoading] = useState(false);
+  const [showRepeatBookingForm, setShowRepeatBookingForm] = useState(false);
 
   useEffect(() => {
     if (!authToken) return;
@@ -72,6 +77,62 @@ export function TherapyTabScreen() {
 
   const openTherapistById = (id, fallback = null) => {
     navigation.navigate(ROOT_ROUTES.THERAPIST_PROFILE, { therapistId: id, therapist: fallback });
+  };
+
+  const loadRepeatBookingSlots = async (therapistId) => {
+    if (!therapistId) return [];
+    const res = await fetch(`${getBaseUrl()}/therapists/${therapistId}/slots`, {
+      headers: { ...TUNNEL_HEADERS },
+    });
+    if (!res.ok) return [];
+    const data = await res.json().catch(() => ({}));
+    return Array.isArray(data.slots) ? data.slots : [];
+  };
+
+  const handleBookAgain = async (therapist) => {
+    if (!authToken) {
+      navigation.navigate(ROOT_ROUTES.MAIN_TABS, { screen: TAB_ROUTES.AUTH });
+      return;
+    }
+    if (!therapist?.id) return;
+
+    setRepeatBookingTherapist(therapist);
+    setRepeatBookingSlots([]);
+    setRepeatBookingSlotsLoading(true);
+    setShowRepeatBookingForm(true);
+
+    try {
+      const [therapistRes, slots] = await Promise.all([
+        fetch(`${getBaseUrl()}/therapist/${therapist.id}`, { headers: { ...TUNNEL_HEADERS } }),
+        loadRepeatBookingSlots(therapist.id),
+      ]);
+      const therapistData = therapistRes.ok ? await therapistRes.json().catch(() => ({})) : {};
+      const fullTherapist = therapistData?.therapist ? mapApiTherapist(therapistData.therapist) : therapist;
+
+      if (fullTherapist?.bookingMode && fullTherapist.bookingMode !== 'FIRST_APPOINTMENT_REQUEST') {
+        Alert.alert('Terminbuchung nicht verfügbar', 'Dieser Therapeut nimmt aktuell keine Terminanfragen über Revio an.');
+        setShowRepeatBookingForm(false);
+        return;
+      }
+
+      setRepeatBookingTherapist(fullTherapist);
+      setRepeatBookingSlots(slots);
+    } catch {
+      Alert.alert('Termine konnten nicht geladen werden', 'Bitte versuche es erneut.');
+      setShowRepeatBookingForm(false);
+    } finally {
+      setRepeatBookingSlotsLoading(false);
+    }
+  };
+
+  const reloadRepeatBookingSlots = async () => {
+    if (!repeatBookingTherapist?.id) return;
+    setRepeatBookingSlotsLoading(true);
+    try {
+      setRepeatBookingSlots(await loadRepeatBookingSlots(repeatBookingTherapist.id));
+    } finally {
+      setRepeatBookingSlotsLoading(false);
+    }
   };
 
   const handleAddSlots = async (slots) => {
@@ -281,6 +342,7 @@ export function TherapyTabScreen() {
           appointment={selectedAppointment}
           onBack={() => setSelectedAppointment(null)}
           onOpenTherapist={openTherapistById}
+          onBookAgain={handleBookAgain}
           onCancelRequest={() => setShowCancelModal(true)}
           authToken={authToken}
           c={c} t={t} styles={appStyles}
@@ -292,6 +354,30 @@ export function TherapyTabScreen() {
           appointment={selectedAppointment}
           c={c}
         />
+        <Modal
+          visible={showRepeatBookingForm}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={() => setShowRepeatBookingForm(false)}
+        >
+          {repeatBookingTherapist ? (
+            <BookingRequestForm
+              c={c}
+              t={t}
+              therapist={repeatBookingTherapist}
+              authToken={authToken}
+              availableSlots={repeatBookingSlots}
+              slotsLoading={repeatBookingSlotsLoading}
+              onSuccess={() => {
+                setShowRepeatBookingForm(false);
+                setSelectedAppointment(null);
+                loadMyAppointments(authToken);
+              }}
+              onClose={() => setShowRepeatBookingForm(false)}
+              onReloadSlots={reloadRepeatBookingSlots}
+            />
+          ) : null}
+        </Modal>
       </>
     );
   }
