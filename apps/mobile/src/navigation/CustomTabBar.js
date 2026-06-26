@@ -84,6 +84,7 @@ export function CustomTabBar({ state, descriptors, navigation, badgeCounts = {} 
           alignSelf: 'center',
           backgroundColor: c.nav,
           borderRadius: RADIUS.lg,
+          overflow: 'hidden',
           paddingTop: SPACE.sm,
           paddingBottom: SPACE.sm,
           width: navWidth,

@@ -72,7 +72,6 @@ export function AppTabs() {
 
   return (
     <Tab.Navigator
-      key={!isLoggedIn ? 'guest-tabs' : isTherapist ? 'signed-in-therapist-tabs' : 'signed-in-patient-tabs'}
       tabBar={(props) => (
         <CustomTabBar
           {...props}
