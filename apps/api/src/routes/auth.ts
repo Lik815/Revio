@@ -67,6 +67,13 @@ const isDatabaseUnavailableError = (error: unknown) => {
   );
 };
 
+function activeAppointmentsMessage(count: number): string {
+  const subject = count === 1 ? '1 aktiven Termin' : `${count} aktive Termine`;
+  const pronoun = count === 1 ? 'ihn' : 'sie';
+  const verb = count === 1 ? 'er vorbei ist' : 'sie vorbei sind';
+  return `Du hast noch ${subject}. Bitte sage ${pronoun} zuerst ab oder warte, bis ${verb}.`;
+}
+
 export const authRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.post('/auth/login', async (request, reply) => {
     try {
@@ -673,6 +680,15 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
 
     // Patient deletion — delete User record directly
     if (user?.role === 'patient') {
+      const activeCount = await fastify.prisma.bookingRequest.count({
+        where: {
+          patientUserId: user.id,
+          status: { in: ['PENDING', 'CONFIRMED'] },
+          confirmedSlotAt: { gte: new Date() },
+        },
+      });
+      if (activeCount > 0) return reply.badRequest(activeAppointmentsMessage(activeCount));
+
       await fastify.prisma.user.delete({ where: { id: user.id } });
       return { success: true };
     }
@@ -684,6 +700,17 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       });
     }
     if (!therapist) return reply.unauthorized('Ungültiger Token');
+
+    {
+      const activeCount = await fastify.prisma.bookingRequest.count({
+        where: {
+          therapistId: therapist.id,
+          status: { in: ['PENDING', 'CONFIRMED'] },
+          confirmedSlotAt: { gte: new Date() },
+        },
+      });
+      if (activeCount > 0) return reply.badRequest(activeAppointmentsMessage(activeCount));
+    }
 
     await fastify.prisma.therapist.delete({ where: { id: therapist.id } });
     if (user) {

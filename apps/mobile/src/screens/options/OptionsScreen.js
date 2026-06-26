@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
+import { Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { appStoreSelectors, useAppStore } from '../../store/useStore';
 import { useTheme } from '../../hooks/use-theme';
 import { appStyles } from '../../styles/app-styles';
 import { translations } from '../../i18n/translations';
 import { ROOT_ROUTES, TAB_ROUTES } from '../../navigation/route-names';
+import { getBaseUrl } from '../../utils/app-utils';
 import { OptionsContent } from './OptionsContent';
 import { FeedbackModal } from '../../modals/FeedbackModal';
 import { ChangePasswordModal } from '../../modals/ChangePasswordModal';
@@ -34,6 +36,7 @@ export function OptionsTabScreen() {
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [showDeleteAccount, setShowDeleteAccount] = useState(false);
   const [showDebug, setShowDebug] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
   const handleLogout = async () => {
     await logoutFromContext();
@@ -42,9 +45,26 @@ export function OptionsTabScreen() {
   };
 
   const handleDeleteAccountConfirmed = async () => {
-    await logoutFromContext();
-    signOut();
-    showLoginTab(navigation);
+    if (isDeletingAccount) return;
+    setIsDeletingAccount(true);
+    try {
+      const res = await fetch(`${getBaseUrl()}/auth/me`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${authToken}` },
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        Alert.alert('Konto konnte nicht gelöscht werden', data.message ?? 'Bitte versuche es erneut.');
+        return;
+      }
+      await logoutFromContext();
+      signOut();
+      showLoginTab(navigation);
+    } catch {
+      Alert.alert('Verbindungsfehler', 'Bitte versuche es erneut.');
+    } finally {
+      setIsDeletingAccount(false);
+    }
   };
 
   return (
