@@ -35,17 +35,32 @@ export function CustomTabBar({ state, descriptors, navigation, badgeCounts = {} 
   const navWidth = useRef(new Animated.Value(targetNavWidth)).current;
   const contentOpacity = useRef(new Animated.Value(1)).current;
   const prevIsGuestTabBarRef = useRef(isGuestTabBar);
+  const snapPillAfterAuthChangeRef = useRef(false);
 
   useEffect(() => {
     if (!itemWidth) return;
     const toValue = state.index * itemWidth + (itemWidth - PILL_SIZE) / 2;
+    const layoutReady = Math.abs(rowWidth - contentWidth) < 1;
+
+    if (snapPillAfterAuthChangeRef.current) {
+      pillX.setValue(toValue);
+      if (!layoutReady) return;
+      snapPillAfterAuthChangeRef.current = false;
+      Animated.timing(contentOpacity, {
+        toValue: 1,
+        duration: 180,
+        useNativeDriver: true,
+      }).start();
+      return;
+    }
+
     Animated.spring(pillX, {
       toValue,
       useNativeDriver: true,
       speed: 18,
       bounciness: 6,
     }).start();
-  }, [state.index, itemWidth]);
+  }, [state.index, itemWidth, rowWidth, contentWidth]);
 
   // Only the guest<->logged-in transition itself should spring-animate the
   // width; layout-only changes (e.g. the container's first measurement,
@@ -56,24 +71,16 @@ export function CustomTabBar({ state, descriptors, navigation, badgeCounts = {} 
     prevIsGuestTabBarRef.current = isGuestTabBar;
 
     if (loginStateChanged) {
+      snapPillAfterAuthChangeRef.current = true;
       contentOpacity.setValue(0);
-      Animated.parallel([
-        Animated.spring(navWidth, {
-          toValue: targetNavWidth,
-          useNativeDriver: false,
-          speed: 16,
-          bounciness: 4,
-        }),
-        Animated.sequence([
-          Animated.delay(70),
-          Animated.timing(contentOpacity, {
-            toValue: 1,
-            duration: 180,
-            useNativeDriver: true,
-          }),
-        ]),
-      ]).start();
+      Animated.spring(navWidth, {
+        toValue: targetNavWidth,
+        useNativeDriver: false,
+        speed: 16,
+        bounciness: 4,
+      }).start();
     } else {
+      snapPillAfterAuthChangeRef.current = false;
       navWidth.setValue(targetNavWidth);
       contentOpacity.setValue(1);
     }
