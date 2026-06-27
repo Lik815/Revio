@@ -21,7 +21,7 @@ const registerSchema = z.object({
   street: z.string().optional(),
   houseNumber: z.string().optional(),
   locationPrecision: z.string().optional(),
-  gender: z.string().optional(),
+  gender: z.enum(['female', 'male']).optional(),
   compliance: z.object({
     taxRegistrationStatus: z.string().nullable().optional(),
     healthAuthorityStatus: z.string().nullable().optional(),

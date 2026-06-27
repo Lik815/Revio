@@ -48,6 +48,7 @@ export function RegistrationFlow({ onClose, onShowLogin, onComplete, c, t, style
   const [city, setCity] = useState('');
   const [cityTouched, setCityTouched] = useState(false);
   const [cityLookupLoading, setCityLookupLoading] = useState(false);
+  const [gender, setGender] = useState(null);
   const [basicError, setBasicError] = useState('');
 
   // Therapist track
@@ -209,6 +210,7 @@ export function RegistrationFlow({ onClose, onShowLogin, onComplete, c, t, style
         employmentStatus,
         specializations: specs,
         languages: ['de'],
+        gender,
       }),
     });
     const data = await res.json().catch(() => ({}));
@@ -222,6 +224,7 @@ export function RegistrationFlow({ onClose, onShowLogin, onComplete, c, t, style
     if (!firstName.trim() || !lastName.trim()) { setBasicError(t('patientRegNameRequired')); return; }
     if (role === 'therapist') {
       if (!city.trim()) { setBasicError('Bitte gib deine Stadt an.'); return; }
+      if (!gender) { setBasicError('Bitte wähle Therapeutin oder Therapeut aus.'); return; }
       setStep('employment');
       return;
     }
@@ -314,6 +317,7 @@ export function RegistrationFlow({ onClose, onShowLogin, onComplete, c, t, style
         city={city}
         onChangeCity={(v) => { setCity(v); setCityTouched(true); }}
         cityLoading={cityLookupLoading}
+        gender={gender} onChangeGender={setGender}
         error={basicError} loading={submitting}
         onSubmit={handleBasicSubmit}
         onBack={() => setStep('otp')}

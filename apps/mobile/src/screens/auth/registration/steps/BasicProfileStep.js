@@ -5,12 +5,18 @@ import { BackButton } from '../../../../components/BackButton';
 
 // Step 4 — first/last name for everyone; therapists also enter postal code +
 // city here (shown only when role === 'therapist').
+const GENDER_OPTIONS = [
+  { key: 'female', label: 'Therapeutin', icon: 'female-outline' },
+  { key: 'male', label: 'Therapeut', icon: 'male-outline' },
+];
+
 export function BasicProfileStep({
   role,
   firstName, onChangeFirstName,
   lastName, onChangeLastName,
   postalCode, onChangePostalCode,
   city, onChangeCity, cityLoading,
+  gender, onChangeGender,
   error, loading,
   onSubmit, onBack,
   c, t, styles,
@@ -81,6 +87,27 @@ export function BasicProfileStep({
             <Text style={{ fontSize: 12, color: c.muted, marginTop: -4 }}>
               Stadt wird aus der PLZ ermittelt. Falls nicht, bitte selbst eintragen.
             </Text>
+
+            <Text style={[styles.filterSectionTitle, { color: c.muted, marginTop: 4 }]}>Geschlecht</Text>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              {GENDER_OPTIONS.map((opt) => {
+                const active = gender === opt.key;
+                return (
+                  <Pressable
+                    key={opt.key}
+                    onPress={() => onChangeGender(opt.key)}
+                    style={[styles.kassenartBtn, {
+                      flexDirection: 'row', alignItems: 'center', gap: 5,
+                      backgroundColor: active ? c.primary : c.mutedBg,
+                      borderColor: active ? c.primary : c.border,
+                    }]}
+                  >
+                    <Ionicons name={opt.icon} size={13} color={active ? '#fff' : c.muted} />
+                    <Text style={[styles.kassenartText, { color: active ? '#fff' : c.text }]}>{opt.label}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
           </>
         )}
       </View>
