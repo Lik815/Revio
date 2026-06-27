@@ -113,16 +113,15 @@ export function AppTabs() {
           <Tab.Screen
             component={OptionsStack}
             name={TAB_ROUTES.OPTIONS}
-            options={{ title: t[TAB_TRANSLATION_KEYS[TAB_ROUTES.OPTIONS]] }}
-            listeners={({ navigation }) => ({
-              // Leaving the Optionen tab resets its nested stack back to the
-              // options home screen, so switching back into it always shows
-              // Optionen — Profil is then only reachable again via its own
-              // edit button, never by just returning to this tab.
-              blur: () => {
-                navigation.navigate(TAB_ROUTES.OPTIONS, { screen: 'OptionsHome' });
-              },
-            })}
+            // popToTopOnBlur resets the nested stack back to the options home
+            // screen whenever this tab loses focus, so switching back into it
+            // always shows Optionen — Profil is then only reachable again via
+            // its own edit button, never by just returning to this tab. Unlike
+            // a manual `navigate` call in a blur listener, this pops the
+            // nested stack in place without re-triggering a tab focus change
+            // (which previously made tab switches away from Optionen get
+            // reverted right back).
+            options={{ title: t[TAB_TRANSLATION_KEYS[TAB_ROUTES.OPTIONS]], popToTopOnBlur: true }}
           />
         </>
       ) : (
