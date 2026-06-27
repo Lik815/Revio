@@ -122,6 +122,7 @@ export function TherapyTabTherapist({
               onPrevMonth={calendarView.handlePrevMonth}
               onNextMonth={calendarView.handleNextMonth}
               onPressList={calendarView.handleShowList}
+              onPressToday={calendarView.handleGoToToday}
               onOpenBooking={onOpenBookingDetail}
               onCancelSlot={onCancelSlot}
               deletingSlotIds={deletingSlotIds}
@@ -138,6 +139,7 @@ export function TherapyTabTherapist({
                 onPrevWeek={calendarView.handlePrevWeek}
                 onNextWeek={calendarView.handleNextWeek}
                 onPressCalendar={calendarView.handleOpenCalendar}
+                onPressToday={calendarView.handleGoToToday}
               />
 
               <TherapistDayTimeline

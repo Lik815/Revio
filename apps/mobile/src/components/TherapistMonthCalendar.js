@@ -23,7 +23,7 @@ function getMonthDayStatuses(mySlots, bookingBySlotId, year, month) {
 
 export function TherapistMonthCalendar({
   c, mySlots, incomingBookings, selectedDate, onSelectDate,
-  visibleMonth, onPrevMonth, onNextMonth, onPressList,
+  visibleMonth, onPrevMonth, onNextMonth, onPressList, onPressToday,
   onOpenBooking, onCancelSlot, deletingSlotIds = [], onAddSlot,
 }) {
   const bookingBySlotId = useMemo(() => {
@@ -82,6 +82,14 @@ export function TherapistMonthCalendar({
         </View>
         <Pressable onPress={onNextMonth} hitSlop={8} style={{ padding: 4 }}>
           <Ionicons name="chevron-forward" size={20} color={c.text} />
+        </Pressable>
+        <Pressable
+          onPress={onPressToday}
+          hitSlop={8}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginLeft: 8, paddingVertical: 6, paddingHorizontal: 10, borderRadius: RADIUS.full, borderWidth: 1, borderColor: c.border }}
+        >
+          <Ionicons name="today-outline" size={16} color={c.text} />
+          <Text style={{ fontSize: 13, fontWeight: '600', color: c.text }}>Heute</Text>
         </Pressable>
         <Pressable
           onPress={onPressList}

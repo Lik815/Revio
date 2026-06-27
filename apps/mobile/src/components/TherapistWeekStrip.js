@@ -8,7 +8,7 @@ const SWIPE_THRESHOLD = 40;
 
 export function TherapistWeekStrip({
   c, selectedDate, visibleWeekStart, mySlots,
-  onSelectDate, onPrevWeek, onNextWeek, onPressCalendar,
+  onSelectDate, onPrevWeek, onNextWeek, onPressCalendar, onPressToday,
 }) {
   const days = useMemo(
     () => Array.from({ length: 7 }, (_, i) => addDays(visibleWeekStart, i)),
@@ -107,6 +107,14 @@ export function TherapistWeekStrip({
 
         <Pressable onPress={onNextWeek} hitSlop={8} style={{ padding: 4 }}>
           <Ionicons name="chevron-forward" size={18} color={c.muted} />
+        </Pressable>
+
+        <Pressable
+          onPress={onPressToday}
+          hitSlop={8}
+          style={{ height: 36, paddingHorizontal: 12, borderRadius: 18, backgroundColor: c.card, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center', marginLeft: 6 }}
+        >
+          <Text style={{ fontSize: 13, fontWeight: '600', color: c.primary }}>Heute</Text>
         </Pressable>
 
         <Pressable

@@ -42,6 +42,13 @@ export function useTherapistCalendarView() {
     });
   };
 
+  const handleGoToToday = () => {
+    const today = startOfDay(new Date());
+    setSelectedDate(today);
+    setVisibleWeekStart(startOfWeek(today));
+    setVisibleMonth({ year: today.getFullYear(), month: today.getMonth() });
+  };
+
   return {
     selectedDate,
     setSelectedDate,
@@ -55,5 +62,6 @@ export function useTherapistCalendarView() {
     handleNextWeek,
     handlePrevMonth,
     handleNextMonth,
+    handleGoToToday,
   };
 }
