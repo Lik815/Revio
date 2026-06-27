@@ -1,3 +1,26 @@
+export const SLOT_DURATIONS = [20, 30, 40, 50, 60];
+export const TIME_HOURS = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19];
+
+export function formatSlotDate(d) {
+  if (!d) return 'Datum wählen';
+  return d.toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+export function formatSlotTime(h, m) {
+  if (h === null) return 'Uhrzeit wählen';
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')} Uhr`;
+}
+
+export function buildCalendar(year, month) {
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const offset = (firstDay + 6) % 7;
+  const cells = [];
+  for (let i = 0; i < offset; i += 1) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d += 1) cells.push(d);
+  return cells;
+}
+
 // Mo-first display order, key matches JS Date#getDay() (0=So..6=Sa).
 export const WEEKDAY_OPTIONS = [
   { key: 1, label: 'Mo' },

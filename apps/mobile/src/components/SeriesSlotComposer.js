@@ -15,8 +15,9 @@ import {
   buildCalendar,
   formatSlotDate,
   formatSlotTime,
-} from './SlotComposer';
-import { WEEKDAY_OPTIONS, generateRecurringSlots } from '../utils/recurring-slots';
+  WEEKDAY_OPTIONS,
+  generateRecurringSlots,
+} from '../utils/recurring-slots';
 
 const TIME_ROW_HEIGHT = 46;
 const WEEKS_PRESETS = [2, 4, 8, 12];

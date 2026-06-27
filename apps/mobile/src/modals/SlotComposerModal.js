@@ -3,7 +3,7 @@ import { ActivityIndicator, Modal, Pressable, ScrollView, useWindowDimensions, V
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { RADIUS } from '../utils/app-utils';
-import { TherapistSlotComposer } from '../components/SlotComposer';
+import { TherapistSlotComposer } from '../components/TherapistSlotComposerForm';
 import { MAX_SLOTS as SERIES_MAX_SLOTS, SeriesSlotComposer } from '../components/SeriesSlotComposer';
 
 export function SlotComposerModal({ visible, onClose, onAddSlot, onAddSlots, error, loading = false, c }) {

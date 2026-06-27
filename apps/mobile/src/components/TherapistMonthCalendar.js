@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { RADIUS, SHADOW, isSameDay, startOfDay } from '../utils/app-utils';
-import { buildCalendar } from './SlotComposer';
+import { buildCalendar } from '../utils/recurring-slots';
 
 const WEEKDAY_LABELS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
 const STATUS_RANK = { pending: 3, booked: 2, free: 1 };

@@ -5,8 +5,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RADIUS, SHADOW, getBaseUrl, TUNNEL_HEADERS } from '../../utils/app-utils';
-import { WEEKDAY_OPTIONS } from '../../utils/recurring-slots';
-import { SLOT_DURATIONS, TIME_HOURS, formatSlotTime } from '../../components/SlotComposer';
+import { WEEKDAY_OPTIONS, SLOT_DURATIONS, TIME_HOURS, formatSlotTime } from '../../utils/recurring-slots';
 import { useToast } from '../../hooks/use-toast';
 import { ToastOverlay } from '../../components/ToastOverlay';
 
