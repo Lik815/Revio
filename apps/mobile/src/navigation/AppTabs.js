@@ -114,6 +114,15 @@ export function AppTabs() {
             component={OptionsStack}
             name={TAB_ROUTES.OPTIONS}
             options={{ title: t[TAB_TRANSLATION_KEYS[TAB_ROUTES.OPTIONS]] }}
+            listeners={({ navigation }) => ({
+              // Leaving the Optionen tab resets its nested stack back to the
+              // options home screen, so switching back into it always shows
+              // Optionen — Profil is then only reachable again via its own
+              // edit button, never by just returning to this tab.
+              blur: () => {
+                navigation.navigate(TAB_ROUTES.OPTIONS, { screen: 'OptionsHome' });
+              },
+            })}
           />
         </>
       ) : (
