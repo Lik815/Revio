@@ -213,6 +213,24 @@ const TUNNEL_HEADERS = BASE_URL.includes('loca.lt')
   ? { 'ngrok-skip-browser-warning': 'true' }
   : {};
 
+// Shared by every "Konto löschen" entry point (Profil bearbeiten, Therapeut
+// und Patient) so the request/error handling lives in exactly one place.
+const deleteAccountRequest = async (authToken) => {
+  try {
+    const res = await fetch(`${getBaseUrl()}/auth/me`, {
+      method: 'DELETE',
+      headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      return { ok: false, message: data.message ?? 'Bitte versuche es erneut.' };
+    }
+    return { ok: true };
+  } catch {
+    return { ok: false, message: 'Verbindungsfehler. Bitte versuche es erneut.' };
+  }
+};
+
 const parseStringOrArray = (val) => {
   if (Array.isArray(val)) return val;
   if (typeof val === 'string') {
@@ -436,6 +454,7 @@ export {
   allSuggestions,
   fortbildungOptions,
   radiusOptions,
+  deleteAccountRequest,
   formatDist,
   formatMissingProfileFields,
   getBaseUrl,

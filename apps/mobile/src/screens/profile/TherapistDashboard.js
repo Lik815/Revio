@@ -14,7 +14,6 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
-import { TherapistSlotComposer } from '../../components/SlotComposer';
 
 import {
   getLangLabel,
@@ -28,6 +27,7 @@ import {
   normalizeKassenarten,
   normalizeTherapistProfile,
   normalizeLanguageCodes,
+  deleteAccountRequest,
 } from '../../utils/app-utils';
 import {
   ComplianceStatusStep,
@@ -35,6 +35,7 @@ import {
 } from '../../components/ComplianceStatusStep';
 import { ProfileChecklist } from '../../components/ProfileChecklist';
 import { ProfileCompletionWizard } from '../../components/ProfileCompletionWizard';
+import { DeleteAccountModal } from '../../modals/DeleteAccountModal';
 import { useAuth } from '../../context/AuthContext';
 import { WorkingHoursScreen } from '../therapy/WorkingHoursScreen';
 
@@ -112,7 +113,7 @@ function StatusMiniCard({ icon, label, value, color, c }) {
   );
 }
 
-export function TherapistDashboardScreen({ c, t, styles, certificationOptions, specializationOptions, heilmittelOptions, onOpenTherapyTab, onAddSlot, onProfileSaved }) {
+export function TherapistDashboardScreen({ c, t, styles, certificationOptions, specializationOptions, heilmittelOptions, onOpenTherapyTab, onAddSlot, onProfileSaved, onAccountDeleted }) {
   const { authToken, loggedInTherapist, setLoggedInTherapist } = useAuth();
 
   // Edit state
@@ -146,6 +147,8 @@ export function TherapistDashboardScreen({ c, t, styles, certificationOptions, s
   const [adminExpanded, setAdminExpanded] = useState(false);
   const [showWizard, setShowWizard] = useState(false);
   const [showWorkingHours, setShowWorkingHours] = useState(false);
+  const [showDeleteAccount, setShowDeleteAccount] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
   // Load documents on mount / token change
   useEffect(() => {
@@ -328,6 +331,21 @@ export function TherapistDashboardScreen({ c, t, styles, certificationOptions, s
     onProfileSaved(t('alertHint') ?? 'Eingereicht', 'Dein Profil wurde zur Prüfung eingereicht.');
   };
 
+  const handleDeleteAccountConfirmed = async () => {
+    if (isDeletingAccount) return;
+    setIsDeletingAccount(true);
+    try {
+      const result = await deleteAccountRequest(authToken);
+      if (!result.ok) {
+        Alert.alert('Konto konnte nicht gelöscht werden', result.message);
+        return;
+      }
+      onAccountDeleted?.();
+    } finally {
+      setIsDeletingAccount(false);
+    }
+  };
+
   if (showWorkingHours) {
     return (
       <WorkingHoursScreen c={c} authToken={authToken} onBack={() => setShowWorkingHours(false)} />
@@ -413,6 +431,14 @@ export function TherapistDashboardScreen({ c, t, styles, certificationOptions, s
         specializationOptions={specializationOptions}
         onRefresh={refreshProfile}
         c={c} t={t} styles={styles}
+      />
+
+      <DeleteAccountModal
+        visible={showDeleteAccount}
+        onClose={() => setShowDeleteAccount(false)}
+        onConfirmed={handleDeleteAccountConfirmed}
+        loggedInTherapist={th}
+        c={c} t={t}
       />
 
       {editMode ? (
@@ -702,6 +728,14 @@ export function TherapistDashboardScreen({ c, t, styles, certificationOptions, s
               <Text style={styles.registerBtnText}>{profileSaving ? t('savingBtn') : t('saveBtn')}</Text>
             </Pressable>
           </View>
+
+          <Pressable
+            onPress={() => setShowDeleteAccount(true)}
+            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, marginTop: 16, borderRadius: RADIUS.md, borderWidth: 1, borderColor: c.error }}
+          >
+            <Ionicons name="trash-outline" size={16} color={c.error} />
+            <Text style={{ fontSize: 14, fontWeight: '700', color: c.error }}>{t('deleteAccount')}</Text>
+          </Pressable>
         </View>
       ) : (
         <>

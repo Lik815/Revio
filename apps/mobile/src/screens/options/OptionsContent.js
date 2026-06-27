@@ -8,14 +8,13 @@ export function OptionsContent({
   loggedInTherapist, loggedInPatient,
   themeMode, setThemeMode,
   onShowLogin, onShowRegister,
-  onShowFeedback, onShowChangePassword, onDeleteAccount, onLogout,
+  onShowFeedback, onShowChangePassword, onLogout,
   onShowDebug,
   c, t, styles,
 }) {
   const [debugTapCount, setDebugTapCount] = React.useState(0);
 const renderOptions = () => {
   const isLoggedIn = Boolean(loggedInTherapist || loggedInPatient);
-  const canDeleteAccount = typeof onDeleteAccount === 'function';
 
   const SectionHeader = ({ title }) => (
     <Text style={{ fontSize: 11, fontWeight: '700', color: c.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginTop: 24, marginBottom: 8, paddingHorizontal: 4 }}>{title}</Text>
@@ -147,15 +146,6 @@ const renderOptions = () => {
                 subtitle={t('logoutHint')}
                 icon="log-out-outline"
                 onPress={onLogout}
-              />
-              <OptionRow
-                label={t('deleteAccount')}
-                subtitle={canDeleteAccount ? t('deleteAccountHint') : t('deleteAccountDisabledHint')}
-                icon="trash-outline"
-                onPress={onDeleteAccount}
-                tint="destructive"
-                disabled={!canDeleteAccount}
-                value={canDeleteAccount ? undefined : t('comingSoon')}
                 last
               />
             </OptionGroup>

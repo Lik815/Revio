@@ -4,6 +4,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { appStoreSelectors, useAppStore } from '../../store/useStore';
+import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../hooks/use-theme';
 import { useNotifications } from '../../context/NotificationContext';
 import { useToast } from '../../hooks/use-toast';
@@ -33,6 +34,8 @@ export function ProfileTabScreen() {
   const loggedInPatient = useAppStore(appStoreSelectors.loggedInPatient);
   const loggedInTherapist = useAppStore(appStoreSelectors.loggedInTherapist);
   const updatePatientProfile = useAppStore((s) => s.updatePatientProfile);
+  const signOut = useAppStore((s) => s.signOut);
+  const { logout } = useAuth();
 
   const { c } = useTheme();
   const { certificationOptions, specializationOptions, heilmittelOptions } = useConfigOptions();
@@ -93,6 +96,12 @@ export function ProfileTabScreen() {
     setShowProfileSaved(true);
   };
 
+  const handleAccountDeleted = async () => {
+    await logout();
+    signOut();
+    navigation.navigate(ROOT_ROUTES.MAIN_TABS, { screen: TAB_ROUTES.AUTH });
+  };
+
   if (loggedInPatient) {
     return (
       <>
@@ -106,6 +115,7 @@ export function ProfileTabScreen() {
             myAppointments={myAppointments}
             onOpenTherapist={(id, th) => navigation.navigate(ROOT_ROUTES.THERAPIST_PROFILE, { therapistId: id, therapist: th })}
             onProfileSaved={handlePatientProfileSaved}
+            onAccountDeleted={handleAccountDeleted}
           />
         </View>
         <ProfileSavedModal
@@ -139,6 +149,7 @@ export function ProfileTabScreen() {
             onOpenTherapyTab={() => navigation.navigate(ROOT_ROUTES.MAIN_TABS, { screen: TAB_ROUTES.THERAPY })}
             onAddSlot={handleAddSlot}
             onProfileSaved={openProfileSavedModal}
+            onAccountDeleted={handleAccountDeleted}
           />
         </View>
         <ProfileSavedModal

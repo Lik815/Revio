@@ -2,16 +2,18 @@ import React, { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   ScrollView,
   Text,
   TextInput,
   View,
 } from 'react-native';
-import { getBaseUrl, RADIUS, SHADOW, SPACE, TUNNEL_HEADERS, TYPE } from '../../utils/app-utils';
+import { deleteAccountRequest, getBaseUrl, RADIUS, SHADOW, SPACE, TUNNEL_HEADERS, TYPE } from '../../utils/app-utils';
+import { DeleteAccountModal } from '../../modals/DeleteAccountModal';
 
 export function PatientDashboardScreen({
-  c, loggedInPatient, styles, t, authToken, onProfileSaved,
+  c, loggedInPatient, styles, t, authToken, onProfileSaved, onAccountDeleted,
   favorites = [], myAppointments = [], onOpenTherapist,
 }) {
   const firstName = loggedInPatient?.firstName ?? '';
@@ -39,6 +41,8 @@ export function PatientDashboardScreen({
   const [editPhone, setEditPhone] = useState('');
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
+  const [showDeleteAccount, setShowDeleteAccount] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
   const openEdit = () => {
     setEditFirst(firstName);
@@ -69,6 +73,21 @@ export function PatientDashboardScreen({
       setSaveError('Verbindungsfehler.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDeleteAccountConfirmed = async () => {
+    if (isDeletingAccount) return;
+    setIsDeletingAccount(true);
+    try {
+      const result = await deleteAccountRequest(authToken);
+      if (!result.ok) {
+        Alert.alert('Konto konnte nicht gelöscht werden', result.message);
+        return;
+      }
+      onAccountDeleted?.();
+    } finally {
+      setIsDeletingAccount(false);
     }
   };
 
@@ -164,8 +183,24 @@ export function PatientDashboardScreen({
               }
             </Pressable>
           </View>
+
+          <Pressable
+            onPress={() => setShowDeleteAccount(true)}
+            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, marginTop: 6, borderRadius: RADIUS.md, borderWidth: 1, borderColor: c.error }}
+          >
+            <Ionicons name="trash-outline" size={16} color={c.error} />
+            <Text style={{ fontSize: 14, fontWeight: '700', color: c.error }}>{t('deleteAccount')}</Text>
+          </Pressable>
         </View>
       )}
+
+      <DeleteAccountModal
+        visible={showDeleteAccount}
+        onClose={() => setShowDeleteAccount(false)}
+        onConfirmed={handleDeleteAccountConfirmed}
+        loggedInPatient={loggedInPatient}
+        c={c} t={t}
+      />
 
       {/* ── Kontakt ─────────────────────────────────────────────────── */}
       <View style={{ backgroundColor: c.card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: c.border, padding: SPACE.lg, marginBottom: SPACE.md }}>
