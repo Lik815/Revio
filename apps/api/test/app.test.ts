@@ -3853,6 +3853,81 @@ describe('Session token expiry', () => {
       });
       expect(res.statusCode).toBe(400);
     });
+
+    // Self-service team join requests (practice_admin confirms/rejects its own
+    // practice's PROPOSED links — no admin dashboard needed for this step).
+    describe('Self-service link requests', () => {
+      async function registerTherapistForPractice(email: string, practiceId: string) {
+        await seedConfirmedOtp(email);
+        const res = await app.inject({
+          method: 'POST', url: '/register/therapist',
+          payload: {
+            email, fullName: 'Tina Therapeutin', city: 'Köln',
+            specializations: ['Rückenschmerzen'], languages: ['de'],
+            isFreelancer: false, practiceId,
+          },
+        });
+        return res.json();
+      }
+
+      it('lists a PROPOSED link as a link request and lets the owner confirm it', async () => {
+        const reg = (await registerPractice('practice-linkreq@test.com')).json();
+        const th = await registerTherapistForPractice('linkreq-th@test.com', reg.practiceId);
+        const auth = { authorization: `Bearer ${reg.token}` };
+
+        const before = await app.inject({ method: 'GET', url: '/practice/me', headers: auth });
+        expect(before.json().linkRequests).toHaveLength(1);
+        const linkId = before.json().linkRequests[0].linkId;
+        expect(before.json().linkRequests[0].fullName).toBe('Tina Therapeutin');
+
+        const confirm = await app.inject({
+          method: 'POST', url: `/practice/me/link-requests/${linkId}/confirm`, headers: auth,
+        });
+        expect(confirm.statusCode).toBe(200);
+
+        const link = await prisma.therapistPracticeLink.findUnique({ where: { id: linkId } });
+        expect(link?.status).toBe('CONFIRMED');
+
+        const after = await app.inject({ method: 'GET', url: '/practice/me', headers: auth });
+        expect(after.json().linkRequests).toHaveLength(0);
+      });
+
+      it('lets the owner reject a link request', async () => {
+        const reg = (await registerPractice('practice-linkreq2@test.com')).json();
+        const th = await registerTherapistForPractice('linkreq-th2@test.com', reg.practiceId);
+        const auth = { authorization: `Bearer ${reg.token}` };
+
+        const before = await app.inject({ method: 'GET', url: '/practice/me', headers: auth });
+        const linkId = before.json().linkRequests[0].linkId;
+
+        const reject = await app.inject({
+          method: 'POST', url: `/practice/me/link-requests/${linkId}/reject`, headers: auth,
+        });
+        expect(reject.statusCode).toBe(200);
+
+        const link = await prisma.therapistPracticeLink.findUnique({ where: { id: linkId } });
+        expect(link?.status).toBe('REJECTED');
+      });
+
+      it('does not let a different practice confirm another practice\'s link request', async () => {
+        const owner = (await registerPractice('practice-linkreq3@test.com')).json();
+        const other = (await registerPractice('practice-linkreq3-other@test.com', { name: 'Andere Praxis', city: 'Bonn' })).json();
+        await registerTherapistForPractice('linkreq-th3@test.com', owner.practiceId);
+
+        const ownerMe = await app.inject({ method: 'GET', url: '/practice/me', headers: { authorization: `Bearer ${owner.token}` } });
+        const linkId = ownerMe.json().linkRequests[0].linkId;
+
+        const res = await app.inject({
+          method: 'POST',
+          url: `/practice/me/link-requests/${linkId}/confirm`,
+          headers: { authorization: `Bearer ${other.token}` },
+        });
+        expect(res.statusCode).toBe(404);
+
+        const link = await prisma.therapistPracticeLink.findUnique({ where: { id: linkId } });
+        expect(link?.status).toBe('PROPOSED');
+      });
+    });
   });
 
   // ─── Search: standalone practices ───────────────────────────────────────────

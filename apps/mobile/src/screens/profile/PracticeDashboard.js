@@ -33,6 +33,8 @@ export function PracticeDashboardScreen({
 }) {
   const [practice, setPractice] = useState(initialPractice);
   const [team, setTeam] = useState([]);
+  const [linkRequests, setLinkRequests] = useState([]);
+  const [respondingLinkId, setRespondingLinkId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState(() => toForm(initialPractice));
@@ -42,27 +44,50 @@ export function PracticeDashboardScreen({
 
   const authHeaders = { ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` };
 
+  const loadPractice = async () => {
+    try {
+      const res = await fetch(`${getBaseUrl()}/practice/me`, { headers: authHeaders });
+      if (res.ok) {
+        const data = await res.json();
+        setPractice(data.practice);
+        setTeam(Array.isArray(data.team) ? data.team : []);
+        setLinkRequests(Array.isArray(data.linkRequests) ? data.linkRequests : []);
+        setForm(toForm(data.practice));
+        setSelSpecs(Array.isArray(data.practice?.specialties) ? data.practice.specialties : []);
+      }
+    } catch {
+      // keep the initial practice from props
+    }
+  };
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      try {
-        const res = await fetch(`${getBaseUrl()}/practice/me`, { headers: authHeaders });
-        if (res.ok) {
-          const data = await res.json();
-          if (cancelled) return;
-          setPractice(data.practice);
-          setTeam(Array.isArray(data.team) ? data.team : []);
-          setForm(toForm(data.practice));
-          setSelSpecs(Array.isArray(data.practice?.specialties) ? data.practice.specialties : []);
-        }
-      } catch {
-        // keep the initial practice from props
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
+      await loadPractice();
+      if (!cancelled) setLoading(false);
     })();
     return () => { cancelled = true; };
   }, []);
+
+  const respondToLinkRequest = async (linkId, action) => {
+    setRespondingLinkId(linkId);
+    try {
+      const res = await fetch(`${getBaseUrl()}/practice/me/link-requests/${linkId}/${action}`, {
+        method: 'POST',
+        headers: authHeaders,
+      });
+      if (res.ok) {
+        setLinkRequests((prev) => prev.filter((r) => r.linkId !== linkId));
+        if (action === 'confirm') await loadPractice();
+      } else {
+        Alert.alert(t('alertError') ?? 'Fehler', t('alertConnectionError') ?? '');
+      }
+    } catch {
+      Alert.alert(t('alertError') ?? 'Fehler', t('alertConnectionError') ?? '');
+    } finally {
+      setRespondingLinkId(null);
+    }
+  };
 
   const setField = (field, rawValue) => {
     let value = rawValue;
@@ -280,6 +305,45 @@ export function PracticeDashboardScreen({
         <View style={{ marginHorizontal: 16, marginTop: 12, padding: 14, backgroundColor: c.card, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: c.border }}>
           <Text style={{ fontSize: 14, color: c.text, lineHeight: 20 }}>{practice.description}</Text>
         </View>
+      )}
+
+      {linkRequests.length > 0 && (
+        <>
+          <Text style={[styles.sectionLabel, { color: c.text, marginTop: 16 }]}>
+            {t('linkRequestsLabel')} ({linkRequests.length})
+          </Text>
+          {linkRequests.map((req) => (
+            <View key={req.linkId} style={[styles.miniCard, { backgroundColor: c.card, borderColor: c.border, flexDirection: 'column', alignItems: 'stretch', gap: 10 }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <View style={[styles.miniAvatar, { backgroundColor: c.primaryBg, alignItems: 'center', justifyContent: 'center' }]}>
+                  <Text style={{ fontSize: 15, fontWeight: '700', color: c.primary }}>
+                    {(req.fullName ?? '?').split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase()}
+                  </Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.cardName, { color: c.text }]}>{req.fullName}</Text>
+                  <Text style={[styles.cardTitle, { color: c.muted }]}>{req.professionalTitle ?? ''}</Text>
+                </View>
+              </View>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <Pressable
+                  onPress={() => respondToLinkRequest(req.linkId, 'reject')}
+                  disabled={respondingLinkId === req.linkId}
+                  style={{ flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: c.border, backgroundColor: c.mutedBg }}
+                >
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: c.text }}>{t('rejectAction')}</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => respondToLinkRequest(req.linkId, 'confirm')}
+                  disabled={respondingLinkId === req.linkId}
+                  style={{ flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: RADIUS.sm, backgroundColor: respondingLinkId === req.linkId ? c.border : c.primary }}
+                >
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: '#fff' }}>{respondingLinkId === req.linkId ? '…' : t('confirmAction')}</Text>
+                </Pressable>
+              </View>
+            </View>
+          ))}
+        </>
       )}
 
       <Text style={[styles.sectionLabel, { color: c.text, marginTop: 16 }]}>{t('teamLabel')} ({team.length})</Text>
