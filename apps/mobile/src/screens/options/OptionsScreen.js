@@ -48,7 +48,6 @@ export function OptionsTabScreen() {
         loggedInPractice={loggedInPractice}
         themeMode={themeMode}
         setThemeMode={setThemeMode}
-        onOpenProfile={() => navigation.navigate(ROOT_ROUTES.PROFILE)}
         onShowLogin={() => showLoginTab(navigation)}
         onShowRegister={() => navigation.navigate(ROOT_ROUTES.REGISTRATION)}
         onShowFeedback={() => setShowFeedback(true)}

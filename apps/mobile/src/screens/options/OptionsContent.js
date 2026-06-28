@@ -7,7 +7,6 @@ import { AccountHeader } from '../../components/AccountHeader';
 export function OptionsContent({
   loggedInTherapist, loggedInPatient, loggedInPractice,
   themeMode, setThemeMode,
-  onOpenProfile,
   onShowLogin, onShowRegister,
   onShowFeedback, onShowChangePassword, onLogout,
   onShowDebug,
@@ -81,22 +80,6 @@ const renderOptions = () => {
             </View>
           </View>
         </OptionGroup>
-
-        {loggedInPractice && (
-          <>
-            <SectionHeader title={t('practiceLabel')} />
-            <OptionGroup>
-              <OptionRow
-                label={t('practiceEditAction')}
-                subtitle={t('practiceSettingsHint')}
-                icon="business-outline"
-                onPress={onOpenProfile}
-                valueColor={c.primary}
-                last
-              />
-            </OptionGroup>
-          </>
-        )}
 
         {/* ── Hilfe & Support ── */}
         <SectionHeader title={t('helpSupportSection')} />
