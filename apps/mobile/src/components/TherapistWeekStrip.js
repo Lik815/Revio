@@ -53,13 +53,23 @@ export function TherapistWeekStrip({
 
   return (
     <View style={{ marginBottom: 16 }}>
-      <View style={{ marginBottom: 10 }}>
-        <Text style={{ fontSize: 13, fontWeight: '700', color: c.text }}>
-          {monthYearLabel} · Woche {weekNumber}
-        </Text>
-        <Text style={{ fontSize: 12, color: c.muted, marginTop: 2 }}>
-          {rangeLabel}
-        </Text>
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 10 }}>
+        <View>
+          <Text style={{ fontSize: 13, fontWeight: '700', color: c.text }}>
+            {monthYearLabel} · Woche {weekNumber}
+          </Text>
+          <Text style={{ fontSize: 12, color: c.muted, marginTop: 2 }}>
+            {rangeLabel}
+          </Text>
+        </View>
+
+        <Pressable
+          onPress={onPressToday}
+          hitSlop={8}
+          style={{ height: 32, paddingHorizontal: 12, borderRadius: 16, backgroundColor: c.card, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' }}
+        >
+          <Text style={{ fontSize: 13, fontWeight: '600', color: c.primary }}>Heute</Text>
+        </Pressable>
       </View>
 
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -107,14 +117,6 @@ export function TherapistWeekStrip({
 
         <Pressable onPress={onNextWeek} hitSlop={8} style={{ padding: 4 }}>
           <Ionicons name="chevron-forward" size={18} color={c.muted} />
-        </Pressable>
-
-        <Pressable
-          onPress={onPressToday}
-          hitSlop={8}
-          style={{ height: 36, paddingHorizontal: 12, borderRadius: 18, backgroundColor: c.card, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center', marginLeft: 6 }}
-        >
-          <Text style={{ fontSize: 13, fontWeight: '600', color: c.primary }}>Heute</Text>
         </Pressable>
 
         <Pressable
