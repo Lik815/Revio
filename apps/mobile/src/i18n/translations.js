@@ -38,6 +38,7 @@ export const translations = {
     // Practice dashboard
     practiceEditTitle: 'Praxisprofil bearbeiten',
     practiceEditAction: 'Praxisprofil bearbeiten',
+    practiceSettingsHint: 'Profil, Team und Anfragen verwalten.',
     teamLabel: 'Team',
     practiceNoTeamTitle: 'Noch keine Therapeut:innen hinterlegt',
     practiceNoTeamBody: 'Therapeut:innen können sich deiner Praxis zuordnen. Bestätigte Mitglieder erscheinen hier.',
