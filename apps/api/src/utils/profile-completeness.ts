@@ -117,6 +117,7 @@ type TherapistChecklistLike = TherapistLike & {
  */
 export function getTherapistProfileCompletionDetail(therapist: TherapistChecklistLike) {
   const has = (v?: string | null) => !!v && v.trim() !== '';
+  const selfEmployed = (therapist.employmentStatus ?? 'SELF_EMPLOYED') === 'SELF_EMPLOYED';
 
   // Full checklist (drives the percentage shown in the dashboard).
   const items: { key: string; done: boolean }[] = [
@@ -139,6 +140,7 @@ export function getTherapistProfileCompletionDetail(therapist: TherapistChecklis
       done: has(therapist.bio)
         && therapist.bio!.trim().split(/[.!?]+/).filter(Boolean).length > 0,
     },
+    { key: 'employmentStatus', done: selfEmployed },
   ];
 
   const completedItems = items.filter((i) => i.done).map((i) => i.key);

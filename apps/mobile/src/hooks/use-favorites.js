@@ -68,73 +68,6 @@ export function useFavorites({ authToken, showToast, t }) {
     [favorites],
   );
 
-  // ── Practice favorites (server-backed; mirrors the therapist logic) ─────────
-  const [practiceFavorites, setPracticeFavorites] = useState([]);
-  const [practiceFavoritesLoading, setPracticeFavoritesLoading] = useState(false);
-  const [practiceFavoritesLastLoadedAt, setPracticeFavoritesLastLoadedAt] = useState(0);
-
-  const loadPracticeFavorites = useCallback(
-    async (token, { background = false } = {}) => {
-      const tok = token ?? authToken;
-      if (!tok) return;
-      if (!background || practiceFavoritesLastLoadedAt === 0) setPracticeFavoritesLoading(true);
-      try {
-        const res = await fetch(`${getBaseUrl()}/auth/favorites/practices`, {
-          headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${tok}` },
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setPracticeFavorites(Array.isArray(data.practices) ? data.practices : []);
-          setPracticeFavoritesLastLoadedAt(Date.now());
-        }
-      } catch {}
-      finally { setPracticeFavoritesLoading(false); }
-    },
-    [authToken, practiceFavoritesLastLoadedAt],
-  );
-
-  const togglePracticeFavorite = useCallback(
-    async (practice) => {
-      if (!authToken) {
-        showToast?.(t?.('favLoginRequired') ?? 'Bitte einloggen um Favoriten zu speichern');
-        return;
-      }
-      const exists = practiceFavorites.some((f) => f.id === practice.id);
-      setPracticeFavorites((prev) =>
-        exists ? prev.filter((f) => f.id !== practice.id) : [practice, ...prev],
-      );
-      if (!exists) showToast?.(t?.('favSaved')?.replace('{name}', practice.name) ?? `${practice.name} gespeichert`);
-      else showToast?.(`${practice.name} entfernt`);
-      try {
-        const res = exists
-          ? await fetch(`${getBaseUrl()}/auth/favorites/practices/${practice.id}`, {
-              method: 'DELETE',
-              headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
-            })
-          : await fetch(`${getBaseUrl()}/auth/favorites/practices`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
-              body: JSON.stringify({ practiceId: practice.id }),
-            });
-        if (!res.ok) {
-          setPracticeFavorites((prev) =>
-            exists ? [practice, ...prev] : prev.filter((f) => f.id !== practice.id),
-          );
-        }
-      } catch {
-        setPracticeFavorites((prev) =>
-          exists ? [practice, ...prev] : prev.filter((f) => f.id !== practice.id),
-        );
-      }
-    },
-    [authToken, practiceFavorites, showToast, t],
-  );
-
-  const isPracticeFavorite = useCallback(
-    (id) => practiceFavorites.some((f) => f.id === id),
-    [practiceFavorites],
-  );
-
   return {
     favorites,
     favoritesLoading,
@@ -142,11 +75,5 @@ export function useFavorites({ authToken, showToast, t }) {
     loadFavorites,
     toggleFavorite,
     isFavorite,
-    practiceFavorites,
-    practiceFavoritesLoading,
-    practiceFavoritesLastLoadedAt,
-    loadPracticeFavorites,
-    togglePracticeFavorite,
-    isPracticeFavorite,
   };
 }

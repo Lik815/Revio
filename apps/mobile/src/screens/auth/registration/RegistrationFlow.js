@@ -5,44 +5,25 @@ import { useAuth } from '../../../context/AuthContext';
 import { useTherapyData } from '../../../context/TherapyContext';
 import { useConfigOptions } from '../../../hooks/use-config-options';
 import { RoleSelectStep } from './steps/RoleSelectStep';
-import { ProviderTypeStep } from './steps/ProviderTypeStep';
 import { AccountCreateStep } from './steps/AccountCreateStep';
 import { OtpVerifyStep } from './steps/OtpVerifyStep';
 import { BasicProfileStep } from './steps/BasicProfileStep';
+import { EmploymentStep } from './steps/EmploymentStep';
 import { SpecializationsStep } from './steps/SpecializationsStep';
-import { PracticeProfileCreateStep } from './steps/PracticeProfileCreateStep';
-import { PracticeLinkStep } from './steps/PracticeLinkStep';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-const EMPTY_PRACTICE_FORM = {
-  name: '', postalCode: '', city: '', address: '',
-  phone: '', email: '', website: '', services: '', description: '',
-};
-
-const splitCsv = (value) => value.split(',').map((s) => s.trim()).filter(Boolean);
-
-async function lookupCityByPostalCode(postalCode) {
-  const res = await fetch(
-    `https://nominatim.openstreetmap.org/search?postalcode=${postalCode}&country=Germany&format=json&addressdetails=1&limit=1&accept-language=de`,
-  );
-  const data = await res.json().catch(() => []);
-  const addr = Array.isArray(data) && data[0]?.address ? data[0].address : null;
-  return addr?.city || addr?.town || addr?.village || addr?.municipality || addr?.county || '';
-}
-
 // Unified registration flow. Owns all step state so back-navigation never loses
-// entered data. Patients finish after the name step. Providers pick a sub-type
-// (freelancer / practice / works-in-practice) and continue on the matching
-// track. The account is only created at the very end of each track, and the
-// session is established exclusively via AuthContext login helpers.
+// entered data. Patients finish after the name step; therapists continue through
+// employment classification and specializations. The account is only created at
+// the very end of each track (POST /auth/register or POST /register/therapist),
+// and the session is established exclusively via AuthContext login helpers.
 export function RegistrationFlow({ onClose, onShowLogin, onComplete, c, t, styles }) {
-  const { loginAsPatient, loginAsTherapist, loginAsPracticeAdmin } = useAuth();
+  const { loginAsPatient, loginAsTherapist } = useAuth();
   const { loadFavorites, loadMyAppointments, loadIncomingBookings } = useTherapyData();
   const { specializationOptions } = useConfigOptions();
 
-  const [role, setRole] = useState(null);            // 'patient' | 'therapist' | 'practice_admin'
-  const [providerType, setProviderType] = useState(null); // 'freelance' | 'practice' | 'in_practice'
+  const [role, setRole] = useState(null);
   const [step, setStep] = useState('role');
 
   // Account
@@ -60,7 +41,7 @@ export function RegistrationFlow({ onClose, onShowLogin, onComplete, c, t, style
   const [otpError, setOtpError] = useState('');
   const [otpLoading, setOtpLoading] = useState(false);
 
-  // Basic profile (patient + therapist tracks)
+  // Basic profile
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [postalCode, setPostalCode] = useState('');
@@ -71,30 +52,17 @@ export function RegistrationFlow({ onClose, onShowLogin, onComplete, c, t, style
   const [basicError, setBasicError] = useState('');
 
   // Therapist track
+  const [employmentStatus, setEmploymentStatus] = useState(null);
+  const [showPivotConfirm, setShowPivotConfirm] = useState(false);
   const [specializations, setSpecializations] = useState([]);
   const [submitError, setSubmitError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  // Flow C — works in a practice
-  const [linkedPractice, setLinkedPractice] = useState(null);
-  const [practiceNameText, setPracticeNameText] = useState('');
-
-  // Practice track (Flow B)
-  const [practiceForm, setPracticeForm] = useState(EMPTY_PRACTICE_FORM);
-  const [practiceSpecialties, setPracticeSpecialties] = useState([]);
-  const [practiceCityTouched, setPracticeCityTouched] = useState(false);
-  const [practiceCityLoading, setPracticeCityLoading] = useState(false);
-
   const normalizedEmail = () => email.trim().toLowerCase();
 
-  const setPracticeField = (field, rawValue) => {
-    let value = rawValue;
-    if (field === 'postalCode') value = rawValue.replace(/\D/g, '').slice(0, 5);
-    if (field === 'city') setPracticeCityTouched(true);
-    setPracticeForm((prev) => ({ ...prev, [field]: value }));
-  };
-
-  // Auto-fill the therapist city from the postal code (manual entry always wins).
+  // Auto-fill the city from the German postal code (same Nominatim service the
+  // search already uses, so it works independently of our own API). Skipped once
+  // the user has typed a city manually — manual entry always wins.
   useEffect(() => {
     if (role !== 'therapist' || cityTouched) return;
     if (!/^\d{5}$/.test(postalCode)) return;
@@ -102,10 +70,16 @@ export function RegistrationFlow({ onClose, onShowLogin, onComplete, c, t, style
     setCityLookupLoading(true);
     const timer = setTimeout(async () => {
       try {
-        const resolved = await lookupCityByPostalCode(postalCode);
-        if (!cancelled && resolved && !cityTouched) setCity(resolved);
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?postalcode=${postalCode}&country=Germany&format=json&addressdetails=1&limit=1&accept-language=de`,
+        );
+        const data = await res.json().catch(() => []);
+        if (cancelled) return;
+        const addr = Array.isArray(data) && data[0]?.address ? data[0].address : null;
+        const resolved = addr?.city || addr?.town || addr?.village || addr?.municipality || addr?.county || '';
+        if (resolved && !cityTouched) setCity(resolved);
       } catch {
-        // leave for manual entry
+        // Lookup failed — leave the city field for manual entry.
       } finally {
         if (!cancelled) setCityLookupLoading(false);
       }
@@ -113,43 +87,10 @@ export function RegistrationFlow({ onClose, onShowLogin, onComplete, c, t, style
     return () => { cancelled = true; clearTimeout(timer); };
   }, [postalCode, cityTouched, role]);
 
-  // Same auto-fill for the practice form.
-  useEffect(() => {
-    if (providerType !== 'practice' || practiceCityTouched) return;
-    if (!/^\d{5}$/.test(practiceForm.postalCode)) return;
-    let cancelled = false;
-    setPracticeCityLoading(true);
-    const timer = setTimeout(async () => {
-      try {
-        const resolved = await lookupCityByPostalCode(practiceForm.postalCode);
-        if (!cancelled && resolved && !practiceCityTouched) {
-          setPracticeForm((prev) => ({ ...prev, city: resolved }));
-        }
-      } catch {
-        // leave for manual entry
-      } finally {
-        if (!cancelled) setPracticeCityLoading(false);
-      }
-    }, 350);
-    return () => { cancelled = true; clearTimeout(timer); };
-  }, [practiceForm.postalCode, practiceCityTouched, providerType]);
-
   // ── Step 1: role ───────────────────────────────────────────────────────────
-  const handleSelectRole = (r) => {
-    setAccountError('');
-    if (r === 'patient') { setRole('patient'); setProviderType(null); setStep('account'); return; }
-    setStep('providerType');
-  };
+  const handleSelectRole = (r) => { setRole(r); setAccountError(''); setStep('account'); };
 
-  // ── Step 2 (provider): sub-type ─────────────────────────────────────────────
-  const handleSelectProviderType = (type) => {
-    setProviderType(type);
-    setRole(type === 'practice' ? 'practice_admin' : 'therapist');
-    setAccountError('');
-    setStep('account');
-  };
-
-  // ── Step: account → send OTP ────────────────────────────────────────────────
+  // ── Step 2: account → send OTP ──────────────────────────────────────────────
   const handleSendOtp = async () => {
     setAccountError('');
     if (!EMAIL_RE.test(email)) { setAccountError('Bitte gib eine gültige E-Mail ein.'); return; }
@@ -175,7 +116,7 @@ export function RegistrationFlow({ onClose, onShowLogin, onComplete, c, t, style
     }
   };
 
-  // ── Step: OTP ───────────────────────────────────────────────────────────────
+  // ── Step 3: OTP ─────────────────────────────────────────────────────────────
   const handleConfirmOtp = async () => {
     if (otpCode.length !== 6) return;
     setOtpLoading(true);
@@ -189,8 +130,7 @@ export function RegistrationFlow({ onClose, onShowLogin, onComplete, c, t, style
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { setOtpError(data.message ?? 'Falscher Code.'); return; }
       setBasicError('');
-      setSubmitError('');
-      setStep(role === 'practice_admin' ? 'practiceCreate' : 'basic');
+      setStep('basic');
     } catch {
       setOtpError('Verbindungsfehler.');
     } finally {
@@ -215,7 +155,7 @@ export function RegistrationFlow({ onClose, onShowLogin, onComplete, c, t, style
     }
   };
 
-  // ── Session helpers (AuthContext only) ──────────────────────────────────────
+  // ── Session helpers (AuthContext only — no direct AsyncStorage) ─────────────
   const fetchProfile = async (token) => {
     const res = await fetch(`${getBaseUrl()}/auth/me`, {
       headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${token}` },
@@ -239,12 +179,6 @@ export function RegistrationFlow({ onClose, onShowLogin, onComplete, c, t, style
     onComplete?.({ landing: 'profile' });
   };
 
-  const completeAsPracticeAdmin = async (token) => {
-    const profile = await fetchProfile(token);
-    await loginAsPracticeAdmin(token, profile ?? null);
-    onComplete?.({ landing: 'profile' });
-  };
-
   const registerPatient = async () => {
     const res = await fetch(`${getBaseUrl()}/auth/register`, {
       method: 'POST',
@@ -263,7 +197,6 @@ export function RegistrationFlow({ onClose, onShowLogin, onComplete, c, t, style
   };
 
   const registerTherapist = async (specs) => {
-    const isInPractice = providerType === 'in_practice';
     const res = await fetch(`${getBaseUrl()}/register/therapist`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...TUNNEL_HEADERS },
@@ -274,14 +207,10 @@ export function RegistrationFlow({ onClose, onShowLogin, onComplete, c, t, style
         lastName: lastName.trim(),
         city: city.trim(),
         postalCode: postalCode.trim() || undefined,
+        employmentStatus,
         specializations: specs,
         languages: ['de'],
         gender,
-        isFreelancer: !isInPractice,
-        ...(isInPractice && linkedPractice ? { practiceId: linkedPractice.id } : {}),
-        ...(isInPractice && !linkedPractice && practiceNameText.trim()
-          ? { practiceNameText: practiceNameText.trim() }
-          : {}),
       }),
     });
     const data = await res.json().catch(() => ({}));
@@ -289,44 +218,14 @@ export function RegistrationFlow({ onClose, onShowLogin, onComplete, c, t, style
     await completeAsTherapist(data.token);
   };
 
-  const registerPractice = async () => {
-    const res = await fetch(`${getBaseUrl()}/register/practice`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...TUNNEL_HEADERS },
-      body: JSON.stringify({
-        email: normalizedEmail(),
-        password,
-        practice: {
-          name: practiceForm.name.trim(),
-          city: practiceForm.city.trim(),
-          postalCode: practiceForm.postalCode.trim() || undefined,
-          address: practiceForm.address.trim() || undefined,
-          phone: practiceForm.phone.trim() || undefined,
-          email: practiceForm.email.trim() || undefined,
-          website: practiceForm.website.trim() || undefined,
-          description: practiceForm.description.trim() || undefined,
-          specialties: practiceSpecialties,
-          services: splitCsv(practiceForm.services),
-        },
-      }),
-    });
-    const data = await res.json().catch(() => ({}));
-    // Duplicate guard: surface the warning (claim flow is Phase 2).
-    if (res.status === 409 && data.code === 'practice_exists') {
-      throw new Error(data.message || 'Diese Praxis existiert bereits.');
-    }
-    if (!res.ok || !data.token) throw new Error(data.message ?? t('alertConnectionError'));
-    await completeAsPracticeAdmin(data.token);
-  };
-
-  // ── Step: basic profile ─────────────────────────────────────────────────────
+  // ── Step 4: basic profile ───────────────────────────────────────────────────
   const handleBasicSubmit = async () => {
     setBasicError('');
     if (!firstName.trim() || !lastName.trim()) { setBasicError(t('patientRegNameRequired')); return; }
     if (role === 'therapist') {
       if (!city.trim()) { setBasicError('Bitte gib deine Stadt an.'); return; }
       if (!gender) { setBasicError('Bitte wähle Therapeutin oder Therapeut aus.'); return; }
-      setStep('specializations');
+      setStep('employment');
       return;
     }
     // Patient track ends here
@@ -340,7 +239,26 @@ export function RegistrationFlow({ onClose, onShowLogin, onComplete, c, t, style
     }
   };
 
-  // ── Therapist final submit ──────────────────────────────────────────────────
+  // ── Step 5: employment ──────────────────────────────────────────────────────
+  const handleSelectEmployment = (status) => {
+    setEmploymentStatus(status);
+    setSubmitError('');
+    setStep('specializations');
+  };
+
+  const handleConfirmPivot = async () => {
+    setSubmitting(true);
+    setSubmitError('');
+    try {
+      await registerPatient();
+    } catch (e) {
+      setSubmitError(e.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // ── Step 6: specializations → create therapist ──────────────────────────────
   const submitTherapist = async (specs) => {
     setSubmitting(true);
     setSubmitError('');
@@ -353,43 +271,12 @@ export function RegistrationFlow({ onClose, onShowLogin, onComplete, c, t, style
     }
   };
 
-  const handleSpecializationsNext = (specs) => {
-    if (providerType === 'in_practice') { setSubmitError(''); setStep('practiceLink'); return; }
-    submitTherapist(specs);
-  };
-
-  // ── Practice final submit ───────────────────────────────────────────────────
-  const handlePracticeSubmit = async () => {
-    setSubmitError('');
-    if (!practiceForm.name.trim()) { setSubmitError('Bitte gib den Praxisnamen an.'); return; }
-    if (!practiceForm.city.trim()) { setSubmitError('Bitte gib die Stadt an.'); return; }
-    setSubmitting(true);
-    try {
-      await registerPractice();
-    } catch (e) {
-      setSubmitError(e.message);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
   const toggleSpec = (spec) =>
     setSpecializations((prev) => (prev.includes(spec) ? prev.filter((s) => s !== spec) : [...prev, spec]));
 
-  const togglePracticeSpecialty = (spec) =>
-    setPracticeSpecialties((prev) => (prev.includes(spec) ? prev.filter((s) => s !== spec) : [...prev, spec]));
-
   // ── Render ──────────────────────────────────────────────────────────────────
   let content;
-  if (step === 'providerType') {
-    content = (
-      <ProviderTypeStep
-        onSelectType={handleSelectProviderType}
-        onBack={() => setStep('role')}
-        c={c} t={t}
-      />
-    );
-  } else if (step === 'account') {
+  if (step === 'account') {
     content = (
       <AccountCreateStep
         email={email} onChangeEmail={(v) => { setEmail(v); setAccountError(''); }}
@@ -400,7 +287,7 @@ export function RegistrationFlow({ onClose, onShowLogin, onComplete, c, t, style
         terms={terms} onToggleTerms={() => setTerms((v) => !v)}
         error={accountError} loading={accountLoading}
         onSubmit={handleSendOtp}
-        onBack={() => setStep(role === 'patient' ? 'role' : 'providerType')}
+        onBack={() => setStep('role')}
         onShowLogin={onShowLogin}
         c={c} t={t} styles={styles}
       />
@@ -437,6 +324,19 @@ export function RegistrationFlow({ onClose, onShowLogin, onComplete, c, t, style
         c={c} t={t} styles={styles}
       />
     );
+  } else if (step === 'employment') {
+    content = (
+      <EmploymentStep
+        showPivotConfirm={showPivotConfirm}
+        onSelectEmployment={handleSelectEmployment}
+        onRequestPivot={() => { setSubmitError(''); setShowPivotConfirm(true); }}
+        onConfirmPivot={handleConfirmPivot}
+        onCancelPivot={() => setShowPivotConfirm(false)}
+        loading={submitting}
+        onBack={() => setStep('basic')}
+        c={c} t={t} styles={styles}
+      />
+    );
   } else if (step === 'specializations') {
     content = (
       <SpecializationsStep
@@ -444,37 +344,9 @@ export function RegistrationFlow({ onClose, onShowLogin, onComplete, c, t, style
         selected={specializations}
         onToggle={toggleSpec}
         error={submitError} loading={submitting}
-        onSubmit={() => handleSpecializationsNext(specializations)}
-        onSkip={() => handleSpecializationsNext([])}
-        onBack={() => setStep('basic')}
-        c={c} t={t} styles={styles}
-      />
-    );
-  } else if (step === 'practiceLink') {
-    content = (
-      <PracticeLinkStep
-        selectedPractice={linkedPractice}
-        onSelectPractice={setLinkedPractice}
-        freeText={practiceNameText}
-        onChangeFreeText={setPracticeNameText}
-        error={submitError} loading={submitting}
         onSubmit={() => submitTherapist(specializations)}
-        onBack={() => setStep('specializations')}
-        c={c} t={t} styles={styles}
-      />
-    );
-  } else if (step === 'practiceCreate') {
-    content = (
-      <PracticeProfileCreateStep
-        values={practiceForm}
-        setField={setPracticeField}
-        specializationOptions={specializationOptions}
-        selectedSpecialties={practiceSpecialties}
-        onToggleSpecialty={togglePracticeSpecialty}
-        cityLoading={practiceCityLoading}
-        error={submitError} loading={submitting}
-        onSubmit={handlePracticeSubmit}
-        onBack={() => setStep('otp')}
+        onSkip={() => submitTherapist([])}
+        onBack={() => setStep('employment')}
         c={c} t={t} styles={styles}
       />
     );

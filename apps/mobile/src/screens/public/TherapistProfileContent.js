@@ -77,7 +77,6 @@ export function TherapistProfileContent(props) {
     authToken,
     accountType,
     onBookingRequest,
-    onOpenPractice,
     availableSlots,
   } = props;
 
@@ -106,11 +105,6 @@ export function TherapistProfileContent(props) {
   const therapistHeilmittel = Array.isArray(th?.heilmittel) ? th.heilmittel : [];
   const therapistPhone = th?.phone || null;
   const displayEmail = th?.email || null;
-  // "Works at" — a confirmed linked practice (clickable) takes precedence over
-  // the free-text practiceNameText (Flow C, not clickable). PROPOSED links are
-  // never returned by the public endpoint, so they never show here.
-  const confirmedPractice = Array.isArray(th?.practices) && th.practices.length > 0 ? th.practices[0] : null;
-  const worksAtName = confirmedPractice?.name || th?.practiceNameText || null;
   const iconHitSlop = { top: 10, bottom: 10, left: 10, right: 10 };
   const canOpenBookingModal = thWithSlots.bookingMode === 'FIRST_APPOINTMENT_REQUEST' && accountType !== 'therapist' && accountType !== 'manager';
   const bookingSlots = Array.isArray(thWithSlots?.availableSlots)
@@ -245,22 +239,6 @@ export function TherapistProfileContent(props) {
             <Text style={[styles.tagText, { color: c.muted, fontSize: 12 }]}>{th.kassenart || 'Alle Kassen'}</Text>
           </View>
         </View>
-
-        {/* "Arbeitet bei" — confirmed practice (clickable) or free-text fallback */}
-        {worksAtName ? (
-          <Pressable
-            disabled={!confirmedPractice}
-            onPress={() => confirmedPractice && onOpenPractice?.(confirmedPractice)}
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 }}
-          >
-            <Ionicons name="business-outline" size={16} color={c.muted} />
-            <Text style={{ fontSize: 14, color: c.muted }}>
-              {t('worksAt')}{' '}
-              <Text style={{ color: confirmedPractice ? c.primary : c.text, fontWeight: '600' }}>{worksAtName}</Text>
-            </Text>
-            {confirmedPractice ? <Ionicons name="chevron-forward" size={14} color={c.muted} /> : null}
-          </Pressable>
-        ) : null}
 
         {/* Info-Rows: Distanz · Telefon · E-Mail */}
         {(th.distKm != null || displayEmail || therapistPhone) ? (

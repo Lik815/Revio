@@ -109,20 +109,6 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
           };
         }
 
-        if (user.role === 'practice_admin') {
-          const practice = await fastify.prisma.practice.findFirst({
-            where: { ownerUserId: user.id },
-            orderBy: { createdAt: 'asc' },
-          });
-          return {
-            token,
-            userId: user.id,
-            accountType: 'practice_admin',
-            practiceId: practice?.id ?? null,
-            practiceName: practice?.name ?? null,
-          };
-        }
-
         const therapist = user.therapistProfile
           ?? await fastify.prisma.therapist.findFirst({ where: { userId: user.id } })
           ?? await fastify.prisma.therapist.findUnique({ where: { email } });
@@ -305,49 +291,6 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       };
     }
 
-    // Practice admin — return the owned practice (editing happens via /practice/me)
-    if (userWithProfile?.role === 'practice_admin') {
-      const practice = await fastify.prisma.practice.findFirst({
-        where: { ownerUserId: userWithProfile.id },
-        orderBy: { createdAt: 'asc' },
-      });
-      let photos: string[] | undefined;
-      if (practice?.photos) { try { photos = JSON.parse(practice.photos); } catch {} }
-      return {
-        id: userWithProfile.id,
-        email: userWithProfile.email,
-        role: 'practice_admin',
-        accountType: 'practice_admin',
-        firstName: (userWithProfile as any).firstName ?? '',
-        lastName: (userWithProfile as any).lastName ?? '',
-        phone: (userWithProfile as any).phone ?? null,
-        createdAt: userWithProfile.createdAt,
-        practice: practice
-          ? {
-              id: practice.id,
-              name: practice.name,
-              city: practice.city,
-              postalCode: practice.postalCode ?? null,
-              address: practice.address ?? null,
-              phone: practice.phone ?? null,
-              email: practice.email ?? null,
-              website: practice.website ?? null,
-              description: practice.description ?? null,
-              specialties: splitList(practice.specialties),
-              services: splitList(practice.services),
-              openingHours: practice.openingHours ?? null,
-              hours: practice.hours ?? null,
-              logo: practice.logo ?? null,
-              photos,
-              lat: practice.lat,
-              lng: practice.lng,
-              isVisible: practice.isVisible,
-              reviewStatus: practice.reviewStatus,
-            }
-          : null,
-      };
-    }
-
     if (userWithProfile?.therapistProfile) therapist = userWithProfile.therapistProfile;
 
     if (!therapist) {
@@ -472,11 +415,6 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
         lastName: updated.lastName ?? '',
         phone: (updated as any).phone ?? null,
       };
-    }
-
-    // Practice profiles are edited through PATCH /practice/me, not here.
-    if (user?.role === 'practice_admin') {
-      return reply.badRequest('Praxisprofile werden über /practice/me bearbeitet.');
     }
 
     if (user?.therapistProfile) therapist = user.therapistProfile;
@@ -755,13 +693,6 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       return { success: true };
     }
 
-    // Practice admin deletion — owned practices become ownerless (Practice.ownerUserId
-    // is SetNull) rather than deleted, so team links / public data are preserved.
-    if (user?.role === 'practice_admin') {
-      await fastify.prisma.user.delete({ where: { id: user.id } });
-      return { success: true };
-    }
-
     if (user?.therapistProfile) therapist = user.therapistProfile;
     if (!therapist) {
       therapist = await fastify.prisma.therapist.findUnique({
@@ -955,72 +886,6 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
 
     await fastify.prisma.userFavoriteTherapist.deleteMany({
       where: { userId, therapistId },
-    });
-
-    return { ok: true };
-  });
-
-  // ── Practice favorites ──────────────────────────────────────────────────────
-  fastify.get('/auth/favorites/practices', async (request, reply) => {
-    const userId = await resolveUserForFavorites(request, reply);
-    if (!userId) return;
-
-    const rows = await fastify.prisma.userFavoritePractice.findMany({
-      where: { userId },
-      include: {
-        practice: {
-          select: {
-            id: true, name: true, city: true, postalCode: true, address: true,
-            phone: true, email: true, website: true, description: true,
-            specialties: true, services: true, openingHours: true, hours: true,
-            logo: true, photos: true, lat: true, lng: true, reviewStatus: true,
-          },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    return {
-      practices: rows.map((r) => {
-        let photos: string[] | undefined;
-        if (r.practice.photos) { try { photos = JSON.parse(r.practice.photos); } catch {} }
-        return {
-          ...r.practice,
-          specialties: splitList(r.practice.specialties),
-          services: splitList(r.practice.services),
-          photos,
-        };
-      }),
-    };
-  });
-
-  fastify.post('/auth/favorites/practices', async (request, reply) => {
-    const userId = await resolveUserForFavorites(request, reply);
-    if (!userId) return;
-
-    const parsed = z.object({ practiceId: z.string().min(1) }).safeParse(request.body);
-    if (!parsed.success) return reply.badRequest(JSON.stringify(parsed.error.flatten()));
-
-    const practice = await fastify.prisma.practice.findUnique({ where: { id: parsed.data.practiceId } });
-    if (!practice) return reply.notFound('Praxis nicht gefunden');
-
-    await fastify.prisma.userFavoritePractice.upsert({
-      where: { userId_practiceId: { userId, practiceId: parsed.data.practiceId } },
-      create: { userId, practiceId: parsed.data.practiceId },
-      update: {},
-    });
-
-    return { ok: true };
-  });
-
-  fastify.delete('/auth/favorites/practices/:practiceId', async (request, reply) => {
-    const userId = await resolveUserForFavorites(request, reply);
-    if (!userId) return;
-
-    const { practiceId } = request.params as { practiceId: string };
-
-    await fastify.prisma.userFavoritePractice.deleteMany({
-      where: { userId, practiceId },
     });
 
     return { ok: true };

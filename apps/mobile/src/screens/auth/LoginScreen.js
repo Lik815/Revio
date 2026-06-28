@@ -25,7 +25,7 @@ import { ROOT_ROUTES } from '../../navigation/route-names';
 
 export function LoginScreen({ c, styles, t, onClose, bookingTargetTherapist, onBookingReady, showBackButton = true }) {
   const navigation = useNavigation();
-  const { loginAsTherapist, loginAsPatient, loginAsPracticeAdmin } = useAuth();
+  const { loginAsTherapist, loginAsPatient } = useAuth();
   const { loadFavorites, loadMyAppointments, loadIncomingBookings } = useTherapyData();
   const insets = useSafeAreaInsets();
   const shellTopPadding = showBackButton ? 0 : insets.top + SPACE.md;
@@ -85,12 +85,6 @@ export function LoginScreen({ c, styles, t, onClose, bookingTargetTherapist, onB
         registerPushToken(token);
         onClose();
         if (bookingTargetTherapist) onBookingReady?.();
-        return;
-      }
-      if (profile.role === 'practice_admin') {
-        await loginAsPracticeAdmin(token, profile);
-        registerPushToken(token);
-        onClose();
         return;
       }
       const therapistProfile = normalizeTherapistProfile(profile);

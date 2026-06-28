@@ -26,7 +26,6 @@ export function AuthProvider({ children }) {
   const [authToken, setAuthToken] = useState(null);
   const [loggedInTherapist, setLoggedInTherapist] = useState(null);
   const [loggedInPatient, setLoggedInPatient] = useState(null);
-  const [loggedInPractice, setLoggedInPractice] = useState(null);
   const [accountType, setAccountType] = useState(null);
   const [bootReady, setBootReady] = useState(false);
 
@@ -80,7 +79,6 @@ export function AuthProvider({ children }) {
               setAccountType(null);
               setLoggedInPatient(null);
               setLoggedInTherapist(null);
-              setLoggedInPractice(null);
             }
             return;
           }
@@ -91,15 +89,9 @@ export function AuthProvider({ children }) {
           if (profile.role === 'patient') {
             setLoggedInPatient(profile);
             setLoggedInTherapist(null);
-            setLoggedInPractice(null);
-          } else if (profile.role === 'practice_admin') {
-            setLoggedInPractice(profile);
-            setLoggedInPatient(null);
-            setLoggedInTherapist(null);
           } else {
             setLoggedInTherapist(normalizeTherapistProfile(profile));
             setLoggedInPatient(null);
-            setLoggedInPractice(null);
           }
         } catch {
           // Keep resolved token in memory so existing sessions are not dropped on transient boot errors.
@@ -125,7 +117,6 @@ export function AuthProvider({ children }) {
     setAccountType('therapist');
     setLoggedInTherapist(therapist ? normalizeTherapistProfile(therapist) : null);
     setLoggedInPatient(null);
-    setLoggedInPractice(null);
   };
 
   const loginAsPatient = async (token, patient) => {
@@ -135,17 +126,6 @@ export function AuthProvider({ children }) {
     setAccountType('patient');
     setLoggedInPatient(patient ?? null);
     setLoggedInTherapist(null);
-    setLoggedInPractice(null);
-  };
-
-  const loginAsPracticeAdmin = async (token, practice) => {
-    await AsyncStorage.setItem(AUTH_TOKEN_KEY, token);
-    await AsyncStorage.setItem(AUTH_ACCOUNT_TYPE_KEY, 'practice_admin');
-    setAuthToken(token);
-    setAccountType('practice_admin');
-    setLoggedInPractice(practice ?? null);
-    setLoggedInPatient(null);
-    setLoggedInTherapist(null);
   };
 
   const logout = async () => {
@@ -154,14 +134,13 @@ export function AuthProvider({ children }) {
     setAccountType(null);
     setLoggedInTherapist(null);
     setLoggedInPatient(null);
-    setLoggedInPractice(null);
   };
 
   return (
     <AuthContext.Provider value={{
-      authToken, loggedInTherapist, loggedInPatient, loggedInPractice, accountType, bootReady,
-      setAuthToken, setLoggedInTherapist, setLoggedInPatient, setLoggedInPractice, setAccountType,
-      loginAsTherapist, loginAsPatient, loginAsPracticeAdmin, logout,
+      authToken, loggedInTherapist, loggedInPatient, accountType, bootReady,
+      setAuthToken, setLoggedInTherapist, setLoggedInPatient, setAccountType,
+      loginAsTherapist, loginAsPatient, logout,
     }}>
       {children}
     </AuthContext.Provider>

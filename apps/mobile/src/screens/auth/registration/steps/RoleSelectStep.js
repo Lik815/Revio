@@ -4,9 +4,8 @@ import { AuthHero } from '../../../../components/auth/AuthHero';
 import { AuthOptionCard } from '../../../../components/auth/AuthOptionCard';
 import { AuthScreenShell } from '../../../../components/auth/AuthScreenShell';
 
-// Step 1 — choose patient vs provider. The provider sub-type (freelancer,
-// practice, works-in-practice) is picked next in ProviderTypeStep. The role is
-// kept locally in RegistrationFlow until an account is actually created.
+// Step 1 — choose patient vs therapist. The role is kept locally in
+// RegistrationFlow until an account is actually created.
 export function RoleSelectStep({ onSelectRole, onBack, c, t }) {
   return (
     <AuthScreenShell c={c} t={t} onBack={onBack} scroll={false}>
@@ -23,11 +22,11 @@ export function RoleSelectStep({ onSelectRole, onBack, c, t }) {
           c={c}
         />
         <AuthOptionCard
-          icon="medkit-outline"
-          title={t('registerRoleProvider')}
-          body={t('registerRoleProviderSub')}
+          icon="person-outline"
+          title={t('registerRoleTherapist')}
+          body={t('registerRoleTherapistSub')}
           scale="lg"
-          onPress={() => onSelectRole('provider')}
+          onPress={() => onSelectRole('therapist')}
           c={c}
         />
       </View>

@@ -55,11 +55,6 @@ export function DiscoverTabScreen() {
     navigation.navigate(ROOT_ROUTES.THERAPIST_PROFILE, { therapistId: id, therapist: fallback });
   };
 
-  const openPractice = (practice) => {
-    if (!practice?.id) return;
-    navigation.navigate(ROOT_ROUTES.PRACTICE_PROFILE, { practice });
-  };
-
   return (
     <>
       <DiscoverContent
@@ -84,10 +79,6 @@ export function DiscoverTabScreen() {
         mapScrollEnabled={search.mapScrollEnabled}
         mapTherapists={search.mapTherapists}
         openTherapistById={openTherapistById}
-        openPractice={openPractice}
-        practiceResults={search.practiceResults}
-        targetType={search.targetType}
-        setTargetType={search.setTargetType}
         query={search.query}
         requestableOnly={search.requestableOnly}
         results={search.results}

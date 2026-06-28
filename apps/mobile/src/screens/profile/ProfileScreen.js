@@ -20,7 +20,6 @@ import { ReviewNotificationModal } from '../../modals/ReviewNotificationModal';
 import { PhotoPromptModal } from '../../modals/PhotoPromptModal';
 import { TherapistDashboardScreen } from './TherapistDashboard';
 import { PatientDashboardScreen } from './PatientDashboard';
-import { PracticeDashboardScreen } from './PracticeDashboard';
 import { useTherapyData } from '../../context/TherapyContext';
 import { TherapistLandingScreen } from '../auth/TherapistLandingScreen';
 
@@ -34,8 +33,6 @@ export function ProfileTabScreen() {
   const accountType = useAppStore(appStoreSelectors.accountType);
   const loggedInPatient = useAppStore(appStoreSelectors.loggedInPatient);
   const loggedInTherapist = useAppStore(appStoreSelectors.loggedInTherapist);
-  const loggedInPractice = useAppStore(appStoreSelectors.loggedInPractice);
-  const updatePracticeProfile = useAppStore((s) => s.updatePracticeProfile);
   const updatePatientProfile = useAppStore((s) => s.updatePatientProfile);
   const signOut = useAppStore((s) => s.signOut);
   const { logout } = useAuth();
@@ -132,38 +129,6 @@ export function ProfileTabScreen() {
           visible={showReviewNotificationModal}
           notification={reviewNotification}
           onDone={markReviewNotificationSeen}
-          c={c} t={t}
-        />
-        <ToastOverlay message={toastMsg} anim={toastAnim} c={c} />
-      </>
-    );
-  }
-
-  if (loggedInPractice) {
-    return (
-      <>
-        <View style={{ flex: 1 }}>
-          <View style={{ paddingTop: insets.top, backgroundColor: c.background }} />
-          <PracticeDashboardScreen
-            c={c} t={t} styles={appStyles}
-            authToken={authToken}
-            practice={loggedInPractice?.practice ?? null}
-            specializationOptions={specializationOptions}
-            onProfileSaved={(updatedPractice) => {
-              if (updatedPractice) updatePracticeProfile({ practice: updatedPractice });
-              openProfileSavedModal(
-                t('profileSavedModalTitle') ?? 'Profil gespeichert',
-                t('profileSavedModalBody') ?? 'Deine Änderungen wurden erfolgreich gespeichert.',
-              );
-            }}
-            onAccountDeleted={handleAccountDeleted}
-          />
-        </View>
-        <ProfileSavedModal
-          visible={showProfileSaved}
-          onClose={() => setShowProfileSaved(false)}
-          title={profileSavedTitle}
-          body={profileSavedBody}
           c={c} t={t}
         />
         <ToastOverlay message={toastMsg} anim={toastAnim} c={c} />

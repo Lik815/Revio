@@ -17,11 +17,12 @@ const CHECKLIST_LABELS = {
   homeVisitRadius: 'Hausbesuche und Radius',
   address: 'Genaue Adresse',
   bio: 'Über mich',
+  employmentStatus: 'Beruflicher Status',
 };
 
 const CHECKLIST_ORDER = [
   'name', 'city', 'specializations', 'languages',
-  'photo', 'document', 'phone', 'certifications', 'kassenart', 'homeVisitRadius', 'address', 'bio',
+  'photo', 'document', 'phone', 'certifications', 'kassenart', 'homeVisitRadius', 'address', 'bio', 'employmentStatus',
 ];
 
 function Row({ done, label, c }) {
@@ -51,8 +52,9 @@ export function ProfileChecklist({ th, authToken, onSubmitted, onOpenWizard, c, 
   const completedCount = CHECKLIST_ORDER.filter((key) => completed.has(key)).length;
   const percentage = Math.round((completedCount / CHECKLIST_ORDER.length) * 100);
   const reviewStatus = th.reviewStatus;
+  const isPreparing = th.employmentStatus === 'PREPARING';
   const canSubmit = (reviewStatus === 'DRAFT' || reviewStatus === 'CHANGES_REQUESTED')
-    && completion.readyForReview;
+    && completion.readyForReview && !isPreparing;
   const inReview = reviewStatus === 'PENDING_REVIEW';
   const isApproved = reviewStatus === 'APPROVED';
   const showRows = percentage < 100;
@@ -94,6 +96,15 @@ export function ProfileChecklist({ th, authToken, onSubmitted, onOpenWizard, c, 
         <Row key={key} done={completed.has(key)} label={CHECKLIST_LABELS[key]} c={c} />
       ))}
 
+      {isPreparing && (
+        <View style={{ flexDirection: 'row', gap: 8, marginTop: 12, padding: 12, borderRadius: RADIUS.md, backgroundColor: c.primaryBg }}>
+          <Ionicons name="information-circle-outline" size={18} color={c.primary} />
+          <Text style={{ fontSize: 13, color: c.text, flex: 1, lineHeight: 18 }}>
+            Profil wird erst sichtbar, wenn du auf "Selbstständig" wechselst.
+          </Text>
+        </View>
+      )}
+
       {!!error && (
         <Text style={{ fontSize: 13, color: c.error, marginTop: 10 }}>{error}</Text>
       )}
@@ -115,7 +126,7 @@ export function ProfileChecklist({ th, authToken, onSubmitted, onOpenWizard, c, 
         </Pressable>
       )}
 
-      {!canSubmit && !inReview && !completion.readyForReview && (
+      {!canSubmit && !inReview && !completion.readyForReview && !isPreparing && (
         <>
           <Pressable
             onPress={onOpenWizard}

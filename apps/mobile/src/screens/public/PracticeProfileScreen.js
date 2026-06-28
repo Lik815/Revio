@@ -1,18 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { Linking, View } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { appStoreSelectors, useAppStore } from '../../store/useStore';
 import { useTheme } from '../../hooks/use-theme';
-import { useFavorites } from '../../hooks/use-favorites';
-import { useToast } from '../../hooks/use-toast';
 import { appStyles } from '../../styles/app-styles';
 import { translations } from '../../i18n/translations';
 import { ROOT_ROUTES } from '../../navigation/route-names';
 import { getBaseUrl, mapApiTherapist, softenErrorMessage, TUNNEL_HEADERS } from '../../utils/app-utils';
-import { ToastOverlay } from '../../components/ToastOverlay';
 import { PracticeProfileContent } from './PracticeProfileContent';
 
 const t = (key) => translations.de[key] ?? key;
+const FAV_PRACTICES_KEY = 'revio_fav_practices';
 
 export function PracticeProfileScreen() {
   const navigation = useNavigation();
@@ -20,19 +18,19 @@ export function PracticeProfileScreen() {
   const { practice: initialPractice = null } = route.params ?? {};
 
   const { c } = useTheme();
-  const authToken = useAppStore(appStoreSelectors.authToken);
-  const { toastMsg, toastAnim, showToast } = useToast();
-  const { isPracticeFavorite, togglePracticeFavorite, loadPracticeFavorites } = useFavorites({ authToken, showToast, t });
 
   const [practice, setPractice] = useState(initialPractice);
   const [therapists, setTherapists] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [favPractices, setFavPractices] = useState([]);
 
-  // Server-backed practice favorites (replaces the old AsyncStorage-only store).
   useEffect(() => {
-    if (authToken) loadPracticeFavorites(authToken);
-  }, [authToken]);
+    AsyncStorage.getItem(FAV_PRACTICES_KEY).then((raw) => {
+      if (!raw) return;
+      try { setFavPractices(JSON.parse(raw)); } catch {}
+    });
+  }, []);
 
   useEffect(() => {
     const id = practice?.id;
@@ -41,22 +39,22 @@ export function PracticeProfileScreen() {
     setError('');
     fetch(`${getBaseUrl()}/practice-detail/${id}`, { headers: { ...TUNNEL_HEADERS } })
       .then((res) => (res.ok ? res.json() : Promise.reject(res.status)))
-      .then((data) => {
-        // Merge the full practice from the detail endpoint so chips / opening
-        // hours / website are present even when navigated here with a minimal
-        // practice object (e.g. from a therapist's "works at" link).
-        if (data.practice) setPractice((prev) => ({ ...(prev ?? {}), ...data.practice }));
-        setTherapists((data.therapists ?? []).map(mapApiTherapist));
-      })
+      .then((data) => setTherapists((data.therapists ?? []).map(mapApiTherapist)))
       .catch(() => setError(t('alertNoConnection')))
       .finally(() => setLoading(false));
   }, [practice?.id]);
 
-  // Strip the joined therapists before storing as a favorite payload.
   const toggleFavoritePractice = (p) => {
-    const { therapists: _drop, ...practiceData } = p ?? {};
-    togglePracticeFavorite(practiceData);
+    const { therapists: _drop, ...practiceData } = p;
+    setFavPractices((prev) => {
+      const exists = prev.some((f) => f.id === p.id);
+      const next = exists ? prev.filter((f) => f.id !== p.id) : [...prev, practiceData];
+      AsyncStorage.setItem(FAV_PRACTICES_KEY, JSON.stringify(next));
+      return next;
+    });
   };
+
+  const isPracticeFavorite = (id) => favPractices.some((f) => f.id === id);
 
   const callPhone = (phone) => {
     if (phone) Linking.openURL(`tel:${phone}`).catch(() => {});
@@ -85,7 +83,6 @@ export function PracticeProfileScreen() {
         t={t}
         toggleFavoritePractice={toggleFavoritePractice}
       />
-      <ToastOverlay message={toastMsg} anim={toastAnim} c={c} />
     </View>
   );
 }

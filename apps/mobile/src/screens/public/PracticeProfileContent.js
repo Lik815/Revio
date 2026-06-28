@@ -61,17 +61,12 @@ export function PracticeProfileContent(props) {
   const practicePublicUrl = practice?.id ? getPublicPracticeUrl(practice.id) : 'https://www.my-revio.de';
   const therapists = Array.isArray(selectedPracticeTherapists) ? selectedPracticeTherapists : [];
   const practicePhotos = Array.isArray(practice?.photos) ? practice.photos.filter(Boolean) : [];
-  const specialties = Array.isArray(practice?.specialties) ? practice.specialties.filter(Boolean) : [];
-  const services = Array.isArray(practice?.services) ? practice.services.filter(Boolean) : [];
   const iconHitSlop = { top: 10, bottom: 10, left: 10, right: 10 };
   const [practiceLogoError, setPracticeLogoError] = React.useState(false);
   const insets = useSafeAreaInsets();
-  const scrollRef = React.useRef(null);
-  const [teamY, setTeamY] = React.useState(0);
-  const scrollToTeam = () => scrollRef.current?.scrollTo?.({ y: Math.max(teamY - 12, 0), animated: true });
 
   return (
-    <ScrollView ref={scrollRef} style={{ flex: 1 }} contentContainerStyle={[styles.scrollContent, { paddingBottom: 20 }]}>
+    <ScrollView style={{ flex: 1 }} contentContainerStyle={[styles.scrollContent, { paddingBottom: 20 }]}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: insets.top + 12 }}>
         <BackButton c={c} label={t('backBtn')} onPress={() => setSelectedPractice(null)} topInset={false} style={{ paddingTop: 0 }} />
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -117,9 +112,7 @@ export function PracticeProfileContent(props) {
       {[
         practice?.address && { icon: 'location-outline', label: practice.address, onPress: () => Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(practice.address)}`) },
         practice?.phone && { icon: 'call-outline', label: practice.phone, onPress: () => Linking.openURL(`tel:${practice.phone}`) },
-        practice?.email && { icon: 'mail-outline', label: practice.email, onPress: () => Linking.openURL(`mailto:${practice.email}`) },
-        practice?.website && { icon: 'globe-outline', label: practice.website, onPress: () => Linking.openURL(/^https?:\/\//.test(practice.website) ? practice.website : `https://${practice.website}`) },
-        (practice?.openingHours || practice?.hours) && { icon: 'time-outline', label: practice.openingHours || practice.hours, onPress: null },
+        practice?.hours && { icon: 'time-outline', label: practice.hours, onPress: null },
       ].filter(Boolean).map((row) => (
         <Pressable key={row.label} onPress={row.onPress ?? undefined} style={[styles.detailRow, { backgroundColor: c.card, borderColor: c.border }]}>
           <Ionicons name={row.icon} size={18} color={row.onPress ? c.primary : c.muted} />
@@ -142,42 +135,6 @@ export function PracticeProfileContent(props) {
         </View>
       )}
 
-      {(specialties.length > 0 || services.length > 0) && (
-        <View style={{ marginHorizontal: 16, marginTop: 8, marginBottom: 4, gap: 12 }}>
-          {specialties.length > 0 && (
-            <View>
-              <Text style={{ ...TYPE.label, color: c.muted, marginBottom: 6, textTransform: 'none', letterSpacing: 0.5 }}>{t('practiceSpecialtiesLabel')}</Text>
-              <View style={styles.tagRow}>
-                {specialties.map((s) => (
-                  <View key={`spec-${s}`} style={[styles.tag, { backgroundColor: c.primaryBg }]}>
-                    <Text style={[styles.tagText, { color: c.primary }]}>{s}</Text>
-                  </View>
-                ))}
-              </View>
-            </View>
-          )}
-          {services.length > 0 && (
-            <View>
-              <Text style={{ ...TYPE.label, color: c.muted, marginBottom: 6, textTransform: 'none', letterSpacing: 0.5 }}>{t('practiceServicesLabel')}</Text>
-              <View style={styles.tagRow}>
-                {services.map((s) => (
-                  <View key={`svc-${s}`} style={[styles.tag, { backgroundColor: c.mutedBg }]}>
-                    <Text style={[styles.tagText, { color: c.text }]}>{s}</Text>
-                  </View>
-                ))}
-              </View>
-            </View>
-          )}
-        </View>
-      )}
-
-      {therapists.length > 0 && (
-        <Pressable style={[styles.ctaBtn, { backgroundColor: c.primary, marginTop: 8 }]} onPress={scrollToTeam}>
-          <Text style={styles.ctaBtnText}>{t('selectTherapist')}</Text>
-        </Pressable>
-      )}
-
-      <View onLayout={(e) => setTeamY(e.nativeEvent.layout.y)}>
       <Text style={[styles.sectionLabel, { color: c.text, marginTop: 4 }]}>
         {t('therapistsLabel')}{!selectedPracticeLoading && !selectedPracticeError ? ` (${therapists.length})` : ''}
       </Text>
@@ -221,11 +178,6 @@ export function PracticeProfileContent(props) {
                       <Text style={[styles.tagText, { color: c.success }]}>{t('homeVisitTag')}</Text>
                     </View>
                   )}
-                  {therapist.requestable && (
-                    <View style={[styles.tag, { backgroundColor: c.successBg }]}>
-                      <Text style={[styles.tagText, { color: c.success }]}>{t('directlyBookable')}</Text>
-                    </View>
-                  )}
                 </View>
               </View>
               <Text style={[styles.practiceArrow, { color: c.muted }]}>›</Text>
@@ -233,18 +185,10 @@ export function PracticeProfileContent(props) {
           );
         })
       )}
-      </View>
 
-      {!!practice?.phone && (
-        <Pressable
-          style={[styles.ctaBtn, therapists.length === 0
-            ? { backgroundColor: c.primary, marginTop: 8 }
-            : { backgroundColor: c.mutedBg, borderWidth: 1, borderColor: c.border, marginTop: 8 }]}
-          onPress={() => callPhone(practice?.phone)}
-        >
-          <Text style={[styles.ctaBtnText, therapists.length > 0 && { color: c.text }]}>{t('callPractice')}</Text>
-        </Pressable>
-      )}
+      <Pressable style={[styles.ctaBtn, { backgroundColor: c.accent, marginTop: 4 }]} onPress={() => callPhone(practice?.phone)}>
+        <Text style={styles.ctaBtnText}>{t('callPractice')}</Text>
+      </Pressable>
     </ScrollView>
   );
 }

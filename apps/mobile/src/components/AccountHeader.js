@@ -43,15 +43,14 @@ function initialsFromName(name) {
 export function AccountHeader({ c, subtitle, titleOverride, onPressAccount, showEdit = false, onPressEdit, rightSlot, style }) {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
-  const { loggedInTherapist, loggedInPatient, loggedInPractice } = useAuth();
+  const { loggedInTherapist, loggedInPatient } = useAuth();
 
   const patientName = loggedInPatient
     ? `${loggedInPatient.firstName ?? ''} ${loggedInPatient.lastName ?? ''}`.trim()
     : '';
-  const practiceName = loggedInPractice?.practice?.name ?? '';
-  const name = titleOverride || loggedInTherapist?.fullName || patientName || practiceName || 'Mein Konto';
+  const name = titleOverride || loggedInTherapist?.fullName || patientName || 'Mein Konto';
   const photo = resolvePhotoUri(loggedInTherapist?.photo);
-  const initials = photo ? null : initialsFromName(loggedInTherapist?.fullName || patientName || practiceName);
+  const initials = photo ? null : initialsFromName(loggedInTherapist?.fullName || patientName);
 
   const handlePressAccount = onPressAccount
     ?? (() => navigation.navigate(ROOT_ROUTES.PROFILE));

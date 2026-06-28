@@ -25,27 +25,14 @@ export function FavoritesTabScreen() {
     favoritesLastLoadedAt,
     loadFavorites,
     toggleFavorite,
-    practiceFavorites,
-    practiceFavoritesLoading,
-    practiceFavoritesLastLoadedAt,
-    loadPracticeFavorites,
-    togglePracticeFavorite,
   } = useFavorites({ authToken, showToast, t });
 
   useEffect(() => {
-    if (authToken) {
-      loadFavorites(authToken);
-      loadPracticeFavorites(authToken);
-    }
+    if (authToken) loadFavorites(authToken);
   }, [authToken]);
 
   const openTherapistById = (id, fallbackTherapist = null) => {
     navigation.navigate(ROOT_ROUTES.THERAPIST_PROFILE, { therapistId: id, therapist: fallbackTherapist });
-  };
-
-  const openPractice = (practice) => {
-    if (!practice?.id) return;
-    navigation.navigate(ROOT_ROUTES.PRACTICE_PROFILE, { practice });
   };
 
   return (
@@ -58,12 +45,6 @@ export function FavoritesTabScreen() {
         loadFavorites={loadFavorites}
         toggleFavorite={toggleFavorite}
         openTherapistById={openTherapistById}
-        practiceFavorites={practiceFavorites}
-        practiceFavoritesLoading={practiceFavoritesLoading}
-        practiceFavoritesLastLoadedAt={practiceFavoritesLastLoadedAt}
-        loadPracticeFavorites={loadPracticeFavorites}
-        togglePracticeFavorite={togglePracticeFavorite}
-        openPractice={openPractice}
         setActiveTab={() => {}}
         setShowLogin={() => navigation.navigate(ROOT_ROUTES.MAIN_TABS, { screen: TAB_ROUTES.AUTH })}
         styles={appStyles}
