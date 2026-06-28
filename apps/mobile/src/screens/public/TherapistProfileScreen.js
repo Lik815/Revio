@@ -118,6 +118,7 @@ export function TherapistProfileScreen() {
         authToken={authToken}
         accountType={accountType}
         onBookingRequest={handleBookingRequest}
+        onOpenPractice={(practice) => navigation.navigate(ROOT_ROUTES.PRACTICE_PROFILE, { practice })}
         availableSlots={availableSlots}
       />
 

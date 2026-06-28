@@ -5,7 +5,7 @@ import { SPACE } from '../../utils/app-utils';
 import { AccountHeader } from '../../components/AccountHeader';
 
 export function OptionsContent({
-  loggedInTherapist, loggedInPatient,
+  loggedInTherapist, loggedInPatient, loggedInPractice,
   themeMode, setThemeMode,
   onShowLogin, onShowRegister,
   onShowFeedback, onShowChangePassword, onLogout,
@@ -14,7 +14,7 @@ export function OptionsContent({
 }) {
   const [debugTapCount, setDebugTapCount] = React.useState(0);
 const renderOptions = () => {
-  const isLoggedIn = Boolean(loggedInTherapist || loggedInPatient);
+  const isLoggedIn = Boolean(loggedInTherapist || loggedInPatient || loggedInPractice);
 
   const SectionHeader = ({ title }) => (
     <Text style={{ fontSize: 11, fontWeight: '700', color: c.muted, letterSpacing: 0.8, textTransform: 'uppercase', marginTop: 24, marginBottom: 8, paddingHorizontal: 4 }}>{title}</Text>

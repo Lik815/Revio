@@ -68,6 +68,9 @@ export function AppTabs() {
   const { notifications, readNotifIds } = useNotifications();
   const isLoggedIn = Boolean(authToken);
   const isTherapist = accountType === 'therapist';
+  // Practice admins manage a practice profile, not their own appointments:
+  // they get Discover + Favorites + Notifications + Options (no Customers/Therapy).
+  const isPractice = accountType === 'practice_admin';
   const unreadNotifications = notifications.filter((n) => !readNotifIds.has(n.id)).length;
 
   return (
@@ -100,11 +103,13 @@ export function AppTabs() {
               options={{ title: t[TAB_TRANSLATION_KEYS[TAB_ROUTES.FAVORITES]] }}
             />
           )}
-          <Tab.Screen
-            component={TherapyStack}
-            name={TAB_ROUTES.THERAPY}
-            options={{ title: t[TAB_TRANSLATION_KEYS[TAB_ROUTES.THERAPY]] }}
-          />
+          {!isPractice && (
+            <Tab.Screen
+              component={TherapyStack}
+              name={TAB_ROUTES.THERAPY}
+              options={{ title: t[TAB_TRANSLATION_KEYS[TAB_ROUTES.THERAPY]] }}
+            />
+          )}
           <Tab.Screen
             component={NotificationsStack}
             name={TAB_ROUTES.NOTIFICATIONS}

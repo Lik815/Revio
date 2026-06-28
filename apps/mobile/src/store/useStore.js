@@ -10,6 +10,7 @@ const INITIAL_AUTH_STATE = {
   accountType: null,
   loggedInPatient: null,
   loggedInTherapist: null,
+  loggedInPractice: null,
 };
 
 const INITIAL_FAVORITES_STATE = {
@@ -55,13 +56,14 @@ export const useAppStore = create(
         });
       },
 
-      signIn: ({ authToken, accountType, loggedInPatient = null, loggedInTherapist = null }) => {
+      signIn: ({ authToken, accountType, loggedInPatient = null, loggedInTherapist = null, loggedInPractice = null }) => {
         set({
           authHydrated: true,
           authToken: authToken ?? null,
           accountType: accountType ?? null,
           loggedInPatient,
           loggedInTherapist,
+          loggedInPractice,
         });
       },
 
@@ -91,6 +93,22 @@ export const useAppStore = create(
       setLoggedInTherapist: (loggedInTherapist) => {
         set({
           loggedInTherapist: loggedInTherapist ?? null,
+        });
+      },
+
+      setLoggedInPractice: (loggedInPractice) => {
+        set({
+          loggedInPractice: loggedInPractice ?? null,
+        });
+      },
+
+      updatePracticeProfile: (patch) => {
+        const current = get().loggedInPractice ?? {};
+        set({
+          loggedInPractice: {
+            ...current,
+            ...(patch ?? {}),
+          },
         });
       },
 
@@ -153,6 +171,7 @@ export const useAppStore = create(
         accountType: state.accountType,
         loggedInPatient: state.loggedInPatient,
         loggedInTherapist: state.loggedInTherapist,
+        loggedInPractice: state.loggedInPractice,
         favorites: state.favorites,
         favoritesLastLoadedAt: state.favoritesLastLoadedAt,
         themePreference: state.themePreference,
@@ -175,4 +194,5 @@ export const appStoreSelectors = {
   favorites: (state) => state.favorites,
   loggedInPatient: (state) => state.loggedInPatient,
   loggedInTherapist: (state) => state.loggedInTherapist,
+  loggedInPractice: (state) => state.loggedInPractice,
 };

@@ -5,9 +5,10 @@ import { AuthOptionCard } from '../../../../components/auth/AuthOptionCard';
 import { AuthPrimaryButton } from '../../../../components/auth/AuthPrimaryButton';
 import { AuthScreenShell } from '../../../../components/auth/AuthScreenShell';
 
-// Step 5 (therapist only) — professional situation. SELF_EMPLOYED/PREPARING
-// continue the therapist track; "not self-employed" triggers an explicit
-// confirmation that an account is created as a patient instead.
+// Step 5 (therapist only) — professional situation. "Self-employed" continues
+// the therapist track; "not self-employed" triggers an explicit confirmation
+// that an account is created as a patient instead. (There is no "in preparation"
+// option — only self-employed freelancers may self-register as providers.)
 export function EmploymentStep({
   showPivotConfirm,
   onSelectEmployment,
@@ -39,14 +40,6 @@ export function EmploymentStep({
           title={t('regEmploymentSelfEmployed')}
           body={t('regEmploymentSelfEmployedSub')}
           onPress={() => onSelectEmployment('SELF_EMPLOYED')}
-          scale="md"
-          c={c}
-        />
-        <AuthOptionCard
-          icon="hourglass-outline"
-          title={t('regEmploymentPreparing')}
-          body={t('regEmploymentPreparingSub')}
-          onPress={() => onSelectEmployment('PREPARING')}
           scale="md"
           c={c}
         />

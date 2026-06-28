@@ -128,6 +128,7 @@ export interface Therapist {
   professionalTitle: string;
   gender?: string | null;
   isFreelancer: boolean;
+  practiceNameText?: string | null;
   specializations: string[];
   languages: string[];
   certifications: string[];
@@ -157,6 +158,19 @@ export interface Practice {
   lng: number;
   reviewStatus: ReviewStatus;
   createdAt: string;
+  // Practice-as-account fields (all optional — legacy practices may lack them)
+  ownerUserId?: string | null;
+  postalCode?: string | null;
+  email?: string | null;
+  website?: string | null;
+  description?: string | null;
+  specialties?: string[];
+  services?: string[];
+  openingHours?: string | null;
+  hours?: string | null;
+  logo?: string | null;
+  photos?: string[];
+  isVisible?: boolean;
 }
 
 export interface TherapistPracticeLink {
@@ -182,7 +196,14 @@ export interface SearchInput {
   specialization?: string;
   heilmittel?: string;
   kassenart?: string;
+  // Which entity types to include in results. Defaults to 'both' server-side.
+  targetType?: SearchTargetType;
 }
+
+export type SearchTargetType = 'therapist' | 'practice' | 'both';
+
+// Account type as surfaced by /auth/me and the mobile AuthContext.
+export type AccountType = 'patient' | 'therapist' | 'practice_admin';
 
 export interface SearchPractice {
   id: string;
@@ -197,6 +218,17 @@ export interface SearchPractice {
   distKm?: number;
   logo?: string;
   photos?: string[];
+  // Set when the practice is returned as a standalone result (not just derived
+  // from a therapist's links). teamCount = confirmed, approved therapists.
+  specialties?: string[];
+  services?: string[];
+  openingHours?: string | null;
+  website?: string | null;
+  email?: string | null;
+  teamCount?: number;
+  relevance?: number;
+  cityMatch?: boolean;
+  radiusMatch?: boolean;
 }
 
 export interface SearchTherapist {

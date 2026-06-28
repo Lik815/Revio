@@ -23,6 +23,7 @@ import {
   TYPE,
 } from '../../utils/app-utils';
 import { AccountHeader } from '../../components/AccountHeader';
+import { PracticeResultCard } from '../../components/PracticeResultCard';
 
 function formatNextSlot(isoString) {
   if (!isoString) return null;
@@ -90,6 +91,10 @@ export function DiscoverContent(props) {
     mapTherapists,
     mapScrollEnabled,
     openTherapistById,
+    openPractice,
+    practiceResults,
+    targetType,
+    setTargetType,
     query,
     results,
     runSearch,
@@ -131,9 +136,10 @@ export function DiscoverContent(props) {
   const insets = useSafeAreaInsets();
 
   const safeResults = Array.isArray(results) ? results : [];
-  const matchedResultsCount = safeResults.filter(
-    (r) => r.cityMatch !== false && r.radiusMatch !== false
-  ).length;
+  const safePracticeResults = Array.isArray(practiceResults) ? practiceResults : [];
+  const matchedResultsCount =
+    safeResults.filter((r) => r.cityMatch !== false && r.radiusMatch !== false).length +
+    safePracticeResults.filter((r) => r.cityMatch !== false && r.radiusMatch !== false).length;
   const safeMapTherapists = Array.isArray(mapTherapists) ? mapTherapists : [];
   const safeFortbildungen = Array.isArray(fortbildungen) ? fortbildungen : [];
   const safeCertificationOptions = Array.isArray(certificationOptions)
@@ -223,6 +229,36 @@ export function DiscoverContent(props) {
           </Pressable>
         ) : null}
       </View>
+
+      {setTargetType != null && (
+        <View style={styles.filterCompactSection}>
+          <Text style={[styles.filterCompactSectionTitle, { color: c.muted }]}>{t('searchTypeLabel')}</Text>
+          <View style={[styles.kassenartCompactToggle, { backgroundColor: c.mutedBg, borderColor: c.border }]}>
+            {[
+              { key: 'both', label: t('searchTypeAll') },
+              { key: 'therapist', label: t('searchTypeTherapists') },
+              { key: 'practice', label: t('searchTypePractices') },
+            ].map((option) => {
+              const active = (targetType ?? 'both') === option.key;
+              return (
+                <Pressable
+                  key={option.key}
+                  onPress={() => setTargetType(option.key)}
+                  style={[
+                    styles.kassenartCompactToggleBtn,
+                    { borderColor: active ? c.primary : 'transparent', backgroundColor: active ? c.card : 'transparent' },
+                  ]}
+                >
+                  <Text style={[styles.kassenartCompactToggleText, { color: active ? c.primary : c.textMuted ?? c.muted }]}>
+                    {option.label}
+                  </Text>
+                  {active ? <Ionicons name="checkmark" size={12} color={c.primary} /> : null}
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      )}
 
       <View style={styles.filterCompactSection}>
         <Text style={[styles.filterCompactSectionTitle, { color: c.muted }]}>Leistungen</Text>
@@ -874,7 +910,25 @@ export function DiscoverContent(props) {
         );
       })}
 
-      {viewMode === 'list' && !searchLoading && safeResults.length === 0 && searched && (
+      {viewMode === 'list' && !searchLoading && safePracticeResults.length > 0 && (
+        <>
+          {safeResults.length > 0 ? (
+            <View style={{ paddingTop: 16, paddingBottom: 4 }}>
+              <Text style={{ ...TYPE.meta, color: mutedText }}>{t('practicesSectionLabel')}</Text>
+            </View>
+          ) : null}
+          {safePracticeResults.map((practice) => (
+            <PracticeResultCard
+              key={`practice-${practice.id}`}
+              practice={practice}
+              onPress={() => openPractice?.(practice)}
+              c={c} t={t} styles={styles}
+            />
+          ))}
+        </>
+      )}
+
+      {viewMode === 'list' && !searchLoading && safeResults.length === 0 && safePracticeResults.length === 0 && searched && (
         <View style={[styles.emptyState, { backgroundColor: c.card, borderColor: c.border }]}>
           <Ionicons name="search-outline" size={32} color={c.muted} />
           <Text style={[styles.emptyTitle, { color: c.text }]}>{t('noResults')}</Text>

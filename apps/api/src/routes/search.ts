@@ -184,9 +184,43 @@ const searchBodySchema = z.object({
   heilmittel: z.string().optional(),
   kassenart: z.string().optional(),
   requestable: z.boolean().optional(),
+  // Which entity types to include. Defaults to 'both'.
+  targetType: z.enum(['therapist', 'practice', 'both']).default('both'),
 }).refine((data) => Boolean(data.city) || Boolean(data.origin), {
   message: 'city oder origin ist erforderlich',
 });
+
+/**
+ * Score a practice against a normalized query. Mirrors the therapist priorities
+ * (name → specialties → services → description → city → generic) so mixed
+ * results rank comparably.
+ */
+function scorePractice(
+  p: { name: string; specialties: string; services: string; description: string | null; city: string },
+  query: string,
+): number {
+  const q = normalizeText(query);
+  if (!q) return 1;
+  const name = normalizeText(p.name);
+  const specs = splitList(p.specialties).map(normalizeText);
+  const services = splitList(p.services).map(normalizeText);
+  const city = normalizeText(p.city);
+  const desc = normalizeText(p.description ?? '');
+  const nameWords = name.split(/\s+/).filter(Boolean);
+  const qWords = q.split(/\s+/).filter(Boolean);
+
+  if (name === q) return 12;
+  if (qWords.length > 0 && qWords.every((w) => nameWords.some((nw) => nw.startsWith(w)))) return 10;
+  if (name.includes(q) || q.includes(name)) return 9;
+  if (specs.some((s) => s === q)) return 10;
+  if (specs.some((s) => s.includes(q) || q.includes(s))) return 8;
+  if (specs.some((s) => qWords.some((w) => s.includes(w)))) return 6;
+  if (services.some((s) => s.includes(q) || q.includes(s))) return 5;
+  if (desc.includes(q)) return 4;
+  if (city.includes(q)) return 3;
+  if (GENERIC_QUERIES.has(q)) return 1;
+  return 0;
+}
 
 export const searchRoutes: FastifyPluginAsync = async (fastify) => {
 
@@ -197,12 +231,15 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
     if (!parsed.success) return reply.badRequest(parsed.error.flatten().toString());
 
     const input: SearchInput = parsed.data;
+    const targetType = (parsed.data as any).targetType ?? 'both';
+    const includeTherapists = targetType !== 'practice';
+    const includePractices = targetType !== 'therapist';
     fastify.log.info({ searchInput: input }, 'mobile search input');
 
     // Load all approved therapists that are publicly visible.
     // Invited profiles and manager-onboarding profiles require an explicit publication
     // confirmation before they may appear in search.
-    const therapists = await fastify.prisma.therapist.findMany({
+    const therapists = includeTherapists ? await fastify.prisma.therapist.findMany({
       where: {
         reviewStatus: 'APPROVED',
         isVisible: true,
@@ -217,7 +254,7 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
           include: { practice: true },
         },
       },
-    });
+    }) : [];
 
     const normalizedCity = input.city ? normalizeText(input.city) : null;
     const passesFilters = (t: typeof therapists[number]) => {
@@ -363,15 +400,95 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
       return b.relevance - a.relevance;
     });
 
-    const practiceMap = new Map<string, SearchPractice>();
-    results.forEach((t) => t.practices.forEach((p) => {
-      if (input.origin && input.radiusKm != null && p.distKm != null && p.distKm > input.radiusKm) return;
-      practiceMap.set(p.id, p);
-    }));
+    // ── Standalone practices ────────────────────────────────────────────────
+    // Practices are first-class results (not just derived from therapist links).
+    // Requestable-only is therapist-specific (booking goes to a therapist), so
+    // practices are excluded when that filter is on. Therapist-only filters
+    // (language/heilmittel/kassenart) do not apply to practices.
+    const practiceResults: SearchPractice[] = [];
+    const requestableOnly = (parsed.data as any).requestable === true;
+
+    if (includePractices && !requestableOnly) {
+      const practices = await fastify.prisma.practice.findMany({
+        where: { reviewStatus: 'APPROVED', isVisible: true },
+        include: {
+          links: {
+            where: {
+              status: 'CONFIRMED',
+              therapist: { reviewStatus: 'APPROVED', isVisible: true, employmentStatus: 'SELF_EMPLOYED' },
+            },
+            select: { id: true },
+          },
+        },
+      });
+
+      practices.forEach((p) => {
+        const relevance = scorePractice(p, input.query);
+        if (relevance <= 0) return;
+
+        // Specialization filter applies to practices too (matched against specialties).
+        if (input.specialization) {
+          const specs = splitList(p.specialties).map((s) => s.toLowerCase());
+          if (!specs.includes(input.specialization.toLowerCase())) return;
+        }
+        // homeVisit filter: only constrain when explicitly requested as true.
+        if (input.homeVisit === true && !p.homeVisit) return;
+
+        const distKm = input.origin && p.lat !== 0 && p.lng !== 0
+          ? haversine(input.origin.lat, input.origin.lng, p.lat, p.lng)
+          : undefined;
+
+        const cityMatch = normalizedCity ? normalizeText(p.city) === normalizedCity : true;
+        let radiusMatch = true;
+        if (input.origin && input.radiusKm != null) {
+          radiusMatch = distKm != null && distKm <= input.radiusKm;
+        }
+
+        let photos: string[] | undefined;
+        if (p.photos) { try { photos = JSON.parse(p.photos); } catch {} }
+
+        practiceResults.push({
+          id: p.id,
+          name: p.name,
+          city: p.city,
+          address: p.address ?? undefined,
+          phone: p.phone ?? undefined,
+          hours: p.hours ?? undefined,
+          description: p.description ?? undefined,
+          lat: p.lat,
+          lng: p.lng,
+          distKm,
+          logo: p.logo ?? undefined,
+          photos,
+          specialties: splitList(p.specialties),
+          services: splitList(p.services),
+          openingHours: p.openingHours ?? null,
+          website: p.website ?? null,
+          email: p.email ?? null,
+          teamCount: p.links.length,
+          relevance,
+          cityMatch,
+          radiusMatch,
+        });
+      });
+
+      // Same ordering as therapists: matched (city + radius) first, then distance, then relevance.
+      const pMatchScore = (r: SearchPractice) => (r.cityMatch ? 1 : 0) + (r.radiusMatch ? 1 : 0);
+      practiceResults.sort((a, b) => {
+        const scoreDiff = pMatchScore(b) - pMatchScore(a);
+        if (scoreDiff !== 0) return scoreDiff;
+        if (input.origin) {
+          const aDist = a.distKm ?? Number.POSITIVE_INFINITY;
+          const bDist = b.distKm ?? Number.POSITIVE_INFINITY;
+          if (aDist !== bDist) return aDist - bDist;
+        }
+        return (b.relevance ?? 0) - (a.relevance ?? 0);
+      });
+    }
 
     return {
       therapists: results,
-      practices: Array.from(practiceMap.values()),
+      practices: practiceResults,
     };
   });
 
@@ -418,6 +535,9 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
         homeVisit: t.homeVisit, city: t.city, bio: t.bio ?? undefined,
         ...((t as any).serviceRadiusKm != null ? { serviceRadiusKm: (t as any).serviceRadiusKm } : {}),
         photo: t.photo ?? undefined, practices,
+        // Free-text practice name (Flow C). The mobile shows a confirmed linked
+        // practice (above) in preference; this is the non-clickable fallback.
+        practiceNameText: (t as any).practiceNameText ?? null,
         bookingMode: (t as any).bookingMode ?? 'DIRECTORY_ONLY',
         requestable: requestability.requestable,
         nextFreeSlotAt: (t as any).nextFreeSlotAt?.toISOString?.() ?? null,
@@ -474,6 +594,8 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
                 isVisible: true,
                 isPublished: true,
                 employmentStatus: true,
+                bookingMode: true,
+                nextFreeSlotAt: true,
               },
             },
           },
@@ -486,8 +608,13 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
     return {
       practice: {
         id: practice.id, name: practice.name, city: practice.city,
+        postalCode: practice.postalCode ?? undefined,
         address: practice.address ?? undefined, phone: practice.phone ?? undefined,
-        hours: practice.hours ?? undefined, description: practice.description ?? undefined,
+        email: practice.email ?? undefined, website: practice.website ?? undefined,
+        hours: practice.hours ?? undefined, openingHours: practice.openingHours ?? undefined,
+        description: practice.description ?? undefined,
+        specialties: splitList(practice.specialties),
+        services: splitList(practice.services),
         lat: practice.lat, lng: practice.lng,
         logo: practice.logo ?? undefined, photos,
       },
@@ -498,6 +625,9 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
           }).publicSearchEligible,
         )
         .map((l) => {
+        const requestability = getTherapistRequestabilityState(l.therapist as any, {
+          links: [{ status: l.status, practice: { reviewStatus: practice.reviewStatus } }],
+        });
         return ({
         id: l.therapist.id,
         fullName: l.therapist.fullName,
@@ -507,6 +637,9 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
         city: l.therapist.city,
         homeVisit: l.therapist.homeVisit,
         bio: l.therapist.bio ?? undefined,
+        bookingMode: (l.therapist as any).bookingMode ?? 'DIRECTORY_ONLY',
+        requestable: requestability.requestable,
+        nextFreeSlotAt: (l.therapist as any).nextFreeSlotAt?.toISOString?.() ?? null,
       })}),
     };
   });

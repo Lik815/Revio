@@ -648,8 +648,16 @@ describe('POST /search', () => {
     expect(body.therapists[0].distKm).toBeLessThan(0.1);
     expect(body.therapists[1].fullName).toBe('Far Away Therapist');
     expect(body.therapists[1].radiusMatch).toBe(false);
-    expect(body.practices).toHaveLength(1);
-    expect(body.practices[0].id).toBe(nearPractice.id);
+    // Practices are now standalone results: like therapists, out-of-radius
+    // practices are not excluded but reordered behind in-radius matches.
+    const practiceIds = body.practices.map((p: any) => p.id);
+    expect(practiceIds).toContain(nearPractice.id);
+    expect(practiceIds).toContain(farPractice.id);
+    const nearResult = body.practices.find((p: any) => p.id === nearPractice.id);
+    const farResult = body.practices.find((p: any) => p.id === farPractice.id);
+    expect(nearResult.radiusMatch).toBe(true);
+    expect(farResult.radiusMatch).toBe(false);
+    expect(practiceIds.indexOf(nearPractice.id)).toBeLessThan(practiceIds.indexOf(farPractice.id));
   });
 
   it('keeps only nearby practices for therapists with multiple linked practices', async () => {
@@ -707,10 +715,14 @@ describe('POST /search', () => {
     expect(res.statusCode).toBe(200);
     const body = res.json();
     expect(body.therapists).toHaveLength(1);
+    // The per-therapist practices array is still radius-filtered to the near one.
     expect(body.therapists[0].practices).toHaveLength(1);
     expect(body.therapists[0].practices[0].id).toBe(nearPractice.id);
-    expect(body.practices).toHaveLength(1);
-    expect(body.practices[0].id).toBe(nearPractice.id);
+    // The standalone practices array lists both (radius only affects ordering).
+    const ids = body.practices.map((p: any) => p.id);
+    expect(ids).toContain(nearPractice.id);
+    expect(ids).toContain(farPractice.id);
+    expect(ids.indexOf(nearPractice.id)).toBeLessThan(ids.indexOf(farPractice.id));
   });
 
   it('combines nearby search with existing filters', async () => {
@@ -2417,9 +2429,16 @@ describe('POST /therapists/me/submit-for-review', () => {
     expect(t?.reviewStatus).toBe('PENDING_REVIEW');
   });
 
-  it('registers a PREPARING therapist and rejects submission', async () => {
-    const { therapistId, token } = await registerTherapist('submit-prep@test.com', {
-      employmentStatus: 'PREPARING',
+  // PREPARING can no longer be chosen at registration — new accounts are always
+  // SELF_EMPLOYED. The defensive submit-for-review gate is kept as a safety net,
+  // so a PREPARING profile forced directly in the DB still cannot be submitted.
+  it('rejects submission of a PREPARING profile forced in the DB (safety net)', async () => {
+    const { therapistId, token, employmentStatus } = await registerTherapist('submit-prep@test.com');
+    expect(employmentStatus).toBe('SELF_EMPLOYED');
+
+    await prisma.therapist.update({
+      where: { id: therapistId },
+      data: { employmentStatus: 'PREPARING' },
     });
     const t0 = await prisma.therapist.findUnique({ where: { id: therapistId } });
     expect(t0?.employmentStatus).toBe('PREPARING');
@@ -2830,7 +2849,10 @@ describe('Slot-based Booking', () => {
 
   it('GET /therapists/:id/slots — returns only future AVAILABLE slots', async () => {
     await createFutureSlot();
-    await createFutureSlot({ status: 'BOOKED' });
+    // Distinct startsAt — createFutureSlot()'s default (now+24h) would otherwise
+    // race the line above into the same millisecond and trip the
+    // (therapistId, startsAt) unique index.
+    await createFutureSlot({ status: 'BOOKED', startsAt: new Date(Date.now() + 48 * 60 * 60 * 1000) });
     await prisma.therapistSlot.create({
       data: { therapistId, startsAt: new Date(Date.now() - 60000), durationMin: 20, status: 'AVAILABLE' },
     });
@@ -3696,5 +3718,344 @@ describe('Session token expiry', () => {
     expect(diffDays).toBeLessThan(32);
 
     await prisma.user.delete({ where: { id: user.id } });
+  });
+
+  // ─── Practice accounts (practice_admin) ─────────────────────────────────────
+  describe('Practice registration & profile', () => {
+    async function registerPractice(email: string, practice: Record<string, unknown> = {}, extra: Record<string, unknown> = {}) {
+      await seedConfirmedOtp(email);
+      const res = await app.inject({
+        method: 'POST',
+        url: '/register/practice',
+        payload: {
+          email,
+          password: 'practicepass123',
+          firstName: 'Petra',
+          lastName: 'Praxis',
+          practice: {
+            name: 'Physio am Dom',
+            city: 'Köln',
+            postalCode: '50667',
+            address: 'Domkloster 4',
+            phone: '+49 221 123456',
+            email: 'kontakt@physio-dom.de',
+            specialties: ['Rückenschmerzen'],
+            services: ['Krankengymnastik'],
+            ...practice,
+          },
+          ...extra,
+        },
+      });
+      return res;
+    }
+
+    it('registers a practice and creates a practice_admin user + pending practice', async () => {
+      const res = await registerPractice('practice-reg@test.com');
+      expect(res.statusCode).toBe(201);
+      const body = res.json();
+      expect(body.accountType).toBe('practice_admin');
+      expect(body.practiceId).toBeTruthy();
+      expect(body.reviewStatus).toBe('PENDING_REVIEW');
+
+      const practice = await prisma.practice.findUnique({ where: { id: body.practiceId } });
+      expect(practice?.ownerUserId).toBeTruthy();
+      expect(practice?.isVisible).toBe(true);
+      const owner = await prisma.user.findUnique({ where: { id: practice!.ownerUserId! } });
+      expect(owner?.role).toBe('practice_admin');
+    });
+
+    it('logs in a practice_admin and returns accountType + practiceId', async () => {
+      await registerPractice('practice-login@test.com');
+      const res = await app.inject({
+        method: 'POST', url: '/auth/login',
+        payload: { email: 'practice-login@test.com', password: 'practicepass123' },
+      });
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      expect(body.accountType).toBe('practice_admin');
+      expect(body.practiceId).toBeTruthy();
+    });
+
+    it('GET /auth/me returns the owned practice for a practice_admin', async () => {
+      const reg = (await registerPractice('practice-me@test.com')).json();
+      const res = await app.inject({
+        method: 'GET', url: '/auth/me',
+        headers: { authorization: `Bearer ${reg.token}` },
+      });
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      expect(body.role).toBe('practice_admin');
+      expect(body.practice?.id).toBe(reg.practiceId);
+      expect(body.practice?.specialties).toContain('Rückenschmerzen');
+    });
+
+    it('GET + PATCH /practice/me reads and updates the own practice', async () => {
+      const reg = (await registerPractice('practice-edit@test.com')).json();
+      const auth = { authorization: `Bearer ${reg.token}` };
+
+      const getRes = await app.inject({ method: 'GET', url: '/practice/me', headers: auth });
+      expect(getRes.statusCode).toBe(200);
+      expect(getRes.json().practice.name).toBe('Physio am Dom');
+      expect(Array.isArray(getRes.json().team)).toBe(true);
+
+      const patchRes = await app.inject({
+        method: 'PATCH', url: '/practice/me', headers: auth,
+        payload: { description: 'Moderne Praxis im Herzen von Köln', services: ['Krankengymnastik', 'Manuelle Therapie'] },
+      });
+      expect(patchRes.statusCode).toBe(200);
+      const updated = patchRes.json().practice;
+      expect(updated.description).toBe('Moderne Praxis im Herzen von Köln');
+      expect(updated.services).toEqual(['Krankengymnastik', 'Manuelle Therapie']);
+    });
+
+    it('blocks PATCH /practice/me for a non-practice_admin token', async () => {
+      const reg = (await registerPractice('practice-guard@test.com')).json();
+      // therapist token must not edit a practice
+      await seedConfirmedOtp('practice-guard-th@test.com');
+      const th = (await app.inject({
+        method: 'POST', url: '/register/therapist',
+        payload: { email: 'practice-guard-th@test.com', fullName: 'Tom T', city: 'Köln', specializations: ['x'], languages: ['de'] },
+      })).json();
+      const res = await app.inject({
+        method: 'PATCH', url: '/practice/me',
+        headers: { authorization: `Bearer ${th.token}` },
+        payload: { description: 'hijack' },
+      });
+      expect(res.statusCode).toBe(401);
+      // owner is unaffected
+      expect(reg.accountType).toBe('practice_admin');
+    });
+
+    it('rejects a duplicate ownerless practice unless forceCreate is set', async () => {
+      // Seed an ownerless practice (as created via legacy therapist registration)
+      await prisma.practice.create({
+        data: { name: 'Reha Zentrum Nord', city: 'Hamburg', reviewStatus: 'APPROVED' },
+      });
+
+      const dupe = await registerPractice('practice-dupe@test.com', { name: 'Reha Zentrum Nord', city: 'Hamburg' });
+      expect(dupe.statusCode).toBe(409);
+      expect(dupe.json().code).toBe('practice_exists');
+      expect(dupe.json().practice?.name).toBe('Reha Zentrum Nord');
+
+      // With forceCreate the registration proceeds
+      const forced = await registerPractice('practice-dupe2@test.com', { name: 'Reha Zentrum Nord', city: 'Hamburg' }, { forceCreate: true });
+      expect(forced.statusCode).toBe(201);
+    });
+
+    it('rejects practice registration without a confirmed OTP', async () => {
+      const res = await app.inject({
+        method: 'POST', url: '/register/practice',
+        payload: {
+          email: 'practice-nootp@test.com',
+          password: 'practicepass123',
+          practice: { name: 'No OTP Praxis', city: 'Köln' },
+        },
+      });
+      expect(res.statusCode).toBe(400);
+    });
+  });
+
+  // ─── Search: standalone practices ───────────────────────────────────────────
+  describe('Search returns standalone practices', () => {
+    async function makePractice(overrides: Record<string, unknown> = {}) {
+      return prisma.practice.create({
+        data: {
+          name: 'Suchbare Praxis',
+          city: 'Bonn',
+          reviewStatus: 'APPROVED',
+          isVisible: true,
+          specialties: 'Rückenschmerzen',
+          lat: 50.7374,
+          lng: 7.0982,
+          ...overrides,
+        },
+      });
+    }
+
+    const search = (body: Record<string, unknown>) =>
+      app.inject({ method: 'POST', url: '/search', payload: { query: 'physiotherapie', city: 'Bonn', ...body } });
+
+    it('includes an APPROVED + visible practice as a standalone result', async () => {
+      const p = await makePractice({ name: 'Praxis Sichtbar Bonn' });
+      const res = await search({ query: 'physiotherapie' });
+      expect(res.statusCode).toBe(200);
+      const ids = (res.json().practices ?? []).map((x: any) => x.id);
+      expect(ids).toContain(p.id);
+    });
+
+    it('excludes non-APPROVED or hidden practices', async () => {
+      const pending = await makePractice({ name: 'Pending Praxis', reviewStatus: 'PENDING_REVIEW' });
+      const hidden = await makePractice({ name: 'Hidden Praxis', isVisible: false });
+      const res = await search({ query: 'physiotherapie' });
+      const ids = (res.json().practices ?? []).map((x: any) => x.id);
+      expect(ids).not.toContain(pending.id);
+      expect(ids).not.toContain(hidden.id);
+    });
+
+    it('targetType "therapist" returns no practices; "practice" returns no therapists', async () => {
+      await makePractice({ name: 'Nur Praxen Test' });
+      const onlyTherapists = await search({ query: 'physiotherapie', targetType: 'therapist' });
+      expect(onlyTherapists.json().practices).toHaveLength(0);
+
+      const onlyPractices = await search({ query: 'physiotherapie', targetType: 'practice' });
+      expect(onlyPractices.json().therapists).toHaveLength(0);
+      expect((onlyPractices.json().practices ?? []).length).toBeGreaterThan(0);
+    });
+
+    it('excludes practices when requestable-only is set (booking is therapist-only)', async () => {
+      await makePractice({ name: 'Requestable Filter Praxis' });
+      const res = await search({ query: 'physiotherapie', requestable: true });
+      expect(res.json().practices).toHaveLength(0);
+    });
+
+    it('reports teamCount from confirmed, approved therapists', async () => {
+      const p = await makePractice({ name: 'Team Praxis' });
+      const th = await prisma.therapist.create({
+        data: {
+          email: `team-th-${Date.now()}@test.com`,
+          fullName: 'Team Therapeut',
+          professionalTitle: 'Physiotherapeut',
+          city: 'Bonn',
+          specializations: 'Rückenschmerzen',
+          languages: 'Deutsch',
+          reviewStatus: 'APPROVED',
+          isVisible: true,
+        },
+      });
+      await prisma.therapistPracticeLink.create({
+        data: { therapistId: th.id, practiceId: p.id, status: 'CONFIRMED' },
+      });
+      const res = await search({ query: 'physiotherapie' });
+      const found = (res.json().practices ?? []).find((x: any) => x.id === p.id);
+      expect(found?.teamCount).toBe(1);
+    });
+
+    it('GET /practice-detail returns specialties/services + team with requestable flag', async () => {
+      const p = await makePractice({
+        name: 'Detail Praxis',
+        specialties: 'Rückenschmerzen, Sportphysiotherapie',
+        services: 'Krankengymnastik, Manuelle Therapie',
+      });
+      const th = await prisma.therapist.create({
+        data: {
+          email: `detail-th-${Date.now()}@test.com`,
+          fullName: 'Detail Therapeut',
+          professionalTitle: 'Physiotherapeut',
+          city: 'Bonn',
+          specializations: 'Rückenschmerzen',
+          languages: 'Deutsch',
+          reviewStatus: 'APPROVED',
+          isVisible: true,
+          // not bookable (DIRECTORY_ONLY) -> requestable false
+        },
+      });
+      await prisma.therapistPracticeLink.create({
+        data: { therapistId: th.id, practiceId: p.id, status: 'CONFIRMED' },
+      });
+
+      const res = await app.inject({ method: 'GET', url: `/practice-detail/${p.id}` });
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      expect(body.practice.specialties).toEqual(['Rückenschmerzen', 'Sportphysiotherapie']);
+      expect(body.practice.services).toEqual(['Krankengymnastik', 'Manuelle Therapie']);
+      expect(body.therapists).toHaveLength(1);
+      expect(body.therapists[0].id).toBe(th.id);
+      expect(body.therapists[0].requestable).toBe(false);
+    });
+  });
+
+  // ─── Practice favorites ─────────────────────────────────────────────────────
+  describe('Practice favorites', () => {
+    async function makePatient(email: string) {
+      const token = `fav-tok-${email}`;
+      await prisma.user.create({
+        data: { email, passwordHash: await hashPassword('test1234'), role: 'patient', firstName: 'Fav', lastName: 'Patient', sessionToken: token, emailVerifiedAt: new Date() },
+      });
+      return token;
+    }
+
+    it('adds, lists and removes a practice favorite', async () => {
+      const token = await makePatient('fav-practice@test.com');
+      const practice = await prisma.practice.create({
+        data: { name: 'Favoriten Praxis', city: 'Bonn', reviewStatus: 'APPROVED', specialties: 'Rückenschmerzen' },
+      });
+      const auth = { authorization: `Bearer ${token}` };
+
+      const add = await app.inject({ method: 'POST', url: '/auth/favorites/practices', headers: auth, payload: { practiceId: practice.id } });
+      expect(add.statusCode).toBe(200);
+
+      const list = await app.inject({ method: 'GET', url: '/auth/favorites/practices', headers: auth });
+      expect(list.statusCode).toBe(200);
+      const ids = (list.json().practices ?? []).map((p: any) => p.id);
+      expect(ids).toContain(practice.id);
+      const fav = list.json().practices.find((p: any) => p.id === practice.id);
+      expect(fav.specialties).toEqual(['Rückenschmerzen']);
+
+      const del = await app.inject({ method: 'DELETE', url: `/auth/favorites/practices/${practice.id}`, headers: auth });
+      expect(del.statusCode).toBe(200);
+
+      const list2 = await app.inject({ method: 'GET', url: '/auth/favorites/practices', headers: auth });
+      expect((list2.json().practices ?? []).map((p: any) => p.id)).not.toContain(practice.id);
+    });
+
+    it('is idempotent on repeated add (upsert) and rejects without a token', async () => {
+      const token = await makePatient('fav-practice2@test.com');
+      const practice = await prisma.practice.create({ data: { name: 'Idem Praxis', city: 'Bonn', reviewStatus: 'APPROVED' } });
+      const auth = { authorization: `Bearer ${token}` };
+
+      await app.inject({ method: 'POST', url: '/auth/favorites/practices', headers: auth, payload: { practiceId: practice.id } });
+      const second = await app.inject({ method: 'POST', url: '/auth/favorites/practices', headers: auth, payload: { practiceId: practice.id } });
+      expect(second.statusCode).toBe(200);
+      const list = await app.inject({ method: 'GET', url: '/auth/favorites/practices', headers: auth });
+      expect((list.json().practices ?? []).filter((p: any) => p.id === practice.id)).toHaveLength(1);
+
+      const noAuth = await app.inject({ method: 'GET', url: '/auth/favorites/practices' });
+      expect(noAuth.statusCode).toBe(401);
+    });
+  });
+
+  // ─── Therapist "works at" (Flow C) ──────────────────────────────────────────
+  describe('Therapist works-at practice display', () => {
+    it('GET /therapist/:id returns practiceNameText (free-text, no link)', async () => {
+      const th = await prisma.therapist.create({
+        data: {
+          email: `worksat-${Date.now()}@test.com`,
+          fullName: 'Frei Text',
+          professionalTitle: 'Physiotherapeut',
+          city: 'Bonn',
+          specializations: 'Rückenschmerzen',
+          languages: 'Deutsch',
+          reviewStatus: 'APPROVED',
+          isVisible: true,
+          isFreelancer: false,
+          practiceNameText: 'Praxis ohne Profil',
+        },
+      });
+      const res = await app.inject({ method: 'GET', url: `/therapist/${th.id}` });
+      expect(res.statusCode).toBe(200);
+      expect(res.json().therapist.practiceNameText).toBe('Praxis ohne Profil');
+      expect(res.json().therapist.practices).toHaveLength(0);
+    });
+
+    it('GET /therapist/:id returns confirmed practice in practices[]', async () => {
+      const p = await prisma.practice.create({ data: { name: 'Link Praxis', city: 'Bonn', reviewStatus: 'APPROVED' } });
+      const th = await prisma.therapist.create({
+        data: {
+          email: `worksat-link-${Date.now()}@test.com`,
+          fullName: 'Mit Link',
+          professionalTitle: 'Physiotherapeut',
+          city: 'Bonn',
+          specializations: 'Rückenschmerzen',
+          languages: 'Deutsch',
+          reviewStatus: 'APPROVED',
+          isVisible: true,
+          links: { create: { practiceId: p.id, status: 'CONFIRMED' } },
+        },
+      });
+      const res = await app.inject({ method: 'GET', url: `/therapist/${th.id}` });
+      expect(res.statusCode).toBe(200);
+      const ids = res.json().therapist.practices.map((x: any) => x.id);
+      expect(ids).toContain(p.id);
+    });
   });
 });

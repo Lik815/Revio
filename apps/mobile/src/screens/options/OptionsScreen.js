@@ -23,6 +23,7 @@ export function OptionsTabScreen() {
   const authToken = useAppStore(appStoreSelectors.authToken);
   const loggedInPatient = useAppStore(appStoreSelectors.loggedInPatient);
   const loggedInTherapist = useAppStore(appStoreSelectors.loggedInTherapist);
+  const loggedInPractice = useAppStore(appStoreSelectors.loggedInPractice);
   const signOut = useAppStore((s) => s.signOut);
 
   const { themeMode, setThemeMode, c } = useTheme();
@@ -44,6 +45,7 @@ export function OptionsTabScreen() {
       <OptionsContent
         loggedInTherapist={loggedInTherapist}
         loggedInPatient={loggedInPatient}
+        loggedInPractice={loggedInPractice}
         themeMode={themeMode}
         setThemeMode={setThemeMode}
         onShowLogin={() => showLoginTab(navigation)}
@@ -61,7 +63,7 @@ export function OptionsTabScreen() {
         visible={showFeedback}
         onClose={() => setShowFeedback(false)}
         authToken={authToken}
-        authenticatedEmail={loggedInPatient?.email ?? loggedInTherapist?.email ?? ''}
+        authenticatedEmail={loggedInPatient?.email ?? loggedInTherapist?.email ?? loggedInPractice?.email ?? ''}
         c={c}
         t={t}
       />

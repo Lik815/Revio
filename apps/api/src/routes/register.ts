@@ -14,8 +14,6 @@ const registerSchema = z.object({
   fullName: z.string().min(2).optional(),
   firstName: z.string().min(1).optional(),
   lastName: z.string().min(1).optional(),
-  // Employment status: PREPARING profiles are never publicly visible
-  employmentStatus: z.enum(['SELF_EMPLOYED', 'PREPARING']).default('SELF_EMPLOYED'),
   city: z.string().optional(),
   postalCode: z.string().optional(),
   street: z.string().optional(),
@@ -30,6 +28,8 @@ const registerSchema = z.object({
   // Optional at registration — defaults to German; further languages added later
   languages: z.array(z.string()).optional(),
   certifications: z.array(z.string()).default([]),
+  // Flow A (freelance) = true; Flow C (works in a practice) = false.
+  isFreelancer: z.boolean().optional(),
   homeVisit: z.boolean().optional(),
   serviceRadiusKm: z.number().min(1).max(200).nullable().optional(),
   kassenart: z.string().optional(),
@@ -41,6 +41,10 @@ const registerSchema = z.object({
     address: z.string().optional(),
     phone: z.string().optional(),
   }).optional(),
+  // Flow C ("I work in a practice"): either link to an existing practice
+  // (PROPOSED link) or store a free-text practice name when none exists yet.
+  practiceId: z.string().optional(),
+  practiceNameText: z.string().max(120).optional(),
 }).refine(
   (d) => !!(d.fullName?.trim() || (d.firstName?.trim() && d.lastName?.trim())),
   { message: 'fullName oder firstName + lastName erforderlich', path: ['fullName'] },
@@ -290,13 +294,17 @@ export const registerRoutes: FastifyPluginAsync = async (fastify) => {
           specializations: data.specializations.join(', '),
           languages: languages.join(', '),
           certifications: data.certifications.join(', '),
+          // Flow C: free-text practice name when the practice has no profile yet.
+          practiceNameText: data.practiceNameText?.trim() || null,
           homeVisit: data.homeVisit ?? false,
-          isFreelancer: true,
+          isFreelancer: data.isFreelancer ?? true,
           serviceRadiusKm: data.serviceRadiusKm ?? null,
           kassenart: serializeKassenarten(data.kassenarten ?? data.kassenart),
           availability: data.availability ?? '',
           passwordHash,
-          employmentStatus: data.employmentStatus,
+          // Freelancers self-register only. PREPARING is no longer a selectable
+          // status — new therapist accounts are always SELF_EMPLOYED.
+          employmentStatus: 'SELF_EMPLOYED',
           // New accounts start as a private DRAFT — never publicly visible until the
           // therapist explicitly submits for review (POST /therapists/me/submit-for-review).
           reviewStatus: 'DRAFT',
@@ -312,6 +320,17 @@ export const registerRoutes: FastifyPluginAsync = async (fastify) => {
           ...(data.compliance && { complianceUpdatedAt: new Date() }),
         },
       });
+
+      // Flow C: link to an existing practice (proposed — practice owner/admin
+      // confirms later). Free-text practiceNameText was already stored above.
+      if (data.practiceId) {
+        const linkedPractice = await tx.practice.findUnique({ where: { id: data.practiceId } });
+        if (linkedPractice) {
+          await tx.therapistPracticeLink.create({
+            data: { therapistId: therapist.id, practiceId: linkedPractice.id, status: 'PROPOSED', initiatedBy: 'THERAPIST' },
+          });
+        }
+      }
 
       if (data.practice) {
         const practiceCoords = await geocodeAddress(

@@ -11,6 +11,7 @@ import rateLimitPlugin from './plugins/rateLimitPlugin.js';
 import { healthRoutes } from './routes/health.js';
 import { searchRoutes } from './routes/search.js';
 import { registerRoutes } from './routes/register.js';
+import { practiceRoutes } from './routes/practice.js';
 import { adminRoutes } from './routes/admin.js';
 import { authRoutes } from './routes/auth.js';
 import { uploadRoutes } from './routes/upload.js';
@@ -42,6 +43,7 @@ export async function buildApp() {
   await app.register(configRoutes);
   await app.register(searchRoutes);
   await app.register(registerRoutes);
+  await app.register(practiceRoutes);
   await app.register(adminRoutes, { prefix: '/admin' });
   await app.register(authRoutes);
   await app.register(uploadRoutes);

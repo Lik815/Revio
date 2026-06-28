@@ -79,6 +79,7 @@ export function useSearch({ t }) {
   const [kassenart, setKassenart] = useState(null);
   const [gender, setGender] = useState(null);
   const [requestableOnly, setRequestableOnly] = useState(false);
+  const [targetType, setTargetType] = useState('both'); // 'both' | 'therapist' | 'practice'
   const [fortbildungen, setFortbildungen] = useState([]);
   const [certificationOptions, setCertificationOptions] = useState(() =>
     normalizeCertificationOptions(fortbildungOptions),
@@ -88,6 +89,7 @@ export function useSearch({ t }) {
 
   // ── Search results ────────────────────────────────────────────────────────
   const [results, setResults] = useState([]);
+  const [practiceResults, setPracticeResults] = useState([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [allApiTherapists, setAllApiTherapists] = useState([]);
   const [searched, setSearched] = useState(false);
@@ -175,7 +177,8 @@ export function useSearch({ t }) {
     (kassenart ? 1 : 0) +
     (gender ? 1 : 0) +
     fortbildungen.length +
-    (requestableOnly ? 1 : 0);
+    (requestableOnly ? 1 : 0) +
+    (targetType !== 'both' ? 1 : 0);
 
   const getCertificationLabel = (key) =>
     certificationOptions.find((o) => o.key === key)?.label ?? key;
@@ -192,8 +195,10 @@ export function useSearch({ t }) {
     setKassenart(null);
     setGender(null);
     setRequestableOnly(false);
+    setTargetType('both');
     setFortbildungen([]);
     setResults([]);
+    setPracticeResults([]);
     setSearched(false);
     setViewMode('list');
     setShowFilters(false);
@@ -259,11 +264,15 @@ export function useSearch({ t }) {
         kassenart: kassenart || undefined,
         gender: gender || undefined,
         requestable: requestableOnly || undefined,
+        targetType,
       }),
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const payload = await response.json();
-    return (Array.isArray(payload?.therapists) ? payload.therapists : []).map(mapApiTherapist);
+    return {
+      therapists: (Array.isArray(payload?.therapists) ? payload.therapists : []).map(mapApiTherapist),
+      practices: Array.isArray(payload?.practices) ? payload.practices : [],
+    };
   };
 
   const runSearchWith = async (q, coords, cityOverride, originOverride) => {
@@ -281,10 +290,13 @@ export function useSearch({ t }) {
     setSearched(true);
     setSearchLoading(true);
     try {
-      const mapped = await fetchSearchResults(q, effectiveCity, effectiveOrigin);
+      const { therapists: mapped, practices } = await fetchSearchResults(q, effectiveCity, effectiveOrigin);
       const withDist = withDistances(mapped, effectiveOrigin);
       setResults(applyFilters(withDist, effectiveOrigin));
       setAllApiTherapists(withDist);
+      // Practices come pre-scored + pre-sorted from the backend (radius sorts,
+      // does not exclude); therapist-only filters do not apply to them.
+      setPracticeResults(practices);
     } catch (err) {
       const message = String(err?.message ?? t('alertUnknownError'));
       const usingLocalTunnel = getBaseUrl().includes('.loca.lt');
@@ -296,6 +308,7 @@ export function useSearch({ t }) {
         `${t('alertSearchFail')}: ${message}\n\nAPI-URL: ${getBaseUrl()}${tunnelHint}`,
       );
       setResults([]);
+      setPracticeResults([]);
     } finally {
       setSearchLoading(false);
     }
@@ -322,7 +335,7 @@ export function useSearch({ t }) {
   useEffect(() => {
     if (!searchedRef.current) return;
     runSearchWith(query, userCoords);
-  }, [homeVisit, kassenart, gender, fortbildungen]);
+  }, [homeVisit, kassenart, gender, fortbildungen, targetType]);
 
   useEffect(() => {
     if (!searchedRef.current) return;
@@ -578,6 +591,7 @@ export function useSearch({ t }) {
     kassenart, setKassenart,
     gender, setGender,
     requestableOnly, setRequestableOnly,
+    targetType, setTargetType,
     fortbildungen, setFortbildungen,
     certificationOptions,
     searchRadius, setSearchRadius,
@@ -588,6 +602,7 @@ export function useSearch({ t }) {
     resetDiscoverState,
     // Search results
     results, setResults,
+    practiceResults,
     searchLoading,
     allApiTherapists,
     searched, setSearched,

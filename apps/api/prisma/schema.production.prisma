@@ -39,6 +39,7 @@ enum SuggestionType {
 enum Role {
   therapist
   manager
+  practice_admin
   admin
   patient
 }
@@ -96,6 +97,11 @@ model User {
   therapistProfile       Therapist?              @relation("TherapistUser")
   managerProfile         PracticeManager?
   favoriteTherapists     UserFavoriteTherapist[]
+  favoritePractices      UserFavoritePractice[]
+  // A user may own one or more practices (practice_admin). Kept as a list and
+  // independent of therapistProfile so a practice owner can ALSO have a
+  // therapist profile later — role is not a hard "either/or".
+  ownedPractices         Practice[]              @relation("PracticeOwner")
   bookingRequests        BookingRequest[]
   appFeedbacks           AppFeedback[]
   therapistReviews       TherapistReview[]
@@ -116,6 +122,10 @@ model Therapist {
   bio                   String?
   homeVisit             Boolean      @default(false)
   isFreelancer          Boolean      @default(true)
+  // Free-text practice name for therapists who work at a practice that does not
+  // (yet) exist as a Practice profile. A confirmed TherapistPracticeLink always
+  // takes precedence over this for display.
+  practiceNameText      String?
   specializations       String
   languages             String
   certifications        String       @default("")
@@ -173,11 +183,25 @@ model Practice {
   inviteToken       String?      @unique
   logo              String?
   photos            String?
+  // ── Practice-as-account fields (nullable so legacy practices created via
+  // therapist registration, which have no owner, keep working) ──────────────
+  ownerUserId       String?
+  owner             User?        @relation("PracticeOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  postalCode        String?
+  email             String?
+  website           String?
+  specialties       String       @default("")  // CSV, like Therapist.specializations
+  services          String       @default("")  // CSV
+  openingHours      String?                     // structured JSON string; legacy `hours` (free text) kept for back-compat
+  isVisible         Boolean      @default(true)
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
   links             TherapistPracticeLink[]
   invitations       Invitation[]
   assignments       ManagerPracticeAssignment[]
+  favoritedBy       UserFavoritePractice[]
+
+  @@index([ownerUserId])
 }
 
 model PracticeManager {
@@ -425,5 +449,17 @@ model UserFavoriteTherapist {
   therapist   Therapist @relation(fields: [therapistId], references: [id], onDelete: Cascade)
 
   @@unique([userId, therapistId])
+  @@index([userId])
+}
+
+model UserFavoritePractice {
+  id         String   @id @default(cuid())
+  userId     String
+  practiceId String
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  practice   Practice @relation(fields: [practiceId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, practiceId])
   @@index([userId])
 }
