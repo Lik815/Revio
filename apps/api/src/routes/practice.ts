@@ -219,19 +219,6 @@ export const practiceRoutes: FastifyPluginAsync = async (fastify) => {
       },
     });
 
-    // Pending join requests from therapists who picked this practice during
-    // registration (Flow C) — practice_admin confirms/rejects these themselves,
-    // no admin dashboard needed for this step.
-    const pendingLinks = await fastify.prisma.therapistPracticeLink.findMany({
-      where: { practiceId: practice.id, status: 'PROPOSED' },
-      include: {
-        therapist: {
-          select: { id: true, fullName: true, professionalTitle: true, photo: true, email: true, city: true },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-
     return {
       practice: serializePractice(practice),
       team: links.map((l) => ({
@@ -242,67 +229,7 @@ export const practiceRoutes: FastifyPluginAsync = async (fastify) => {
         specializations: splitList(l.therapist.specializations),
         city: l.therapist.city,
       })),
-      linkRequests: pendingLinks.map((l) => ({
-        linkId: l.id,
-        therapistId: l.therapist.id,
-        fullName: l.therapist.fullName,
-        professionalTitle: l.therapist.professionalTitle,
-        photo: l.therapist.photo ?? undefined,
-        email: l.therapist.email,
-        city: l.therapist.city,
-        createdAt: l.createdAt,
-      })),
     };
-  });
-
-  // ── POST /practice/me/link-requests/:linkId/confirm ────────────────────────
-  fastify.post('/practice/me/link-requests/:linkId/confirm', async (request, reply) => {
-    const token = getToken(request);
-    if (!token) return reply.unauthorized('Kein Token');
-
-    const { user, practice, expired } = await resolveOwnerPractice(token) as any;
-    if (expired) return reply.unauthorized('Sitzung abgelaufen. Bitte erneut anmelden.');
-    if (!user) return reply.unauthorized('Ungültiger Token');
-    if (!practice) return reply.notFound('Kein Praxisprofil gefunden.');
-
-    const { linkId } = request.params as { linkId: string };
-    // Scoped to the owner's own practice — a practice_admin can never confirm a
-    // link targeting a different practice.
-    const link = await fastify.prisma.therapistPracticeLink.findFirst({
-      where: { id: linkId, practiceId: practice.id, status: 'PROPOSED' },
-    });
-    if (!link) return reply.notFound('Anfrage nicht gefunden.');
-
-    await fastify.prisma.therapistPracticeLink.update({
-      where: { id: linkId },
-      data: { status: 'CONFIRMED' },
-    });
-
-    return { ok: true };
-  });
-
-  // ── POST /practice/me/link-requests/:linkId/reject ─────────────────────────
-  fastify.post('/practice/me/link-requests/:linkId/reject', async (request, reply) => {
-    const token = getToken(request);
-    if (!token) return reply.unauthorized('Kein Token');
-
-    const { user, practice, expired } = await resolveOwnerPractice(token) as any;
-    if (expired) return reply.unauthorized('Sitzung abgelaufen. Bitte erneut anmelden.');
-    if (!user) return reply.unauthorized('Ungültiger Token');
-    if (!practice) return reply.notFound('Kein Praxisprofil gefunden.');
-
-    const { linkId } = request.params as { linkId: string };
-    const link = await fastify.prisma.therapistPracticeLink.findFirst({
-      where: { id: linkId, practiceId: practice.id, status: 'PROPOSED' },
-    });
-    if (!link) return reply.notFound('Anfrage nicht gefunden.');
-
-    await fastify.prisma.therapistPracticeLink.update({
-      where: { id: linkId },
-      data: { status: 'REJECTED' },
-    });
-
-    return { ok: true };
   });
 
   // ── PATCH /practice/me ─────────────────────────────────────────────────────
