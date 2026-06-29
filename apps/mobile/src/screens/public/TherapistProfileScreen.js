@@ -16,18 +16,6 @@ import { TherapistProfileContent } from './TherapistProfileContent';
 
 const t = (key) => translations.de[key] ?? key;
 
-function therapistHasProfileContent(therapist) {
-  if (!therapist) return false;
-  return Boolean(
-    (typeof therapist.bio === 'string' && therapist.bio.trim()) ||
-    (Array.isArray(therapist.specializations) && therapist.specializations.length > 0) ||
-    (Array.isArray(therapist.behandlungsbereiche) && therapist.behandlungsbereiche.length > 0) ||
-    (Array.isArray(therapist.fortbildungen) && therapist.fortbildungen.length > 0) ||
-    (Array.isArray(therapist.practices) && therapist.practices.length > 0) ||
-    (Array.isArray(therapist.languages) && therapist.languages.length > 0),
-  );
-}
-
 export function TherapistProfileScreen() {
   const navigation = useNavigation();
   const route = useRoute();
@@ -55,9 +43,11 @@ export function TherapistProfileScreen() {
     if (authToken) loadFavorites(authToken);
   }, [authToken]);
 
+  // initialTherapist (from the search result) is shown immediately as a fallback,
+  // but is always replaced by a fresh fetch — search results can lag behind the
+  // therapist's current profile (bio, specializations, slots, etc.).
   useEffect(() => {
     if (!therapistId) return;
-    if (therapistHasProfileContent(therapist)) return;
     fetch(`${getBaseUrl()}/therapist/${therapistId}`, { headers: { ...TUNNEL_HEADERS } })
       .then((res) => (res.ok ? res.json() : null))
       .then((payload) => {

@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { View } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
 import { useTherapyData } from '../../context/TherapyContext';
 import { useTheme } from '../../hooks/use-theme';
@@ -26,9 +27,13 @@ export function CustomersTabScreen() {
 
   // This tab can now be opened without ever visiting the Therapie tab first,
   // so it can't rely on that screen's effect to have loaded patients already.
-  useEffect(() => {
-    if (authToken) loadPatients(authToken);
-  }, [authToken]);
+  // Refreshing on every focus (not just mount) means a confirmed booking or new
+  // patient shows up as soon as the tab is revisited, without a restart.
+  useFocusEffect(
+    useCallback(() => {
+      if (authToken) loadPatients(authToken, { background: true });
+    }, [authToken, loadPatients]),
+  );
 
   if (selectedPatientId) {
     return (

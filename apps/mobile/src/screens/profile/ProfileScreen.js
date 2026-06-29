@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { View } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { appStoreSelectors, useAppStore } from '../../store/useStore';
@@ -12,7 +12,7 @@ import { useFavorites } from '../../hooks/use-favorites';
 import { appStyles } from '../../styles/app-styles';
 import { translations } from '../../i18n/translations';
 import { ROOT_ROUTES, TAB_ROUTES } from '../../navigation/route-names';
-import { getBaseUrl, TUNNEL_HEADERS } from '../../utils/app-utils';
+import { getBaseUrl, normalizeTherapistProfile, TUNNEL_HEADERS } from '../../utils/app-utils';
 import { useConfigOptions } from '../../hooks/use-config-options';
 import { ToastOverlay } from '../../components/ToastOverlay';
 import { ProfileSavedModal } from '../../modals/ProfileSavedModal';
@@ -33,9 +33,8 @@ export function ProfileTabScreen() {
   const accountType = useAppStore(appStoreSelectors.accountType);
   const loggedInPatient = useAppStore(appStoreSelectors.loggedInPatient);
   const loggedInTherapist = useAppStore(appStoreSelectors.loggedInTherapist);
-  const updatePatientProfile = useAppStore((s) => s.updatePatientProfile);
   const signOut = useAppStore((s) => s.signOut);
-  const { logout } = useAuth();
+  const { logout, setLoggedInPatient, setLoggedInTherapist } = useAuth();
 
   const { c } = useTheme();
   const { certificationOptions, specializationOptions, heilmittelOptions } = useConfigOptions();
@@ -71,12 +70,32 @@ export function ProfileTabScreen() {
   const [profileSavedBody, setProfileSavedBody] = useState('');
   const [showProfileSaved, setShowProfileSaved] = useState(false);
 
-  const handlePatientProfileSaved = ({ firstName, lastName, phone }) => {
-    updatePatientProfile({ firstName, lastName, phone });
+  // PatientDashboardScreen already wrote the saved fields into AuthContext itself
+  // (mirroring the therapist dashboard), so this only has to surface the modal.
+  const handlePatientProfileSaved = () => {
     setProfileSavedTitle(t('profileSavedModalTitle') ?? 'Profil gespeichert');
     setProfileSavedBody(t('profileSavedModalBody') ?? 'Deine Änderungen wurden erfolgreich gespeichert.');
     setShowProfileSaved(true);
   };
+
+  // Refresh /auth/me whenever the Profile tab gains focus, so changes made
+  // elsewhere (review approval, another device, a stale boot session) show up
+  // without a restart. Background fetch — existing profile stays on screen.
+  useFocusEffect(
+    useCallback(() => {
+      if (!authToken) return;
+      let cancelled = false;
+      fetch(`${getBaseUrl()}/auth/me`, { headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` } })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((profile) => {
+          if (cancelled || !profile) return;
+          if (profile.role === 'patient') setLoggedInPatient(profile);
+          else setLoggedInTherapist(normalizeTherapistProfile(profile));
+        })
+        .catch(() => {});
+      return () => { cancelled = true; };
+    }, [authToken, setLoggedInPatient, setLoggedInTherapist]),
+  );
 
   const handleAddSlot = async (slot) => {
     if (!authToken) return;

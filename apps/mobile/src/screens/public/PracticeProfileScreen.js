@@ -32,6 +32,9 @@ export function PracticeProfileScreen() {
     });
   }, []);
 
+  // initialPractice (from the search result/card) is shown immediately as a
+  // fallback, but practice-detail also returns the practice record itself —
+  // merge it in so address/hours/photos etc. are never stuck on stale search data.
   useEffect(() => {
     const id = practice?.id;
     if (!id) return;
@@ -39,7 +42,10 @@ export function PracticeProfileScreen() {
     setError('');
     fetch(`${getBaseUrl()}/practice-detail/${id}`, { headers: { ...TUNNEL_HEADERS } })
       .then((res) => (res.ok ? res.json() : Promise.reject(res.status)))
-      .then((data) => setTherapists((data.therapists ?? []).map(mapApiTherapist)))
+      .then((data) => {
+        if (data.practice) setPractice((prev) => ({ ...prev, ...data.practice }));
+        setTherapists((data.therapists ?? []).map(mapApiTherapist));
+      })
       .catch(() => setError(t('alertNoConnection')))
       .finally(() => setLoading(false));
   }, [practice?.id]);

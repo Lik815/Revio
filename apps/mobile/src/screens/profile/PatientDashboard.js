@@ -11,11 +11,14 @@ import {
 } from 'react-native';
 import { deleteAccountRequest, getBaseUrl, RADIUS, SHADOW, SPACE, TUNNEL_HEADERS, TYPE } from '../../utils/app-utils';
 import { DeleteAccountModal } from '../../modals/DeleteAccountModal';
+import { useAuth } from '../../context/AuthContext';
 
 export function PatientDashboardScreen({
   c, loggedInPatient, styles, t, authToken, onProfileSaved, onAccountDeleted,
   favorites = [], myAppointments = [], onOpenTherapist,
 }) {
+  const { setLoggedInPatient } = useAuth();
+
   const firstName = loggedInPatient?.firstName ?? '';
   const lastName = loggedInPatient?.lastName ?? '';
   const email = loggedInPatient?.email ?? '';
@@ -67,7 +70,11 @@ export function PatientDashboardScreen({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { setSaveError(data.message ?? 'Fehler beim Speichern.'); return; }
-      onProfileSaved({ firstName: data.firstName, lastName: data.lastName, phone: data.phone ?? null });
+      // Update AuthContext directly (same pattern as the therapist dashboard) —
+      // AuthBridge then keeps the zustand store in sync automatically, instead of
+      // each screen mutating the store on its own and drifting out of sync.
+      setLoggedInPatient((prev) => ({ ...prev, firstName: data.firstName, lastName: data.lastName, phone: data.phone ?? null }));
+      onProfileSaved();
       setEditing(false);
     } catch {
       setSaveError('Verbindungsfehler.');

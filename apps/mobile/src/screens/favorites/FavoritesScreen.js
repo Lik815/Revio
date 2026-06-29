@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { useNavigation } from '@react-navigation/native';
+import React, { useCallback } from 'react';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { appStoreSelectors, useAppStore } from '../../store/useStore';
 import { useTheme } from '../../hooks/use-theme';
 import { useFavorites } from '../../hooks/use-favorites';
@@ -27,9 +27,13 @@ export function FavoritesTabScreen() {
     toggleFavorite,
   } = useFavorites({ authToken, showToast, t });
 
-  useEffect(() => {
-    if (authToken) loadFavorites(authToken);
-  }, [authToken]);
+  // Refresh on every focus, not just mount — favorites toggled from a therapist's
+  // profile screen would otherwise stay stale here until the app restarts.
+  useFocusEffect(
+    useCallback(() => {
+      if (authToken) loadFavorites(authToken, { background: true });
+    }, [authToken, loadFavorites]),
+  );
 
   const openTherapistById = (id, fallbackTherapist = null) => {
     navigation.navigate(ROOT_ROUTES.THERAPIST_PROFILE, { therapistId: id, therapist: fallbackTherapist });

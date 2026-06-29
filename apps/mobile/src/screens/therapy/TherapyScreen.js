@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Ionicons, } from '@expo/vector-icons';
 import { Alert, Modal, Pressable, ScrollView, Text, View } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { appStoreSelectors, useAppStore } from '../../store/useStore';
+import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../hooks/use-theme';
 import { appStyles } from '../../styles/app-styles';
 import { translations } from '../../i18n/translations';
@@ -32,7 +33,7 @@ export function TherapyTabScreen() {
   const authToken = useAppStore(appStoreSelectors.authToken);
   const accountType = useAppStore(appStoreSelectors.accountType);
   const loggedInTherapist = useAppStore(appStoreSelectors.loggedInTherapist);
-  const setLoggedInTherapist = useAppStore((state) => state.setLoggedInTherapist);
+  const { setLoggedInTherapist } = useAuth();
 
   const { c } = useTheme();
   const { heilmittelOptions } = useConfigOptions();
@@ -43,8 +44,8 @@ export function TherapyTabScreen() {
     mySlots, slotsLoading, deletingSlotIds, slotsLastLoadedAt, setMySlots, setDeletingSlotIds,
     patients, patientsLoading, patientsLastLoadedAt,
     therapyRefreshing,
-    loadMyAppointments, loadIncomingBookings, loadMySlots, loadPatients,
-    handleTherapyRefresh,
+    loadMyAppointments, loadIncomingBookings, loadMySlots,
+    handleTherapyRefresh, refreshTherapyTab,
   } = useTherapyData();
 
   const [selectedAppointment, setSelectedAppointment] = useState(null);
@@ -65,15 +66,33 @@ export function TherapyTabScreen() {
   const [repeatBookingSlotsLoading, setRepeatBookingSlotsLoading] = useState(false);
   const [showRepeatBookingForm, setShowRepeatBookingForm] = useState(false);
 
+  // Force-refreshes every list each time this tab gains focus (tab switch, back
+  // navigation after booking, etc.), not just on first mount. Loaders only show a
+  // blocking spinner the very first time (lastLoadedAt === 0), so refocusing never
+  // flickers — existing data stays on screen while the background fetch resolves.
+  useFocusEffect(
+    useCallback(() => {
+      if (!authToken) return;
+      refreshTherapyTab(authToken, accountType, loggedInTherapist, { force: true });
+    }, [authToken, accountType, loggedInTherapist, refreshTherapyTab]),
+  );
+
+  // Keeps an already-open detail view in sync when the underlying list refreshes
+  // in the background, so status changes (CONFIRMED/DECLINED/CANCELLED) become
+  // visible without having to close and reopen the detail screen.
   useEffect(() => {
-    if (!authToken) return;
-    if (accountType === 'patient') loadMyAppointments(authToken);
-    if (accountType === 'therapist') {
-      loadMySlots(authToken);
-      loadIncomingBookings(authToken);
-      loadPatients(authToken);
+    if (!selectedAppointment) return;
+    const updated = myAppointments.find((a) => a.id === selectedAppointment.id);
+    if (updated && updated !== selectedAppointment) setSelectedAppointment(updated);
+  }, [myAppointments, selectedAppointment]);
+
+  useEffect(() => {
+    if (!selectedTherapistPatientAppointment) return;
+    const updated = incomingBookings.find((b) => b.id === selectedTherapistPatientAppointment.appointment.id);
+    if (updated && updated !== selectedTherapistPatientAppointment.appointment) {
+      setSelectedTherapistPatientAppointment((prev) => (prev ? { ...prev, appointment: updated } : prev));
     }
-  }, [authToken, accountType]);
+  }, [incomingBookings, selectedTherapistPatientAppointment]);
 
   const openTherapistById = (id, fallback = null) => {
     navigation.navigate(ROOT_ROUTES.THERAPIST_PROFILE, { therapistId: id, therapist: fallback });

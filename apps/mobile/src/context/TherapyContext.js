@@ -1,13 +1,18 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
+import { AppState } from 'react-native';
 import { getBaseUrl, TUNNEL_HEADERS } from '../utils/app-utils';
 import { timedFetch } from '../utils/perf-log';
+import { useAuth } from './AuthContext';
 
 const TherapyContext = createContext(null);
 
-const STALE_MS = 5 * 60 * 1000;
+// Background-refresh window: a focus/foreground refresh always forces a refetch,
+// this only governs how "fresh" data must be for a non-forced background call.
+const STALE_MS = 20 * 1000;
 const isStale = (lastLoadedAt) => Date.now() - lastLoadedAt > STALE_MS;
 
 export function TherapyProvider({ children }) {
+  const { authToken, accountType, loggedInTherapist } = useAuth();
   const [myAppointments, setMyAppointments] = useState([]);
   const [myAppointmentsLoading, setMyAppointmentsLoading] = useState(false);
   const [incomingBookings, setIncomingBookings] = useState([]);
@@ -195,6 +200,30 @@ export function TherapyProvider({ children }) {
     try { await refreshTherapyTab(token, accountType, loggedInTherapist, { force: true }); }
     finally { setTherapyRefreshing(false); }
   }, [refreshTherapyTab]);
+
+  // Clears out the previous account's data the moment a session ends, so a
+  // following login on the same device never flashes stale appointments/patients
+  // before the next fetch resolves.
+  const previousTokenRef = useRef(authToken);
+  useEffect(() => {
+    if (previousTokenRef.current && !authToken) resetTherapyData();
+    previousTokenRef.current = authToken;
+  }, [authToken, resetTherapyData]);
+
+  // Mirrors NotificationContext's AppState handling: force a refetch of every
+  // therapy-tab list when the app returns to the foreground, so booking/slot/
+  // patient changes made elsewhere (or by the backend) show up without a restart.
+  const appStateRef = useRef(AppState.currentState);
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      const wasActive = appStateRef.current === 'active';
+      appStateRef.current = nextState;
+      if (nextState === 'active' && !wasActive) {
+        refreshTherapyTab(authToken, accountType, loggedInTherapist, { force: true });
+      }
+    });
+    return () => subscription.remove();
+  }, [authToken, accountType, loggedInTherapist, refreshTherapyTab]);
 
   return (
     <TherapyContext.Provider value={{

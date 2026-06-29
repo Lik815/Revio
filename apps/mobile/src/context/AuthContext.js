@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import { AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getBaseUrl, TUNNEL_HEADERS, normalizeTherapistProfile } from '../utils/app-utils';
 
@@ -108,6 +109,44 @@ export function AuthProvider({ children }) {
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  // Refreshes /auth/me whenever the app returns to the foreground, so profile
+  // changes made elsewhere (admin review, another device) show up without a
+  // restart. Reads the token via a ref instead of resubscribing on every change.
+  const authTokenRef = useRef(authToken);
+  useEffect(() => { authTokenRef.current = authToken; }, [authToken]);
+
+  useEffect(() => {
+    const appStateRef = { current: AppState.currentState };
+
+    const refreshProfile = async () => {
+      const token = authTokenRef.current;
+      if (!token) return;
+      try {
+        const response = await fetch(`${getBaseUrl()}/auth/me`, {
+          headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${token}` },
+        });
+        if (!response.ok) return;
+        const profile = await response.json();
+        if (!profile) return;
+        if (profile.role === 'patient') {
+          setLoggedInPatient(profile);
+          setLoggedInTherapist(null);
+        } else {
+          setLoggedInTherapist(normalizeTherapistProfile(profile));
+          setLoggedInPatient(null);
+        }
+      } catch {}
+    };
+
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      const wasActive = appStateRef.current === 'active';
+      appStateRef.current = nextState;
+      if (nextState === 'active' && !wasActive) refreshProfile();
+    });
+
+    return () => subscription.remove();
   }, []);
 
   const loginAsTherapist = async (token, therapist) => {
