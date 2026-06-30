@@ -69,8 +69,6 @@ export interface TherapistWorkingHoursRule {
   weekday: number; // 0-6, JS Date#getDay() convention (0=So..6=Sa)
   startMinute: number;
   endMinute: number;
-  durationMin: number;
-  intervalMin: number | null;
   effectiveFrom: string | null;
   effectiveUntil: string | null;
   isActive: boolean;
@@ -80,8 +78,6 @@ export interface TherapistWorkingHoursRuleInput {
   weekday: number;
   startMinute: number;
   endMinute: number;
-  durationMin: number;
-  intervalMin?: number | null;
   effectiveFrom?: string | null;
   effectiveUntil?: string | null;
   isActive?: boolean;
@@ -89,8 +85,6 @@ export interface TherapistWorkingHoursRuleInput {
 
 export interface PutWorkingHoursResponse {
   rules: TherapistWorkingHoursRule[];
-  materialized: { created: number; skipped: number };
-  pruned: number;
 }
 
 export interface BookingRequest {
@@ -113,6 +107,9 @@ export interface BookingRequest {
   cancelReason?: string | null;
   cancelledBy?: 'PATIENT' | 'THERAPIST' | null;
   cancelledAt?: string | null;
+  // Zeitfenster des Termins (dynamisches Buchungssystem).
+  startsAt?: string | null;
+  endsAt?: string | null;
   createdAt: string;
   responseDueAt: string;
   respondedAt?: string | null;
@@ -350,7 +347,8 @@ export interface TherapistPatientListItem {
 export interface TherapistPatientAppointment {
   id: string;
   status: BookingRequestStatus;
-  slot?: { id: string; startsAt: string; durationMin: number; status: SlotStatus } | null;
+  startsAt?: string | null;
+  endsAt?: string | null;
   confirmedSlotAt?: string | null;
   createdAt: string;
   respondedAt?: string | null;
@@ -364,4 +362,61 @@ export interface TherapistPatientAppointment {
 export interface TherapistPatientDetail {
   patient: TherapistPatientListItem;
   appointments: TherapistPatientAppointment[];
+}
+
+// ─── Dynamisches Buchungssystem ───────────────────────────────────────────────
+
+// Ein live berechnetes, nicht gespeichertes Zeitfenster für eine Leistung.
+export interface AvailableSlot {
+  startsAt: string; // ISO-8601
+  endsAt: string;   // ISO-8601
+}
+
+// Therapeutenspezifische Leistungskonfiguration (Dauer-Override pro Heilmittel).
+export interface TherapistService {
+  id: string;
+  therapistId: string;
+  heilmittelKey: string;
+  durationMin: number;
+  bufferAfterMin: number;
+  slotIntervalMin: number | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Neutrale Blockzeit (Pause, Hausbesuch, Urlaub, …).
+export interface TherapistBlockedTime {
+  id: string;
+  therapistId: string;
+  startsAt: string;
+  endsAt: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GetTherapistServicesResponse {
+  services: TherapistService[];
+}
+
+export interface PutTherapistServiceInput {
+  durationMin: number;
+  bufferAfterMin?: number;
+  slotIntervalMin?: number | null;
+  isActive?: boolean;
+}
+
+export interface GetBlockedTimesResponse {
+  blockedTimes: TherapistBlockedTime[];
+}
+
+export interface CreateBlockedTimeInput {
+  startsAt: string;
+  endsAt: string;
+  title?: string;
+}
+
+export interface GetAvailableSlotsResponse {
+  slots: AvailableSlot[];
 }

@@ -56,20 +56,9 @@ enum BookingRequestStatus {
   EXPIRED
 }
 
-enum SlotStatus {
-  AVAILABLE
-  BOOKED
-  CANCELLED
-}
-
 enum AppFeedbackStatus {
   NEW
   RESOLVED
-}
-
-enum SlotSource {
-  MANUAL
-  WORKING_HOURS
 }
 
 enum CancelledBy {
@@ -164,8 +153,9 @@ model Therapist {
   documents             TherapistDocument[]
   bookingRequests       BookingRequest[]
   favoritedBy           UserFavoriteTherapist[]
-  slots                 TherapistSlot[]
   workingHoursRules     TherapistWorkingHoursRule[]
+  services              TherapistService[]
+  blockedTimes          TherapistBlockedTime[]
   reviews               TherapistReview[]
 }
 
@@ -280,24 +270,6 @@ model AppFeedback {
   @@index([userId, createdAt])
 }
 
-model TherapistSlot {
-  id                  String      @id @default(cuid())
-  therapistId         String
-  therapist           Therapist   @relation(fields: [therapistId], references: [id], onDelete: Cascade)
-  startsAt            DateTime
-  durationMin         Int         @default(20)
-  status              SlotStatus  @default(AVAILABLE)
-  booking             BookingRequest?
-  createdAt           DateTime    @default(now())
-  source              SlotSource  @default(MANUAL)
-  workingHoursRuleId  String?
-  workingHoursRule    TherapistWorkingHoursRule? @relation(fields: [workingHoursRuleId], references: [id], onDelete: SetNull)
-
-  @@unique([therapistId, startsAt])
-  @@index([therapistId, status, startsAt])
-  @@index([workingHoursRuleId])
-}
-
 model TherapistWorkingHoursRule {
   id              String          @id @default(cuid())
   therapistId     String
@@ -305,14 +277,11 @@ model TherapistWorkingHoursRule {
   weekday         Int
   startMinute     Int
   endMinute       Int
-  durationMin     Int             @default(20)
-  intervalMin     Int?
   effectiveFrom   DateTime?
   effectiveUntil  DateTime?
   isActive        Boolean         @default(true)
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
-  slots           TherapistSlot[]
 
   @@index([therapistId, isActive])
 }
@@ -323,8 +292,7 @@ model BookingRequest {
   therapist            Therapist            @relation(fields: [therapistId], references: [id], onDelete: Cascade)
   patientUserId        String?
   patientUser          User?                @relation(fields: [patientUserId], references: [id], onDelete: SetNull)
-  slotId               String?              @unique
-  slot                 TherapistSlot?       @relation(fields: [slotId], references: [id], onDelete: SetNull)
+  slotId               String?
   status               BookingRequestStatus @default(PENDING)
   patientName          String
   patientEmail         String?
@@ -338,6 +306,8 @@ model BookingRequest {
   cancelReason         String?
   cancelledBy          CancelledBy?
   cancelledAt          DateTime?
+  startsAt             DateTime?
+  endsAt               DateTime?
   consentAcceptedAt    DateTime
   createdAt            DateTime             @default(now())
   responseDueAt        DateTime
@@ -411,15 +381,45 @@ model SpecializationOption {
 }
 
 model HeilmittelOption {
-  id        String   @id @default(cuid())
-  key       String   @unique
-  label     String   @unique
-  isActive  Boolean  @default(true)
-  sortOrder Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                 String   @id @default(cuid())
+  key                String   @unique
+  label              String   @unique
+  defaultDurationMin Int      @default(20)
+  isActive           Boolean  @default(true)
+  sortOrder          Int      @default(0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   @@index([isActive, sortOrder, label])
+}
+
+model TherapistService {
+  id              String    @id @default(cuid())
+  therapistId     String
+  therapist       Therapist @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+  heilmittelKey   String
+  durationMin     Int
+  bufferAfterMin  Int       @default(0)
+  slotIntervalMin Int?
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([therapistId, heilmittelKey])
+  @@index([therapistId, isActive])
+}
+
+model TherapistBlockedTime {
+  id          String    @id @default(cuid())
+  therapistId String
+  therapist   Therapist @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+  startsAt    DateTime
+  endsAt      DateTime
+  title       String    @default("Blockiert")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([therapistId, startsAt, endsAt])
 }
 
 model AppSetting {

@@ -11,7 +11,7 @@ import { DeclineBookingModal } from '../../modals/DeclineBookingModal';
 import { markMounted } from '../../utils/perf-log';
 
 function formatDateParts(appointment) {
-  const slotDate = appointment?.slot?.startsAt ?? appointment?.confirmedSlotAt ?? null;
+  const slotDate = appointment?.startsAt ?? appointment?.slot?.startsAt ?? appointment?.confirmedSlotAt ?? null;
   const durationMin = appointment?.slot?.durationMin ?? 20;
   const date = slotDate ? new Date(slotDate) : null;
 

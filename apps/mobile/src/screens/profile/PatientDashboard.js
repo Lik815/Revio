@@ -31,11 +31,11 @@ export function PatientDashboardScreen({
 
   const activeApts = myAppointments.filter(a => ['PENDING', 'CONFIRMED'].includes(a.status));
   const confirmedPast = myAppointments
-    .filter(a => a.status === 'CONFIRMED' && new Date(a.slot?.startsAt ?? a.confirmedSlotAt ?? 0) < new Date())
-    .sort((a, b) => new Date(b.slot?.startsAt ?? b.confirmedSlotAt ?? 0) - new Date(a.slot?.startsAt ?? a.confirmedSlotAt ?? 0));
+    .filter(a => a.status === 'CONFIRMED' && new Date(a.startsAt ?? a.slot?.startsAt ?? a.confirmedSlotAt ?? 0) < new Date())
+    .sort((a, b) => new Date(b.startsAt ?? b.slot?.startsAt ?? b.confirmedSlotAt ?? 0) - new Date(a.startsAt ?? a.slot?.startsAt ?? a.confirmedSlotAt ?? 0));
   const lastTherapy = confirmedPast[0] ?? null;
   const lastTherapyDate = lastTherapy
-    ? new Date(lastTherapy.slot?.startsAt ?? lastTherapy.confirmedSlotAt).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    ? new Date(lastTherapy.startsAt ?? lastTherapy.slot?.startsAt ?? lastTherapy.confirmedSlotAt).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
     : null;
 
   const [editing, setEditing] = useState(false);

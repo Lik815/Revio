@@ -90,7 +90,7 @@ export function PatientNextAppointmentCard({
   onSelectKommend,
   onSelectVergangen,
 }) {
-  const slotDate = appointment ? (appointment.slot?.startsAt ?? appointment.confirmedSlotAt ?? null) : null;
+  const slotDate = appointment ? (appointment.startsAt ?? appointment.slot?.startsAt ?? appointment.confirmedSlotAt ?? null) : null;
 
   if (!appointment || !slotDate) {
     return (
@@ -172,11 +172,13 @@ const PATIENT_STATUS_LABEL_OVERRIDES = { CANCELLED: 'Abgesagt' };
 export const PatientAppointmentCard = React.memo(function PatientAppointmentCard({
   c, appointment, onOpenDetail, isPast = false, isFirst = false, isLast = false,
 }) {
-  const { status, therapist, slot, confirmedSlotAt } = appointment;
+  const { status, therapist, slot, startsAt, endsAt, confirmedSlotAt } = appointment;
   const badge = STATUS_COLORS[status] ?? STATUS_COLORS.EXPIRED;
   const badgeLabel = PATIENT_STATUS_LABEL_OVERRIDES[status] ?? badge.label;
-  const slotDate = slot?.startsAt ?? confirmedSlotAt ?? null;
-  const durationMin = slot?.durationMin ?? 20;
+  const slotDate = startsAt ?? slot?.startsAt ?? confirmedSlotAt ?? null;
+  const durationMin = endsAt && startsAt
+    ? Math.round((new Date(endsAt) - new Date(startsAt)) / 60_000)
+    : (slot?.durationMin ?? 20);
   const isActive = (status === 'CONFIRMED' || status === 'PENDING') && !isPast;
   const dotColor = isActive ? (c.success ?? '#5A9E8E') : c.muted;
   const d = slotDate ? new Date(slotDate) : null;
@@ -233,8 +235,7 @@ export function TherapistBookingCard({ c, t, request, onRespond, onCancel }) {
 
   const isPending = request.status === 'PENDING';
   const slot = request.slot ?? null;
-  // Legacy: fall back to confirmedSlotAt if no slot
-  const slotDate = slot?.startsAt ?? request.confirmedSlotAt ?? null;
+  const slotDate = request.startsAt ?? slot?.startsAt ?? request.confirmedSlotAt ?? null;
 
   async function handleRespond(action) {
     setError('');

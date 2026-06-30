@@ -24,13 +24,11 @@ function deriveDisplayName(firstName: string | null, lastName: string | null) {
 
 function isBookingReviewable(booking: {
   status: string;
-  confirmedSlotAt: Date | null;
-  slot: { startsAt: Date } | null;
+  startsAt: Date | null;
 }) {
   if (booking.status !== 'CONFIRMED') return false;
-  const appointmentAt = booking.slot?.startsAt ?? booking.confirmedSlotAt;
-  if (!appointmentAt) return false;
-  return appointmentAt.getTime() < Date.now();
+  if (!booking.startsAt) return false;
+  return booking.startsAt.getTime() < Date.now();
 }
 
 export async function reviewRoutes(fastify: FastifyInstance) {
@@ -78,7 +76,7 @@ export async function reviewRoutes(fastify: FastifyInstance) {
     const { id } = request.params as { id: string };
     const bookings = await fastify.prisma.bookingRequest.findMany({
       where: { therapistId: id, patientUserId: patient.id, status: 'CONFIRMED' },
-      include: { slot: true, review: true },
+      include: { review: true },
       orderBy: { createdAt: 'desc' },
     });
 
@@ -109,7 +107,7 @@ export async function reviewRoutes(fastify: FastifyInstance) {
     const { id } = request.params as { id: string };
     const booking = await fastify.prisma.bookingRequest.findUnique({
       where: { id },
-      include: { slot: true, review: true },
+      include: { review: true },
     });
     if (!booking || booking.patientUserId !== patient.id) return reply.notFound('Buchung nicht gefunden');
 
@@ -141,7 +139,7 @@ export async function reviewRoutes(fastify: FastifyInstance) {
     const { id } = request.params as { id: string };
     const booking = await fastify.prisma.bookingRequest.findUnique({
       where: { id },
-      include: { slot: true, review: true },
+      include: { review: true },
     });
     if (!booking || booking.patientUserId !== patient.id) return reply.notFound('Buchung nicht gefunden');
     if (booking.review) return reply.status(409).send({ error: 'Buchung wurde bereits bewertet' });

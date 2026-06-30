@@ -5,7 +5,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RADIUS, SHADOW, getBaseUrl, TUNNEL_HEADERS } from '../../utils/app-utils';
-import { WEEKDAY_OPTIONS, SLOT_DURATIONS, TIME_HOURS, formatSlotTime } from '../../utils/recurring-slots';
+import { WEEKDAY_OPTIONS, TIME_HOURS, formatSlotTime } from '../../utils/recurring-slots';
 import { useToast } from '../../hooks/use-toast';
 import { ToastOverlay } from '../../components/ToastOverlay';
 
@@ -29,25 +29,21 @@ function emptyBlock() {
     weekdays: [],
     startMinute: 8 * 60,
     endMinute: 12 * 60,
-    durationMin: 20,
   };
 }
 
-// Groups flat rules (as returned by GET /therapist/working-hours) back into
-// editable "blocks" — rules that share the same time range + duration
-// collapse into one block with multiple weekdays selected, so existing
-// working hours don't show up as N confusing single-day blocks.
+// Gruppiert Regeln nach Zeitblock (startMinute-endMinute). Dauer-Feld
+// wird nicht mehr pro Regel gespeichert — sie kommt von TherapistService.
 function groupRulesIntoBlocks(rules) {
   const byKey = new Map();
   for (const rule of rules) {
-    const key = `${rule.startMinute}-${rule.endMinute}-${rule.durationMin}`;
+    const key = `${rule.startMinute}-${rule.endMinute}`;
     if (!byKey.has(key)) {
       byKey.set(key, {
         id: nextBlockId(),
         weekdays: [],
         startMinute: rule.startMinute,
         endMinute: rule.endMinute,
-        durationMin: rule.durationMin,
       });
     }
     byKey.get(key).weekdays.push(rule.weekday);
@@ -63,7 +59,7 @@ function blocksToRules(blocks) {
         weekday,
         startMinute: b.startMinute,
         endMinute: b.endMinute,
-        durationMin: b.durationMin,
+        durationMin: 20, // Platzhalter; Dauer kommt jetzt aus TherapistService
       })),
     );
 }
@@ -169,24 +165,6 @@ function WorkingHoursBlockCard({ c, block, onChange, onRemove, canRemove }) {
         {invalidRange ? (
           <Text style={{ fontSize: 12, color: c.error }}>„Bis" muss nach „Von" liegen.</Text>
         ) : null}
-      </View>
-
-      <View style={{ gap: 8 }}>
-        <Text style={{ fontSize: 11, fontWeight: '700', color: c.muted, letterSpacing: 0.5 }}>DAUER</Text>
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          {SLOT_DURATIONS.map((dur) => {
-            const active = block.durationMin === dur;
-            return (
-              <Pressable
-                key={dur}
-                onPress={() => onChange({ ...block, durationMin: dur })}
-                style={{ flex: 1, paddingVertical: 7, borderRadius: RADIUS.sm, alignItems: 'center', borderWidth: 1.5, borderColor: active ? c.primary : c.border, backgroundColor: active ? c.primaryBg : c.mutedBg }}
-              >
-                <Text style={{ fontSize: 13, fontWeight: active ? '700' : '400', color: active ? c.primary : c.muted }}>{dur}'</Text>
-              </Pressable>
-            );
-          })}
-        </View>
       </View>
 
       <TimePickerModal
@@ -296,7 +274,7 @@ export function WorkingHoursScreen({ c, authToken, onBack }) {
         <>
           <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 4, paddingBottom: 16, gap: 12 }} showsVerticalScrollIndicator={false}>
             <Text style={{ fontSize: 13, color: c.muted, lineHeight: 18 }}>
-              Lege deine wiederkehrenden Arbeitszeiten fest. Daraus werden automatisch buchbare Termine für die nächsten Wochen erstellt — du musst sie nicht mehr manuell anlegen.
+              Lege deine wiederkehrenden Arbeitszeiten fest. Daraus berechnet Revio buchbare Zeitfenster für Patient:innen — je nach gewähltem Heilmittel und der Dauer, die du unter „Leistungen" konfiguriert hast.
             </Text>
 
             {blocks.map((block) => (
@@ -320,7 +298,7 @@ export function WorkingHoursScreen({ c, authToken, onBack }) {
 
             <View style={{ backgroundColor: c.primaryBg, borderRadius: RADIUS.sm, padding: 10 }}>
               <Text style={{ fontSize: 12, color: c.primary, textAlign: 'center' }}>
-                Es werden Termine für die nächsten 8 Wochen erstellt.
+                Dauer pro Heilmittel kannst du unter „Leistungen" festlegen.
               </Text>
             </View>
           </ScrollView>

@@ -19,7 +19,7 @@ export function TherapyTabPatient({
   // which list renders below — not an inline expansion, so only one list
   // is ever on screen at a time, in the same spot.
   const [activeView, setActiveView] = useState('kommend');
-  const getDate = (a) => new Date(a.slot?.startsAt ?? a.confirmedSlotAt ?? 0);
+  const getDate = (a) => new Date(a.startsAt ?? a.slot?.startsAt ?? a.confirmedSlotAt ?? 0);
 
   const { kommend, vergangen } = useMemo(() => {
     const now = new Date();

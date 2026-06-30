@@ -11,7 +11,7 @@ import { useTherapyData } from '../../context/TherapyContext';
 import { markMounted } from '../../utils/perf-log';
 
 function formatAppointmentDate(appointment) {
-  const slotDate = appointment.slot?.startsAt ?? appointment.confirmedSlotAt ?? null;
+  const slotDate = appointment.startsAt ?? appointment.slot?.startsAt ?? appointment.confirmedSlotAt ?? null;
   if (!slotDate) return 'Termin noch nicht abgestimmt';
   const d = new Date(slotDate);
   const date = d.toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'long' });

@@ -38,6 +38,8 @@ import { ProfileCompletionWizard } from '../../components/ProfileCompletionWizar
 import { DeleteAccountModal } from '../../modals/DeleteAccountModal';
 import { useAuth } from '../../context/AuthContext';
 import { WorkingHoursScreen } from '../therapy/WorkingHoursScreen';
+import { TherapistServicesScreen } from '../therapy/TherapistServicesScreen';
+import { BlockedTimesScreen } from '../therapy/BlockedTimesScreen';
 
 const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024;
 
@@ -147,6 +149,8 @@ export function TherapistDashboardScreen({ c, t, styles, certificationOptions, s
   const [adminExpanded, setAdminExpanded] = useState(false);
   const [showWizard, setShowWizard] = useState(false);
   const [showWorkingHours, setShowWorkingHours] = useState(false);
+  const [showServices, setShowServices] = useState(false);
+  const [showBlockedTimes, setShowBlockedTimes] = useState(false);
   const [showDeleteAccount, setShowDeleteAccount] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
@@ -347,9 +351,13 @@ export function TherapistDashboardScreen({ c, t, styles, certificationOptions, s
   };
 
   if (showWorkingHours) {
-    return (
-      <WorkingHoursScreen c={c} authToken={authToken} onBack={() => setShowWorkingHours(false)} />
-    );
+    return <WorkingHoursScreen c={c} authToken={authToken} onBack={() => setShowWorkingHours(false)} />;
+  }
+  if (showServices) {
+    return <TherapistServicesScreen c={c} authToken={authToken} onBack={() => setShowServices(false)} />;
+  }
+  if (showBlockedTimes) {
+    return <BlockedTimesScreen c={c} authToken={authToken} onBack={() => setShowBlockedTimes(false)} />;
   }
 
   const th = loggedInTherapist;
@@ -749,6 +757,36 @@ export function TherapistDashboardScreen({ c, t, styles, certificationOptions, s
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 15, fontWeight: '700', color: c.text }}>Arbeitszeiten</Text>
                 <Text style={{ fontSize: 12, color: c.muted, marginTop: 2 }}>Wiederkehrende Arbeitszeiten festlegen</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={c.muted} />
+            </Pressable>
+          )}
+
+          {/* ── Leistungen ───────────────────────────────────────────── */}
+          {th.bookingMode === 'FIRST_APPOINTMENT_REQUEST' && (
+            <Pressable
+              onPress={() => setShowServices(true)}
+              style={{ backgroundColor: c.card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: c.border, padding: SPACE.lg, marginBottom: SPACE.md, flexDirection: 'row', alignItems: 'center', gap: SPACE.sm }}
+            >
+              <Ionicons name="medkit-outline" size={20} color={c.muted} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 15, fontWeight: '700', color: c.text }}>Leistungen</Text>
+                <Text style={{ fontSize: 12, color: c.muted, marginTop: 2 }}>Dauer pro Heilmittel festlegen</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={c.muted} />
+            </Pressable>
+          )}
+
+          {/* ── Blockzeiten ──────────────────────────────────────────── */}
+          {th.bookingMode === 'FIRST_APPOINTMENT_REQUEST' && (
+            <Pressable
+              onPress={() => setShowBlockedTimes(true)}
+              style={{ backgroundColor: c.card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: c.border, padding: SPACE.lg, marginBottom: SPACE.md, flexDirection: 'row', alignItems: 'center', gap: SPACE.sm }}
+            >
+              <Ionicons name="ban-outline" size={20} color={c.muted} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 15, fontWeight: '700', color: c.text }}>Blockzeiten</Text>
+                <Text style={{ fontSize: 12, color: c.muted, marginTop: 2 }}>Pausen, Urlaub, Hausbesuche blockieren</Text>
               </View>
               <Ionicons name="chevron-forward" size={18} color={c.muted} />
             </Pressable>

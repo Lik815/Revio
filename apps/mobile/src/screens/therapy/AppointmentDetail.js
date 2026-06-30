@@ -20,7 +20,7 @@ export function AppointmentDetail({
   c, t, styles,
 }) {
   const appointment_data = appointment;
-  const slotDate = appointment?.slot?.startsAt ?? appointment?.confirmedSlotAt ?? null;
+  const slotDate = appointment?.startsAt ?? appointment?.slot?.startsAt ?? appointment?.confirmedSlotAt ?? null;
   const durationMin = appointment?.slot?.durationMin ?? 20;
   const badge = STATUS_COLORS[appointment?.status] ?? STATUS_COLORS.EXPIRED;
   const therapist = appointment?.therapist ?? null;

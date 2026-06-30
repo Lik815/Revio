@@ -1,12 +1,11 @@
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import type {
-  TherapistPatientListItem, TherapistPatientAppointment, CreateTherapistSlotsResponse,
-  TherapistWorkingHoursRule, PutWorkingHoursResponse,
+  TherapistPatientListItem, TherapistPatientAppointment, TherapistWorkingHoursRule,
 } from '@revio/shared';
 import { sendPushNotification } from '../utils/push.js';
 import { expireStaleBookings } from '../utils/booking-expiry.js';
-import { materializeWorkingHours, pruneFutureWorkingHoursSlots } from '../utils/working-hours.js';
+import { generateAvailableSlots } from '../utils/slot-generator.js';
 
 async function resolvePatient(fastify: FastifyInstance, token: string) {
   const user = await fastify.prisma.user.findUnique({ where: { sessionToken: token } });
@@ -32,18 +31,7 @@ function canUseBookingMode(therapist: { reviewStatus?: string | null; bookingMod
 const splitList = (value: string) =>
   value.split(',').map((s) => s.trim()).filter(Boolean);
 
-const SLOT_STATUS_VALUES = ['AVAILABLE', 'BOOKED', 'CANCELLED'] as const;
-type SlotStatusValue = (typeof SLOT_STATUS_VALUES)[number];
-
-function parseSlotStatusFilter(status: string | undefined): SlotStatusValue[] {
-  if (!status) return [];
-  return splitList(status).filter((s): s is SlotStatusValue =>
-    (SLOT_STATUS_VALUES as readonly string[]).includes(s));
-}
-
-// Optional, additive filters for /bookings/my and /bookings/incoming. Absent params
-// preserve today's behaviour (full, unfiltered history) — nothing calls these with
-// params yet, this just makes the capability available for future pagination UI.
+// Optional, additive filters for /bookings/my and /bookings/incoming.
 function parseBookingListQuery(query: Record<string, unknown>) {
   const { from, to, status, limit } = query as { from?: string; to?: string; status?: string; limit?: string };
   const where: Record<string, unknown> = {};
@@ -66,22 +54,15 @@ function parseBookingListQuery(query: Record<string, unknown>) {
   return { where, take };
 }
 
-function serializeSlot(slot: { id: string; startsAt: Date; durationMin: number; status: string } | null | undefined) {
-  if (!slot) return null;
-  return { id: slot.id, startsAt: slot.startsAt.toISOString(), durationMin: slot.durationMin, status: slot.status };
-}
-
 function serializeWorkingHoursRule(rule: {
-  id: string; weekday: number; startMinute: number; endMinute: number; durationMin: number;
-  intervalMin: number | null; effectiveFrom: Date | null; effectiveUntil: Date | null; isActive: boolean;
+  id: string; weekday: number; startMinute: number; endMinute: number;
+  effectiveFrom: Date | null; effectiveUntil: Date | null; isActive: boolean;
 }): TherapistWorkingHoursRule {
   return {
     id: rule.id,
     weekday: rule.weekday,
     startMinute: rule.startMinute,
     endMinute: rule.endMinute,
-    durationMin: rule.durationMin,
-    intervalMin: rule.intervalMin,
     effectiveFrom: rule.effectiveFrom ? rule.effectiveFrom.toISOString() : null,
     effectiveUntil: rule.effectiveUntil ? rule.effectiveUntil.toISOString() : null,
     isActive: rule.isActive,
@@ -92,6 +73,8 @@ type PatientBooking = {
   id: string;
   status: string;
   createdAt: Date;
+  startsAt: Date | null;
+  endsAt: Date | null;
   confirmedSlotAt: Date | null;
   respondedAt: Date | null;
   message: string | null;
@@ -100,7 +83,6 @@ type PatientBooking = {
   declinedReason: string | null;
   cancelReason: string | null;
   patientPhone: string | null;
-  slot: { id: string; startsAt: Date; durationMin: number; status: string } | null;
 };
 
 function buildPatientListItem(
@@ -112,7 +94,7 @@ function buildPatientListItem(
   const now = new Date();
   const nextAppointment = bookings
     .filter((b) => b.status === 'CONFIRMED')
-    .map((b) => b.slot?.startsAt ?? b.confirmedSlotAt)
+    .map((b) => b.startsAt ?? b.confirmedSlotAt)
     .filter((d): d is Date => !!d && d > now)
     .sort((a, b) => a.getTime() - b.getTime())[0] ?? null;
 
@@ -133,8 +115,9 @@ function serializePatientAppointment(booking: PatientBooking): TherapistPatientA
   return {
     id: booking.id,
     status: booking.status as TherapistPatientAppointment['status'],
-    slot: serializeSlot(booking.slot) as TherapistPatientAppointment['slot'],
-    confirmedSlotAt: booking.confirmedSlotAt?.toISOString() ?? null,
+    startsAt: (booking.startsAt ?? booking.confirmedSlotAt)?.toISOString() ?? null,
+    endsAt: booking.endsAt?.toISOString() ?? null,
+    confirmedSlotAt: (booking.startsAt ?? booking.confirmedSlotAt)?.toISOString() ?? null,
     createdAt: booking.createdAt.toISOString(),
     respondedAt: booking.respondedAt?.toISOString() ?? null,
     message: booking.message,
@@ -147,184 +130,33 @@ function serializePatientAppointment(booking: PatientBooking): TherapistPatientA
 
 export async function bookingRoutes(fastify: FastifyInstance) {
 
-  // ── Therapeut: Slot-Verwaltung ──────────────────────────────────────────
-
-  // GET /therapist/slots — Eigene Slots auflisten
-  fastify.get('/therapist/slots', async (request, reply) => {
-    const token = request.headers.authorization?.replace('Bearer ', '');
-    if (!token) return reply.status(401).send({ error: 'Unauthorized' });
-    const therapist = await resolveTherapist(fastify, token);
-    if (!therapist) return reply.status(403).send({ error: 'Only therapists can manage slots' });
-
-    const { from, to, status } = request.query as { from?: string; to?: string; status?: string };
-    const fromDate = from ? new Date(from) : new Date();
-    const toDate = to ? new Date(to) : new Date(Date.now() + 60 * 24 * 60 * 60 * 1000);
-    const statuses = parseSlotStatusFilter(status);
-
-    const slots = await fastify.prisma.therapistSlot.findMany({
-      where: {
-        therapistId: therapist.id,
-        OR: [
-          { startsAt: { gte: fromDate, lte: toDate } },
-          { status: 'BOOKED', booking: { status: 'PENDING' } },
-        ],
-        ...(statuses.length > 0 ? { status: { in: statuses } } : {}),
-      },
-      include: { booking: { select: { id: true, patientName: true, patientEmail: true, patientPhone: true, status: true } } },
-      orderBy: { startsAt: 'asc' },
-    });
-
-    return { slots: slots.map((s) => ({
-      id: s.id,
-      startsAt: s.startsAt.toISOString(),
-      durationMin: s.durationMin,
-      status: s.status,
-      bookingId: s.booking?.id ?? null,
-      patientName: s.booking?.patientName ?? null,
-      patientEmail: s.booking?.patientEmail ?? null,
-      patientPhone: s.booking?.patientPhone ?? null,
-      bookingStatus: s.booking?.status ?? null,
-      createdAt: s.createdAt.toISOString(),
-    })) };
+  // GET /therapist/slots (kept as 410 tombstone for 1 release cycle)
+  fastify.get('/therapist/slots', async (_request, reply) => {
+    return reply.status(410).send({ error: 'Dieser Endpunkt wurde entfernt. Nutze GET /therapist/working-hours und GET /therapists/:id/available-slots.' });
   });
 
-  // POST /therapist/slots — Einen oder mehrere Slots anlegen
-  fastify.post('/therapist/slots', async (request, reply) => {
-    const token = request.headers.authorization?.replace('Bearer ', '');
-    if (!token) return reply.status(401).send({ error: 'Unauthorized' });
-    const therapist = await resolveTherapist(fastify, token);
-    if (!therapist) return reply.status(403).send({ error: 'Only therapists can create slots' });
-    if (!canUseBookingMode(therapist)) {
-      return reply.status(400).send({ error: 'Terminanfragen können erst nach der Profilprüfung aktiviert werden.' });
-    }
+  // ── (interne Hilfsfunktion für alten Endpoint — jetzt 410) ──────────────
+  // Dieser Block ersetzt alle alten Slot-CRUD-Routen.
+  // ────────────────────────────────────────────────────────────────────────
 
-    const schema = z.object({
-      slots: z.array(z.object({
-        startsAt: z.string().datetime(),
-        durationMin: z.number().int().min(5).max(120).optional(),
-      })).min(1).max(200),
-    });
-
-    const parsed = schema.safeParse(request.body);
-    if (!parsed.success) return reply.status(400).send({ error: 'Invalid request', details: parsed.error.flatten() });
-
-    const now = new Date();
-    const future = parsed.data.slots.filter((s) => new Date(s.startsAt) > now);
-    const rejected: CreateTherapistSlotsResponse['rejected'] = parsed.data.slots
-      .filter((s) => new Date(s.startsAt) <= now)
-      .map((s) => ({ startsAt: s.startsAt, reason: 'past' as const }));
-
-    const futureDates = future.map((s) => new Date(s.startsAt));
-    const existing = await fastify.prisma.therapistSlot.findMany({
-      where: { therapistId: therapist.id, startsAt: { in: futureDates } },
-      select: { startsAt: true },
-    });
-    const existingTimes = new Set(existing.map((s) => s.startsAt.getTime()));
-
-    const toCreate = future.filter((s) => !existingTimes.has(new Date(s.startsAt).getTime()));
-    const skipped: CreateTherapistSlotsResponse['skipped'] = future
-      .filter((s) => existingTimes.has(new Date(s.startsAt).getTime()))
-      .map((s) => ({ startsAt: s.startsAt, reason: 'duplicate' as const }));
-
-    let created: { id: string; startsAt: Date; durationMin: number; status: string }[] = [];
-    if (toCreate.length > 0) {
-      try {
-        created = await fastify.prisma.$transaction(
-          toCreate.map((s) =>
-            fastify.prisma.therapistSlot.create({
-              data: { therapistId: therapist.id, startsAt: new Date(s.startsAt), durationMin: s.durationMin ?? 20 },
-            }),
-          ),
-        );
-      } catch (err: any) {
-        // A concurrent request (e.g. a double-submit) created the same slots first.
-        // The (therapistId, startsAt) unique constraint rolled the whole batch back —
-        // report these as already-existing instead of surfacing a raw 500.
-        if (err.code !== 'P2002') throw err;
-        skipped.push(...toCreate.map((s) => ({ startsAt: s.startsAt, reason: 'duplicate' as const })));
-      }
-    }
-
-    const response: CreateTherapistSlotsResponse = {
-      created: created.map(serializeSlot) as CreateTherapistSlotsResponse['created'],
-      skipped,
-      rejected,
-    };
-    return reply.status(201).send(response);
+  // POST /therapist/slots — ENTFERNT
+  fastify.post('/therapist/slots', async (_request, reply) => {
+    return reply.status(410).send({ error: 'Dieser Endpunkt wurde entfernt.' });
   });
 
-  // PATCH /therapist/slots/:id — Slot stornieren (nur AVAILABLE)
-  fastify.patch('/therapist/slots/:id', async (request, reply) => {
-    const token = request.headers.authorization?.replace('Bearer ', '');
-    if (!token) return reply.status(401).send({ error: 'Unauthorized' });
-    const therapist = await resolveTherapist(fastify, token);
-    if (!therapist) return reply.status(403).send({ error: 'Only therapists can manage slots' });
-
-    const { id } = request.params as { id: string };
-    const slot = await fastify.prisma.therapistSlot.findUnique({ where: { id } });
-    if (!slot) return reply.status(404).send({ error: 'Slot not found' });
-    if (slot.therapistId !== therapist.id) return reply.status(403).send({ error: 'Not your slot' });
-    if (slot.status === 'BOOKED') return reply.status(409).send({ error: 'Cannot cancel a booked slot. Decline the booking first.' });
-    if (slot.status === 'CANCELLED') return reply.status(400).send({ error: 'Slot is already cancelled' });
-
-    const updated = await fastify.prisma.therapistSlot.update({
-      where: { id },
-      data: { status: 'CANCELLED' },
-    });
-
-    return { ...serializeSlot(updated) };
+  // PATCH /therapist/slots/:id — ENTFERNT
+  fastify.patch('/therapist/slots/:slotId', async (_request, reply) => {
+    return reply.status(410).send({ error: 'Dieser Endpunkt wurde entfernt.' });
   });
 
-  // DELETE /therapist/slots/:id — Slot löschen (nur AVAILABLE oder CANCELLED)
-  fastify.delete('/therapist/slots/:id', async (request, reply) => {
-    const token = request.headers.authorization?.replace('Bearer ', '');
-    if (!token) return reply.status(401).send({ error: 'Unauthorized' });
-    const therapist = await resolveTherapist(fastify, token);
-    if (!therapist) return reply.status(403).send({ error: 'Only therapists can delete slots' });
-
-    const { id } = request.params as { id: string };
-    const slot = await fastify.prisma.therapistSlot.findUnique({ where: { id } });
-    if (!slot) return reply.status(404).send({ error: 'Slot not found' });
-    if (slot.therapistId !== therapist.id) return reply.status(403).send({ error: 'Not your slot' });
-    if (slot.status === 'BOOKED') return reply.status(409).send({ error: 'Cannot delete a booked slot. Decline the booking first.' });
-
-    await fastify.prisma.therapistSlot.delete({ where: { id } });
-    return { deleted: true };
+  // DELETE /therapist/slots/:id — ENTFERNT
+  fastify.delete('/therapist/slots/:slotId_del', async (_request, reply) => {
+    return reply.status(410).send({ error: 'Dieser Endpunkt wurde entfernt.' });
   });
 
-  // POST /therapist/slots/bulk-delete — Mehrere Slots auf einmal löschen (nur nicht-gebuchte)
-  fastify.post('/therapist/slots/bulk-delete', async (request, reply) => {
-    const token = request.headers.authorization?.replace('Bearer ', '');
-    if (!token) return reply.status(401).send({ error: 'Unauthorized' });
-    const therapist = await resolveTherapist(fastify, token);
-    if (!therapist) return reply.status(403).send({ error: 'Only therapists can delete slots' });
-
-    const schema = z.object({
-      slotIds: z.array(z.string()).min(1).max(500),
-    });
-    const parsed = schema.safeParse(request.body);
-    if (!parsed.success) return reply.status(400).send({ error: 'Invalid request', details: parsed.error.flatten() });
-
-    const { slotIds } = parsed.data;
-    const slots = await fastify.prisma.therapistSlot.findMany({
-      where: { id: { in: slotIds }, therapistId: therapist.id },
-      select: { id: true, status: true },
-    });
-    const foundIds = new Set(slots.map((s) => s.id));
-
-    const deletableIds = slots.filter((s) => s.status !== 'BOOKED').map((s) => s.id);
-    const skipped: { id: string; reason: 'booked' | 'not_found' }[] = [
-      ...slots.filter((s) => s.status === 'BOOKED').map((s) => ({ id: s.id, reason: 'booked' as const })),
-      // Covers both "doesn't exist" and "belongs to another therapist" — scoped out by
-      // the findMany's therapistId filter already, so we never leak which case it was.
-      ...slotIds.filter((id) => !foundIds.has(id)).map((id) => ({ id, reason: 'not_found' as const })),
-    ];
-
-    if (deletableIds.length > 0) {
-      await fastify.prisma.therapistSlot.deleteMany({ where: { id: { in: deletableIds } } });
-    }
-
-    return reply.send({ deletedIds: deletableIds, skipped });
+  // POST /therapist/slots/bulk-delete — ENTFERNT
+  fastify.post('/therapist/slots/bulk-delete', async (_request, reply) => {
+    return reply.status(410).send({ error: 'Dieser Endpunkt wurde entfernt.' });
   });
 
   // GET /therapist/working-hours — Eigene Arbeitszeiten-Regeln auflisten
@@ -342,10 +174,9 @@ export async function bookingRoutes(fastify: FastifyInstance) {
     return { rules: rules.map(serializeWorkingHoursRule) };
   });
 
-  // PUT /therapist/working-hours — Arbeitszeiten-Regeln vollständig ersetzen
-  // und für das rollierende Fenster neu materialisieren. Ersetzt die
-  // komplette Regelmenge (kein Teil-Update einzelner Regeln) — passend zu
-  // einem einzelnen "Arbeitszeiten speichern"-CTA in der App.
+  // PUT /therapist/working-hours — Arbeitszeiten-Regeln vollständig ersetzen.
+  // Slots werden nicht mehr materialisiert — freie Zeitfenster werden live
+  // aus den Regeln, Blockzeiten und Buchungen berechnet (generateAvailableSlots).
   fastify.put('/therapist/working-hours', async (request, reply) => {
     const token = request.headers.authorization?.replace('Bearer ', '');
     if (!token) return reply.status(401).send({ error: 'Unauthorized' });
@@ -359,8 +190,8 @@ export async function bookingRoutes(fastify: FastifyInstance) {
       weekday: z.number().int().min(0).max(6),
       startMinute: z.number().int().min(0).max(1439),
       endMinute: z.number().int().min(0).max(1439),
-      durationMin: z.number().int().min(5).max(120),
-      intervalMin: z.number().int().min(5).max(120).nullable().optional(),
+      // durationMin wird aus Kompatibilität noch akzeptiert aber ignoriert
+      durationMin: z.number().int().min(5).max(120).optional(),
       effectiveFrom: z.string().datetime().nullable().optional(),
       effectiveUntil: z.string().datetime().nullable().optional(),
       isActive: z.boolean().optional(),
@@ -369,12 +200,6 @@ export async function bookingRoutes(fastify: FastifyInstance) {
     const schema = z.object({ rules: z.array(ruleSchema).max(50) });
     const parsed = schema.safeParse(request.body);
     if (!parsed.success) return reply.status(400).send({ error: 'Invalid request', details: parsed.error.flatten() });
-
-    const now = new Date();
-
-    // BOOKED slots are never touched — pruning only ever targets future,
-    // still-AVAILABLE slots that the materializer itself created.
-    const pruned = await pruneFutureWorkingHoursSlots(fastify, therapist.id, now);
 
     await fastify.prisma.therapistWorkingHoursRule.deleteMany({ where: { therapistId: therapist.id } });
 
@@ -387,8 +212,6 @@ export async function bookingRoutes(fastify: FastifyInstance) {
                 weekday: r.weekday,
                 startMinute: r.startMinute,
                 endMinute: r.endMinute,
-                durationMin: r.durationMin,
-                intervalMin: r.intervalMin ?? null,
                 effectiveFrom: r.effectiveFrom ? new Date(r.effectiveFrom) : null,
                 effectiveUntil: r.effectiveUntil ? new Date(r.effectiveUntil) : null,
                 isActive: r.isActive ?? true,
@@ -398,14 +221,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
         )
       : [];
 
-    const materialized = await materializeWorkingHours(fastify, therapist.id, { now });
-
-    const response: PutWorkingHoursResponse = {
-      rules: created.map(serializeWorkingHoursRule),
-      materialized,
-      pruned,
-    };
-    return reply.send(response);
+    return reply.send({ rules: created.map(serializeWorkingHoursRule) });
   });
 
   // GET /therapist/patients — Eigene Patient:innen auflisten (dedupliziert über Buchungen)
@@ -419,7 +235,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
 
     const bookings = await fastify.prisma.bookingRequest.findMany({
       where: { therapistId: therapist.id, patientUserId: { not: null } },
-      include: { slot: true, patientUser: true },
+      include: { patientUser: true },
       orderBy: { createdAt: 'desc' },
     });
 
@@ -450,7 +266,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
     const { patientUserId } = request.params as { patientUserId: string };
     const bookings = await fastify.prisma.bookingRequest.findMany({
       where: { therapistId: therapist.id, patientUserId },
-      include: { slot: true, patientUser: true },
+      include: { patientUser: true },
       orderBy: { createdAt: 'desc' },
     });
 
@@ -466,7 +282,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
 
   // ── Patient: Buchung ────────────────────────────────────────────────────
 
-  // POST /bookings — Patient bucht einen Slot
+  // POST /bookings — Patient bucht ein Zeitfenster (dynamisches Buchungssystem)
   fastify.post('/bookings', async (request, reply) => {
     const token = request.headers.authorization?.replace('Bearer ', '');
     if (!token) return reply.status(401).send({ error: 'Unauthorized' });
@@ -476,23 +292,17 @@ export async function bookingRoutes(fastify: FastifyInstance) {
 
     const schema = z.object({
       therapistId: z.string(),
-      slotId: z.string(),
+      startsAt: z.string().datetime(),
+      heilmittel: z.string(),
       message: z.string().max(1000).optional(),
       consentAccepted: z.literal(true),
-      heilmittel: z.string().optional(),
       kassenart: z.enum(['gesetzlich', 'privat', 'selbstzahler']).optional(),
-      // Legacy-Felder werden ignoriert, damit bestehende Mobile-Calls nicht brechen
-      preferredDays: z.string().optional(),
-      preferredTimeWindows: z.string().optional(),
-      patientName: z.string().optional(),
-      patientEmail: z.string().optional(),
-      patientPhone: z.string().optional(),
     });
 
     const parsed = schema.safeParse(request.body);
     if (!parsed.success) return reply.status(400).send({ error: 'Invalid request', details: parsed.error.flatten() });
 
-    const { therapistId, slotId, message, heilmittel, kassenart } = parsed.data;
+    const { therapistId, startsAt: startsAtStr, heilmittel, message, kassenart } = parsed.data;
 
     // Therapeut und Modus prüfen
     const therapist = await fastify.prisma.therapist.findUnique({ where: { id: therapistId } });
@@ -500,43 +310,71 @@ export async function bookingRoutes(fastify: FastifyInstance) {
     if (!canUseBookingMode(therapist)) {
       return reply.status(400).send({ error: 'This therapist does not accept booking requests' });
     }
-    if (heilmittel && !splitList(therapist.heilmittel ?? '').includes(heilmittel)) {
+    if (!splitList(therapist.heilmittel ?? '').includes(heilmittel)) {
       return reply.status(400).send({ error: 'Dieses Heilmittel wird von diesem Therapeuten nicht angeboten.' });
     }
 
-    // Patientenname aus Account ableiten
+    const now = new Date();
+    const startsAt = new Date(startsAtStr);
+    if (startsAt <= now) {
+      return reply.status(400).send({ error: 'Der gewählte Termin liegt in der Vergangenheit.' });
+    }
+
+    // Leistungsdauer ermitteln (analog zum Slot-Generator)
+    const serviceConfig = await fastify.prisma.therapistService.findUnique({
+      where: { therapistId_heilmittelKey: { therapistId, heilmittelKey: heilmittel } },
+    });
+    let durationMin: number;
+    if (serviceConfig?.isActive && serviceConfig.durationMin > 0) {
+      durationMin = serviceConfig.durationMin;
+    } else {
+      const option = await fastify.prisma.heilmittelOption.findUnique({ where: { key: heilmittel } });
+      durationMin = option?.defaultDurationMin ?? 20;
+    }
+    const endsAt = new Date(startsAt.getTime() + durationMin * 60_000);
+
     const patientName = `${patient.firstName ?? ''} ${patient.lastName ?? ''}`.trim() || patient.email;
 
-    const now = new Date();
-
-    // Alles atomar in einer Transaktion
     try {
       const result = await fastify.prisma.$transaction(async (tx) => {
-        const slot = await tx.therapistSlot.findUnique({ where: { id: slotId } });
-        if (!slot) throw Object.assign(new Error('Slot not found'), { code: 404 });
-        if (slot.therapistId !== therapistId) throw Object.assign(new Error('Slot does not belong to this therapist'), { code: 400 });
-        if (slot.status !== 'AVAILABLE') throw Object.assign(new Error('Slot is no longer available'), { code: 409 });
-        if (slot.startsAt <= now) throw Object.assign(new Error('Slot is in the past'), { code: 400 });
+        // Race-Condition-Schutz: Überschneidung mit bestehenden PENDING/CONFIRMED-Buchungen
+        const bookingConflict = await tx.bookingRequest.findFirst({
+          where: {
+            therapistId,
+            status: { in: ['PENDING', 'CONFIRMED'] },
+            startsAt: { lt: endsAt },
+            endsAt: { gt: startsAt },
+          },
+        });
+        if (bookingConflict) throw Object.assign(new Error('Zeitfenster nicht mehr verfügbar.'), { code: 409 });
 
-        await tx.therapistSlot.update({ where: { id: slotId }, data: { status: 'BOOKED' } });
+        // Überschneidung mit Blockzeiten
+        const blockedConflict = await tx.therapistBlockedTime.findFirst({
+          where: {
+            therapistId,
+            startsAt: { lt: endsAt },
+            endsAt: { gt: startsAt },
+          },
+        });
+        if (blockedConflict) throw Object.assign(new Error('Zeitfenster ist blockiert.'), { code: 409 });
 
         return tx.bookingRequest.create({
           data: {
             therapistId,
             patientUserId: patient.id,
-            slotId,
             status: 'PENDING',
             patientName,
             patientEmail: patient.email,
             patientPhone: (patient as any).phone ?? null,
-            confirmedSlotAt: slot.startsAt,
+            startsAt,
+            endsAt,
+            confirmedSlotAt: startsAt,
             consentAcceptedAt: now,
             responseDueAt: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),
             message,
             heilmittel,
             kassenart,
           },
-          include: { slot: true },
         });
       });
 
@@ -544,7 +382,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
         sendPushNotification(
           therapist.expoPushToken,
           'Neue Terminanfrage',
-          `${patientName} hat einen Termin am ${new Date(result.confirmedSlotAt!).toLocaleDateString('de-DE')} gebucht.`,
+          `${patientName} hat einen Termin am ${startsAt.toLocaleDateString('de-DE')} gebucht.`,
           { bookingId: result.id, screen: 'bookings' },
         );
       }
@@ -552,19 +390,14 @@ export async function bookingRoutes(fastify: FastifyInstance) {
       return reply.status(201).send({
         id: result.id,
         status: result.status,
-        slot: serializeSlot(result.slot),
+        startsAt: result.startsAt?.toISOString(),
+        endsAt: result.endsAt?.toISOString(),
         expiresAt: result.responseDueAt,
       });
     } catch (err: any) {
-      // Custom errors thrown inside the transaction carry a numeric .code
       if (typeof err.code === 'number') {
         return reply.status(err.code).send({ error: err.message });
       }
-      // Prisma unique-constraint violation (e.g. slotId already booked)
-      if (err.code === 'P2002') {
-        return reply.status(409).send({ error: 'Slot ist nicht mehr verfügbar.' });
-      }
-      // Any other Prisma / unexpected error
       fastify.log.error({ err }, 'POST /bookings unexpected error');
       return reply.status(500).send({ error: 'Buchung konnte nicht abgeschlossen werden. Bitte versuche es erneut.' });
     }
@@ -584,14 +417,13 @@ export async function bookingRoutes(fastify: FastifyInstance) {
     const bookings = await fastify.prisma.bookingRequest.findMany({
       where: { patientUserId: patient.id, ...listFilters },
       include: {
-        slot: true,
         therapist: { select: { id: true, fullName: true, professionalTitle: true, city: true, photo: true, phone: true } },
       },
       orderBy: { createdAt: 'desc' },
       ...(take ? { take } : {}),
     });
 
-    return reply.send(bookings.map((b) => ({ ...b, slot: serializeSlot(b.slot) })));
+    return reply.send(bookings);
   });
 
   // GET /bookings/incoming — Therapeut sieht eingehende Buchungen
@@ -607,12 +439,11 @@ export async function bookingRoutes(fastify: FastifyInstance) {
 
     const bookings = await fastify.prisma.bookingRequest.findMany({
       where: { therapistId: therapist.id, ...listFilters },
-      include: { slot: true },
       orderBy: { createdAt: 'desc' },
       ...(take ? { take } : {}),
     });
 
-    return reply.send(bookings.map((b) => ({ ...b, slot: serializeSlot(b.slot) })));
+    return reply.send(bookings);
   });
 
   // PATCH /bookings/:id/respond — Therapeut bestätigt oder lehnt ab
@@ -623,10 +454,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
     if (!therapist) return reply.status(403).send({ error: 'Only therapists can respond to bookings' });
 
     const { id } = request.params as { id: string };
-    const booking = await fastify.prisma.bookingRequest.findUnique({
-      where: { id },
-      include: { slot: true },
-    });
+    const booking = await fastify.prisma.bookingRequest.findUnique({ where: { id } });
     if (!booking) return reply.status(404).send({ error: 'Booking not found' });
     if (booking.therapistId !== therapist.id) return reply.status(403).send({ error: 'Not your booking' });
     if (booking.status !== 'PENDING') return reply.status(400).send({ error: 'Booking is no longer pending' });
@@ -642,36 +470,27 @@ export async function bookingRoutes(fastify: FastifyInstance) {
     const now = new Date();
 
     if (parsed.data.action === 'CONFIRM') {
-      const confirmedAt = booking.slot?.startsAt ?? booking.confirmedSlotAt ?? now;
+      const confirmedAt = booking.startsAt ?? booking.confirmedSlotAt ?? now;
       const updated = await fastify.prisma.bookingRequest.update({
         where: { id },
         data: { status: 'CONFIRMED', confirmedSlotAt: confirmedAt, respondedAt: now },
-        include: { slot: true },
       });
 
       const patientUser = booking.patientUserId
         ? await fastify.prisma.user.findUnique({ where: { id: booking.patientUserId } })
         : null;
       if (patientUser?.expoPushToken) {
-        const slotDate = confirmedAt.toLocaleDateString('de-DE');
         sendPushNotification(patientUser.expoPushToken, 'Termin bestätigt 🎉',
-          `${therapist.fullName} hat deinen Termin am ${slotDate} bestätigt.`,
+          `${therapist.fullName} hat deinen Termin am ${confirmedAt.toLocaleDateString('de-DE')} bestätigt.`,
           { bookingId: booking.id, screen: 'bookings' });
       }
 
-      return reply.send({ ...updated, slot: serializeSlot(updated.slot) });
+      return reply.send(updated);
     } else {
       const declineData = parsed.data as { action: 'DECLINE'; declinedReason?: string };
-      const updated = await fastify.prisma.$transaction(async (tx) => {
-        const u = await tx.bookingRequest.update({
-          where: { id },
-          data: { status: 'DECLINED', declinedReason: declineData.declinedReason, respondedAt: now, slotId: null },
-          include: { slot: true },
-        });
-        if (booking.slotId) {
-          await tx.therapistSlot.update({ where: { id: booking.slotId }, data: { status: 'AVAILABLE' } });
-        }
-        return u;
+      const updated = await fastify.prisma.bookingRequest.update({
+        where: { id },
+        data: { status: 'DECLINED', declinedReason: declineData.declinedReason, respondedAt: now },
       });
 
       const patientUser = booking.patientUserId
@@ -683,7 +502,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
           { bookingId: booking.id, screen: 'bookings' });
       }
 
-      return reply.send({ ...updated, slot: serializeSlot(updated.slot) });
+      return reply.send(updated);
     }
   });
 
@@ -714,15 +533,9 @@ export async function bookingRoutes(fastify: FastifyInstance) {
       return reply.status(400).send({ error: 'Bitte gib einen Grund an.' });
     }
 
-    const updated = await fastify.prisma.$transaction(async (tx) => {
-      const u = await tx.bookingRequest.update({
-        where: { id },
-        data: { status: 'CANCELLED', respondedAt: new Date(), slotId: null, cancelReason, cancelledBy: 'PATIENT', cancelledAt: new Date() },
-      });
-      if (booking.slotId) {
-        await tx.therapistSlot.update({ where: { id: booking.slotId }, data: { status: 'AVAILABLE' } });
-      }
-      return u;
+    const updated = await fastify.prisma.bookingRequest.update({
+      where: { id },
+      data: { status: 'CANCELLED', respondedAt: new Date(), cancelReason, cancelledBy: 'PATIENT', cancelledAt: new Date() },
     });
 
     if (booking.therapist.expoPushToken) {
@@ -763,15 +576,9 @@ export async function bookingRoutes(fastify: FastifyInstance) {
     }
     const cancelReason = parsedTherapistCancel.data.cancelReason;
 
-    const updated = await fastify.prisma.$transaction(async (tx) => {
-      const u = await tx.bookingRequest.update({
-        where: { id },
-        data: { status: 'CANCELLED', respondedAt: new Date(), slotId: null, cancelReason, cancelledBy: 'THERAPIST', cancelledAt: new Date() },
-      });
-      if (booking.slotId) {
-        await tx.therapistSlot.update({ where: { id: booking.slotId }, data: { status: 'AVAILABLE' } });
-      }
-      return u;
+    const updated = await fastify.prisma.bookingRequest.update({
+      where: { id },
+      data: { status: 'CANCELLED', respondedAt: new Date(), cancelReason, cancelledBy: 'THERAPIST', cancelledAt: new Date() },
     });
 
     const patientUser = booking.patientUserId
@@ -787,5 +594,157 @@ export async function bookingRoutes(fastify: FastifyInstance) {
     }
 
     return reply.send(updated);
+  });
+
+  // ── Therapeut: Leistungskonfiguration ──────────────────────────────────────
+
+  // GET /therapist/services — Konfigurierte Leistungen (heilmittelKey + Dauer) auflisten
+  fastify.get('/therapist/services', async (request, reply) => {
+    const token = request.headers.authorization?.replace('Bearer ', '');
+    if (!token) return reply.status(401).send({ error: 'Unauthorized' });
+    const therapist = await resolveTherapist(fastify, token);
+    if (!therapist) return reply.status(403).send({ error: 'Only therapists can manage services' });
+
+    const services = await fastify.prisma.therapistService.findMany({
+      where: { therapistId: therapist.id },
+      orderBy: { heilmittelKey: 'asc' },
+    });
+
+    return { services };
+  });
+
+  // PUT /therapist/services/:heilmittelKey — Leistungskonfiguration setzen (Upsert)
+  fastify.put('/therapist/services/:heilmittelKey', async (request, reply) => {
+    const token = request.headers.authorization?.replace('Bearer ', '');
+    if (!token) return reply.status(401).send({ error: 'Unauthorized' });
+    const therapist = await resolveTherapist(fastify, token);
+    if (!therapist) return reply.status(403).send({ error: 'Only therapists can manage services' });
+
+    const { heilmittelKey } = request.params as { heilmittelKey: string };
+
+    // Sicherstellen, dass der Key ein bekanntes, aktives Heilmittel ist
+    const validOption = await fastify.prisma.heilmittelOption.findFirst({
+      where: { key: heilmittelKey, isActive: true },
+    });
+    if (!validOption) {
+      return reply.status(400).send({ error: `Unbekanntes oder inaktives Heilmittel: "${heilmittelKey}"` });
+    }
+
+    const schema = z.object({
+      durationMin: z.number().int().min(5).max(180),
+      bufferAfterMin: z.number().int().min(0).max(60).optional(),
+      slotIntervalMin: z.number().int().min(5).max(180).nullable().optional(),
+      isActive: z.boolean().optional(),
+    });
+
+    const parsed = schema.safeParse(request.body);
+    if (!parsed.success) return reply.status(400).send({ error: 'Invalid request', details: parsed.error.flatten() });
+
+    const service = await fastify.prisma.therapistService.upsert({
+      where: { therapistId_heilmittelKey: { therapistId: therapist.id, heilmittelKey } },
+      create: {
+        therapistId: therapist.id,
+        heilmittelKey,
+        durationMin: parsed.data.durationMin,
+        bufferAfterMin: parsed.data.bufferAfterMin ?? 0,
+        slotIntervalMin: parsed.data.slotIntervalMin ?? null,
+        isActive: parsed.data.isActive ?? true,
+      },
+      update: {
+        durationMin: parsed.data.durationMin,
+        bufferAfterMin: parsed.data.bufferAfterMin ?? 0,
+        slotIntervalMin: parsed.data.slotIntervalMin ?? null,
+        ...(parsed.data.isActive !== undefined ? { isActive: parsed.data.isActive } : {}),
+      },
+    });
+
+    return reply.send(service);
+  });
+
+  // ── Therapeut: Blockzeiten ──────────────────────────────────────────────────
+
+  // GET /therapist/blocked-times — Eigene Blockzeiten auflisten
+  fastify.get('/therapist/blocked-times', async (request, reply) => {
+    const token = request.headers.authorization?.replace('Bearer ', '');
+    if (!token) return reply.status(401).send({ error: 'Unauthorized' });
+    const therapist = await resolveTherapist(fastify, token);
+    if (!therapist) return reply.status(403).send({ error: 'Only therapists can manage blocked times' });
+
+    const { from, to } = request.query as { from?: string; to?: string };
+    const fromDate = from ? new Date(from) : new Date();
+    const toDate = to ? new Date(to) : new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
+
+    const blockedTimes = await fastify.prisma.therapistBlockedTime.findMany({
+      where: {
+        therapistId: therapist.id,
+        startsAt: { lt: toDate },
+        endsAt: { gt: fromDate },
+      },
+      orderBy: { startsAt: 'asc' },
+    });
+
+    return {
+      blockedTimes: blockedTimes.map((b) => ({
+        id: b.id,
+        startsAt: b.startsAt.toISOString(),
+        endsAt: b.endsAt.toISOString(),
+        title: b.title,
+        createdAt: b.createdAt.toISOString(),
+        updatedAt: b.updatedAt.toISOString(),
+      })),
+    };
+  });
+
+  // POST /therapist/blocked-times — Neue Blockzeit anlegen
+  fastify.post('/therapist/blocked-times', async (request, reply) => {
+    const token = request.headers.authorization?.replace('Bearer ', '');
+    if (!token) return reply.status(401).send({ error: 'Unauthorized' });
+    const therapist = await resolveTherapist(fastify, token);
+    if (!therapist) return reply.status(403).send({ error: 'Only therapists can manage blocked times' });
+
+    const schema = z.object({
+      startsAt: z.string().datetime(),
+      endsAt: z.string().datetime(),
+      title: z.string().trim().min(1).max(100).optional(),
+    }).refine((d) => new Date(d.endsAt) > new Date(d.startsAt), {
+      message: 'endsAt must be after startsAt',
+    });
+
+    const parsed = schema.safeParse(request.body);
+    if (!parsed.success) return reply.status(400).send({ error: 'Invalid request', details: parsed.error.flatten() });
+
+    const blocked = await fastify.prisma.therapistBlockedTime.create({
+      data: {
+        therapistId: therapist.id,
+        startsAt: new Date(parsed.data.startsAt),
+        endsAt: new Date(parsed.data.endsAt),
+        title: parsed.data.title ?? 'Blockiert',
+      },
+    });
+
+    return reply.status(201).send({
+      id: blocked.id,
+      startsAt: blocked.startsAt.toISOString(),
+      endsAt: blocked.endsAt.toISOString(),
+      title: blocked.title,
+      createdAt: blocked.createdAt.toISOString(),
+      updatedAt: blocked.updatedAt.toISOString(),
+    });
+  });
+
+  // DELETE /therapist/blocked-times/:id — Blockzeit löschen
+  fastify.delete('/therapist/blocked-times/:id', async (request, reply) => {
+    const token = request.headers.authorization?.replace('Bearer ', '');
+    if (!token) return reply.status(401).send({ error: 'Unauthorized' });
+    const therapist = await resolveTherapist(fastify, token);
+    if (!therapist) return reply.status(403).send({ error: 'Only therapists can manage blocked times' });
+
+    const { id } = request.params as { id: string };
+    const existing = await fastify.prisma.therapistBlockedTime.findUnique({ where: { id } });
+    if (!existing) return reply.status(404).send({ error: 'Blocked time not found' });
+    if (existing.therapistId !== therapist.id) return reply.status(403).send({ error: 'Not your blocked time' });
+
+    await fastify.prisma.therapistBlockedTime.delete({ where: { id } });
+    return reply.send({ deleted: true });
   });
 }

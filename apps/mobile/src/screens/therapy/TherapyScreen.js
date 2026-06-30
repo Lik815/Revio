@@ -62,8 +62,6 @@ export function TherapyTabScreen() {
   const [slotError, setSlotError] = useState('');
   const [isAddingSlots, setIsAddingSlots] = useState(false);
   const [repeatBookingTherapist, setRepeatBookingTherapist] = useState(null);
-  const [repeatBookingSlots, setRepeatBookingSlots] = useState([]);
-  const [repeatBookingSlotsLoading, setRepeatBookingSlotsLoading] = useState(false);
   const [showRepeatBookingForm, setShowRepeatBookingForm] = useState(false);
 
   // Force-refreshes every list each time this tab gains focus (tab switch, back
@@ -98,16 +96,6 @@ export function TherapyTabScreen() {
     navigation.navigate(ROOT_ROUTES.THERAPIST_PROFILE, { therapistId: id, therapist: fallback });
   };
 
-  const loadRepeatBookingSlots = async (therapistId) => {
-    if (!therapistId) return [];
-    const res = await fetch(`${getBaseUrl()}/therapists/${therapistId}/slots`, {
-      headers: { ...TUNNEL_HEADERS },
-    });
-    if (!res.ok) return [];
-    const data = await res.json().catch(() => ({}));
-    return Array.isArray(data.slots) ? data.slots : [];
-  };
-
   const handleBookAgain = async (therapist) => {
     if (!authToken) {
       navigation.navigate(ROOT_ROUTES.MAIN_TABS, { screen: TAB_ROUTES.AUTH });
@@ -115,43 +103,22 @@ export function TherapyTabScreen() {
     }
     if (!therapist?.id) return;
 
-    setRepeatBookingTherapist(therapist);
-    setRepeatBookingSlots([]);
-    setRepeatBookingSlotsLoading(true);
-    setShowRepeatBookingForm(true);
-
+    // Frischen Therapeuten-Datensatz laden (prüft bookingMode)
     try {
-      const [therapistRes, slots] = await Promise.all([
-        fetch(`${getBaseUrl()}/therapist/${therapist.id}`, { headers: { ...TUNNEL_HEADERS } }),
-        loadRepeatBookingSlots(therapist.id),
-      ]);
+      const therapistRes = await fetch(`${getBaseUrl()}/therapist/${therapist.id}`, { headers: { ...TUNNEL_HEADERS } });
       const therapistData = therapistRes.ok ? await therapistRes.json().catch(() => ({})) : {};
       const fullTherapist = therapistData?.therapist ? mapApiTherapist(therapistData.therapist) : therapist;
 
       if (fullTherapist?.bookingMode && fullTherapist.bookingMode !== 'FIRST_APPOINTMENT_REQUEST') {
         Alert.alert('Terminbuchung nicht verfügbar', 'Dieser Therapeut nimmt aktuell keine Terminanfragen über Revio an.');
-        setShowRepeatBookingForm(false);
         return;
       }
 
       setRepeatBookingTherapist(fullTherapist);
-      setRepeatBookingSlots(slots);
     } catch {
-      Alert.alert('Termine konnten nicht geladen werden', 'Bitte versuche es erneut.');
-      setShowRepeatBookingForm(false);
-    } finally {
-      setRepeatBookingSlotsLoading(false);
+      setRepeatBookingTherapist(therapist);
     }
-  };
-
-  const reloadRepeatBookingSlots = async () => {
-    if (!repeatBookingTherapist?.id) return;
-    setRepeatBookingSlotsLoading(true);
-    try {
-      setRepeatBookingSlots(await loadRepeatBookingSlots(repeatBookingTherapist.id));
-    } finally {
-      setRepeatBookingSlotsLoading(false);
-    }
+    setShowRepeatBookingForm(true);
   };
 
   const handleAddSlots = async (slots) => {
@@ -385,15 +352,12 @@ export function TherapyTabScreen() {
               t={t}
               therapist={repeatBookingTherapist}
               authToken={authToken}
-              availableSlots={repeatBookingSlots}
-              slotsLoading={repeatBookingSlotsLoading}
               onSuccess={() => {
                 setShowRepeatBookingForm(false);
                 setSelectedAppointment(null);
                 loadMyAppointments(authToken);
               }}
               onClose={() => setShowRepeatBookingForm(false)}
-              onReloadSlots={reloadRepeatBookingSlots}
             />
           ) : null}
         </Modal>

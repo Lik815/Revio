@@ -4,7 +4,6 @@ import { prisma } from '../src/plugins/prisma.js';
 import { hashPassword } from '../src/routes/auth-utils.js';
 import { getProfileStatus } from '../src/utils/profile-completeness.js';
 import { sha256 } from '../src/utils/hash.js';
-import { materializeWorkingHours } from '../src/utils/working-hours.js';
 
 process.env.DATABASE_URL ??= 'file:./prisma/test.db';
 process.env.REVIO_ADMIN_TOKEN ??= 'test-token';
@@ -73,7 +72,6 @@ afterEach(async () => {
   await prisma.userFavoriteTherapist.deleteMany();
   await prisma.user.deleteMany();
   await prisma.bookingRequest.deleteMany();
-  await prisma.therapistSlot.deleteMany();
   await prisma.therapistDocument.deleteMany();
   await prisma.therapistPracticeLink.deleteMany();
   await prisma.therapist.deleteMany();
@@ -2665,55 +2663,51 @@ describe('GET /auth/favorites/therapists', () => {
   });
 });
 
-// ─── Slot-based Booking ───────────────────────────────────────────────────────
+// ─── Dynamic Booking ──────────────────────────────────────────────────────────
 
-describe('Slot-based Booking', () => {
+describe('Dynamic Booking', () => {
   let therapistToken: string;
   let therapistId: string;
   let patientToken: string;
 
+  // Morgen 09:00 UTC (weit genug in der Zukunft für alle Tests)
+  function futureStartsAt(offsetHours = 48) {
+    const d = new Date(Date.now() + offsetHours * 60 * 60 * 1000);
+    d.setMinutes(0, 0, 0);
+    return d;
+  }
+
   async function setupTherapistAndPatient() {
     const therapist = await prisma.therapist.create({
       data: {
-        email: 'slot-therapist@test.de',
-        fullName: 'Slot Therapeutin',
+        email: 'dyn-therapist@test.de',
+        fullName: 'Dynamic Therapeutin',
         professionalTitle: 'Physiotherapeutin',
         city: 'Berlin',
         specializations: 'Rückenschmerzen',
         languages: 'Deutsch',
+        heilmittel: 'KG,MT',
         reviewStatus: 'APPROVED',
         isVisible: true,
         bookingMode: 'FIRST_APPOINTMENT_REQUEST',
-        sessionToken: 'slot-therapist-token',
+        sessionToken: 'dyn-therapist-token',
       },
     });
-    therapistToken = 'slot-therapist-token';
+    therapistToken = 'dyn-therapist-token';
     therapistId = therapist.id;
 
     await prisma.user.create({
       data: {
-        email: 'slot-patient@test.de',
+        email: 'dyn-patient@test.de',
         passwordHash: await hashPassword('test1234'),
         role: 'patient',
-        firstName: 'Slot',
+        firstName: 'Dynamic',
         lastName: 'Patient',
-        sessionToken: 'slot-patient-token',
+        sessionToken: 'dyn-patient-token',
         emailVerifiedAt: new Date(),
       },
     });
-    patientToken = 'slot-patient-token';
-  }
-
-  async function createFutureSlot(overrides: Record<string, unknown> = {}) {
-    return prisma.therapistSlot.create({
-      data: {
-        therapistId,
-        startsAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-        durationMin: 20,
-        status: 'AVAILABLE',
-        ...overrides,
-      },
-    });
+    patientToken = 'dyn-patient-token';
   }
 
   beforeEach(async () => {
@@ -2722,533 +2716,366 @@ describe('Slot-based Booking', () => {
 
   afterEach(async () => {
     await prisma.bookingRequest.deleteMany();
-    await prisma.therapistSlot.deleteMany();
+    await prisma.therapistBlockedTime.deleteMany();
+    await prisma.therapistService.deleteMany();
+    await prisma.therapistWorkingHoursRule.deleteMany();
   });
 
-  it('POST /therapist/slots — therapist creates a slot', async () => {
-    const startsAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
-    const res = await app.inject({
-      method: 'POST', url: '/therapist/slots',
-      headers: { authorization: `Bearer ${therapistToken}`, 'content-type': 'application/json' },
-      payload: { slots: [{ startsAt, durationMin: 20 }] },
-    });
-    expect(res.statusCode).toBe(201);
-    expect(res.json().created).toHaveLength(1);
-    expect(res.json().created[0].status).toBe('AVAILABLE');
-  });
+  // ── /therapist/services ──────────────────────────────────────────────────
 
-  it('POST /therapist/slots — rejects therapists without approved profile', async () => {
-    await prisma.therapist.update({
-      where: { id: therapistId },
-      data: { reviewStatus: 'PENDING_REVIEW' },
+  it('PUT /therapist/services/:heilmittelKey — legt Leistungskonfiguration an (Upsert)', async () => {
+    await prisma.heilmittelOption.upsert({
+      where: { key: 'KG' },
+      create: { key: 'KG', label: 'KG', defaultDurationMin: 20 },
+      update: {},
     });
-    const startsAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
-    const res = await app.inject({
-      method: 'POST', url: '/therapist/slots',
-      headers: { authorization: `Bearer ${therapistToken}`, 'content-type': 'application/json' },
-      payload: { slots: [{ startsAt, durationMin: 20 }] },
-    });
-    expect(res.statusCode).toBe(400);
-  });
-
-  it('POST /therapist/slots — mixed duplicate and valid batch returns partial success, not 409', async () => {
-    const existingSlot = await createFutureSlot();
-    const newStartsAt1 = new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString();
-    const newStartsAt2 = new Date(Date.now() + 96 * 60 * 60 * 1000).toISOString();
 
     const res = await app.inject({
-      method: 'POST', url: '/therapist/slots',
+      method: 'PUT', url: '/therapist/services/KG',
       headers: { authorization: `Bearer ${therapistToken}`, 'content-type': 'application/json' },
-      payload: { slots: [
-        { startsAt: existingSlot.startsAt.toISOString(), durationMin: 20 },
-        { startsAt: newStartsAt1, durationMin: 20 },
-        { startsAt: newStartsAt2, durationMin: 20 },
-      ] },
+      payload: { durationMin: 25 },
     });
-
-    expect(res.statusCode).toBe(201);
-    const body = res.json();
-    expect(body.created).toHaveLength(2);
-    expect(body.skipped).toHaveLength(1);
-    expect(body.skipped[0].reason).toBe('duplicate');
-    expect(body.rejected).toHaveLength(0);
-  });
-
-  it('POST /therapist/slots — mixed past and future batch reports rejected, still creates future ones', async () => {
-    const pastStartsAt = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-    const futureStartsAt = new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString();
-
-    const res = await app.inject({
-      method: 'POST', url: '/therapist/slots',
-      headers: { authorization: `Bearer ${therapistToken}`, 'content-type': 'application/json' },
-      payload: { slots: [
-        { startsAt: pastStartsAt, durationMin: 20 },
-        { startsAt: futureStartsAt, durationMin: 20 },
-      ] },
-    });
-
-    expect(res.statusCode).toBe(201);
-    const body = res.json();
-    expect(body.created).toHaveLength(1);
-    expect(body.rejected).toHaveLength(1);
-    expect(body.rejected[0].reason).toBe('past');
-  });
-
-  it('POST /therapist/slots — all-duplicate batch returns 201 with empty created and full skipped', async () => {
-    const slotA = await createFutureSlot({ startsAt: new Date(Date.now() + 72 * 60 * 60 * 1000) });
-    const slotB = await createFutureSlot({ startsAt: new Date(Date.now() + 96 * 60 * 60 * 1000) });
-
-    const res = await app.inject({
-      method: 'POST', url: '/therapist/slots',
-      headers: { authorization: `Bearer ${therapistToken}`, 'content-type': 'application/json' },
-      payload: { slots: [
-        { startsAt: slotA.startsAt.toISOString(), durationMin: 20 },
-        { startsAt: slotB.startsAt.toISOString(), durationMin: 20 },
-      ] },
-    });
-
-    expect(res.statusCode).toBe(201);
-    const body = res.json();
-    expect(body.created).toHaveLength(0);
-    expect(body.skipped).toHaveLength(2);
-  });
-
-  it('POST /therapist/slots — still rejects more than 200 slots in one request', async () => {
-    const slots = Array.from({ length: 201 }, (_, i) => ({
-      startsAt: new Date(Date.now() + (i + 1) * 60 * 60 * 1000).toISOString(),
-      durationMin: 20,
-    }));
-
-    const res = await app.inject({
-      method: 'POST', url: '/therapist/slots',
-      headers: { authorization: `Bearer ${therapistToken}`, 'content-type': 'application/json' },
-      payload: { slots },
-    });
-
-    expect(res.statusCode).toBe(400);
-  });
-
-  it('GET /therapists/:id/slots — returns only future AVAILABLE slots', async () => {
-    await createFutureSlot();
-    await createFutureSlot({ status: 'BOOKED' });
-    await prisma.therapistSlot.create({
-      data: { therapistId, startsAt: new Date(Date.now() - 60000), durationMin: 20, status: 'AVAILABLE' },
-    });
-
-    const res = await app.inject({ method: 'GET', url: `/therapists/${therapistId}/slots` });
     expect(res.statusCode).toBe(200);
-    expect(res.json().slots).toHaveLength(1);
-    expect(res.json().slots[0].status).toBe('AVAILABLE');
+    expect(res.json().durationMin).toBe(25);
+    expect(res.json().heilmittelKey).toBe('KG');
   });
 
-  it('POST /bookings — books an AVAILABLE slot atomically', async () => {
-    const slot = await createFutureSlot();
-
+  it('PUT /therapist/services/:heilmittelKey — lehnt unbekanntes Heilmittel ab', async () => {
     const res = await app.inject({
-      method: 'POST', url: '/bookings',
-      headers: { authorization: `Bearer ${patientToken}`, 'content-type': 'application/json' },
-      payload: { therapistId, slotId: slot.id, consentAccepted: true },
-    });
-    expect(res.statusCode).toBe(201);
-    expect(res.json().slot.id).toBe(slot.id);
-
-    const updatedSlot = await prisma.therapistSlot.findUnique({ where: { id: slot.id } });
-    expect(updatedSlot?.status).toBe('BOOKED');
-  });
-
-  it('POST /bookings — accepts a valid heilmittel + kassenart and stores it', async () => {
-    await prisma.therapist.update({ where: { id: therapistId }, data: { heilmittel: 'KG,MT' } });
-    const slot = await createFutureSlot();
-
-    const res = await app.inject({
-      method: 'POST', url: '/bookings',
-      headers: { authorization: `Bearer ${patientToken}`, 'content-type': 'application/json' },
-      payload: { therapistId, slotId: slot.id, consentAccepted: true, heilmittel: 'KG', kassenart: 'gesetzlich' },
-    });
-    expect(res.statusCode).toBe(201);
-
-    const created = await prisma.bookingRequest.findUnique({ where: { id: res.json().id } });
-    expect(created?.heilmittel).toBe('KG');
-    expect(created?.kassenart).toBe('gesetzlich');
-  });
-
-  it('POST /bookings — rejects a heilmittel the therapist does not offer', async () => {
-    await prisma.therapist.update({ where: { id: therapistId }, data: { heilmittel: 'KG' } });
-    const slot = await createFutureSlot();
-
-    const res = await app.inject({
-      method: 'POST', url: '/bookings',
-      headers: { authorization: `Bearer ${patientToken}`, 'content-type': 'application/json' },
-      payload: { therapistId, slotId: slot.id, consentAccepted: true, heilmittel: 'MT', kassenart: 'gesetzlich' },
+      method: 'PUT', url: '/therapist/services/UNBEKANNT',
+      headers: { authorization: `Bearer ${therapistToken}`, 'content-type': 'application/json' },
+      payload: { durationMin: 20 },
     });
     expect(res.statusCode).toBe(400);
   });
 
-  it('POST /bookings — rejects unapproved therapists', async () => {
-    const slot = await createFutureSlot();
-    await prisma.therapist.update({
-      where: { id: therapistId },
-      data: { reviewStatus: 'PENDING_REVIEW' },
+  it('GET /therapist/services — listet konfigurierte Leistungen auf', async () => {
+    await prisma.heilmittelOption.upsert({
+      where: { key: 'KG' },
+      create: { key: 'KG', label: 'KG', defaultDurationMin: 20 },
+      update: {},
+    });
+    await prisma.therapistService.create({
+      data: { therapistId, heilmittelKey: 'KG', durationMin: 30 },
     });
 
     const res = await app.inject({
-      method: 'POST', url: '/bookings',
-      headers: { authorization: `Bearer ${patientToken}`, 'content-type': 'application/json' },
-      payload: { therapistId, slotId: slot.id, consentAccepted: true },
+      method: 'GET', url: '/therapist/services',
+      headers: { authorization: `Bearer ${therapistToken}` },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().services).toHaveLength(1);
+    expect(res.json().services[0].durationMin).toBe(30);
+  });
+
+  // ── /therapist/blocked-times ──────────────────────────────────────────────
+
+  it('POST /therapist/blocked-times — legt Blockzeit an', async () => {
+    const start = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const end = new Date(start.getTime() + 60 * 60 * 1000);
+
+    const res = await app.inject({
+      method: 'POST', url: '/therapist/blocked-times',
+      headers: { authorization: `Bearer ${therapistToken}`, 'content-type': 'application/json' },
+      payload: { startsAt: start.toISOString(), endsAt: end.toISOString(), title: 'Pause' },
+    });
+    expect(res.statusCode).toBe(201);
+    expect(res.json().title).toBe('Pause');
+  });
+
+  it('POST /therapist/blocked-times — lehnt endsAt <= startsAt ab', async () => {
+    const t = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const res = await app.inject({
+      method: 'POST', url: '/therapist/blocked-times',
+      headers: { authorization: `Bearer ${therapistToken}`, 'content-type': 'application/json' },
+      payload: { startsAt: t.toISOString(), endsAt: t.toISOString() },
     });
     expect(res.statusCode).toBe(400);
   });
 
-  it('POST /bookings — double-booking same slot returns 409', async () => {
-    const slot = await createFutureSlot();
-
-    await app.inject({
-      method: 'POST', url: '/bookings',
-      headers: { authorization: `Bearer ${patientToken}`, 'content-type': 'application/json' },
-      payload: { therapistId, slotId: slot.id, consentAccepted: true },
+  it('DELETE /therapist/blocked-times/:id — löscht eigene Blockzeit', async () => {
+    const start = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const end = new Date(start.getTime() + 60 * 60 * 1000);
+    const created = await prisma.therapistBlockedTime.create({
+      data: { therapistId, startsAt: start, endsAt: end },
     });
 
-    const patient2 = await prisma.user.create({
-      data: { email: 'patient2@test.de', passwordHash: 'x', role: 'patient', sessionToken: 'patient2-token', emailVerifiedAt: new Date() },
-    });
-    const res2 = await app.inject({
-      method: 'POST', url: '/bookings',
-      headers: { authorization: 'Bearer patient2-token', 'content-type': 'application/json' },
-      payload: { therapistId, slotId: slot.id, consentAccepted: true },
-    });
-    expect(res2.statusCode).toBe(409);
-
-    const slotAfter = await prisma.therapistSlot.findUnique({ where: { id: slot.id } });
-    expect(slotAfter?.status).toBe('BOOKED');
-  });
-
-  it('PATCH /bookings/:id/cancel — patient cancel releases slot', async () => {
-    const slot = await createFutureSlot();
-    const bookRes = await app.inject({
-      method: 'POST', url: '/bookings',
-      headers: { authorization: `Bearer ${patientToken}`, 'content-type': 'application/json' },
-      payload: { therapistId, slotId: slot.id, consentAccepted: true },
-    });
-    const bookingId = bookRes.json().id;
-
-    const cancelRes = await app.inject({
-      method: 'PATCH', url: `/bookings/${bookingId}/cancel`,
-      headers: { authorization: `Bearer ${patientToken}` },
-    });
-    expect(cancelRes.statusCode).toBe(200);
-
-    const updatedSlot = await prisma.therapistSlot.findUnique({ where: { id: slot.id } });
-    expect(updatedSlot?.status).toBe('AVAILABLE');
-  });
-
-  it('PATCH /bookings/:id/cancel — PENDING cancel needs no reason, even with no body at all', async () => {
-    const slot = await createFutureSlot();
-    const bookRes = await app.inject({
-      method: 'POST', url: '/bookings',
-      headers: { authorization: `Bearer ${patientToken}`, 'content-type': 'application/json' },
-      payload: { therapistId, slotId: slot.id, consentAccepted: true },
-    });
-
-    const cancelRes = await app.inject({
-      method: 'PATCH', url: `/bookings/${bookRes.json().id}/cancel`,
-      headers: { authorization: `Bearer ${patientToken}` },
-    });
-    expect(cancelRes.statusCode).toBe(200);
-  });
-
-  it('PATCH /bookings/:id/cancel — CONFIRMED cancel without a reason is rejected', async () => {
-    const slot = await createFutureSlot();
-    const bookRes = await app.inject({
-      method: 'POST', url: '/bookings',
-      headers: { authorization: `Bearer ${patientToken}`, 'content-type': 'application/json' },
-      payload: { therapistId, slotId: slot.id, consentAccepted: true },
-    });
-    await app.inject({
-      method: 'PATCH', url: `/bookings/${bookRes.json().id}/respond`,
-      headers: { authorization: `Bearer ${therapistToken}`, 'content-type': 'application/json' },
-      payload: { action: 'CONFIRM' },
-    });
-
-    const cancelRes = await app.inject({
-      method: 'PATCH', url: `/bookings/${bookRes.json().id}/cancel`,
-      headers: { authorization: `Bearer ${patientToken}` },
-    });
-    expect(cancelRes.statusCode).toBe(400);
-
-    const stillConfirmed = await prisma.bookingRequest.findUnique({ where: { id: bookRes.json().id } });
-    expect(stillConfirmed?.status).toBe('CONFIRMED');
-  });
-
-  it('PATCH /bookings/:id/cancel — CONFIRMED cancel with a reason stores it and surfaces it on GET /bookings/my', async () => {
-    const slot = await createFutureSlot();
-    const bookRes = await app.inject({
-      method: 'POST', url: '/bookings',
-      headers: { authorization: `Bearer ${patientToken}`, 'content-type': 'application/json' },
-      payload: { therapistId, slotId: slot.id, consentAccepted: true },
-    });
-    await app.inject({
-      method: 'PATCH', url: `/bookings/${bookRes.json().id}/respond`,
-      headers: { authorization: `Bearer ${therapistToken}`, 'content-type': 'application/json' },
-      payload: { action: 'CONFIRM' },
-    });
-
-    const cancelRes = await app.inject({
-      method: 'PATCH', url: `/bookings/${bookRes.json().id}/cancel`,
-      headers: { authorization: `Bearer ${patientToken}`, 'content-type': 'application/json' },
-      payload: { cancelReason: 'Ich bin verhindert' },
-    });
-    expect(cancelRes.statusCode).toBe(200);
-    expect(cancelRes.json().cancelReason).toBe('Ich bin verhindert');
-    expect(cancelRes.json().cancelledBy).toBe('PATIENT');
-    expect(cancelRes.json().cancelledAt).toBeTruthy();
-
-    const myBookings = await app.inject({
-      method: 'GET', url: '/bookings/my',
-      headers: { authorization: `Bearer ${patientToken}` },
-    });
-    const mine = myBookings.json().find((b: { id: string }) => b.id === bookRes.json().id);
-    expect(mine.cancelReason).toBe('Ich bin verhindert');
-  });
-
-  it('PATCH /bookings/:id/therapist-cancel — rejects without a reason', async () => {
-    const slot = await createFutureSlot();
-    const bookRes = await app.inject({
-      method: 'POST', url: '/bookings',
-      headers: { authorization: `Bearer ${patientToken}`, 'content-type': 'application/json' },
-      payload: { therapistId, slotId: slot.id, consentAccepted: true },
-    });
-    await app.inject({
-      method: 'PATCH', url: `/bookings/${bookRes.json().id}/respond`,
-      headers: { authorization: `Bearer ${therapistToken}`, 'content-type': 'application/json' },
-      payload: { action: 'CONFIRM' },
-    });
-
-    const cancelRes = await app.inject({
-      method: 'PATCH', url: `/bookings/${bookRes.json().id}/therapist-cancel`,
-      headers: { authorization: `Bearer ${therapistToken}` },
-    });
-    expect(cancelRes.statusCode).toBe(400);
-  });
-
-  it('PATCH /bookings/:id/therapist-cancel — with a reason stores it and surfaces it on /bookings/incoming and /therapist/patients/:id', async () => {
-    const slot = await createFutureSlot();
-    const bookRes = await app.inject({
-      method: 'POST', url: '/bookings',
-      headers: { authorization: `Bearer ${patientToken}`, 'content-type': 'application/json' },
-      payload: { therapistId, slotId: slot.id, consentAccepted: true },
-    });
-    const bookingId = bookRes.json().id;
-    await app.inject({
-      method: 'PATCH', url: `/bookings/${bookingId}/respond`,
-      headers: { authorization: `Bearer ${therapistToken}`, 'content-type': 'application/json' },
-      payload: { action: 'CONFIRM' },
-    });
-
-    const cancelRes = await app.inject({
-      method: 'PATCH', url: `/bookings/${bookingId}/therapist-cancel`,
-      headers: { authorization: `Bearer ${therapistToken}`, 'content-type': 'application/json' },
-      payload: { cancelReason: 'Krankheitsbedingt' },
-    });
-    expect(cancelRes.statusCode).toBe(200);
-    expect(cancelRes.json().cancelReason).toBe('Krankheitsbedingt');
-    expect(cancelRes.json().cancelledBy).toBe('THERAPIST');
-
-    const incoming = await app.inject({
-      method: 'GET', url: '/bookings/incoming',
-      headers: { authorization: `Bearer ${therapistToken}` },
-    });
-    const incomingBooking = incoming.json().find((b: { id: string }) => b.id === bookingId);
-    expect(incomingBooking.cancelReason).toBe('Krankheitsbedingt');
-
-    const patientUser = await prisma.user.findUnique({ where: { email: 'slot-patient@test.de' } });
-    const patientDetail = await app.inject({
-      method: 'GET', url: `/therapist/patients/${patientUser!.id}`,
-      headers: { authorization: `Bearer ${therapistToken}` },
-    });
-    const appointment = patientDetail.json().appointments.find((a: { id: string }) => a.id === bookingId);
-    expect(appointment.cancelReason).toBe('Krankheitsbedingt');
-  });
-
-  it('PATCH /bookings/:id/respond CONFIRM — booking confirmed, slot stays BOOKED', async () => {
-    const slot = await createFutureSlot();
-    const bookRes = await app.inject({
-      method: 'POST', url: '/bookings',
-      headers: { authorization: `Bearer ${patientToken}`, 'content-type': 'application/json' },
-      payload: { therapistId, slotId: slot.id, consentAccepted: true },
-    });
-
-    const confirmRes = await app.inject({
-      method: 'PATCH', url: `/bookings/${bookRes.json().id}/respond`,
-      headers: { authorization: `Bearer ${therapistToken}`, 'content-type': 'application/json' },
-      payload: { action: 'CONFIRM' },
-    });
-    expect(confirmRes.statusCode).toBe(200);
-    expect(confirmRes.json().status).toBe('CONFIRMED');
-    expect(confirmRes.json().confirmedSlotAt).toBeTruthy();
-
-    const updatedSlot = await prisma.therapistSlot.findUnique({ where: { id: slot.id } });
-    expect(updatedSlot?.status).toBe('BOOKED');
-  });
-
-  it('PATCH /bookings/:id/respond DECLINE — booking declined, slot released', async () => {
-    const slot = await createFutureSlot();
-    const bookRes = await app.inject({
-      method: 'POST', url: '/bookings',
-      headers: { authorization: `Bearer ${patientToken}`, 'content-type': 'application/json' },
-      payload: { therapistId, slotId: slot.id, consentAccepted: true },
-    });
-
-    const declineRes = await app.inject({
-      method: 'PATCH', url: `/bookings/${bookRes.json().id}/respond`,
-      headers: { authorization: `Bearer ${therapistToken}`, 'content-type': 'application/json' },
-      payload: { action: 'DECLINE', declinedReason: 'Keine Kapazität' },
-    });
-    expect(declineRes.statusCode).toBe(200);
-    expect(declineRes.json().status).toBe('DECLINED');
-
-    const updatedSlot = await prisma.therapistSlot.findUnique({ where: { id: slot.id } });
-    expect(updatedSlot?.status).toBe('AVAILABLE');
-  });
-
-  it('Expiry — expired PENDING booking releases slot', async () => {
-    const slot = await createFutureSlot();
-    const booking = await prisma.bookingRequest.create({
-      data: {
-        therapistId,
-        slotId: slot.id,
-        status: 'PENDING',
-        patientName: 'Test',
-        patientEmail: 'test@x.de',
-        consentAcceptedAt: new Date(),
-        responseDueAt: new Date(Date.now() - 1000),
-      },
-    });
-    await prisma.therapistSlot.update({ where: { id: slot.id }, data: { status: 'BOOKED' } });
-
-    await app.inject({
-      method: 'GET', url: `/bookings/incoming`,
-      headers: { authorization: `Bearer ${therapistToken}` },
-    });
-
-    const updatedBooking = await prisma.bookingRequest.findUnique({ where: { id: booking.id } });
-    expect(updatedBooking?.status).toBe('EXPIRED');
-
-    const updatedSlot = await prisma.therapistSlot.findUnique({ where: { id: slot.id } });
-    expect(updatedSlot?.status).toBe('AVAILABLE');
-  });
-
-  it('DELETE /therapist/slots/:id — therapist can delete own AVAILABLE slot', async () => {
-    const slot = await createFutureSlot();
     const res = await app.inject({
-      method: 'DELETE', url: `/therapist/slots/${slot.id}`,
+      method: 'DELETE', url: `/therapist/blocked-times/${created.id}`,
       headers: { authorization: `Bearer ${therapistToken}` },
     });
     expect(res.statusCode).toBe(200);
     expect(res.json().deleted).toBe(true);
   });
 
-  it('DELETE /therapist/slots/:id — cannot delete BOOKED slot', async () => {
-    const slot = await createFutureSlot({ status: 'BOOKED' });
+  // ── /therapists/:id/available-slots ──────────────────────────────────────
+
+  it('GET /therapists/:id/available-slots — gibt live berechnete Zeitfenster zurück', async () => {
+    const day = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000);
+    day.setHours(0, 0, 0, 0);
+    await prisma.therapistWorkingHoursRule.create({
+      data: {
+        therapistId,
+        weekday: day.getDay(),
+        startMinute: 8 * 60,
+        endMinute: 10 * 60,
+      },
+    });
+
+    await prisma.heilmittelOption.upsert({
+      where: { key: 'KG' },
+      create: { key: 'KG', label: 'KG', defaultDurationMin: 20 },
+      update: { defaultDurationMin: 20 },
+    });
+
+    const from = day.toISOString();
+    const to = new Date(day.getTime() + 24 * 60 * 60 * 1000).toISOString();
     const res = await app.inject({
-      method: 'DELETE', url: `/therapist/slots/${slot.id}`,
-      headers: { authorization: `Bearer ${therapistToken}` },
+      method: 'GET',
+      url: `/therapists/${therapistId}/available-slots?heilmittel=KG&from=${from}&to=${to}`,
+    });
+    expect(res.statusCode).toBe(200);
+    // 08:00–10:00 à 20 Min → 6 Slots
+    expect(res.json().slots.length).toBeGreaterThanOrEqual(6);
+    expect(res.json().slots[0].startsAt).toBeTruthy();
+    expect(res.json().slots[0].endsAt).toBeTruthy();
+  });
+
+  it('GET /therapists/:id/available-slots — erfordert heilmittel-Parameter', async () => {
+    const res = await app.inject({
+      method: 'GET', url: `/therapists/${therapistId}/available-slots`,
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  // ── POST /bookings (dynamisch) ────────────────────────────────────────────
+
+  it('POST /bookings — bucht Zeitfenster atomisch (startsAt)', async () => {
+    const startsAt = futureStartsAt().toISOString();
+
+    const res = await app.inject({
+      method: 'POST', url: '/bookings',
+      headers: { authorization: `Bearer ${patientToken}`, 'content-type': 'application/json' },
+      payload: { therapistId, startsAt, heilmittel: 'KG', consentAccepted: true },
+    });
+    expect(res.statusCode).toBe(201);
+    expect(res.json().startsAt).toBeTruthy();
+    expect(res.json().endsAt).toBeTruthy();
+
+    const created = await prisma.bookingRequest.findUnique({ where: { id: res.json().id } });
+    expect(created?.startsAt).toBeInstanceOf(Date);
+  });
+
+  it('POST /bookings — speichert heilmittel + kassenart', async () => {
+    const startsAt = futureStartsAt().toISOString();
+    const res = await app.inject({
+      method: 'POST', url: '/bookings',
+      headers: { authorization: `Bearer ${patientToken}`, 'content-type': 'application/json' },
+      payload: { therapistId, startsAt, heilmittel: 'KG', kassenart: 'gesetzlich', consentAccepted: true },
+    });
+    expect(res.statusCode).toBe(201);
+    const created = await prisma.bookingRequest.findUnique({ where: { id: res.json().id } });
+    expect(created?.heilmittel).toBe('KG');
+    expect(created?.kassenart).toBe('gesetzlich');
+  });
+
+  it('POST /bookings — lehnt Heilmittel ab, das der Therapeut nicht anbietet', async () => {
+    const res = await app.inject({
+      method: 'POST', url: '/bookings',
+      headers: { authorization: `Bearer ${patientToken}`, 'content-type': 'application/json' },
+      payload: { therapistId, startsAt: futureStartsAt().toISOString(), heilmittel: 'MLD', consentAccepted: true },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('POST /bookings — lehnt unapproved Therapeuten ab', async () => {
+    await prisma.therapist.update({ where: { id: therapistId }, data: { reviewStatus: 'PENDING_REVIEW' } });
+    const res = await app.inject({
+      method: 'POST', url: '/bookings',
+      headers: { authorization: `Bearer ${patientToken}`, 'content-type': 'application/json' },
+      payload: { therapistId, startsAt: futureStartsAt().toISOString(), heilmittel: 'KG', consentAccepted: true },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('POST /bookings — Doppelbuchung desselben Zeitfensters liefert 409', async () => {
+    const startsAt = futureStartsAt().toISOString();
+
+    await app.inject({
+      method: 'POST', url: '/bookings',
+      headers: { authorization: `Bearer ${patientToken}`, 'content-type': 'application/json' },
+      payload: { therapistId, startsAt, heilmittel: 'KG', consentAccepted: true },
+    });
+
+    const patient2 = await prisma.user.create({
+      data: { email: 'dyn-patient2@test.de', passwordHash: 'x', role: 'patient', sessionToken: 'dyn-patient2-token', emailVerifiedAt: new Date() },
+    });
+    const res2 = await app.inject({
+      method: 'POST', url: '/bookings',
+      headers: { authorization: 'Bearer dyn-patient2-token', 'content-type': 'application/json' },
+      payload: { therapistId, startsAt, heilmittel: 'KG', consentAccepted: true },
+    });
+    expect(res2.statusCode).toBe(409);
+  });
+
+  it('POST /bookings — lehnt Zeitfenster innerhalb einer Blockzeit ab', async () => {
+    const startsAt = futureStartsAt();
+    const endsAt = new Date(startsAt.getTime() + 2 * 60 * 60 * 1000);
+    await prisma.therapistBlockedTime.create({
+      data: { therapistId, startsAt, endsAt },
+    });
+
+    const res = await app.inject({
+      method: 'POST', url: '/bookings',
+      headers: { authorization: `Bearer ${patientToken}`, 'content-type': 'application/json' },
+      payload: { therapistId, startsAt: startsAt.toISOString(), heilmittel: 'KG', consentAccepted: true },
     });
     expect(res.statusCode).toBe(409);
   });
 
-  it('POST /therapist/slots/bulk-delete — deletes multiple AVAILABLE slots in one call', async () => {
-    const slotA = await createFutureSlot({ startsAt: new Date(Date.now() + 24 * 60 * 60 * 1000) });
-    const slotB = await createFutureSlot({ startsAt: new Date(Date.now() + 48 * 60 * 60 * 1000) });
-    const slotC = await createFutureSlot({ startsAt: new Date(Date.now() + 72 * 60 * 60 * 1000) });
+  // ── Respond / Cancel ──────────────────────────────────────────────────────
 
+  async function createDynBooking(offsetHours = 48) {
+    const startsAt = futureStartsAt(offsetHours);
     const res = await app.inject({
-      method: 'POST', url: '/therapist/slots/bulk-delete',
-      headers: { authorization: `Bearer ${therapistToken}`, 'content-type': 'application/json' },
-      payload: { slotIds: [slotA.id, slotB.id, slotC.id] },
+      method: 'POST', url: '/bookings',
+      headers: { authorization: `Bearer ${patientToken}`, 'content-type': 'application/json' },
+      payload: { therapistId, startsAt: startsAt.toISOString(), heilmittel: 'KG', consentAccepted: true },
     });
+    return res.json().id as string;
+  }
 
+  it('PATCH /bookings/:id/respond CONFIRM — Buchung wird bestätigt', async () => {
+    const bookingId = await createDynBooking();
+    const res = await app.inject({
+      method: 'PATCH', url: `/bookings/${bookingId}/respond`,
+      headers: { authorization: `Bearer ${therapistToken}`, 'content-type': 'application/json' },
+      payload: { action: 'CONFIRM' },
+    });
     expect(res.statusCode).toBe(200);
-    const body = res.json();
-    expect(body.deletedIds.sort()).toEqual([slotA.id, slotB.id, slotC.id].sort());
-    expect(body.skipped).toHaveLength(0);
-
-    const remaining = await prisma.therapistSlot.findMany({ where: { therapistId } });
-    expect(remaining).toHaveLength(0);
+    expect(res.json().status).toBe('CONFIRMED');
+    expect(res.json().confirmedSlotAt).toBeTruthy();
   });
 
-  it('POST /therapist/slots/bulk-delete — skips a BOOKED slot but still deletes the rest', async () => {
-    const free = await createFutureSlot({ startsAt: new Date(Date.now() + 24 * 60 * 60 * 1000) });
-    const booked = await createFutureSlot({ startsAt: new Date(Date.now() + 48 * 60 * 60 * 1000), status: 'BOOKED' });
-
+  it('PATCH /bookings/:id/respond DECLINE — Buchung wird abgelehnt', async () => {
+    const bookingId = await createDynBooking();
     const res = await app.inject({
-      method: 'POST', url: '/therapist/slots/bulk-delete',
+      method: 'PATCH', url: `/bookings/${bookingId}/respond`,
       headers: { authorization: `Bearer ${therapistToken}`, 'content-type': 'application/json' },
-      payload: { slotIds: [free.id, booked.id] },
+      payload: { action: 'DECLINE', declinedReason: 'Keine Kapazität' },
     });
-
     expect(res.statusCode).toBe(200);
-    const body = res.json();
-    expect(body.deletedIds).toEqual([free.id]);
-    expect(body.skipped).toEqual([{ id: booked.id, reason: 'booked' }]);
-
-    const stillThere = await prisma.therapistSlot.findUnique({ where: { id: booked.id } });
-    expect(stillThere).not.toBeNull();
+    expect(res.json().status).toBe('DECLINED');
+    expect(res.json().declinedReason).toBe('Keine Kapazität');
   });
 
-  it("POST /therapist/slots/bulk-delete — skips slot ids that aren't this therapist's", async () => {
-    const own = await createFutureSlot({ startsAt: new Date(Date.now() + 24 * 60 * 60 * 1000) });
-    const otherTherapist = await prisma.therapist.create({
-      data: {
-        email: 'other-slot-therapist@test.de', fullName: 'Andere Therapeutin',
-        professionalTitle: 'Physiotherapeutin', city: 'Berlin',
-        specializations: 'Sport', languages: 'Deutsch',
-        reviewStatus: 'APPROVED', isVisible: true,
-        bookingMode: 'FIRST_APPOINTMENT_REQUEST', sessionToken: 'other-slot-therapist-token',
-      },
-    });
-    const notMine = await prisma.therapistSlot.create({
-      data: { therapistId: otherTherapist.id, startsAt: new Date(Date.now() + 24 * 60 * 60 * 1000), status: 'AVAILABLE' },
-    });
-
+  it('PATCH /bookings/:id/cancel — PENDING stornieren braucht keinen Grund', async () => {
+    const bookingId = await createDynBooking();
     const res = await app.inject({
-      method: 'POST', url: '/therapist/slots/bulk-delete',
-      headers: { authorization: `Bearer ${therapistToken}`, 'content-type': 'application/json' },
-      payload: { slotIds: [own.id, notMine.id, 'does-not-exist'] },
+      method: 'PATCH', url: `/bookings/${bookingId}/cancel`,
+      headers: { authorization: `Bearer ${patientToken}` },
     });
-
     expect(res.statusCode).toBe(200);
-    const body = res.json();
-    expect(body.deletedIds).toEqual([own.id]);
-    expect(body.skipped.sort((a: { id: string }, b: { id: string }) => a.id.localeCompare(b.id))).toEqual(
-      [{ id: notMine.id, reason: 'not_found' }, { id: 'does-not-exist', reason: 'not_found' }].sort((a, b) => a.id.localeCompare(b.id)),
-    );
+    expect(res.json().status).toBe('CANCELLED');
+    expect(res.json().cancelledBy).toBe('PATIENT');
 
-    const otherSlotStillThere = await prisma.therapistSlot.findUnique({ where: { id: notMine.id } });
-    expect(otherSlotStillThere).not.toBeNull();
+    // Nach Stornierung ist dasselbe Zeitfenster wieder buchbar (DECLINED-Buchung
+    // zählt nicht mehr als Overlap).
+    const rebookRes = await app.inject({
+      method: 'POST', url: '/bookings',
+      headers: { authorization: `Bearer ${patientToken}`, 'content-type': 'application/json' },
+      payload: { therapistId, startsAt: futureStartsAt().toISOString(), heilmittel: 'KG', consentAccepted: true },
+    });
+    expect(rebookRes.statusCode).toBe(201);
   });
 
-  it('Legacy booking without slotId remains readable', async () => {
-    const legacy = await prisma.bookingRequest.create({
-      data: {
-        therapistId,
-        status: 'PENDING',
-        patientName: 'Legacy Patient',
-        patientEmail: 'legacy@test.de',
-        preferredDays: 'Montag',
-        preferredTimeWindows: 'Vormittag',
-        consentAcceptedAt: new Date(),
-        responseDueAt: new Date(Date.now() + 86400000),
-      },
+  it('PATCH /bookings/:id/cancel — CONFIRMED stornieren erfordert Grund', async () => {
+    const bookingId = await createDynBooking(48);
+    await app.inject({
+      method: 'PATCH', url: `/bookings/${bookingId}/respond`,
+      headers: { authorization: `Bearer ${therapistToken}`, 'content-type': 'application/json' },
+      payload: { action: 'CONFIRM' },
     });
 
-    const res = await app.inject({
+    const noReason = await app.inject({
+      method: 'PATCH', url: `/bookings/${bookingId}/cancel`,
+      headers: { authorization: `Bearer ${patientToken}` },
+    });
+    expect(noReason.statusCode).toBe(400);
+
+    const withReason = await app.inject({
+      method: 'PATCH', url: `/bookings/${bookingId}/cancel`,
+      headers: { authorization: `Bearer ${patientToken}`, 'content-type': 'application/json' },
+      payload: { cancelReason: 'Ich bin verhindert' },
+    });
+    expect(withReason.statusCode).toBe(200);
+    expect(withReason.json().cancelReason).toBe('Ich bin verhindert');
+    expect(withReason.json().cancelledAt).toBeTruthy();
+  });
+
+  it('PATCH /bookings/:id/therapist-cancel — erfordert Grund', async () => {
+    const bookingId = await createDynBooking(48);
+    await app.inject({
+      method: 'PATCH', url: `/bookings/${bookingId}/respond`,
+      headers: { authorization: `Bearer ${therapistToken}`, 'content-type': 'application/json' },
+      payload: { action: 'CONFIRM' },
+    });
+
+    const noReason = await app.inject({
+      method: 'PATCH', url: `/bookings/${bookingId}/therapist-cancel`,
+      headers: { authorization: `Bearer ${therapistToken}` },
+    });
+    expect(noReason.statusCode).toBe(400);
+
+    const withReason = await app.inject({
+      method: 'PATCH', url: `/bookings/${bookingId}/therapist-cancel`,
+      headers: { authorization: `Bearer ${therapistToken}`, 'content-type': 'application/json' },
+      payload: { cancelReason: 'Krankheitsbedingt' },
+    });
+    expect(withReason.statusCode).toBe(200);
+    expect(withReason.json().cancelReason).toBe('Krankheitsbedingt');
+    expect(withReason.json().cancelledBy).toBe('THERAPIST');
+
+    const incoming = await app.inject({
       method: 'GET', url: '/bookings/incoming',
       headers: { authorization: `Bearer ${therapistToken}` },
     });
-    expect(res.statusCode).toBe(200);
-    const found = res.json().find((b: { id: string }) => b.id === legacy.id);
-    expect(found).toBeTruthy();
-    expect(found.slot).toBeNull();
+    const found = incoming.json().find((b: { id: string }) => b.id === bookingId);
+    expect(found.cancelReason).toBe('Krankheitsbedingt');
+  });
+
+  it('Expiry — abgelaufene PENDING-Buchung wird auf EXPIRED gesetzt', async () => {
+    const startsAt = futureStartsAt();
+    const booking = await prisma.bookingRequest.create({
+      data: {
+        therapistId,
+        status: 'PENDING',
+        patientName: 'Test',
+        patientEmail: 'test@x.de',
+        startsAt,
+        endsAt: new Date(startsAt.getTime() + 20 * 60_000),
+        confirmedSlotAt: startsAt,
+        consentAcceptedAt: new Date(),
+        responseDueAt: new Date(Date.now() - 1000), // bereits abgelaufen
+      },
+    });
+
+    // Expiry wird beim nächsten List-Call getriggert
+    await app.inject({
+      method: 'GET', url: '/bookings/incoming',
+      headers: { authorization: `Bearer ${therapistToken}` },
+    });
+
+    const updated = await prisma.bookingRequest.findUnique({ where: { id: booking.id } });
+    expect(updated?.status).toBe('EXPIRED');
+
+    // Nach Ablauf muss dasselbe Zeitfenster wieder buchbar sein
+    const rebookRes = await app.inject({
+      method: 'POST', url: '/bookings',
+      headers: { authorization: `Bearer ${patientToken}`, 'content-type': 'application/json' },
+      payload: { therapistId, startsAt: startsAt.toISOString(), heilmittel: 'KG', consentAccepted: true },
+    });
+    expect(rebookRes.statusCode).toBe(201);
   });
 });
 
@@ -3279,16 +3106,14 @@ describe('Therapist Working Hours', () => {
 
   afterEach(async () => {
     await prisma.bookingRequest.deleteMany();
-    await prisma.therapistSlot.deleteMany();
     await prisma.therapistWorkingHoursRule.deleteMany();
   });
 
   function mondayRule(overrides: Record<string, unknown> = {}) {
     return {
       weekday: 1,
-      startMinute: 9 * 60,
-      endMinute: 9 * 60,
-      durationMin: 20,
+      startMinute: 8 * 60,
+      endMinute: 12 * 60,
       ...overrides,
     };
   }
@@ -3302,7 +3127,7 @@ describe('Therapist Working Hours', () => {
     expect(res.json().rules).toEqual([]);
   });
 
-  it('PUT /therapist/working-hours — saves rules and materializes future AVAILABLE slots', async () => {
+  it('PUT /therapist/working-hours — saves rules and returns them (kein Slot-Materialisierer mehr)', async () => {
     const res = await app.inject({
       method: 'PUT', url: '/therapist/working-hours',
       headers: { authorization: `Bearer ${therapistToken}`, 'content-type': 'application/json' },
@@ -3311,15 +3136,10 @@ describe('Therapist Working Hours', () => {
     expect(res.statusCode).toBe(200);
     const body = res.json();
     expect(body.rules).toHaveLength(1);
-    expect(body.materialized.created).toBeGreaterThan(0);
-
-    const slots = await prisma.therapistSlot.findMany({ where: { therapistId } });
-    expect(slots.length).toBe(body.materialized.created);
-    slots.forEach((s) => {
-      expect(s.source).toBe('WORKING_HOURS');
-      expect(s.status).toBe('AVAILABLE');
-      expect(s.workingHoursRuleId).toBe(body.rules[0].id);
-    });
+    expect(body.rules[0].weekday).toBe(1);
+    expect(body.rules[0].startMinute).toBe(8 * 60);
+    // Kein 'materialized'-Feld mehr — Slots werden live berechnet
+    expect(body.materialized).toBeUndefined();
   });
 
   it('PUT /therapist/working-hours — rejects therapists without an approved/active booking mode', async () => {
@@ -3341,65 +3161,33 @@ describe('Therapist Working Hours', () => {
     expect(res.statusCode).toBe(400);
   });
 
-  it('PUT /therapist/working-hours — re-saving the same rules converges to the same slot count', async () => {
-    const first = await app.inject({
-      method: 'PUT', url: '/therapist/working-hours',
-      headers: { authorization: `Bearer ${therapistToken}`, 'content-type': 'application/json' },
-      payload: { rules: [mondayRule()] },
-    });
-    const firstCount = await prisma.therapistSlot.count({ where: { therapistId } });
-
-    // Each PUT prunes its own previously-generated AVAILABLE slots before
-    // regenerating, so re-saving identical rules must land on the exact same
-    // resulting slot count rather than accumulating duplicates.
-    const second = await app.inject({
-      method: 'PUT', url: '/therapist/working-hours',
-      headers: { authorization: `Bearer ${therapistToken}`, 'content-type': 'application/json' },
-      payload: { rules: [mondayRule()] },
-    });
-    const secondCount = await prisma.therapistSlot.count({ where: { therapistId } });
-
-    expect(first.statusCode).toBe(200);
-    expect(second.statusCode).toBe(200);
-    expect(secondCount).toBe(firstCount);
-  });
-
-  it('PUT /therapist/working-hours — changing rules never touches an already-BOOKED slot', async () => {
+  it('PUT /therapist/working-hours — re-saving replaces the rule set', async () => {
     await app.inject({
       method: 'PUT', url: '/therapist/working-hours',
       headers: { authorization: `Bearer ${therapistToken}`, 'content-type': 'application/json' },
       payload: { rules: [mondayRule()] },
     });
 
-    const aSlot = await prisma.therapistSlot.findFirst({ where: { therapistId, source: 'WORKING_HOURS' } });
-    expect(aSlot).toBeTruthy();
-    await prisma.therapistSlot.update({ where: { id: aSlot!.id }, data: { status: 'BOOKED' } });
-
-    // Replace with a completely different rule (Tuesday instead of Monday) —
-    // the old Monday-derived slot must survive untouched because it's BOOKED.
-    const res = await app.inject({
+    const second = await app.inject({
       method: 'PUT', url: '/therapist/working-hours',
       headers: { authorization: `Bearer ${therapistToken}`, 'content-type': 'application/json' },
       payload: { rules: [mondayRule({ weekday: 2 })] },
     });
-    expect(res.statusCode).toBe(200);
+    expect(second.statusCode).toBe(200);
+    expect(second.json().rules).toHaveLength(1);
+    expect(second.json().rules[0].weekday).toBe(2);
 
-    const stillThere = await prisma.therapistSlot.findUnique({ where: { id: aSlot!.id } });
-    expect(stillThere).not.toBeNull();
-    expect(stillThere?.status).toBe('BOOKED');
+    const rules = await prisma.therapistWorkingHoursRule.findMany({ where: { therapistId } });
+    expect(rules).toHaveLength(1);
+    expect(rules[0].weekday).toBe(2);
   });
 
-  it('PUT /therapist/working-hours — empty rules array clears rules and prunes future AVAILABLE slots, but keeps BOOKED ones', async () => {
+  it('PUT /therapist/working-hours — empty array clears all rules', async () => {
     await app.inject({
       method: 'PUT', url: '/therapist/working-hours',
       headers: { authorization: `Bearer ${therapistToken}`, 'content-type': 'application/json' },
       payload: { rules: [mondayRule()] },
     });
-
-    const generated = await prisma.therapistSlot.findMany({ where: { therapistId, source: 'WORKING_HOURS' } });
-    expect(generated.length).toBeGreaterThan(1);
-    const booked = generated[0];
-    await prisma.therapistSlot.update({ where: { id: booked.id }, data: { status: 'BOOKED' } });
 
     const res = await app.inject({
       method: 'PUT', url: '/therapist/working-hours',
@@ -3409,34 +3197,8 @@ describe('Therapist Working Hours', () => {
     expect(res.statusCode).toBe(200);
     expect(res.json().rules).toEqual([]);
 
-    const remaining = await prisma.therapistSlot.findMany({ where: { therapistId } });
-    expect(remaining).toHaveLength(1);
-    expect(remaining[0].id).toBe(booked.id);
-    expect(remaining[0].status).toBe('BOOKED');
-
     const remainingRules = await prisma.therapistWorkingHoursRule.findMany({ where: { therapistId } });
     expect(remainingRules).toEqual([]);
-  });
-
-  it('materializeWorkingHours — re-running without pruning does not duplicate already-materialized slots', async () => {
-    await prisma.therapistWorkingHoursRule.create({
-      data: { therapistId, weekday: 1, startMinute: 9 * 60, endMinute: 9 * 60, durationMin: 20 },
-    });
-
-    const first = await materializeWorkingHours(app, therapistId);
-    expect(first.created).toBeGreaterThan(0);
-    const countAfterFirst = await prisma.therapistSlot.count({ where: { therapistId } });
-    expect(countAfterFirst).toBe(first.created);
-
-    // Simulates the periodic top-up job running again later without a
-    // preceding prune — must recognize the already-materialized slots and
-    // skip them rather than failing or duplicating.
-    const second = await materializeWorkingHours(app, therapistId);
-    const countAfterSecond = await prisma.therapistSlot.count({ where: { therapistId } });
-
-    expect(second.created).toBe(0);
-    expect(second.skipped).toBe(first.created);
-    expect(countAfterSecond).toBe(countAfterFirst);
   });
 });
 

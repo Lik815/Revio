@@ -28,10 +28,7 @@ export function TherapistProfileScreen() {
   const { toastMsg, toastAnim, showToast } = useToast();
 
   const [therapist, setTherapist] = useState(initialTherapist);
-  const [availableSlots, setAvailableSlots] = useState([]);
-  const [slotsLoading, setSlotsLoading] = useState(false);
   const [showBookingForm, setShowBookingForm] = useState(false);
-  const [selectedSlotId, setSelectedSlotId] = useState(null);
 
   const { favorites, loadFavorites, toggleFavorite, isFavorite } = useFavorites({
     authToken,
@@ -43,9 +40,8 @@ export function TherapistProfileScreen() {
     if (authToken) loadFavorites(authToken);
   }, [authToken]);
 
-  // initialTherapist (from the search result) is shown immediately as a fallback,
-  // but is always replaced by a fresh fetch — search results can lag behind the
-  // therapist's current profile (bio, specializations, slots, etc.).
+  // initialTherapist (aus dem Suchergebnis) wird sofort angezeigt,
+  // aber immer durch einen frischen API-Call ersetzt.
   useEffect(() => {
     if (!therapistId) return;
     fetch(`${getBaseUrl()}/therapist/${therapistId}`, { headers: { ...TUNNEL_HEADERS } })
@@ -57,34 +53,12 @@ export function TherapistProfileScreen() {
       .catch(() => {});
   }, [therapistId]);
 
-  const loadAvailableSlots = async (id) => {
-    setSlotsLoading(true);
-    try {
-      const res = await fetch(`${getBaseUrl()}/therapists/${id}/slots`, {
-        headers: { ...TUNNEL_HEADERS },
-      });
-      setAvailableSlots(res.ok ? ((await res.json()).slots ?? []) : []);
-    } catch {
-      setAvailableSlots([]);
-    } finally {
-      setSlotsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (therapist?.bookingMode === 'FIRST_APPOINTMENT_REQUEST') loadAvailableSlots(therapist.id);
-  }, [therapist?.id, therapist?.bookingMode]);
-
   const handleBookingRequest = (th) => {
     if (!authToken) {
       navigation.navigate(ROOT_ROUTES.MAIN_TABS, { screen: TAB_ROUTES.AUTH });
       return;
     }
-    if (th) {
-      loadAvailableSlots(th.id);
-      setSelectedSlotId(th.selectedSlotId ?? null);
-      setShowBookingForm(true);
-    }
+    if (th) setShowBookingForm(true);
   };
 
   const callPhone = (phone) => {
@@ -108,7 +82,7 @@ export function TherapistProfileScreen() {
         authToken={authToken}
         accountType={accountType}
         onBookingRequest={handleBookingRequest}
-        availableSlots={availableSlots}
+        availableSlots={[]}
       />
 
       <Modal
@@ -120,16 +94,13 @@ export function TherapistProfileScreen() {
         <BookingRequestForm
           c={c}
           t={t}
-          therapist={selectedSlotId ? { ...therapist, selectedSlotId } : therapist}
+          therapist={therapist}
           authToken={authToken}
-          availableSlots={availableSlots}
-          slotsLoading={slotsLoading}
           onSuccess={() => {
             setShowBookingForm(false);
             navigation.navigate(ROOT_ROUTES.MAIN_TABS, { screen: TAB_ROUTES.THERAPY });
           }}
           onClose={() => setShowBookingForm(false)}
-          onReloadSlots={() => loadAvailableSlots(therapist.id)}
         />
       </Modal>
 

@@ -320,7 +320,6 @@ const mapApiTherapist = (t) => ({
   website: t.website ?? '',
   bookingMode: t.bookingMode ?? 'DIRECTORY_ONLY',
   requestable: t.requestable ?? false,
-  nextFreeSlotAt: t.nextFreeSlotAt ?? null,
 });
 
 const normalizeTherapistProfile = (therapist) => {

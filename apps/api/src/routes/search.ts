@@ -5,6 +5,7 @@ import { normalizeText, scoreMatch, levenshtein } from '../utils/search-utils.js
 import { getTherapistPublicationState, getTherapistRequestabilityState } from '../utils/profile-completeness.js';
 import { expireStaleBookings } from '../utils/booking-expiry.js';
 import { normalizeKassenarten } from '../utils/kassenarten.js';
+import { generateAvailableSlots } from '../utils/slot-generator.js';
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
@@ -338,7 +339,6 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
         practices,
         bookingMode: tAny.bookingMode ?? 'DIRECTORY_ONLY',
         requestable: requestability.requestable,
-        nextFreeSlotAt: tAny.nextFreeSlotAt?.toISOString?.() ?? tAny.nextFreeSlotAt ?? null,
         cityMatch,
         radiusMatch,
         // Neue Felder für mobile Therapeuten
@@ -420,30 +420,7 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
         photo: t.photo ?? undefined, practices,
         bookingMode: (t as any).bookingMode ?? 'DIRECTORY_ONLY',
         requestable: requestability.requestable,
-        nextFreeSlotAt: (t as any).nextFreeSlotAt?.toISOString?.() ?? null,
       },
-    };
-  });
-
-  // ── GET /therapists/:id/slots ─────────────────────────────────────────────
-
-  fastify.get('/therapists/:id/slots', async (request, reply) => {
-    const { id } = request.params as { id: string };
-    await expireStaleBookings(fastify, { therapistId: id });
-    const now = new Date();
-    const slots = await fastify.prisma.therapistSlot.findMany({
-      where: { therapistId: id, status: 'AVAILABLE', startsAt: { gt: now } },
-      orderBy: { startsAt: 'asc' },
-      take: 20,
-    });
-    return {
-      slots: slots.map((s) => ({
-        id: s.id,
-        therapistId: s.therapistId,
-        startsAt: s.startsAt.toISOString(),
-        durationMin: s.durationMin,
-        status: s.status,
-      })),
     };
   });
 
@@ -573,5 +550,36 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
     });
 
     return { practices };
+  });
+
+  // ── GET /therapists/:id/available-slots ──────────────────────────────────
+  // Dynamisch berechnete Zeitfenster für eine Leistung — kein DB-Eintrag.
+  fastify.get('/therapists/:id/available-slots', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const { heilmittel, from, to } = request.query as { heilmittel?: string; from?: string; to?: string };
+
+    if (!heilmittel) {
+      return reply.status(400).send({ error: 'Parameter "heilmittel" ist erforderlich.' });
+    }
+
+    const now = new Date();
+    const fromDate = from ? new Date(from) : now;
+    const toDate = to ? new Date(to) : new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
+
+    if (fromDate >= toDate) {
+      return reply.status(400).send({ error: '"from" muss vor "to" liegen.' });
+    }
+    if (toDate.getTime() - fromDate.getTime() > 90 * 24 * 60 * 60 * 1000) {
+      return reply.status(400).send({ error: 'Zeitraum darf maximal 90 Tage betragen.' });
+    }
+
+    const slots = await generateAvailableSlots(fastify, id, heilmittel, { from: fromDate, to: toDate }, now);
+
+    return {
+      slots: slots.map((s) => ({
+        startsAt: s.startsAt.toISOString(),
+        endsAt: s.endsAt.toISOString(),
+      })),
+    };
   });
 };

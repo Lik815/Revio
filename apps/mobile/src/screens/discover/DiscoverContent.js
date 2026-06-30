@@ -24,18 +24,6 @@ import {
 } from '../../utils/app-utils';
 import { AccountHeader } from '../../components/AccountHeader';
 
-function formatNextSlot(isoString) {
-  if (!isoString) return null;
-  const d = new Date(isoString);
-  const now = new Date();
-  const diffDays = Math.floor((d - now) / 86400000);
-  const timeStr = d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-  if (diffDays < 0) return null;
-  if (diffDays === 0) return `Heute · ${timeStr} Uhr`;
-  if (diffDays === 1) return `Morgen · ${timeStr} Uhr`;
-  return `${d.toLocaleDateString('de-DE', { weekday: 'short' })} · ${timeStr} Uhr`;
-}
-
 // ── Map platform split ──────────────────────────────────────────────────────
 // Native (iOS / Android): real react-native-maps
 //   iOS  → Apple Maps / MapKit   (no API key required)
@@ -755,7 +743,6 @@ export function DiscoverContent(props) {
       ))}
 
       {viewMode === 'list' && !searchLoading && safeResults.map((therapist, index) => {
-        const nextSlot = formatNextSlot(therapist.nextFreeSlotAt);
         const spec = (therapist.specializations ?? [])[0] ?? null;
         const initials = (therapist.fullName ?? '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
 
@@ -851,12 +838,6 @@ export function DiscoverContent(props) {
                     {therapist.city ?? '—'}{therapist.distKm != null ? ` · ${formatDist(therapist.distKm)}` : ''}
                   </Text>
                 </View>
-                {nextSlot ? (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1 }}>
-                    <Ionicons name="calendar-outline" size={13} color={c.success} />
-                    <Text style={{ fontSize: 13, color: c.success, fontWeight: '500' }} numberOfLines={1}>{nextSlot}</Text>
-                  </View>
-                ) : null}
               </View>
               {therapist.phone ? (
                 <Pressable
