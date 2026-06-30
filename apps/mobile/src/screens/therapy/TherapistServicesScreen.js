@@ -23,6 +23,9 @@ export function TherapistServicesScreen({ c, authToken, onBack }) {
 
   useEffect(() => {
     let cancelled = false;
+    // Fallback: after 5 s stop waiting for config options even if still empty,
+    // so the screen never spins forever on a slow/failing /config/options call.
+    const configTimeout = setTimeout(() => { if (!cancelled) setLoading(false); }, 5000);
     fetch(`${getBaseUrl()}/therapist/services`, {
       headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
     })
@@ -36,8 +39,8 @@ export function TherapistServicesScreen({ c, authToken, onBack }) {
         setServices(map);
       })
       .catch(() => {})
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
+      .finally(() => { if (!cancelled) { clearTimeout(configTimeout); setLoading(false); } });
+    return () => { cancelled = true; clearTimeout(configTimeout); };
   }, [authToken]);
 
   const saveService = async (heilmittelKey, durationMin, isActive) => {
@@ -72,9 +75,15 @@ export function TherapistServicesScreen({ c, authToken, onBack }) {
     <View style={{ flex: 1, backgroundColor: c.background }}>
       <BackButton onPress={onBack} c={c} label="Leistungen" />
 
-      {loading || heilmittelOptions.length === 0 ? (
+      {loading ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator color={c.primary} />
+        </View>
+      ) : heilmittelOptions.length === 0 ? (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+          <Text style={{ fontSize: 14, color: c.muted, textAlign: 'center' }}>
+            Heilmittel konnten nicht geladen werden. Bitte versuche es erneut.
+          </Text>
         </View>
       ) : (
         <ScrollView

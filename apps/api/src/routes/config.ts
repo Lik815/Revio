@@ -64,9 +64,12 @@ export const configRoutes: FastifyPluginAsync = async (fastify) => {
       orderBy: [{ sortOrder: 'asc' }, { label: 'asc' }],
     });
 
+    // Explizit selektieren, damit kein SELECT * entsteht — rückwärtskompatibel
+    // mit Production-DBs, auf denen defaultDurationMin noch nicht migriert ist.
     const heilmittel = await fastify.prisma.heilmittelOption.findMany({
       where: { isActive: true },
       orderBy: [{ sortOrder: 'asc' }, { label: 'asc' }],
+      select: { key: true, label: true },
     });
 
     try {
