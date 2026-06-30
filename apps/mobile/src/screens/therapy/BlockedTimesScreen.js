@@ -171,7 +171,7 @@ export function BlockedTimesScreen({ c, authToken, onBack }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: c.background }}>
-      <BackButton onBack={onBack} c={c} title="Blockzeiten" />
+      <BackButton onPress={onBack} c={c} label="Blockzeiten" />
 
       {loading ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>

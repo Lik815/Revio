@@ -70,9 +70,9 @@ export function TherapistServicesScreen({ c, authToken, onBack }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: c.background }}>
-      <BackButton onBack={onBack} c={c} title="Leistungen" />
+      <BackButton onPress={onBack} c={c} label="Leistungen" />
 
-      {loading ? (
+      {loading || heilmittelOptions.length === 0 ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator color={c.primary} />
         </View>
