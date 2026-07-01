@@ -66,13 +66,8 @@ export function Sidebar({
           <div>
             <div className="kicker">Revio Admin</div>
             <h1 className="sidebar-title">Cockpit</h1>
-            <p className="sidebar-copy">Prüfen, freigeben und sauber steuern.</p>
+            <p className="sidebar-copy">Prüfen und freigeben.</p>
           </div>
-        </div>
-
-        <div className="sidebar-health">
-          <span className="sidebar-health__dot" />
-          <span>Live Moderation</span>
         </div>
 
         <nav className="sidebar-nav" aria-label="Admin Navigation">

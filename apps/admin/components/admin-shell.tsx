@@ -28,22 +28,12 @@ export function AdminShell({
       <main className="main">
         <div className="desktop-commandbar">
           <div>
-            <div className="command-eyebrow">
-              <span className="command-live-dot" />
-              Admin Bereich
-            </div>
+            <div className="command-eyebrow">Admin Bereich</div>
             <div className="command-title">Revio Verwaltung</div>
           </div>
-          <div className="command-search" aria-hidden="true">
-            <span>Suche, Profile, Einstellungen</span>
-            <kbd>/</kbd>
-          </div>
-          <div className="command-user">
-            <span>{adminUser.name.slice(0, 1)}</span>
-            <div>
-              <strong>{adminUser.name}</strong>
-              <small>{adminUser.role}</small>
-            </div>
+          <div className="command-meta">
+            <strong>{adminUser.name}</strong>
+            <span>{adminUser.role}</span>
           </div>
         </div>
 
