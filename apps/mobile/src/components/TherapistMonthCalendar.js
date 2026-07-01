@@ -189,12 +189,8 @@ export function TherapistMonthCalendar({
                     const durationLabel = durationMin < 60 ? `${durationMin} Min` : (() => { const h = Math.floor(durationMin / 60); const m = durationMin % 60; return m === 0 ? `${h} Std` : `${h} Std ${m} Min`; })();
 
                     if (item.kind === 'free') {
-                      return (
-                        <View key={`free-${idx}`} style={{ paddingVertical: 8, paddingHorizontal: 12, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: c.border, backgroundColor: c.background, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                          <View style={{ width: 7, height: 7, borderRadius: 4, borderWidth: 2, borderColor: c.success ?? '#5A9E8E' }} />
-                          <Text style={{ fontSize: 13, color: c.muted }}>{startTime} · Frei · {durationLabel}</Text>
-                        </View>
-                      );
+                      const height = Math.min(Math.max(24, durationMin * 0.8), 120);
+                      return <View key={`free-${idx}`} style={{ height }} />;
                     }
                     if (item.kind === 'blocked') {
                       return (

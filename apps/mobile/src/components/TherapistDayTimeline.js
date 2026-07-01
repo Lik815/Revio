@@ -37,27 +37,9 @@ function HourBlock({ c, hour, items, onOpenBooking }) {
           const duration = formatDuration(item.startsAt, item.endsAt);
 
           if (item.kind === 'free') {
-            return (
-              <View
-                key={`free-${idx}`}
-                style={{
-                  paddingVertical: 8,
-                  paddingHorizontal: 12,
-                  borderRadius: RADIUS.sm,
-                  borderWidth: 1,
-                  borderColor: c.border,
-                  backgroundColor: c.background,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 6,
-                }}
-              >
-                <View style={{ width: 7, height: 7, borderRadius: 4, borderWidth: 2, borderColor: c.success ?? '#5A9E8E' }} />
-                <Text style={{ fontSize: 13, color: c.muted }}>
-                  {startTime} · Frei · {duration}
-                </Text>
-              </View>
-            );
+            const durationMin = Math.round((new Date(item.endsAt) - new Date(item.startsAt)) / 60_000);
+            const height = Math.min(Math.max(24, durationMin * 0.8), 120);
+            return <View key={`free-${idx}`} style={{ height }} />;
           }
 
           if (item.kind === 'blocked') {
