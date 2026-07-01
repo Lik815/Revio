@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getBaseUrl, RADIUS, TUNNEL_HEADERS } from '../../utils/app-utils';
 import { useConfigOptions } from '../../hooks/use-config-options';
+import { appStoreSelectors, useAppStore } from '../../store/useStore';
 import { useToast } from '../../hooks/use-toast';
 import { ToastOverlay } from '../../components/ToastOverlay';
 import { BackButton } from '../../components/BackButton';
@@ -15,7 +16,15 @@ import { BackButton } from '../../components/BackButton';
 export function TherapistServicesScreen({ c, authToken, onBack }) {
   const insets = useSafeAreaInsets();
   const { heilmittelOptions } = useConfigOptions();
+  const loggedInTherapist = useAppStore(appStoreSelectors.loggedInTherapist);
   const { toastMsg, toastAnim, showToast } = useToast();
+
+  // Nur Heilmittel anzeigen, die der/die Therapeut:in auch im Profil anbietet.
+  const ownHeilmittel = (loggedInTherapist?.heilmittel ?? []);
+  const ownSet = new Set(Array.isArray(ownHeilmittel) ? ownHeilmittel : String(ownHeilmittel).split(',').map(s => s.trim()).filter(Boolean));
+  const filteredHeilmittelOptions = heilmittelOptions.filter(
+    (opt) => ownSet.has(opt.key) || ownSet.has(opt.label),
+  );
 
   const [services, setServices] = useState({});      // { heilmittelKey: { durationMin, isActive } }
   const [loading, setLoading] = useState(true);
@@ -95,7 +104,7 @@ export function TherapistServicesScreen({ c, authToken, onBack }) {
             Zeitfenster, die zu ihrer gewählten Leistung und deiner Dauer passen.
           </Text>
 
-          {(heilmittelOptions ?? []).map((opt) => {
+          {filteredHeilmittelOptions.map((opt) => {
             const current = services[opt.key];
             const isActive = current?.isActive ?? false;
             const durationMin = String(current?.durationMin ?? 20);
