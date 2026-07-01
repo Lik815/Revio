@@ -487,6 +487,8 @@ export {
   getIsoWeekNumber,
   bookingToCalendarItem,
   activeBookingItems,
+  computeDayPeriods,
+  hasWorkingHoursOnDay,
 };
 
 function formatDayHeader(isoString, locale = 'de-DE') {
@@ -537,6 +539,94 @@ function bookingToCalendarItem(b) {
     : (b?.slot?.durationMin ?? 20);
   const kind = b?.status === 'PENDING' ? 'requested' : 'booked';
   return { booking: b, startsAt, endsAt, durationMin, kind };
+}
+
+// Gibt true zurück, wenn für das gegebene Datum aktive Arbeitszeiten vorliegen.
+function hasWorkingHoursOnDay(rules, date) {
+  if (!Array.isArray(rules) || !date) return false;
+  const weekday = date.getDay();
+  return rules.some((r) => {
+    if (!r.isActive || r.weekday !== weekday) return false;
+    if (r.effectiveFrom && new Date(r.effectiveFrom) > date) return false;
+    if (r.effectiveUntil && new Date(r.effectiveUntil) < date) return false;
+    return true;
+  });
+}
+
+// Berechnet alle Zeitabschnitte eines Tages aus Arbeitszeit-Regeln, Blockzeiten
+// und Buchungen. Gibt eine sortierte Liste zurück:
+//   kind: 'free' | 'blocked' | 'booked' | 'requested'
+// Die freien Lücken zwischen blockierten/gebuchten Zeiten werden als 'free'
+// eingefügt, damit der Therapeut die gesamte Arbeitszeit im Blick hat.
+function computeDayPeriods(rules, blockedTimes, bookings, date) {
+  if (!date || !Array.isArray(rules)) return [];
+  const weekday = date.getDay();
+
+  const activeRules = rules.filter((r) => {
+    if (!r.isActive || r.weekday !== weekday) return false;
+    if (r.effectiveFrom && new Date(r.effectiveFrom) > date) return false;
+    if (r.effectiveUntil && new Date(r.effectiveUntil) < date) return false;
+    return true;
+  });
+  if (activeRules.length === 0) return [];
+
+  const result = [];
+
+  for (const rule of activeRules) {
+    const windowStart = new Date(date);
+    windowStart.setHours(Math.floor(rule.startMinute / 60), rule.startMinute % 60, 0, 0);
+    const windowEnd = new Date(date);
+    windowEnd.setHours(Math.floor(rule.endMinute / 60), rule.endMinute % 60, 0, 0);
+    if (windowEnd <= windowStart) continue;
+
+    // Alle "belegten" Zeiträume innerhalb des Fensters sammeln
+    const occupied = [];
+
+    (Array.isArray(blockedTimes) ? blockedTimes : []).forEach((bt) => {
+      const s = new Date(bt.startsAt);
+      const e = new Date(bt.endsAt);
+      if (s >= windowEnd || e <= windowStart) return;
+      occupied.push({
+        startsAt: new Date(Math.max(s.getTime(), windowStart.getTime())),
+        endsAt: new Date(Math.min(e.getTime(), windowEnd.getTime())),
+        kind: 'blocked',
+        blockedTime: bt,
+      });
+    });
+
+    (Array.isArray(bookings) ? bookings : [])
+      .filter((b) => b?.status === 'PENDING' || b?.status === 'CONFIRMED')
+      .forEach((b) => {
+        const rawStart = b?.startsAt ?? b?.confirmedSlotAt ?? b?.slot?.startsAt;
+        if (!rawStart) return;
+        const s = new Date(rawStart);
+        const e = b?.endsAt ? new Date(b.endsAt) : new Date(s.getTime() + 20 * 60_000);
+        if (s >= windowEnd || e <= windowStart) return;
+        occupied.push({
+          startsAt: new Date(Math.max(s.getTime(), windowStart.getTime())),
+          endsAt: new Date(Math.min(e.getTime(), windowEnd.getTime())),
+          kind: b.status === 'PENDING' ? 'requested' : 'booked',
+          booking: b,
+        });
+      });
+
+    occupied.sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
+
+    // Lücken als 'free' auffüllen
+    let cursor = windowStart.getTime();
+    for (const occ of occupied) {
+      if (occ.startsAt.getTime() > cursor + 60_000) {
+        result.push({ startsAt: new Date(cursor), endsAt: occ.startsAt, kind: 'free' });
+      }
+      result.push(occ);
+      cursor = Math.max(cursor, occ.endsAt.getTime());
+    }
+    if (cursor < windowEnd.getTime() - 60_000) {
+      result.push({ startsAt: new Date(cursor), endsAt: windowEnd, kind: 'free' });
+    }
+  }
+
+  return result.sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
 }
 
 // Aktive Kalender-Termine (nur PENDING + CONFIRMED), nach startsAt sortiert.

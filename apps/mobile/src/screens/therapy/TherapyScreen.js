@@ -314,6 +314,7 @@ export function TherapyTabScreen() {
     return (
       <>
         <TherapyTabTherapist
+          authToken={authToken}
           incomingBookings={incomingBookings}
           incomingBookingsLoading={incomingBookingsLoading}
           therapyRefreshing={therapyRefreshing}

@@ -6,11 +6,14 @@ import { RADIUS } from '../utils/app-utils';
 export const TimelineSlotRow = React.memo(function TimelineSlotRow({
   c, time, kind, title, durationMin, onPress, onDelete, isDeleting,
 }) {
-  const dotColor = kind === 'requested' ? (c.warning ?? '#F2A900') : (c.success ?? '#5A9E8E');
+  const dotColor = kind === 'requested' ? (c.warning ?? '#F2A900')
+    : kind === 'blocked' ? (c.muted ?? '#9CA3AF')
+    : (c.success ?? '#5A9E8E');
   const dotFilled = kind !== 'free';
 
   const cardBg = kind === 'booked' ? (c.successBg ?? '#EAF4F1')
     : kind === 'requested' ? (c.warningBg ?? '#FEF5DC')
+    : kind === 'blocked' ? (c.mutedBg ?? '#F3F4F6')
     : c.card;
 
   const cardContent = (
@@ -42,7 +45,7 @@ export const TimelineSlotRow = React.memo(function TimelineSlotRow({
           borderColor: dotColor,
         }} />
       </View>
-      {kind === 'free' ? (
+      {kind === 'free' || kind === 'blocked' ? (
         <View
           style={{
             flex: 1,
@@ -58,13 +61,15 @@ export const TimelineSlotRow = React.memo(function TimelineSlotRow({
           }}
         >
           {cardContent}
-          {isDeleting ? (
-            <ActivityIndicator size="small" color={c.muted} />
-          ) : (
-            <Pressable onPress={onDelete} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Ionicons name="trash-outline" size={20} color={c.muted} />
-            </Pressable>
-          )}
+          {onDelete ? (
+            isDeleting ? (
+              <ActivityIndicator size="small" color={c.muted} />
+            ) : (
+              <Pressable onPress={onDelete} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Ionicons name="trash-outline" size={20} color={c.muted} />
+              </Pressable>
+            )
+          ) : null}
         </View>
       ) : (
         <Pressable

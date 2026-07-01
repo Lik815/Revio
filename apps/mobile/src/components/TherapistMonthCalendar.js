@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { RADIUS, SHADOW, isSameDay, startOfDay, activeBookingItems } from '../utils/app-utils';
+import { RADIUS, SHADOW, isSameDay, startOfDay, activeBookingItems, hasWorkingHoursOnDay, computeDayPeriods } from '../utils/app-utils';
 import { buildCalendar } from '../utils/recurring-slots';
 
 const WEEKDAY_LABELS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
@@ -10,7 +10,7 @@ const STATUS_RANK = { requested: 2, booked: 1 };
 // Monatskalender: markiert Tage mit Terminen und zeigt die Termine des
 // gewählten Tages. Quelle: incomingBookings (per startsAt) — keine Slots.
 export function TherapistMonthCalendar({
-  c, incomingBookings, selectedDate, onSelectDate,
+  c, incomingBookings, workingHoursRules = [], blockedTimes = [], selectedDate, onSelectDate,
   visibleMonth, onPrevMonth, onNextMonth, onPressList, onPressToday,
   onOpenBooking,
 }) {
@@ -18,18 +18,27 @@ export function TherapistMonthCalendar({
 
   const dayStatuses = useMemo(() => {
     const statusByDay = {};
+    // Buchungen eintragen
     items.forEach(({ startsAt, kind }) => {
       const d = new Date(startsAt);
       if (d.getFullYear() !== visibleMonth.year || d.getMonth() !== visibleMonth.month) return;
       const day = d.getDate();
       if ((STATUS_RANK[kind] ?? 0) > (STATUS_RANK[statusByDay[day]] ?? 0)) statusByDay[day] = kind;
     });
+    // Arbeitstage ohne Buchungen als 'free' markieren
+    const daysInMonth = new Date(visibleMonth.year, visibleMonth.month + 1, 0).getDate();
+    for (let day = 1; day <= daysInMonth; day++) {
+      if (statusByDay[day]) continue;
+      const date = new Date(visibleMonth.year, visibleMonth.month, day);
+      if (hasWorkingHoursOnDay(workingHoursRules, date)) statusByDay[day] = 'free';
+    }
     return statusByDay;
-  }, [items, visibleMonth.year, visibleMonth.month]);
+  }, [items, visibleMonth.year, visibleMonth.month, workingHoursRules]);
 
   const dotColorFor = (status) => ({
     requested: c.warning ?? '#B78700',
     booked: c.primary,
+    free: c.success ?? '#5A9E8E',
   }[status] ?? c.border);
 
   const rows = useMemo(() => {
@@ -45,9 +54,10 @@ export function TherapistMonthCalendar({
   );
   const today = startOfDay(new Date());
 
+  // Alle Perioden des ausgewählten Tages (Arbeitszeit + Blockzeiten + Buchungen)
   const dayRows = useMemo(
-    () => items.filter((it) => isSameDay(new Date(it.startsAt), selectedDate)),
-    [items, selectedDate],
+    () => computeDayPeriods(workingHoursRules, blockedTimes, incomingBookings, selectedDate),
+    [workingHoursRules, blockedTimes, incomingBookings, selectedDate],
   );
 
   const dayHeading = selectedDate.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
@@ -134,16 +144,44 @@ export function TherapistMonthCalendar({
         </View>
 
         {dayRows.length === 0 ? (
-          <Text style={{ fontSize: 13, color: c.muted }}>Keine Termine an diesem Tag.</Text>
+          <Text style={{ fontSize: 13, color: c.muted }}>Keine Arbeitszeit an diesem Tag.</Text>
         ) : (
-          dayRows.map(({ booking, startsAt, durationMin, kind }, index) => {
+          dayRows.map((period, index) => {
+            const { kind, startsAt, endsAt } = period;
             const time = new Date(startsAt).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-            const dotColor = kind === 'requested' ? (c.warning ?? '#B78700') : (c.success ?? '#5A9E8E');
-            const title = kind === 'requested' ? 'Neue Anfrage' : (booking?.patientName ?? 'Gebucht');
+            const durationMin = Math.round((new Date(endsAt) - new Date(startsAt)) / 60_000);
             const rowStyle = { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, borderTopWidth: index === 0 ? 0 : 1, borderTopColor: c.border };
 
+            if (kind === 'free') {
+              return (
+                <View key={`free-${index}`} style={rowStyle}>
+                  <View style={{ width: 9, height: 9, borderRadius: 4.5, borderWidth: 2, borderColor: c.success ?? '#5A9E8E', backgroundColor: 'transparent' }} />
+                  <Text style={{ width: 48, fontSize: 13, fontWeight: '600', color: c.muted }}>{time}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: c.text }}>Frei</Text>
+                    <Text style={{ fontSize: 12, color: c.muted, marginTop: 1 }}>{durationMin} Min</Text>
+                  </View>
+                </View>
+              );
+            }
+
+            if (kind === 'blocked') {
+              return (
+                <View key={`blocked-${index}`} style={rowStyle}>
+                  <View style={{ width: 9, height: 9, borderRadius: 4.5, backgroundColor: c.muted }} />
+                  <Text style={{ width: 48, fontSize: 13, fontWeight: '600', color: c.muted }}>{time}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: c.text }}>{period.blockedTime?.title ?? 'Blockiert'}</Text>
+                    <Text style={{ fontSize: 12, color: c.muted, marginTop: 1 }}>{durationMin} Min</Text>
+                  </View>
+                </View>
+              );
+            }
+
+            const dotColor = kind === 'requested' ? (c.warning ?? '#B78700') : (c.success ?? '#5A9E8E');
+            const title = kind === 'requested' ? 'Neue Anfrage' : (period.booking?.patientName ?? 'Gebucht');
             return (
-              <Pressable key={booking.id} onPress={() => onOpenBooking?.(booking)} style={rowStyle}>
+              <Pressable key={period.booking?.id ?? `booking-${index}`} onPress={() => onOpenBooking?.(period.booking)} style={rowStyle}>
                 <View style={{ width: 9, height: 9, borderRadius: 4.5, backgroundColor: dotColor }} />
                 <Text style={{ width: 48, fontSize: 13, fontWeight: '600', color: c.muted }}>{time}</Text>
                 <View style={{ flex: 1 }}>

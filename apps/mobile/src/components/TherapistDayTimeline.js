@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { RADIUS, SHADOW, isSameDay, activeBookingItems } from '../utils/app-utils';
+import { RADIUS, SHADOW, isSameDay, computeDayPeriods } from '../utils/app-utils';
 import { TimelineSlotRow } from './TimelineSlotRow';
 
 const shouldShowSectionLoading = (isLoading, lastLoadedAt) => isLoading && lastLoadedAt === 0;
@@ -10,16 +10,26 @@ const TIME_COL_WIDTH = 48;
 const DOT_COL_WIDTH = 24;
 const LINE_WIDTH = 2;
 
-// Tagesansicht: rendert die Termine (Buchungen) des gewählten Tages aus
-// incomingBookings (per startsAt) — keine freien Slots mehr.
+// Formatiert eine Zeitdauer in Minuten als lesbaren String.
+function formatDuration(startsAt, endsAt) {
+  const mins = Math.round((new Date(endsAt) - new Date(startsAt)) / 60_000);
+  if (mins < 60) return `${mins} Min`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return m === 0 ? `${h} Std` : `${h} Std ${m} Min`;
+}
+
+// Tagesansicht: zeigt die gesamte Arbeitszeit als Timeline, mit Buchungen,
+// Blockzeiten und freien Lücken darin.
 export function TherapistDayTimeline({
-  c, selectedDate, incomingBookings,
+  c, selectedDate, incomingBookings, workingHoursRules, blockedTimes,
   incomingBookingsLoading, incomingBookingsLastLoadedAt,
   onOpenBooking,
 }) {
-  const rows = useMemo(() => (
-    activeBookingItems(incomingBookings).filter((it) => isSameDay(new Date(it.startsAt), selectedDate))
-  ), [incomingBookings, selectedDate]);
+  const periods = useMemo(
+    () => computeDayPeriods(workingHoursRules, blockedTimes, incomingBookings, selectedDate),
+    [workingHoursRules, blockedTimes, incomingBookings, selectedDate],
+  );
 
   const dayHeading = useMemo(
     () => selectedDate.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }),
@@ -38,12 +48,14 @@ export function TherapistDayTimeline({
         <View style={{ alignItems: 'center', paddingVertical: 24 }}>
           <ActivityIndicator color={c.primary} />
         </View>
-      ) : rows.length === 0 ? (
+      ) : periods.length === 0 ? (
         <View style={{ alignItems: 'center', paddingVertical: 20 }}>
           <Ionicons name="calendar-outline" size={28} color={c.muted} style={{ marginBottom: 8 }} />
-          <Text style={{ fontSize: 14, fontWeight: '600', color: c.text, textAlign: 'center' }}>Keine Termine an diesem Tag</Text>
+          <Text style={{ fontSize: 14, fontWeight: '600', color: c.text, textAlign: 'center' }}>
+            Keine Arbeitszeit an diesem Tag
+          </Text>
           <Text style={{ fontSize: 13, color: c.muted, textAlign: 'center', marginTop: 4, lineHeight: 18 }}>
-            Wähle einen anderen Tag.
+            Lege Arbeitszeiten im Profil fest.
           </Text>
         </View>
       ) : (
@@ -59,19 +71,49 @@ export function TherapistDayTimeline({
               backgroundColor: c.border,
             }}
           />
-          {rows.map(({ booking, startsAt, durationMin, kind }) => {
-            const d = new Date(startsAt);
-            const time = d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-            const title = kind === 'requested' ? 'Neue Anfrage' : (booking?.patientName ?? 'Gebucht');
+          {periods.map((period, idx) => {
+            const time = new Date(period.startsAt).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+            const duration = formatDuration(period.startsAt, period.endsAt);
+
+            if (period.kind === 'free') {
+              return (
+                <TimelineSlotRow
+                  key={`free-${idx}`}
+                  c={c}
+                  time={time}
+                  kind="free"
+                  title="Frei"
+                  durationMin={Math.round((new Date(period.endsAt) - new Date(period.startsAt)) / 60_000)}
+                />
+              );
+            }
+
+            if (period.kind === 'blocked') {
+              return (
+                <TimelineSlotRow
+                  key={`blocked-${idx}`}
+                  c={c}
+                  time={time}
+                  kind="blocked"
+                  title={period.blockedTime?.title ?? 'Blockiert'}
+                  durationMin={Math.round((new Date(period.endsAt) - new Date(period.startsAt)) / 60_000)}
+                />
+              );
+            }
+
+            // booked / requested
+            const title = period.kind === 'requested'
+              ? 'Neue Anfrage'
+              : (period.booking?.patientName ?? 'Gebucht');
             return (
               <TimelineSlotRow
-                key={booking.id}
+                key={period.booking?.id ?? `booking-${idx}`}
                 c={c}
                 time={time}
-                kind={kind}
+                kind={period.kind}
                 title={title}
-                durationMin={durationMin}
-                onPress={() => onOpenBooking?.(booking)}
+                durationMin={Math.round((new Date(period.endsAt) - new Date(period.startsAt)) / 60_000)}
+                onPress={() => onOpenBooking?.(period.booking)}
               />
             );
           })}
