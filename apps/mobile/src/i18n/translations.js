@@ -51,7 +51,7 @@ export const translations = {
     tabNotifications: 'Mitteilungen',
     tabTherapist: 'Profil',
     tabProfile: 'Profil',
-    tabOptions: 'Optionen',
+    tabOptions: 'Konto',
     tabLogin: 'Anmelden',
     favoritesTitle: 'Favoriten',
     favoritesEmpty: 'Noch keine Favoriten',

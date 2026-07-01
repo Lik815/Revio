@@ -11,26 +11,7 @@ import { translations } from '../i18n/translations';
 
 const PILL_SIZE = 44;
 
-function TabIcon({ baseIcon, focused, color, routeName }) {
-  if (routeName === TAB_ROUTES.OPTIONS) {
-    return (
-      <View style={{ width: 28, height: 28, alignItems: 'center', justifyContent: 'center' }}>
-        <Ionicons
-          name={focused ? 'person' : 'person-outline'}
-          size={focused ? 24 : 21}
-          color={color}
-          style={{ marginRight: 4, includeFontPadding: false }}
-        />
-        <Ionicons
-          name={focused ? 'settings-sharp' : 'settings-outline'}
-          size={focused ? 15 : 13}
-          color={color}
-          style={{ position: 'absolute', right: 0, bottom: 1, includeFontPadding: false }}
-        />
-      </View>
-    );
-  }
-
+function TabIcon({ baseIcon, focused, color }) {
   return (
     <Ionicons
       name={focused ? baseIcon : `${baseIcon}-outline`}

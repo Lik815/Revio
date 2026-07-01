@@ -6,7 +6,7 @@ export const TAB_ICON_BY_ROUTE = {
   [TAB_ROUTES.FAVORITES]:  'heart',
   [TAB_ROUTES.CUSTOMERS]:  'people',
   [TAB_ROUTES.NOTIFICATIONS]: 'notifications',
-  [TAB_ROUTES.OPTIONS]:    'settings',
+  [TAB_ROUTES.OPTIONS]:    'person',
   [TAB_ROUTES.AUTH]:       'log-in',
 };
 
