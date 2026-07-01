@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { RADIUS, SHADOW, isSameDay, startOfDay, activeBookingItems, hasWorkingHoursOnDay, computeDayPeriods } from '../utils/app-utils';
+import { RADIUS, SHADOW, isSameDay, startOfDay, activeBookingItems, hasWorkingHoursOnDay, computeDayPeriods, splitAtHourBoundaries } from '../utils/app-utils';
 import { buildCalendar } from '../utils/recurring-slots';
 
 const WEEKDAY_LABELS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
@@ -54,11 +54,36 @@ export function TherapistMonthCalendar({
   );
   const today = startOfDay(new Date());
 
-  // Alle Perioden des ausgewählten Tages (Arbeitszeit + Blockzeiten + Buchungen)
-  const dayRows = useMemo(
+  const dayPeriods = useMemo(
     () => computeDayPeriods(workingHoursRules, blockedTimes, incomingBookings, selectedDate),
     [workingHoursRules, blockedTimes, incomingBookings, selectedDate],
   );
+
+  // Stündliches Raster für das Tagesdetail
+  const hourRows = useMemo(() => {
+    if (!dayPeriods.length) return [];
+    const weekday = selectedDate.getDay();
+    const activeRules = (Array.isArray(workingHoursRules) ? workingHoursRules : []).filter((r) => {
+      if (!r.isActive || r.weekday !== weekday) return false;
+      if (r.effectiveFrom && new Date(r.effectiveFrom) > selectedDate) return false;
+      if (r.effectiveUntil && new Date(r.effectiveUntil) < selectedDate) return false;
+      return true;
+    });
+    if (!activeRules.length) return [];
+    const startHour = Math.floor(Math.min(...activeRules.map((r) => r.startMinute)) / 60);
+    const endHour = Math.ceil(Math.max(...activeRules.map((r) => r.endMinute)) / 60);
+    const chunks = splitAtHourBoundaries(dayPeriods);
+    const byHour = {};
+    for (const chunk of chunks) {
+      const h = new Date(chunk.startsAt).getHours();
+      if (!byHour[h]) byHour[h] = [];
+      byHour[h].push(chunk);
+    }
+    return Array.from({ length: endHour - startHour }, (_, i) => {
+      const h = startHour + i;
+      return { hour: h, items: byHour[h] ?? [] };
+    });
+  }, [dayPeriods, selectedDate, workingHoursRules]);
 
   const dayHeading = selectedDate.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
@@ -136,60 +161,69 @@ export function TherapistMonthCalendar({
       <View style={{ backgroundColor: c.card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: c.border, padding: 16, marginTop: 16, ...SHADOW.card }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
           <Text style={{ fontSize: 15, fontWeight: '800', color: c.text, flex: 1 }}>{dayHeading}</Text>
-          {dayRows.length > 0 ? (
-            <Text style={{ fontSize: 13, fontWeight: '700', color: c.primary }}>
-              {dayRows.length} {dayRows.length === 1 ? 'Termin' : 'Termine'}
-            </Text>
-          ) : null}
+          {(() => {
+            const bookedCount = dayPeriods.filter((p) => p.kind === 'booked' || p.kind === 'requested').length;
+            return bookedCount > 0 ? (
+              <Text style={{ fontSize: 13, fontWeight: '700', color: c.primary }}>
+                {bookedCount} {bookedCount === 1 ? 'Termin' : 'Termine'}
+              </Text>
+            ) : null;
+          })()}
         </View>
 
-        {dayRows.length === 0 ? (
+        {hourRows.length === 0 ? (
           <Text style={{ fontSize: 13, color: c.muted }}>Keine Arbeitszeit an diesem Tag.</Text>
         ) : (
-          dayRows.map((period, index) => {
-            const { kind, startsAt, endsAt } = period;
-            const time = new Date(startsAt).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-            const durationMin = Math.round((new Date(endsAt) - new Date(startsAt)) / 60_000);
-            const rowStyle = { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, borderTopWidth: index === 0 ? 0 : 1, borderTopColor: c.border };
-
-            if (kind === 'free') {
-              return (
-                <View key={`free-${index}`} style={rowStyle}>
-                  <View style={{ width: 9, height: 9, borderRadius: 4.5, borderWidth: 2, borderColor: c.success ?? '#5A9E8E', backgroundColor: 'transparent' }} />
-                  <Text style={{ width: 48, fontSize: 13, fontWeight: '600', color: c.muted }}>{time}</Text>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 14, fontWeight: '700', color: c.text }}>Frei</Text>
-                    <Text style={{ fontSize: 12, color: c.muted, marginTop: 1 }}>{durationMin} Min</Text>
-                  </View>
-                </View>
-              );
-            }
-
-            if (kind === 'blocked') {
-              return (
-                <View key={`blocked-${index}`} style={rowStyle}>
-                  <View style={{ width: 9, height: 9, borderRadius: 4.5, backgroundColor: c.muted }} />
-                  <Text style={{ width: 48, fontSize: 13, fontWeight: '600', color: c.muted }}>{time}</Text>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 14, fontWeight: '700', color: c.text }}>{period.blockedTime?.title ?? 'Blockiert'}</Text>
-                    <Text style={{ fontSize: 12, color: c.muted, marginTop: 1 }}>{durationMin} Min</Text>
-                  </View>
-                </View>
-              );
-            }
-
-            const dotColor = kind === 'requested' ? (c.warning ?? '#B78700') : (c.success ?? '#5A9E8E');
-            const title = kind === 'requested' ? 'Neue Anfrage' : (period.booking?.patientName ?? 'Gebucht');
+          hourRows.map(({ hour, items }) => {
+            const hourLabel = `${String(hour).padStart(2, '0')}:00`;
             return (
-              <Pressable key={period.booking?.id ?? `booking-${index}`} onPress={() => onOpenBooking?.(period.booking)} style={rowStyle}>
-                <View style={{ width: 9, height: 9, borderRadius: 4.5, backgroundColor: dotColor }} />
-                <Text style={{ width: 48, fontSize: 13, fontWeight: '600', color: c.muted }}>{time}</Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 14, fontWeight: '700', color: c.text }}>{title}</Text>
-                  <Text style={{ fontSize: 12, color: c.muted, marginTop: 1 }}>{durationMin} Min</Text>
+              <View key={hour} style={{ marginBottom: 2 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: c.muted, width: 44, letterSpacing: 0.2 }}>{hourLabel}</Text>
+                  <View style={{ flex: 1, height: 1, backgroundColor: c.border }} />
                 </View>
-                <Ionicons name="chevron-forward" size={16} color={c.muted} />
-              </Pressable>
+                <View style={{ paddingLeft: 44, gap: 5, marginBottom: 6 }}>
+                  {items.map((item, idx) => {
+                    const startTime = new Date(item.startsAt).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+                    const durationMin = Math.round((new Date(item.endsAt) - new Date(item.startsAt)) / 60_000);
+                    const durationLabel = durationMin < 60 ? `${durationMin} Min` : (() => { const h = Math.floor(durationMin / 60); const m = durationMin % 60; return m === 0 ? `${h} Std` : `${h} Std ${m} Min`; })();
+
+                    if (item.kind === 'free') {
+                      return (
+                        <View key={`free-${idx}`} style={{ paddingVertical: 8, paddingHorizontal: 12, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: c.border, backgroundColor: c.background, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <View style={{ width: 7, height: 7, borderRadius: 4, borderWidth: 2, borderColor: c.success ?? '#5A9E8E' }} />
+                          <Text style={{ fontSize: 13, color: c.muted }}>{startTime} · Frei · {durationLabel}</Text>
+                        </View>
+                      );
+                    }
+                    if (item.kind === 'blocked') {
+                      return (
+                        <View key={`blocked-${idx}`} style={{ paddingVertical: 10, paddingHorizontal: 12, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: c.border, backgroundColor: c.mutedBg ?? '#F3F4F6' }}>
+                          <Text style={{ fontSize: 14, fontWeight: '700', color: c.text }}>{item.blockedTime?.title ?? 'Blockiert'}</Text>
+                          <Text style={{ fontSize: 12, color: c.muted, marginTop: 2 }}>{startTime} · {durationLabel}</Text>
+                        </View>
+                      );
+                    }
+                    const title = item.kind === 'requested' ? 'Neue Anfrage' : (item.booking?.patientName ?? 'Gebucht');
+                    const cardBg = item.kind === 'requested' ? (c.warningBg ?? '#FEF5DC') : (c.successBg ?? '#EAF4F1');
+                    return (
+                      <Pressable key={item.booking?.id ?? `booking-${idx}`} onPress={() => onOpenBooking?.(item.booking)} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10, paddingHorizontal: 12, borderRadius: RADIUS.sm, backgroundColor: cardBg }}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 14, fontWeight: '700', color: c.text }}>{title}</Text>
+                          <Text style={{ fontSize: 12, color: c.muted, marginTop: 2 }}>{startTime} · {durationLabel}</Text>
+                        </View>
+                        {item.kind === 'requested' ? (
+                          <View style={{ backgroundColor: c.warning ?? '#B78700', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, marginLeft: 8 }}>
+                            <Text style={{ fontSize: 10, fontWeight: '700', color: '#fff' }}>NEU</Text>
+                          </View>
+                        ) : (
+                          <Ionicons name="chevron-forward" size={16} color={c.muted} />
+                        )}
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
             );
           })
         )}

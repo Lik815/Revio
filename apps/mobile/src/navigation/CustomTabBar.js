@@ -11,6 +11,36 @@ import { translations } from '../i18n/translations';
 
 const PILL_SIZE = 44;
 
+function TabIcon({ baseIcon, focused, color, routeName }) {
+  if (routeName === TAB_ROUTES.OPTIONS) {
+    return (
+      <View style={{ width: 28, height: 28, alignItems: 'center', justifyContent: 'center' }}>
+        <Ionicons
+          name={focused ? 'person' : 'person-outline'}
+          size={focused ? 24 : 21}
+          color={color}
+          style={{ marginRight: 4, includeFontPadding: false }}
+        />
+        <Ionicons
+          name={focused ? 'settings-sharp' : 'settings-outline'}
+          size={focused ? 15 : 13}
+          color={color}
+          style={{ position: 'absolute', right: 0, bottom: 1, includeFontPadding: false }}
+        />
+      </View>
+    );
+  }
+
+  return (
+    <Ionicons
+      name={focused ? baseIcon : `${baseIcon}-outline`}
+      size={focused ? 27 : 20}
+      color={color}
+      style={{ includeFontPadding: false, textAlignVertical: 'center', textAlign: 'center' }}
+    />
+  );
+}
+
 export function CustomTabBar({ state, descriptors, navigation, badgeCounts = {} }) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
@@ -140,7 +170,6 @@ export function CustomTabBar({ state, descriptors, navigation, badgeCounts = {} 
             const { options } = descriptors[route.key];
             const focused = state.index === index;
             const baseIcon = TAB_ICON_BY_ROUTE[route.name] ?? 'ellipse';
-            const iconName = focused ? baseIcon : `${baseIcon}-outline`;
             const label = options.title ?? t[TAB_TRANSLATION_KEYS[route.name]] ?? route.name;
             const nestedState = route.state;
             const badgeCount = Number(badgeCounts[route.name] ?? 0);
@@ -174,11 +203,11 @@ export function CustomTabBar({ state, descriptors, navigation, badgeCounts = {} 
                 style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
               >
                 <View style={{ width: PILL_SIZE, height: PILL_SIZE, alignItems: 'center', justifyContent: 'center' }}>
-                  <Ionicons
-                    name={iconName}
-                    size={focused ? 27 : 20}
+                  <TabIcon
+                    baseIcon={baseIcon}
+                    focused={focused}
                     color={focused ? '#FFFFFF' : (c.textMuted ?? c.muted)}
-                    style={{ includeFontPadding: false, textAlignVertical: 'center', textAlign: 'center' }}
+                    routeName={route.name}
                   />
                   {badgeCount > 0 ? (
                     <View

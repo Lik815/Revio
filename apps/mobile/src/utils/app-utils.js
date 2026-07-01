@@ -489,6 +489,7 @@ export {
   activeBookingItems,
   computeDayPeriods,
   hasWorkingHoursOnDay,
+  splitAtHourBoundaries,
 };
 
 function formatDayHeader(isoString, locale = 'de-DE') {
@@ -627,6 +628,28 @@ function computeDayPeriods(rules, blockedTimes, bookings, date) {
   }
 
   return result.sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
+}
+
+// Teilt Perioden an vollen Stundengrenzen auf, sodass jeder Chunk genau in
+// eine Stunde fällt. Ergebnis ist nach startsAt sortiert, gleiche Reihenfolge
+// wie computeDayPeriods — nur feiner aufgeteilt.
+function splitAtHourBoundaries(periods) {
+  const result = [];
+  for (const period of periods) {
+    let s = new Date(period.startsAt).getTime();
+    const e = new Date(period.endsAt).getTime();
+    while (s < e) {
+      const nextHour = new Date(s);
+      nextHour.setMinutes(0, 0, 0);
+      if (nextHour.getTime() <= s) nextHour.setHours(nextHour.getHours() + 1);
+      const chunkEnd = Math.min(nextHour.getTime(), e);
+      if (chunkEnd - s >= 60_000) {
+        result.push({ ...period, startsAt: new Date(s).toISOString(), endsAt: new Date(chunkEnd).toISOString() });
+      }
+      s = chunkEnd;
+    }
+  }
+  return result;
 }
 
 // Aktive Kalender-Termine (nur PENDING + CONFIRMED), nach startsAt sortiert.

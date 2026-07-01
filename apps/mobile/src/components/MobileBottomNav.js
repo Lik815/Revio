@@ -3,6 +3,35 @@ import { Ionicons } from '@expo/vector-icons';
 import { Pressable, Text, View } from 'react-native';
 import { RADIUS } from '../utils/app-utils';
 
+function BottomNavIcon({ tab, active, color }) {
+  if (tab.key === 'options') {
+    return (
+      <View style={{ width: 24, height: 24, alignItems: 'center', justifyContent: 'center' }}>
+        <Ionicons
+          name={active ? 'person' : 'person-outline'}
+          size={22}
+          color={color}
+          style={{ marginRight: 4 }}
+        />
+        <Ionicons
+          name={active ? 'settings-sharp' : 'settings-outline'}
+          size={13}
+          color={color}
+          style={{ position: 'absolute', right: 0, bottom: 0 }}
+        />
+      </View>
+    );
+  }
+
+  return (
+    <Ionicons
+      name={active ? tab.icon : `${tab.icon}-outline`}
+      size={22}
+      color={color}
+    />
+  );
+}
+
 /**
  * Props:
  *   tabs           – array of { key, labelKey, icon }
@@ -55,11 +84,7 @@ export function MobileBottomNav({ tabs, activeTab, onTabPress, c, t, badgeCount 
               }}
             >
               <View style={{ position: 'relative' }}>
-                <Ionicons
-                  name={active ? tab.icon : `${tab.icon}-outline`}
-                  size={22}
-                  color={active ? c.primary : c.muted}
-                />
+                <BottomNavIcon tab={tab} active={active} color={active ? c.primary : c.muted} />
                 {showTabBadge && (
                   <View
                     style={{
