@@ -573,6 +573,25 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(400).send({ error: 'Zeitraum darf maximal 90 Tage betragen.' });
     }
 
+    // Sichtbarkeits- und Buchbarkeits-Checks — identisch zu GET /therapists/:id
+    const therapist = await fastify.prisma.therapist.findUnique({
+      where: { id },
+      include: {
+        links: { where: { status: 'CONFIRMED' }, include: { practice: true } },
+      },
+    });
+    if (!therapist) return reply.status(404).send({ error: 'Therapeut nicht gefunden.' });
+
+    const { publicSearchEligible } = getTherapistPublicationState(therapist, { links: therapist.links });
+    if (!publicSearchEligible) return reply.status(404).send({ error: 'Therapeut nicht gefunden.' });
+
+    const { requestable } = getTherapistRequestabilityState(therapist, { links: therapist.links });
+    if (!requestable) return reply.status(404).send({ error: 'Therapeut nicht buchbar.' });
+
+    if (!splitList(therapist.heilmittel ?? '').includes(heilmittel)) {
+      return reply.status(404).send({ error: 'Leistung wird von diesem Therapeuten nicht angeboten.' });
+    }
+
     const slots = await generateAvailableSlots(fastify, id, heilmittel, { from: fromDate, to: toDate }, now);
 
     return {

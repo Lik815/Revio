@@ -15,4 +15,4 @@ cmds = [
 # (z.B. Entfernen der alten TherapistSlot-Tabelle im dynamischen Buchungssystem)
 # nicht-interaktiv anwendet. Ohne das Flag verweigert db push die Sync und die
 # Prod-DB bleibt out of sync (fehlende Tabellen/Spalten → 500 P2021).
-cmd = "cd apps/api && npx prisma db push --schema prisma/schema.production.prisma --skip-generate --accept-data-loss && node dist/server.js"
+cmd = "cd apps/api && npx prisma db push --schema prisma/schema.production.prisma --skip-generate --accept-data-loss && TZ=Europe/Berlin node dist/server.js"

@@ -29,8 +29,6 @@ export type BookingMode = 'DIRECTORY_ONLY' | 'FIRST_APPOINTMENT_REQUEST';
 
 export type BookingRequestStatus = 'PENDING' | 'CONFIRMED' | 'DECLINED' | 'CANCELLED' | 'EXPIRED';
 
-export type SlotStatus = 'AVAILABLE' | 'BOOKED' | 'CANCELLED';
-
 export type AppFeedbackStatus = 'NEW' | 'RESOLVED';
 
 export interface AppFeedback {
@@ -42,22 +40,6 @@ export interface AppFeedback {
   createdAt: string;
   updatedAt: string;
   userId?: string | null;
-}
-
-export interface TherapistSlot {
-  id: string;
-  therapistId: string;
-  startsAt: string;
-  durationMin: number;
-  status: SlotStatus;
-  bookingId?: string | null;
-  createdAt: string;
-}
-
-export interface CreateTherapistSlotsResponse {
-  created: TherapistSlot[];
-  skipped: { startsAt: string; reason: 'duplicate' }[];
-  rejected: { startsAt: string; reason: 'past' }[];
 }
 
 // Recurring weekly working hours ("Arbeitszeiten"). See
@@ -90,13 +72,6 @@ export interface PutWorkingHoursResponse {
 export interface BookingRequest {
   id: string;
   therapistId: string;
-  slotId?: string | null;
-  slot?: {
-    id: string;
-    startsAt: string;
-    durationMin: number;
-    status: SlotStatus;
-  } | null;
   status: BookingRequestStatus;
   patientName: string;
   patientEmail?: string | null;

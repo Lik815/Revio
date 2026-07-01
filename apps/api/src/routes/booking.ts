@@ -7,6 +7,21 @@ import { sendPushNotification } from '../utils/push.js';
 import { expireStaleBookings } from '../utils/booking-expiry.js';
 import { generateAvailableSlots, resolveServiceConfig } from '../utils/slot-generator.js';
 
+// true auf PostgreSQL (prod), false auf SQLite (dev) — steuert Advisory-Lock-Nutzung.
+function isPostgres(): boolean {
+  const url = process.env.DATABASE_URL ?? '';
+  return url.startsWith('postgres://') || url.startsWith('postgresql://');
+}
+
+// djb2-Hash der therapistId → stabiler pg_advisory_xact_lock-Schlüssel pro Therapeut.
+function therapistLockId(therapistId: string): bigint {
+  let h = 5381;
+  for (let i = 0; i < therapistId.length; i++) {
+    h = ((Math.imul(33, h) ^ therapistId.charCodeAt(i)) >>> 0);
+  }
+  return BigInt(h);
+}
+
 async function resolvePatient(fastify: FastifyInstance, token: string) {
   const user = await fastify.prisma.user.findUnique({ where: { sessionToken: token } });
   if (!user || user.role !== 'patient') return null;
@@ -347,6 +362,12 @@ export async function bookingRoutes(fastify: FastifyInstance) {
 
     try {
       const result = await fastify.prisma.$transaction(async (tx) => {
+        // Advisory Lock: serialisiert gleichzeitige Buchungen desselben Therapeuten
+        // (nur PostgreSQL; SQLite überspringen — kein $queryRaw-Support für diese Syntax).
+        if (isPostgres()) {
+          await tx.$queryRaw`SELECT pg_advisory_xact_lock(${therapistLockId(therapistId)}::bigint)`;
+        }
+
         // Race-Condition-Schutz: Überschneidung mit bestehenden PENDING/CONFIRMED-Buchungen
         const bookingConflict = await tx.bookingRequest.findFirst({
           where: {

@@ -15,10 +15,13 @@ else
   exit 1
 fi
 
+export TZ=Europe/Berlin
+
 echo "Running prisma db push..."
-npx prisma db push --schema prisma/schema.production.prisma --accept-data-loss || {
-  echo "WARNING: prisma db push failed, starting server anyway..."
-}
+if ! npx prisma db push --schema prisma/schema.production.prisma --accept-data-loss; then
+  echo "ERROR: prisma db push failed — server wird nicht gestartet."
+  exit 1
+fi
 
 echo "Starting node server..."
 exec node dist/server.js

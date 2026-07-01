@@ -139,6 +139,67 @@ describe('Zwei überschneidende Regeln → keine Duplikate', () => {
   });
 });
 
+describe('slotIntervalMin: Schrittweite kleiner als Dauer (feineres Raster)', () => {
+  // KG 20 Min Dauer, aber Raster 10 Min → Startzeiten alle 10 Min, jeder Slot 20 Min lang.
+  // Buchbar: 08:00-08:20, 08:10-08:30, 08:20-08:40, … bis 11:40-12:00.
+  test('durationMin=20, stepMin=10 → 25 Slots à 10-Min-Raster in 08:00–12:00', () => {
+    const slots = computeAvailableSlots(
+      [rule()], [], [],
+      20, 10,
+      { from: new Date(2026, 6, 6, 0, 0), to: new Date(2026, 6, 6, 23, 59) },
+      new Date(2026, 6, 6, 7, 0),
+    );
+    // 08:00..11:40 im 10-Min-Raster → (240-20)/10 + 1 = 23 Slots
+    // (Fenster 08:00–12:00 = 240 Min, letzter Start = 11:40, (11:40-08:00)/10+1 = 23)
+    expect(slots).toHaveLength(23);
+    expect(hhmm(slots[0].startsAt)).toBe('08:00');
+    expect(hhmm(slots[1].startsAt)).toBe('08:10');
+    expect(hhmm(slots[slots.length - 1].startsAt)).toBe('11:40');
+  });
+
+  test('jeder Slot ist genau 20 Min lang', () => {
+    const slots = computeAvailableSlots(
+      [rule()], [], [],
+      20, 10,
+      { from: new Date(2026, 6, 6, 0, 0), to: new Date(2026, 6, 6, 23, 59) },
+      new Date(2026, 6, 6, 7, 0),
+    );
+    slots.forEach((s) => {
+      expect(s.endsAt.getTime() - s.startsAt.getTime()).toBe(20 * 60_000);
+    });
+  });
+
+  test('Blockzeit 10:00–10:30, Raster 10 Min: nächster Slot startet direkt 10:30', () => {
+    // Sequentielles Scheduling: Cursor springt auf overlap.endsAt (10:30), nicht auf den
+    // nächsten Raster-Tick vom letzten Grid (10:20 + 10 = 10:30 — hier identisch, aber
+    // bei unrunder Blockzeit z.B. 10:00–10:25 springt Cursor auf 10:25, nicht auf 10:30).
+    const slots = computeAvailableSlots(
+      [rule()],
+      [{ startsAt: new Date(2026, 6, 6, 10, 0), endsAt: new Date(2026, 6, 6, 10, 25) }],
+      [],
+      20, 10,
+      { from: new Date(2026, 6, 6, 0, 0), to: new Date(2026, 6, 6, 23, 59) },
+      new Date(2026, 6, 6, 7, 0),
+    );
+    const times = slots.map((s) => hhmm(s.startsAt));
+    // Sequentiell: nach 10:00–10:25 springt Cursor auf 10:25 → nächster Slot 10:25.
+    // Regulärer Grid-Tick wäre 10:30 (10:20 + 10), also beweist 10:25 das sequentielle Verhalten.
+    expect(times).toContain('10:25');
+    expect(times).toContain('10:35'); // 10:25 + 10min
+  });
+
+  test('stepMin=durationMin entspricht Standard-Verhalten (kein feineres Raster)', () => {
+    const withEqual = computeAvailableSlots(
+      [rule()], [], [],
+      20, 20,
+      { from: new Date(2026, 6, 6, 0, 0), to: new Date(2026, 6, 6, 23, 59) },
+      new Date(2026, 6, 6, 7, 0),
+    );
+    expect(withEqual.map((s) => hhmm(s.startsAt)))
+      .toEqual(['08:00', '08:20', '08:40', '09:00', '09:20', '09:40', '10:00', '10:20', '10:40', '11:00', '11:20', '11:40']);
+  });
+});
+
 describe('Mehrere Wochentage', () => {
   test('Mo+Di Regeln → Slots auf beiden Tagen', () => {
     const slots = computeAvailableSlots(

@@ -143,6 +143,10 @@ export async function resolveServiceConfig(
     durationMin = heilmittelOption?.defaultDurationMin ?? 20;
   }
 
+  // TODO bufferAfterMin: TherapistService.bufferAfterMin ist im Schema vorhanden, wird aber
+  // noch nicht angewendet. Plan: resolveServiceConfig um bufferAfterMin erweitern; in
+  // generateAvailableSlots existingBookings mit [startsAt, endsAt + buffer] als BlockedPeriod
+  // übergeben statt [startsAt, endsAt], sodass der nächste Slot erst nach dem Puffer beginnt.
   return {
     disabled: false,
     durationMin,
