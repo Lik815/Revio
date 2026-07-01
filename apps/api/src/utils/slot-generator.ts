@@ -106,6 +106,50 @@ export function computeAvailableSlots(
   });
 }
 
+export type ResolvedServiceConfig = {
+  // true, wenn eine TherapistService-Zeile existiert und explizit deaktiviert
+  // wurde — dann darf die Leistung weder Slots erzeugen noch gebucht werden.
+  disabled: boolean;
+  durationMin: number;
+  stepMin: number;
+};
+
+// Einheitliche Auflösung der Leistungsdauer — verwendet von generateAvailableSlots
+// UND POST /bookings, damit "Leistung deaktiviert" an genau einer Stelle definiert ist.
+// Regeln:
+//   - TherapistService-Zeile vorhanden & isActive=false → disabled (keine Slots).
+//   - TherapistService-Zeile vorhanden & isActive=true   → deren durationMin/slotIntervalMin.
+//   - keine Zeile (Leistung nur über therapist.heilmittel-CSV angeboten) → defaultDurationMin.
+export async function resolveServiceConfig(
+  fastify: FastifyInstance,
+  therapistId: string,
+  heilmittelKey: string,
+): Promise<ResolvedServiceConfig> {
+  const serviceConfig = await fastify.prisma.therapistService.findUnique({
+    where: { therapistId_heilmittelKey: { therapistId, heilmittelKey } },
+  });
+
+  if (serviceConfig && !serviceConfig.isActive) {
+    return { disabled: true, durationMin: 0, stepMin: 0 };
+  }
+
+  let durationMin: number;
+  if (serviceConfig && serviceConfig.durationMin > 0) {
+    durationMin = serviceConfig.durationMin;
+  } else {
+    const heilmittelOption = await fastify.prisma.heilmittelOption.findUnique({
+      where: { key: heilmittelKey },
+    });
+    durationMin = heilmittelOption?.defaultDurationMin ?? 20;
+  }
+
+  return {
+    disabled: false,
+    durationMin,
+    stepMin: serviceConfig?.slotIntervalMin ?? durationMin,
+  };
+}
+
 // DB-Wrapper: lädt alle benötigten Daten und ruft computeAvailableSlots auf.
 export async function generateAvailableSlots(
   fastify: FastifyInstance,
@@ -116,22 +160,9 @@ export async function generateAvailableSlots(
 ): Promise<AvailableSlotResult[]> {
   const { from, to } = range;
 
-  // 1. Dauer + Schrittweite aus TherapistService oder HeilmittelOption
-  const serviceConfig = await fastify.prisma.therapistService.findUnique({
-    where: { therapistId_heilmittelKey: { therapistId, heilmittelKey } },
-  });
-
-  let durationMin: number;
-  if (serviceConfig?.isActive && serviceConfig.durationMin > 0) {
-    durationMin = serviceConfig.durationMin;
-  } else {
-    const heilmittelOption = await fastify.prisma.heilmittelOption.findUnique({
-      where: { key: heilmittelKey },
-    });
-    durationMin = heilmittelOption?.defaultDurationMin ?? 20;
-  }
-
-  const stepMin = serviceConfig?.slotIntervalMin ?? durationMin;
+  // 1. Dauer + Schrittweite auflösen. Deaktivierte Leistung → keine Slots.
+  const { disabled, durationMin, stepMin } = await resolveServiceConfig(fastify, therapistId, heilmittelKey);
+  if (disabled) return [];
 
   // 2. Arbeitszeiten, Blockzeiten, bestehende Buchungen laden
   const [rules, blockedTimes, bookings] = await Promise.all([

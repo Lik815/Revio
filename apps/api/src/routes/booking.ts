@@ -5,7 +5,7 @@ import type {
 } from '@revio/shared';
 import { sendPushNotification } from '../utils/push.js';
 import { expireStaleBookings } from '../utils/booking-expiry.js';
-import { generateAvailableSlots } from '../utils/slot-generator.js';
+import { generateAvailableSlots, resolveServiceConfig } from '../utils/slot-generator.js';
 
 async function resolvePatient(fastify: FastifyInstance, token: string) {
   const user = await fastify.prisma.user.findUnique({ where: { sessionToken: token } });
@@ -320,18 +320,28 @@ export async function bookingRoutes(fastify: FastifyInstance) {
       return reply.status(400).send({ error: 'Der gewählte Termin liegt in der Vergangenheit.' });
     }
 
-    // Leistungsdauer ermitteln (analog zum Slot-Generator)
-    const serviceConfig = await fastify.prisma.therapistService.findUnique({
-      where: { therapistId_heilmittelKey: { therapistId, heilmittelKey: heilmittel } },
-    });
-    let durationMin: number;
-    if (serviceConfig?.isActive && serviceConfig.durationMin > 0) {
-      durationMin = serviceConfig.durationMin;
-    } else {
-      const option = await fastify.prisma.heilmittelOption.findUnique({ where: { key: heilmittel } });
-      durationMin = option?.defaultDurationMin ?? 20;
+    // Leistungsdauer auflösen (gleiche Logik wie der Slot-Generator).
+    // Deaktivierte Leistung → ablehnen.
+    const service = await resolveServiceConfig(fastify, therapistId, heilmittel);
+    if (service.disabled) {
+      return reply.status(400).send({ error: 'Diese Leistung ist aktuell nicht buchbar.' });
     }
-    const endsAt = new Date(startsAt.getTime() + durationMin * 60_000);
+    const endsAt = new Date(startsAt.getTime() + service.durationMin * 60_000);
+
+    // Server-seitige Validierung, dass startsAt wirklich ein buchbares Zeitfenster
+    // ist — deckt Arbeitszeit, Raster-Ausrichtung, Blockzeiten und bestehende
+    // Buchungen über dieselbe Single-Source-of-Truth ab (kein Buchen außerhalb
+    // der Arbeitszeit oder zu "krummen" Zeiten). Die verbindliche Overlap-Prüfung
+    // gegen Races passiert zusätzlich in der Transaktion unten.
+    const dayStart = new Date(startsAt);
+    dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(startsAt);
+    dayEnd.setHours(23, 59, 59, 999);
+    const daySlots = await generateAvailableSlots(fastify, therapistId, heilmittel, { from: dayStart, to: dayEnd }, now);
+    const isBookable = daySlots.some((s) => s.startsAt.getTime() === startsAt.getTime());
+    if (!isBookable) {
+      return reply.status(409).send({ error: 'Der gewählte Termin ist nicht (mehr) verfügbar.' });
+    }
 
     const patientName = `${patient.firstName ?? ''} ${patient.lastName ?? ''}`.trim() || patient.email;
 

@@ -2696,6 +2696,17 @@ describe('Dynamic Booking', () => {
     therapistToken = 'dyn-therapist-token';
     therapistId = therapist.id;
 
+    // Arbeitszeit für alle Wochentage 00:00–23:59, damit jede runde Stunde
+    // aus futureStartsAt() ein gültiges (buchbares) Zeitfenster ist.
+    await prisma.therapistWorkingHoursRule.createMany({
+      data: Array.from({ length: 7 }, (_, weekday) => ({
+        therapistId,
+        weekday,
+        startMinute: 0,
+        endMinute: 23 * 60 + 59,
+      })),
+    });
+
     await prisma.user.create({
       data: {
         email: 'dyn-patient@test.de',
@@ -2931,6 +2942,55 @@ describe('Dynamic Booking', () => {
       payload: { therapistId, startsAt: startsAt.toISOString(), heilmittel: 'KG', consentAccepted: true },
     });
     expect(res.statusCode).toBe(409);
+  });
+
+  it('POST /bookings — lehnt Termin außerhalb der Arbeitszeit ab', async () => {
+    // Arbeitszeit auf nur Montag beschränken, dann einen Nicht-Montag buchen
+    await prisma.therapistWorkingHoursRule.deleteMany({ where: { therapistId } });
+    await prisma.therapistWorkingHoursRule.create({
+      data: { therapistId, weekday: 1, startMinute: 8 * 60, endMinute: 12 * 60 },
+    });
+
+    // Nächsten Mittwoch 09:00 wählen (garantiert kein Montag)
+    const d = new Date();
+    d.setDate(d.getDate() + ((3 - d.getDay() + 7) % 7 || 7));
+    d.setHours(9, 0, 0, 0);
+
+    const res = await app.inject({
+      method: 'POST', url: '/bookings',
+      headers: { authorization: `Bearer ${patientToken}`, 'content-type': 'application/json' },
+      payload: { therapistId, startsAt: d.toISOString(), heilmittel: 'KG', consentAccepted: true },
+    });
+    expect(res.statusCode).toBe(409);
+  });
+
+  it('POST /bookings — lehnt deaktivierte Leistung ab (TherapistService isActive=false)', async () => {
+    await prisma.heilmittelOption.upsert({
+      where: { key: 'KG' },
+      create: { key: 'KG', label: 'KG', defaultDurationMin: 20 },
+      update: {},
+    });
+    await prisma.therapistService.create({
+      data: { therapistId, heilmittelKey: 'KG', durationMin: 20, isActive: false },
+    });
+
+    // available-slots muss leer sein
+    const day = futureStartsAt();
+    const from = new Date(day); from.setHours(0, 0, 0, 0);
+    const to = new Date(day); to.setHours(23, 59, 59, 999);
+    const slotsRes = await app.inject({
+      method: 'GET',
+      url: `/therapists/${therapistId}/available-slots?heilmittel=KG&from=${from.toISOString()}&to=${to.toISOString()}`,
+    });
+    expect(slotsRes.json().slots).toHaveLength(0);
+
+    // und Buchung wird abgelehnt
+    const res = await app.inject({
+      method: 'POST', url: '/bookings',
+      headers: { authorization: `Bearer ${patientToken}`, 'content-type': 'application/json' },
+      payload: { therapistId, startsAt: futureStartsAt().toISOString(), heilmittel: 'KG', consentAccepted: true },
+    });
+    expect(res.statusCode).toBe(400);
   });
 
   // ── Respond / Cancel ──────────────────────────────────────────────────────

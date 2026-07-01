@@ -101,6 +101,7 @@ Open only the focused doc you need:
 - `docs/design-system.md`: visual rules
 - `docs/email-setup.md`: email configuration
 - `docs/freelancer-first-appointment-mvp.md`: freelancer booking blueprint
+- `docs/dynamisches-buchungssystem.md`: dynamic time-slot booking (services, blocked times, slot generator)
 - `docs/plattform-architektur-reverse-engineering.md`: long-form architecture notes
 
 Treat `history.md` as archive only.
