@@ -3520,3 +3520,146 @@ describe('Session token expiry', () => {
     await prisma.user.delete({ where: { id: user.id } });
   });
 });
+
+// ─── E2E: Therapeut legt neue Terminzeiten an (kompletter Ablauf) ──────────────
+// Ein atomarer Test, der den echten HTTP-Fluss durchspielt:
+// Arbeitszeit → Leistungsdauer → Blockzeit → live berechnete Zeitfenster → Buchung
+// inkl. Ablehnungen (Doppelbuchung, außerhalb Arbeitszeit, Blockzeit, deaktiviert).
+describe('E2E — Therapeut legt neue Terminzeiten an', () => {
+  const FLOW_T = 'flow-therapist-token';
+  const FLOW_P = 'flow-patient-token';
+
+  function nextMonday() {
+    const d = new Date();
+    d.setDate(d.getDate() + (((1 - d.getDay() + 7) % 7) || 7));
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }
+  const at = (day: Date, h: number, m = 0) => {
+    const d = new Date(day); d.setHours(h, m, 0, 0); return d;
+  };
+  const hhmm = (iso: string) => {
+    const d = new Date(iso);
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  };
+
+  it('Arbeitszeit → Leistungsdauer → Blockzeit → buchbare Zeitfenster → Buchung', async () => {
+    const monday = nextMonday();
+
+    const therapist = await prisma.therapist.create({
+      data: {
+        email: 'flow-therapist@test.de', fullName: 'Flow Therapeutin',
+        professionalTitle: 'Physiotherapeutin', city: 'Berlin',
+        specializations: 'Rückenschmerzen', languages: 'Deutsch', heilmittel: 'KG,MT',
+        reviewStatus: 'APPROVED', isVisible: true,
+        bookingMode: 'FIRST_APPOINTMENT_REQUEST', sessionToken: FLOW_T,
+      },
+    });
+    const therapistId = therapist.id;
+    await prisma.user.create({
+      data: {
+        email: 'flow-patient@test.de', passwordHash: await hashPassword('test1234'),
+        role: 'patient', firstName: 'Flow', lastName: 'Patient',
+        phone: '+49 170 1234567', sessionToken: FLOW_P, emailVerifiedAt: new Date(),
+      },
+    });
+    await prisma.heilmittelOption.upsert({
+      where: { key: 'KG' },
+      create: { key: 'KG', label: 'KG', defaultDurationMin: 20 },
+      update: { defaultDurationMin: 20 },
+    });
+
+    const tH = { authorization: `Bearer ${FLOW_T}`, 'content-type': 'application/json' };
+    const pH = { authorization: `Bearer ${FLOW_P}`, 'content-type': 'application/json' };
+    const slotsUrl = `/therapists/${therapistId}/available-slots?heilmittel=KG`
+      + `&from=${at(monday, 0, 0).toISOString()}&to=${at(monday, 23, 59).toISOString()}`;
+
+    // [1] Arbeitszeit Mo 08:00–12:00
+    const wh = await app.inject({
+      method: 'PUT', url: '/therapist/working-hours', headers: tH,
+      payload: { rules: [{ weekday: 1, startMinute: 8 * 60, endMinute: 12 * 60 }] },
+    });
+    console.log('\n[1] PUT /therapist/working-hours →', wh.statusCode, '| rules:', wh.json().rules?.length);
+    expect(wh.statusCode).toBe(200);
+    expect(wh.json().rules).toHaveLength(1);
+    expect(wh.json().materialized).toBeUndefined();
+
+    // [2] KG-Dauer = 30 Min
+    const svc = await app.inject({
+      method: 'PUT', url: '/therapist/services/KG', headers: tH, payload: { durationMin: 30 },
+    });
+    console.log('[2] PUT /therapist/services/KG →', svc.statusCode, '| durationMin:', svc.json().durationMin);
+    expect(svc.statusCode).toBe(200);
+    expect(svc.json().durationMin).toBe(30);
+
+    // [3] Blockzeit 10:00–10:30
+    const block = await app.inject({
+      method: 'POST', url: '/therapist/blocked-times', headers: tH,
+      payload: { startsAt: at(monday, 10, 0).toISOString(), endsAt: at(monday, 10, 30).toISOString(), title: 'Dokumentation' },
+    });
+    console.log('[3] POST /therapist/blocked-times →', block.statusCode, '| title:', block.json().title);
+    expect(block.statusCode).toBe(201);
+
+    // [4] berechnete KG-Zeitfenster (30 Min, Blockzeit ausgespart)
+    const s1 = await app.inject({ method: 'GET', url: slotsUrl });
+    const t1 = s1.json().slots.map((s: { startsAt: string }) => hhmm(s.startsAt));
+    console.log('[4] GET /available-slots?heilmittel=KG →', s1.statusCode, '\n    freie KG-Termine:', t1.join('  '));
+    expect(s1.statusCode).toBe(200);
+    expect(t1).toEqual(['08:00', '08:30', '09:00', '09:30', '10:30', '11:00', '11:30']);
+
+    // [5] Patient bucht 09:00 → 09:00–09:30
+    const book = await app.inject({
+      method: 'POST', url: '/bookings', headers: pH,
+      payload: { therapistId, heilmittel: 'KG', startsAt: at(monday, 9, 0).toISOString(), kassenart: 'gesetzlich', consentAccepted: true },
+    });
+    console.log('[5] POST /bookings 09:00 →', book.statusCode, '| Zeitraum:', hhmm(book.json().startsAt), '-', hhmm(book.json().endsAt));
+    expect(book.statusCode).toBe(201);
+    expect(hhmm(book.json().startsAt)).toBe('09:00');
+    expect(hhmm(book.json().endsAt)).toBe('09:30');
+
+    // [6] gebuchtes 09:00-Fenster verschwindet (09:30 bleibt — keine Überschneidung)
+    const s2 = await app.inject({ method: 'GET', url: slotsUrl });
+    const t2 = s2.json().slots.map((s: { startsAt: string }) => hhmm(s.startsAt));
+    console.log('[6] GET /available-slots (nach Buchung) →', t2.join('  '));
+    expect(t2).not.toContain('09:00');
+    expect(t2).toEqual(['08:00', '08:30', '09:30', '10:30', '11:00', '11:30']);
+
+    // [7] erneute Buchung 09:00 → 409
+    const dupe = await app.inject({
+      method: 'POST', url: '/bookings', headers: pH,
+      payload: { therapistId, heilmittel: 'KG', startsAt: at(monday, 9, 0).toISOString(), consentAccepted: true },
+    });
+    console.log('[7] POST /bookings 09:00 erneut →', dupe.statusCode);
+    expect(dupe.statusCode).toBe(409);
+
+    // [8] vor Arbeitsbeginn (07:00) → 409
+    const early = await app.inject({
+      method: 'POST', url: '/bookings', headers: pH,
+      payload: { therapistId, heilmittel: 'KG', startsAt: at(monday, 7, 0).toISOString(), consentAccepted: true },
+    });
+    console.log('[8] POST /bookings 07:00 (vor Arbeitsbeginn) →', early.statusCode);
+    expect(early.statusCode).toBe(409);
+
+    // [9] in der Blockzeit (10:00) → 409
+    const inBlock = await app.inject({
+      method: 'POST', url: '/bookings', headers: pH,
+      payload: { therapistId, heilmittel: 'KG', startsAt: at(monday, 10, 0).toISOString(), consentAccepted: true },
+    });
+    console.log('[9] POST /bookings 10:00 (Blockzeit) →', inBlock.statusCode);
+    expect(inBlock.statusCode).toBe(409);
+
+    // [10] KG deaktivieren → keine Slots + Buchung 400
+    const off = await app.inject({
+      method: 'PUT', url: '/therapist/services/KG', headers: tH, payload: { durationMin: 30, isActive: false },
+    });
+    expect(off.statusCode).toBe(200);
+    const s3 = await app.inject({ method: 'GET', url: slotsUrl });
+    const bookOff = await app.inject({
+      method: 'POST', url: '/bookings', headers: pH,
+      payload: { therapistId, heilmittel: 'KG', startsAt: at(monday, 8, 0).toISOString(), consentAccepted: true },
+    });
+    console.log('[10] KG deaktiviert → slots:', s3.json().slots.length, '| Buchung:', bookOff.statusCode);
+    expect(s3.json().slots).toHaveLength(0);
+    expect(bookOff.statusCode).toBe(400);
+  });
+});
