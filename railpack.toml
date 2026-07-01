@@ -11,4 +11,8 @@ cmds = [
 ]
 
 [deploy]
-cmd = "cd apps/api && npx prisma db push --schema prisma/schema.production.prisma --skip-generate && node dist/server.js"
+# --accept-data-loss ist nötig, damit db push destruktive Schema-Änderungen
+# (z.B. Entfernen der alten TherapistSlot-Tabelle im dynamischen Buchungssystem)
+# nicht-interaktiv anwendet. Ohne das Flag verweigert db push die Sync und die
+# Prod-DB bleibt out of sync (fehlende Tabellen/Spalten → 500 P2021).
+cmd = "cd apps/api && npx prisma db push --schema prisma/schema.production.prisma --skip-generate --accept-data-loss && node dist/server.js"
