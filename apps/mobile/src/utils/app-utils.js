@@ -485,6 +485,8 @@ export {
   startOfWeek,
   addDays,
   getIsoWeekNumber,
+  bookingToCalendarItem,
+  activeBookingItems,
 };
 
 function formatDayHeader(isoString, locale = 'de-DE') {
@@ -523,6 +525,27 @@ function addDays(d, n) {
   const copy = new Date(d);
   copy.setDate(copy.getDate() + n);
   return copy;
+}
+
+// Normalisiert eine Buchung zu einem Kalender-Item (dynamisches Buchungssystem).
+// Termine werden über startsAt/endsAt der Buchung dargestellt, nicht mehr über Slots.
+function bookingToCalendarItem(b) {
+  const startsAt = b?.startsAt ?? b?.confirmedSlotAt ?? b?.slot?.startsAt ?? null;
+  const endsAt = b?.endsAt ?? null;
+  const durationMin = startsAt && endsAt
+    ? Math.max(1, Math.round((new Date(endsAt) - new Date(startsAt)) / 60000))
+    : (b?.slot?.durationMin ?? 20);
+  const kind = b?.status === 'PENDING' ? 'requested' : 'booked';
+  return { booking: b, startsAt, endsAt, durationMin, kind };
+}
+
+// Aktive Kalender-Termine (nur PENDING + CONFIRMED), nach startsAt sortiert.
+function activeBookingItems(bookings) {
+  return (Array.isArray(bookings) ? bookings : [])
+    .filter((b) => b?.status === 'PENDING' || b?.status === 'CONFIRMED')
+    .map(bookingToCalendarItem)
+    .filter((it) => it.startsAt)
+    .sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt));
 }
 
 // Standard ISO-8601 week number (the week containing that week's Thursday

@@ -1,8 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import {
-  Pressable, RefreshControl, ScrollView, Text, View,
+  RefreshControl, ScrollView, View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { AccountHeader } from '../../components/AccountHeader';
 import { HeilmittelSelectModal } from '../../modals/HeilmittelSelectModal';
 import { TherapistSummaryCard } from '../../components/TherapistSummaryCard';
@@ -14,39 +13,33 @@ import { TherapistFilteredSlotsScreen } from './TherapistFilteredSlotsScreen';
 import { useBookingActivation } from '../../hooks/use-booking-activation';
 import { useTherapistCalendarView } from '../../hooks/use-therapist-calendar-view';
 
+// Therapeuten-Tab "Termine": zeigt die Termine (Buchungen) im Kalender.
+// Verfügbarkeit wird nicht mehr hier verwaltet, sondern im Profil über
+// Arbeitszeiten / Leistungen / Blockzeiten (dynamisches Buchungssystem).
 export function TherapyTabTherapist({
-  mySlots, slotsLoading, incomingBookings, incomingBookingsLoading,
-  deletingSlotIds,
-  therapyRefreshing, slotsLastLoadedAt, incomingBookingsLastLoadedAt,
-  onRefresh, onOpenTherapistById,
-  onCancelSlot, onBulkDeleteSlots, onRespond, onTherapistCancelRequest, onSelectTherapistDetailBooking, setShowSlotComposerModal,
-  onOpenBookingDetail,
+  incomingBookings, incomingBookingsLoading,
+  therapyRefreshing, incomingBookingsLastLoadedAt,
+  onRefresh, onOpenBookingDetail, onSelectTherapistDetailBooking, onTherapistCancelRequest,
   loggedInTherapist,
   onActivateBookingRequests,
   heilmittelOptions,
-  authToken,
   c, t, styles,
 }) {
-  const slotBookingEnabled = loggedInTherapist?.bookingMode === 'FIRST_APPOINTMENT_REQUEST';
+  const bookingEnabled = loggedInTherapist?.bookingMode === 'FIRST_APPOINTMENT_REQUEST';
   const reviewApproved = loggedInTherapist?.reviewStatus === 'APPROVED';
-  const [filterListKind, setFilterListKind] = useState(null); // null | 'free' | 'booked' | 'pending'
+  const [filterListKind, setFilterListKind] = useState(null); // null | 'booked' | 'pending'
 
   const activation = useBookingActivation({ onActivateBookingRequests });
   const calendarView = useTherapistCalendarView();
 
-  const pendingIncomingBookings = useMemo(
-    () => incomingBookings.filter((r) => r.status === 'PENDING'),
+  const pendingCount = useMemo(
+    () => incomingBookings.filter((r) => r.status === 'PENDING').length,
     [incomingBookings],
   );
-  const freeSlots = useMemo(() => mySlots.filter(s => s.status === 'AVAILABLE'), [mySlots]);
-  const confirmedBookingsCount = useMemo(
+  const confirmedCount = useMemo(
     () => incomingBookings.filter((b) => b.status === 'CONFIRMED').length,
     [incomingBookings],
   );
-
-  const handleTherapistCancel = (bookingId) => {
-    onTherapistCancelRequest(bookingId);
-  };
 
   const handleOpenDetail = (booking) => {
     onSelectTherapistDetailBooking(booking);
@@ -57,19 +50,10 @@ export function TherapyTabTherapist({
     return (
       <TherapistFilteredSlotsScreen
         filterListKind={filterListKind}
-        freeSlots={freeSlots}
-        mySlots={mySlots}
         incomingBookings={incomingBookings}
-        deletingSlotIds={deletingSlotIds}
         onClose={() => setFilterListKind(null)}
-        onCancelSlot={onCancelSlot}
-        onRespond={onRespond}
-        onTherapistCancel={handleTherapistCancel}
         onOpenDetail={handleOpenDetail}
-        onBulkDeleteSlots={onBulkDeleteSlots}
-        slotsLoading={slotsLoading}
         incomingBookingsLoading={incomingBookingsLoading}
-        slotsLastLoadedAt={slotsLastLoadedAt}
         incomingBookingsLastLoadedAt={incomingBookingsLastLoadedAt}
         c={c}
         styles={styles}
@@ -79,21 +63,7 @@ export function TherapyTabTherapist({
 
   return (
     <View style={{ flex: 1 }}>
-      <AccountHeader
-        c={c}
-        subtitle="Termine"
-        rightSlot={slotBookingEnabled ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Pressable
-              onPress={() => setShowSlotComposerModal(true)}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: c.primary, borderRadius: 999, paddingVertical: 10, paddingHorizontal: 14 }}
-            >
-              <Ionicons name="calendar-outline" size={15} color="#fff" />
-              <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>+ Termin</Text>
-            </Pressable>
-          </View>
-        ) : null}
-      />
+      <AccountHeader c={c} subtitle="Termine" />
 
       <ScrollView
         contentContainerStyle={[styles.scrollContent, { paddingBottom: 32, paddingTop: 8 }]}
@@ -102,19 +72,16 @@ export function TherapyTabTherapist({
       >
         <TherapistSummaryCard
           c={c}
-          freeCount={freeSlots.length}
-          confirmedCount={confirmedBookingsCount}
-          pendingCount={pendingIncomingBookings.length}
-          onPressFree={() => setFilterListKind('free')}
+          confirmedCount={confirmedCount}
+          pendingCount={pendingCount}
           onPressBooked={() => setFilterListKind('booked')}
           onPressPending={() => setFilterListKind('pending')}
         />
 
-        {slotBookingEnabled ? (
+        {bookingEnabled ? (
           calendarView.viewMode === 'calendar' ? (
             <TherapistMonthCalendar
               c={c}
-              mySlots={mySlots}
               incomingBookings={incomingBookings}
               selectedDate={calendarView.selectedDate}
               onSelectDate={calendarView.handleSelectCalendarDate}
@@ -124,9 +91,6 @@ export function TherapyTabTherapist({
               onPressList={calendarView.handleShowList}
               onPressToday={calendarView.handleGoToToday}
               onOpenBooking={onOpenBookingDetail}
-              onCancelSlot={onCancelSlot}
-              deletingSlotIds={deletingSlotIds}
-              onAddSlot={() => setShowSlotComposerModal(true)}
             />
           ) : (
             <>
@@ -134,7 +98,7 @@ export function TherapyTabTherapist({
                 c={c}
                 selectedDate={calendarView.selectedDate}
                 visibleWeekStart={calendarView.visibleWeekStart}
-                mySlots={mySlots}
+                incomingBookings={incomingBookings}
                 onSelectDate={calendarView.setSelectedDate}
                 onPrevWeek={calendarView.handlePrevWeek}
                 onNextWeek={calendarView.handleNextWeek}
@@ -145,15 +109,10 @@ export function TherapyTabTherapist({
               <TherapistDayTimeline
                 c={c}
                 selectedDate={calendarView.selectedDate}
-                mySlots={mySlots}
                 incomingBookings={incomingBookings}
-                slotsLoading={slotsLoading}
-                slotsLastLoadedAt={slotsLastLoadedAt}
                 incomingBookingsLoading={incomingBookingsLoading}
                 incomingBookingsLastLoadedAt={incomingBookingsLastLoadedAt}
-                deletingSlotIds={deletingSlotIds}
                 onOpenBooking={onOpenBookingDetail}
-                onCancelSlot={onCancelSlot}
               />
             </>
           )

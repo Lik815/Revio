@@ -17,15 +17,12 @@ import { TherapistAppointmentDetail } from './TherapistAppointmentDetail';
 import { TherapistPatientDetailScreen } from './TherapistPatientDetailScreen';
 import { CancelAppointmentModal } from '../../modals/CancelAppointmentModal';
 import { TherapistCancelModal } from '../../modals/TherapistCancelModal';
-import { SlotComposerModal } from '../../modals/SlotComposerModal';
-import { SlotCreatedModal } from '../../modals/SlotCreatedModal';
 import { BookingRequestForm } from '../public/BookingRequestForm';
 import { useTherapyData } from '../../context/TherapyContext';
 import { useConfigOptions } from '../../hooks/use-config-options';
 import { markTap } from '../../utils/perf-log';
 
 const t = (key) => translations.de[key] ?? key;
-const BULK_DELETE_SLOT_BATCH_SIZE = 500;
 
 export function TherapyTabScreen() {
   const navigation = useNavigation();
@@ -41,10 +38,9 @@ export function TherapyTabScreen() {
   const {
     myAppointments, myAppointmentsLoading, appointmentsLastLoadedAt, setMyAppointments,
     incomingBookings, incomingBookingsLoading, incomingBookingsLastLoadedAt, setIncomingBookings,
-    mySlots, slotsLoading, deletingSlotIds, slotsLastLoadedAt, setMySlots, setDeletingSlotIds,
     patients, patientsLoading, patientsLastLoadedAt,
     therapyRefreshing,
-    loadMyAppointments, loadIncomingBookings, loadMySlots,
+    loadMyAppointments, loadIncomingBookings,
     handleTherapyRefresh, refreshTherapyTab,
   } = useTherapyData();
 
@@ -56,11 +52,6 @@ export function TherapyTabScreen() {
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [showTherapistCancelModal, setShowTherapistCancelModal] = useState(false);
   const [therapistCancelBookingId, setTherapistCancelBookingId] = useState(null);
-  const [showSlotComposer, setShowSlotComposer] = useState(false);
-  const [createdResult, setCreatedResult] = useState(null);
-  const [showSlotCreated, setShowSlotCreated] = useState(false);
-  const [slotError, setSlotError] = useState('');
-  const [isAddingSlots, setIsAddingSlots] = useState(false);
   const [repeatBookingTherapist, setRepeatBookingTherapist] = useState(null);
   const [showRepeatBookingForm, setShowRepeatBookingForm] = useState(false);
 
@@ -121,86 +112,10 @@ export function TherapyTabScreen() {
     setShowRepeatBookingForm(true);
   };
 
-  const handleAddSlots = async (slots) => {
-    if (!authToken || slots.length === 0 || isAddingSlots) return;
-    setIsAddingSlots(true);
-    try {
-      const res = await fetch(`${getBaseUrl()}/therapist/slots`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
-        body: JSON.stringify({ slots }),
-      });
-      const data = await res.json().catch(() => null);
-      if (res.ok && data) {
-        setShowSlotComposer(false);
-        setCreatedResult(data);
-        setShowSlotCreated(true);
-        setSlotError('');
-      } else {
-        setSlotError(data?.error ?? 'Termine konnten nicht angelegt werden.');
-      }
-    } catch {
-      setSlotError('Verbindungsfehler.');
-    } finally {
-      await loadMySlots(authToken);
-      setIsAddingSlots(false);
-    }
-  };
-
-  const handleCancelSlot = async (slotId) => {
-    if (!authToken) return;
-    setDeletingSlotIds((prev) => [...prev, slotId]);
-    try {
-      const res = await fetch(`${getBaseUrl()}/therapist/slots/${slotId}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${authToken}` },
-      });
-      if (res.ok) {
-        setMySlots((prev) => prev.filter((s) => s.id !== slotId));
-      }
-    } catch {}
-    finally {
-      setDeletingSlotIds((prev) => prev.filter((id) => id !== slotId));
-    }
-  };
-
-  const handleBulkDeleteSlots = async (slotIds) => {
-    if (!authToken || !slotIds?.length) return;
-    const deletedIds = new Set();
-    let bookedCount = 0;
-    try {
-      for (let i = 0; i < slotIds.length; i += BULK_DELETE_SLOT_BATCH_SIZE) {
-        const batch = slotIds.slice(i, i + BULK_DELETE_SLOT_BATCH_SIZE);
-        const res = await fetch(`${getBaseUrl()}/therapist/slots/bulk-delete`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
-          body: JSON.stringify({ slotIds: batch }),
-        });
-        const data = await res.json().catch(() => null);
-        if (!res.ok) {
-          throw new Error(data?.error ?? 'Freie Termine konnten nicht gelöscht werden.');
-        }
-        (data?.deletedIds ?? batch).forEach((id) => deletedIds.add(id));
-        bookedCount += (data?.skipped ?? []).filter((s) => s.reason === 'booked').length;
-      }
-      setMySlots((prev) => prev.filter((s) => !deletedIds.has(s.id)));
-
-      if (bookedCount > 0) {
-        Alert.alert(
-          'Hinweis',
-          `${bookedCount} ${bookedCount === 1 ? 'Termin wurde' : 'Termine wurden'} inzwischen gebucht und nicht gelöscht.`,
-        );
-      }
-    } catch (error) {
-      Alert.alert('Löschen fehlgeschlagen', error?.message ?? 'Bitte versuche es erneut.');
-      throw error;
-    }
-  };
-
-  // Patches the local incoming-bookings/slots cache from the PATCH response instead of
-  // re-fetching both full lists — respond/cancel only ever change one booking + one slot.
+  // Patcht die lokale incoming-bookings-Liste aus der PATCH-Antwort. Kein
+  // Slot-Status mehr — der Zeitraum wird serverseitig automatisch frei, sobald
+  // die Buchung PENDING/CONFIRMED verlässt.
   const handleTherapistRespond = async (bookingId, body) => {
-    const previousSlotId = incomingBookings.find((b) => b.id === bookingId)?.slot?.id ?? null;
     const res = await fetch(`${getBaseUrl()}/bookings/${bookingId}/respond`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
@@ -212,21 +127,11 @@ export function TherapyTabScreen() {
     }
     const updated = await res.json();
     setIncomingBookings((prev) => prev.map((b) => (b.id === updated.id ? { ...b, ...updated } : b)));
-    if (body.action === 'DECLINE') {
-      if (previousSlotId) {
-        setMySlots((prev) => prev.map((s) => (s.id === previousSlotId ? { ...s, status: 'AVAILABLE', bookingId: null, bookingStatus: null } : s)));
-      } else {
-        // Booking wasn't present in the local incoming-bookings cache (e.g. stale), so we
-        // don't know which slot to release locally — fall back to a single targeted refetch.
-        loadMySlots(authToken);
-      }
-    }
   };
 
   const handleTherapistCancelConfirm = async (reason) => {
     setShowTherapistCancelModal(false);
     if (!therapistCancelBookingId) return;
-    const previousSlotId = incomingBookings.find((b) => b.id === therapistCancelBookingId)?.slot?.id ?? null;
     const res = await fetch(`${getBaseUrl()}/bookings/${therapistCancelBookingId}/therapist-cancel`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
@@ -235,13 +140,8 @@ export function TherapyTabScreen() {
     if (res.ok) {
       const updated = await res.json().catch(() => null);
       setIncomingBookings((prev) => prev.map((b) => (
-        b.id === therapistCancelBookingId ? { ...b, ...(updated ?? { status: 'CANCELLED' }), slot: null } : b
+        b.id === therapistCancelBookingId ? { ...b, ...(updated ?? { status: 'CANCELLED' }) } : b
       )));
-      if (previousSlotId) {
-        setMySlots((prev) => prev.map((s) => (s.id === previousSlotId ? { ...s, status: 'AVAILABLE', bookingId: null, bookingStatus: null } : s)));
-      } else {
-        loadMySlots(authToken);
-      }
     } else {
       const data = await res.json().catch(() => ({}));
       Alert.alert('Absagen fehlgeschlagen', data.error ?? 'Bitte versuche es erneut.');
@@ -288,7 +188,6 @@ export function TherapyTabScreen() {
         setLoggedInTherapist(normalizeTherapistProfile(await meRes.json()));
       }
 
-      await loadMySlots(authToken);
       await loadIncomingBookings(authToken);
       return { ok: true };
     } catch {
@@ -415,35 +314,17 @@ export function TherapyTabScreen() {
     return (
       <>
         <TherapyTabTherapist
-          mySlots={mySlots}
-          slotsLoading={slotsLoading}
           incomingBookings={incomingBookings}
           incomingBookingsLoading={incomingBookingsLoading}
-          deletingSlotIds={deletingSlotIds}
-          activeFilterTherapist={activeFilterTherapist}
-          setActiveFilterTherapist={setActiveFilterTherapist}
           therapyRefreshing={therapyRefreshing}
-          slotsLastLoadedAt={slotsLastLoadedAt}
           incomingBookingsLastLoadedAt={incomingBookingsLastLoadedAt}
           onRefresh={() => handleTherapyRefresh(authToken, accountType, loggedInTherapist)}
-          onRespond={handleTherapistRespond}
-          onOpenTherapistById={openTherapistById}
-          onCancelSlot={handleCancelSlot}
-          onBulkDeleteSlots={handleBulkDeleteSlots}
           onTherapistCancelRequest={(id) => { setTherapistCancelBookingId(id); setShowTherapistCancelModal(true); }}
           onSelectTherapistDetailBooking={(booking) => { setTherapistCancelBookingId(booking.id); setShowTherapistCancelModal(true); }}
           onOpenBookingDetail={handleOpenBookingDetail}
-          setShowSlotComposerModal={setShowSlotComposer}
           loggedInTherapist={loggedInTherapist}
           onActivateBookingRequests={handleActivateBookingRequests}
           heilmittelOptions={heilmittelOptions}
-          therapistView={therapistView}
-          setTherapistView={setTherapistView}
-          patients={patients}
-          patientsLoading={patientsLoading}
-          patientsLastLoadedAt={patientsLastLoadedAt}
-          onSelectPatient={(patientId) => { markTap(patientId); setSelectedPatientId(patientId); }}
-          authToken={authToken}
           c={c} t={t} styles={appStyles}
         />
         <TherapistCancelModal
@@ -451,21 +332,6 @@ export function TherapyTabScreen() {
           onClose={() => setShowTherapistCancelModal(false)}
           onConfirm={handleTherapistCancelConfirm}
           booking={incomingBookings.find((b) => b.id === therapistCancelBookingId) ?? null}
-          c={c}
-        />
-        <SlotComposerModal
-          visible={showSlotComposer}
-          onClose={() => { setShowSlotComposer(false); setSlotError(''); }}
-          onAddSlot={(slot) => handleAddSlots([slot])}
-          onAddSlots={handleAddSlots}
-          error={slotError}
-          loading={isAddingSlots}
-          c={c}
-        />
-        <SlotCreatedModal
-          visible={showSlotCreated}
-          onClose={() => setShowSlotCreated(false)}
-          result={createdResult}
           c={c}
         />
       </>

@@ -1,13 +1,13 @@
 import React, { useMemo, useRef } from 'react';
 import { PanResponder, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { RADIUS, addDays, getIsoWeekNumber, isSameDay, startOfDay } from '../utils/app-utils';
+import { RADIUS, addDays, getIsoWeekNumber, isSameDay, startOfDay, activeBookingItems } from '../utils/app-utils';
 
 const WEEKDAY_LABELS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
 const SWIPE_THRESHOLD = 40;
 
 export function TherapistWeekStrip({
-  c, selectedDate, visibleWeekStart, mySlots,
+  c, selectedDate, visibleWeekStart, incomingBookings,
   onSelectDate, onPrevWeek, onNextWeek, onPressCalendar, onPressToday,
 }) {
   const days = useMemo(
@@ -43,11 +43,9 @@ export function TherapistWeekStrip({
   ).current;
 
   const hasActivity = useMemo(() => {
-    const activeDays = (Array.isArray(mySlots) ? mySlots : [])
-      .filter((s) => s.status !== 'CANCELLED')
-      .map((s) => new Date(s.startsAt));
+    const activeDays = activeBookingItems(incomingBookings).map((it) => new Date(it.startsAt));
     return (day) => activeDays.some((d) => isSameDay(d, day));
-  }, [mySlots]);
+  }, [incomingBookings]);
 
   const today = startOfDay(new Date());
 

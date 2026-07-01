@@ -97,18 +97,6 @@ export function ProfileTabScreen() {
     }, [authToken, setLoggedInPatient, setLoggedInTherapist]),
   );
 
-  const handleAddSlot = async (slot) => {
-    if (!authToken) return;
-    try {
-      const res = await fetch(`${getBaseUrl()}/therapist/slots`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
-        body: JSON.stringify({ slots: [slot] }),
-      });
-      if (res.ok) showToast(t('slotCreated') ?? 'Termin erstellt');
-    } catch {}
-  };
-
   const openProfileSavedModal = (title, body) => {
     setProfileSavedTitle(title);
     setProfileSavedBody(body);
@@ -166,7 +154,6 @@ export function ProfileTabScreen() {
             specializationOptions={specializationOptions}
             heilmittelOptions={heilmittelOptions}
             onOpenTherapyTab={() => navigation.navigate(ROOT_ROUTES.MAIN_TABS, { screen: TAB_ROUTES.THERAPY })}
-            onAddSlot={handleAddSlot}
             onProfileSaved={openProfileSavedModal}
             onAccountDeleted={handleAccountDeleted}
           />

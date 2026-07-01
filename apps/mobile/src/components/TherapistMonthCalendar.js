@@ -1,46 +1,35 @@
 import React, { useMemo } from 'react';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { RADIUS, SHADOW, isSameDay, startOfDay } from '../utils/app-utils';
+import { RADIUS, SHADOW, isSameDay, startOfDay, activeBookingItems } from '../utils/app-utils';
 import { buildCalendar } from '../utils/recurring-slots';
 
 const WEEKDAY_LABELS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-const STATUS_RANK = { pending: 3, booked: 2, free: 1 };
+const STATUS_RANK = { requested: 2, booked: 1 };
 
-function getMonthDayStatuses(mySlots, bookingBySlotId, year, month) {
-  const statusByDay = {};
-  (mySlots ?? []).forEach((slot) => {
-    if (slot.status === 'CANCELLED') return;
-    const d = new Date(slot.startsAt);
-    if (d.getFullYear() !== year || d.getMonth() !== month) return;
-    const day = d.getDate();
-    const booking = bookingBySlotId[slot.id];
-    const kind = booking?.status === 'PENDING' ? 'pending' : slot.status === 'AVAILABLE' ? 'free' : 'booked';
-    if ((STATUS_RANK[kind] ?? 0) > (STATUS_RANK[statusByDay[day]] ?? 0)) statusByDay[day] = kind;
-  });
-  return statusByDay;
-}
-
+// Monatskalender: markiert Tage mit Terminen und zeigt die Termine des
+// gewählten Tages. Quelle: incomingBookings (per startsAt) — keine Slots.
 export function TherapistMonthCalendar({
-  c, mySlots, incomingBookings, selectedDate, onSelectDate,
+  c, incomingBookings, selectedDate, onSelectDate,
   visibleMonth, onPrevMonth, onNextMonth, onPressList, onPressToday,
-  onOpenBooking, onCancelSlot, deletingSlotIds = [], onAddSlot,
+  onOpenBooking,
 }) {
-  const bookingBySlotId = useMemo(() => {
-    const map = {};
-    (incomingBookings ?? []).forEach((b) => { if (b.slotId) map[b.slotId] = b; });
-    return map;
-  }, [incomingBookings]);
+  const items = useMemo(() => activeBookingItems(incomingBookings), [incomingBookings]);
 
-  const dayStatuses = useMemo(
-    () => getMonthDayStatuses(mySlots, bookingBySlotId, visibleMonth.year, visibleMonth.month),
-    [mySlots, bookingBySlotId, visibleMonth.year, visibleMonth.month],
-  );
+  const dayStatuses = useMemo(() => {
+    const statusByDay = {};
+    items.forEach(({ startsAt, kind }) => {
+      const d = new Date(startsAt);
+      if (d.getFullYear() !== visibleMonth.year || d.getMonth() !== visibleMonth.month) return;
+      const day = d.getDate();
+      if ((STATUS_RANK[kind] ?? 0) > (STATUS_RANK[statusByDay[day]] ?? 0)) statusByDay[day] = kind;
+    });
+    return statusByDay;
+  }, [items, visibleMonth.year, visibleMonth.month]);
 
   const dotColorFor = (status) => ({
-    pending: c.warning ?? '#B78700',
+    requested: c.warning ?? '#B78700',
     booked: c.primary,
-    free: c.success ?? '#5A9E8E',
   }[status] ?? c.border);
 
   const rows = useMemo(() => {
@@ -56,16 +45,10 @@ export function TherapistMonthCalendar({
   );
   const today = startOfDay(new Date());
 
-  const dayRows = useMemo(() => {
-    const daySlots = (mySlots ?? [])
-      .filter((s) => s.status !== 'CANCELLED' && isSameDay(new Date(s.startsAt), selectedDate))
-      .sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt));
-    return daySlots.map((slot) => {
-      const booking = bookingBySlotId[slot.id] ?? null;
-      const kind = slot.status === 'AVAILABLE' ? 'free' : booking?.status === 'PENDING' ? 'pending' : 'booked';
-      return { slot, booking, kind };
-    });
-  }, [mySlots, bookingBySlotId, selectedDate]);
+  const dayRows = useMemo(
+    () => items.filter((it) => isSameDay(new Date(it.startsAt), selectedDate)),
+    [items, selectedDate],
+  );
 
   const dayHeading = selectedDate.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
@@ -144,7 +127,7 @@ export function TherapistMonthCalendar({
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
           <Text style={{ fontSize: 15, fontWeight: '800', color: c.text, flex: 1 }}>{dayHeading}</Text>
           {dayRows.length > 0 ? (
-            <Text style={{ fontSize: 13, fontWeight: '700', color: c.success ?? '#5A9E8E' }}>
+            <Text style={{ fontSize: 13, fontWeight: '700', color: c.primary }}>
               {dayRows.length} {dayRows.length === 1 ? 'Termin' : 'Termine'}
             </Text>
           ) : null}
@@ -153,59 +136,25 @@ export function TherapistMonthCalendar({
         {dayRows.length === 0 ? (
           <Text style={{ fontSize: 13, color: c.muted }}>Keine Termine an diesem Tag.</Text>
         ) : (
-          dayRows.map(({ slot, booking, kind }, index) => {
-            const time = new Date(slot.startsAt).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-            const isFree = kind === 'free';
-            const dotColor = kind === 'pending' ? (c.warning ?? '#B78700') : isFree ? c.muted : (c.success ?? '#5A9E8E');
-            const title = isFree ? 'Frei' : (booking?.patientName ?? 'Gebucht');
-            const isDeleting = deletingSlotIds.includes(slot.id);
+          dayRows.map(({ booking, startsAt, durationMin, kind }, index) => {
+            const time = new Date(startsAt).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+            const dotColor = kind === 'requested' ? (c.warning ?? '#B78700') : (c.success ?? '#5A9E8E');
+            const title = kind === 'requested' ? 'Neue Anfrage' : (booking?.patientName ?? 'Gebucht');
+            const rowStyle = { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, borderTopWidth: index === 0 ? 0 : 1, borderTopColor: c.border };
 
-            const rowInner = (
-              <>
-                <View
-                  style={{
-                    width: 9, height: 9, borderRadius: 4.5,
-                    backgroundColor: isFree ? 'transparent' : dotColor,
-                    borderWidth: isFree ? 2 : 0, borderColor: dotColor,
-                  }}
-                />
+            return (
+              <Pressable key={booking.id} onPress={() => onOpenBooking?.(booking)} style={rowStyle}>
+                <View style={{ width: 9, height: 9, borderRadius: 4.5, backgroundColor: dotColor }} />
                 <Text style={{ width: 48, fontSize: 13, fontWeight: '600', color: c.muted }}>{time}</Text>
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontSize: 14, fontWeight: '700', color: c.text }}>{title}</Text>
-                  <Text style={{ fontSize: 12, color: c.muted, marginTop: 1 }}>{slot.durationMin} Min</Text>
+                  <Text style={{ fontSize: 12, color: c.muted, marginTop: 1 }}>{durationMin} Min</Text>
                 </View>
-              </>
-            );
-
-            const rowStyle = { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, borderTopWidth: index === 0 ? 0 : 1, borderTopColor: c.border };
-
-            return isFree ? (
-              <View key={slot.id} style={rowStyle}>
-                {rowInner}
-                {isDeleting ? (
-                  <ActivityIndicator size="small" color={c.muted} />
-                ) : (
-                  <Pressable onPress={() => onCancelSlot?.(slot.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Ionicons name="trash-outline" size={18} color={c.muted} />
-                  </Pressable>
-                )}
-              </View>
-            ) : (
-              <Pressable key={slot.id} onPress={() => onOpenBooking?.(booking)} style={rowStyle}>
-                {rowInner}
                 <Ionicons name="chevron-forward" size={16} color={c.muted} />
               </Pressable>
             );
           })
         )}
-
-        <Pressable
-          onPress={onAddSlot}
-          style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 14, marginTop: dayRows.length > 0 ? 0 : 4, borderTopWidth: dayRows.length > 0 ? 1 : 0, borderTopColor: c.border }}
-        >
-          <Ionicons name="add-circle-outline" size={18} color={c.success ?? '#5A9E8E'} />
-          <Text style={{ fontSize: 14, fontWeight: '700', color: c.success ?? '#5A9E8E' }}>Termin hinzufügen</Text>
-        </Pressable>
       </View>
     </View>
   );

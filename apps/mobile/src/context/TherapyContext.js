@@ -186,13 +186,13 @@ export function TherapyProvider({ children }) {
     if (accountType === 'patient') {
       if (force || isStale(appointmentsLastLoadedAt)) jobs.push(loadMyAppointments(token, { background: true }));
     } else if (loggedInTherapist) {
-      if (force || isStale(slotsLastLoadedAt)) jobs.push(loadMySlots(token, { background: true }));
+      // Keine freien Slots mehr — Termine kommen aus incomingBookings.
       if (force || isStale(incomingBookingsLastLoadedAt)) jobs.push(loadIncomingBookings(token, { background: true }));
       if (force || isStale(patientsLastLoadedAt)) jobs.push(loadPatients(token, { background: true }));
     }
     if (jobs.length > 0) await Promise.allSettled(jobs);
-  }, [favoritesLastLoadedAt, appointmentsLastLoadedAt, slotsLastLoadedAt, incomingBookingsLastLoadedAt, patientsLastLoadedAt,
-      loadFavorites, loadMyAppointments, loadMySlots, loadIncomingBookings, loadPatients]);
+  }, [favoritesLastLoadedAt, appointmentsLastLoadedAt, incomingBookingsLastLoadedAt, patientsLastLoadedAt,
+      loadFavorites, loadMyAppointments, loadIncomingBookings, loadPatients]);
 
   const handleTherapyRefresh = useCallback(async (token, accountType, loggedInTherapist) => {
     if (!token) return;

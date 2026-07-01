@@ -28,11 +28,10 @@ function StatChip({ c, value, label, dotColor, onPress }) {
 }
 
 export function TherapistSummaryCard({
-  c, freeCount, confirmedCount, pendingCount, onPressFree, onPressBooked, onPressPending,
+  c, confirmedCount, pendingCount, onPressBooked, onPressPending,
 }) {
   return (
     <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
-      <StatChip c={c} value={freeCount} label="Frei" dotColor={c.success ?? '#5A9E8E'} onPress={onPressFree} />
       <StatChip c={c} value={confirmedCount} label="Gebucht" dotColor={c.primary} onPress={onPressBooked} />
       <StatChip c={c} value={pendingCount} label="Anfragen" dotColor={c.warning ?? '#B78700'} onPress={onPressPending} />
     </View>
