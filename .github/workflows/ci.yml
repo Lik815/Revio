@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request: {}
+
+jobs:
+  api:
+    name: API — typecheck + tests
+    runs-on: ubuntu-latest
+    env:
+      # setup.ts überschreibt das ohnehin, aber prisma generate liest env("DATABASE_URL")
+      DATABASE_URL: file:./prisma/test.db
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.6.3
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # ignoredBuiltDependencies verhindert Auto-Generate beim install — explizit nötig,
+      # weil der Test-Setup prisma db push --skip-generate ausführt.
+      - name: Prisma generate
+        run: pnpm --filter @revio/api prisma:generate
+
+      - name: Typecheck
+        run: pnpm --filter @revio/api typecheck
+
+      - name: Tests
+        run: pnpm --filter @revio/api test
+
+  admin:
+    name: Admin — build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.6.3
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm --filter @revio/admin build
