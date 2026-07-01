@@ -10,6 +10,7 @@ export function OptionsContent({
   onShowLogin, onShowRegister,
   onShowFeedback, onShowChangePassword, onLogout,
   onShowDebug,
+  onShowWorkingHours, onShowServices, onShowBlockedTimes,
   c, t, styles,
 }) {
   const [debugTapCount, setDebugTapCount] = React.useState(0);
@@ -64,6 +65,37 @@ const renderOptions = () => {
     <View style={{ flex: 1 }}>
       <AccountHeader c={c} subtitle={t('optionsSubtitle')} showEdit />
       <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 32, paddingTop: SPACE.sm }]} showsVerticalScrollIndicator={false}>
+
+        {/* ── Praxis (nur Therapeuten mit aktiviertem Booking) ── */}
+        {loggedInTherapist?.bookingMode === 'FIRST_APPOINTMENT_REQUEST' && (
+          <>
+            <SectionHeader title="Praxis" />
+            <OptionGroup>
+              <OptionRow
+                label="Arbeitszeiten"
+                subtitle="Wiederkehrende Arbeitszeiten festlegen"
+                icon="time-outline"
+                onPress={onShowWorkingHours}
+                valueColor={c.primary}
+              />
+              <OptionRow
+                label="Leistungen"
+                subtitle="Dauer pro Heilmittel festlegen"
+                icon="medkit-outline"
+                onPress={onShowServices}
+                valueColor={c.primary}
+              />
+              <OptionRow
+                label="Blockzeiten"
+                subtitle="Pausen, Urlaub, Hausbesuche blockieren"
+                icon="ban-outline"
+                onPress={onShowBlockedTimes}
+                valueColor={c.primary}
+                last
+              />
+            </OptionGroup>
+          </>
+        )}
 
         {/* ── App-Einstellungen ── */}
         <SectionHeader title="App-Einstellungen" />

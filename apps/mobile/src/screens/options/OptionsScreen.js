@@ -10,6 +10,9 @@ import { FeedbackModal } from '../../modals/FeedbackModal';
 import { ChangePasswordModal } from '../../modals/ChangePasswordModal';
 import { AuthDebugScreen } from '../AuthDebugScreen';
 import { useAuth } from '../../context/AuthContext';
+import { WorkingHoursScreen } from '../therapy/WorkingHoursScreen';
+import { TherapistServicesScreen } from '../therapy/TherapistServicesScreen';
+import { BlockedTimesScreen } from '../therapy/BlockedTimesScreen';
 
 const t = (key) => translations.de[key] ?? key;
 
@@ -32,12 +35,25 @@ export function OptionsTabScreen() {
   const [showFeedback, setShowFeedback] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [showDebug, setShowDebug] = useState(false);
+  const [showWorkingHours, setShowWorkingHours] = useState(false);
+  const [showServices, setShowServices] = useState(false);
+  const [showBlockedTimes, setShowBlockedTimes] = useState(false);
 
   const handleLogout = async () => {
     await logoutFromContext();
     signOut();
     showLoginTab(navigation);
   };
+
+  if (showWorkingHours) {
+    return <WorkingHoursScreen c={c} authToken={authToken} onBack={() => setShowWorkingHours(false)} />;
+  }
+  if (showServices) {
+    return <TherapistServicesScreen c={c} authToken={authToken} onBack={() => setShowServices(false)} />;
+  }
+  if (showBlockedTimes) {
+    return <BlockedTimesScreen c={c} authToken={authToken} onBack={() => setShowBlockedTimes(false)} />;
+  }
 
   return (
     <>
@@ -52,6 +68,9 @@ export function OptionsTabScreen() {
         onShowChangePassword={() => setShowChangePassword(true)}
         onLogout={handleLogout}
         onShowDebug={() => setShowDebug(true)}
+        onShowWorkingHours={() => setShowWorkingHours(true)}
+        onShowServices={() => setShowServices(true)}
+        onShowBlockedTimes={() => setShowBlockedTimes(true)}
         c={c}
         t={t}
         styles={appStyles}
