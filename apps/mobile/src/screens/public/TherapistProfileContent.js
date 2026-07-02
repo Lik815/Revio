@@ -110,7 +110,7 @@ export function TherapistProfileContent(props) {
   const bookingSlots = Array.isArray(thWithSlots?.availableSlots)
     ? [...thWithSlots.availableSlots].sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt))
     : [];
-  const hasOnlineBooking = canOpenBookingModal && bookingSlots.length > 0;
+  const hasOnlineBooking = canOpenBookingModal;
   const showBookingBar = accountType !== 'therapist' && accountType !== 'manager';
   const slotGroups = bookingSlots.reduce((acc, slot) => {
     const dayKey = getSlotDayKey(slot.startsAt);
