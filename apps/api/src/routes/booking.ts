@@ -14,12 +14,14 @@ function isPostgres(): boolean {
 }
 
 // djb2-Hash der therapistId → stabiler pg_advisory_xact_lock-Schlüssel pro Therapeut.
-function therapistLockId(therapistId: string): bigint {
+// Gibt uint32 (JS number) zurück — wird via $queryRawUnsafe direkt in SQL eingebettet
+// um BigInt-Serialisierungsprobleme von Prisma's $queryRaw zu umgehen.
+function therapistLockId(therapistId: string): number {
   let h = 5381;
   for (let i = 0; i < therapistId.length; i++) {
     h = ((Math.imul(33, h) ^ therapistId.charCodeAt(i)) >>> 0);
   }
-  return BigInt(h);
+  return h;
 }
 
 async function resolvePatient(fastify: FastifyInstance, token: string) {
@@ -365,7 +367,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
         // Advisory Lock: serialisiert gleichzeitige Buchungen desselben Therapeuten
         // (nur PostgreSQL; SQLite überspringen — kein $queryRaw-Support für diese Syntax).
         if (isPostgres()) {
-          await tx.$queryRaw`SELECT pg_advisory_xact_lock(${therapistLockId(therapistId)}::bigint)`;
+          await tx.$queryRawUnsafe(`SELECT pg_advisory_xact_lock(${therapistLockId(therapistId)}::bigint)`);
         }
 
         // Race-Condition-Schutz: Überschneidung mit bestehenden PENDING/CONFIRMED-Buchungen

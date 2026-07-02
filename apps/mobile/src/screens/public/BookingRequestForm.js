@@ -381,7 +381,7 @@ export function BookingRequestForm({ c, t, therapist, authToken, onSuccess, onCl
                               return (
                                 <Pressable
                                   key={slot.startsAt}
-                                  onPress={() => { setSelectedStartsAt(slot.startsAt); setSelectedEndsAt(slot.endsAt); }}
+                                  onPress={() => { setSelectedStartsAt(slot.startsAt); setSelectedEndsAt(slot.endsAt); setStep(4); }}
                                   style={{
                                     paddingVertical: 10, paddingHorizontal: 14,
                                     borderRadius: RADIUS.sm, borderWidth: 1.5,
@@ -491,14 +491,14 @@ export function BookingRequestForm({ c, t, therapist, authToken, onSuccess, onCl
 
         {/* Action */}
         <View style={{ marginTop: SPACE.sm }}>
-          {step < 4 ? (
+          {step < 4 && step !== 3 ? (
             <Pressable
               onPress={handleNext}
               style={{ backgroundColor: c.primary, borderRadius: RADIUS.md, paddingVertical: 16, alignItems: 'center' }}
             >
               <Text style={{ ...TYPE.label, color: '#fff', fontSize: 16 }}>Weiter</Text>
             </Pressable>
-          ) : (
+          ) : step === 4 ? (
             <Pressable
               onPress={handleSubmit}
               disabled={loading || !consent}
@@ -512,7 +512,7 @@ export function BookingRequestForm({ c, t, therapist, authToken, onSuccess, onCl
                 : <Text style={{ ...TYPE.label, color: '#fff', fontSize: 16 }}>Anfrage senden</Text>
               }
             </Pressable>
-          )}
+          ) : null}
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
