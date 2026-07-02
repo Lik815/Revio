@@ -69,7 +69,7 @@ export function TherapistFilteredSlotsScreen({
                 <View style={{ width: 9, height: 9, borderRadius: 4.5, backgroundColor: dotColor }} />
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontSize: 14, fontWeight: '700', color: c.text }}>
-                    {kind === 'requested' ? 'Neue Anfrage' : (booking?.patientName ?? 'Gebucht')}
+                    {booking?.patientName ?? (kind === 'requested' ? 'Neue Anfrage' : 'Gebucht')}
                   </Text>
                   <Text style={{ fontSize: 12, color: c.muted, marginTop: 2 }}>
                     {dateLabel} · {time} Uhr · {durationMin} Min

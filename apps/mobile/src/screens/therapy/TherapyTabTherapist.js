@@ -71,8 +71,7 @@ export function TherapyTabTherapist({
   );
 
   const handleOpenDetail = (booking) => {
-    onSelectTherapistDetailBooking(booking);
-    onTherapistCancelRequest(booking.id);
+    onOpenBookingDetail(booking);
   };
 
   if (filterListKind) {
