@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { RADIUS, SHADOW, isSameDay, startOfDay, activeBookingItems, hasWorkingHoursOnDay, computeDayPeriods, splitAtHourBoundaries } from '../utils/app-utils';
+import { RADIUS, SHADOW, isSameDay, startOfDay, activeBookingItems, hasWorkingHoursOnDay, computeDayPeriods, splitAtHalfHourBoundaries } from '../utils/app-utils';
 import { buildCalendar } from '../utils/recurring-slots';
 
 const WEEKDAY_LABELS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
@@ -70,18 +70,19 @@ export function TherapistMonthCalendar({
       return true;
     });
     if (!activeRules.length) return [];
-    const startHour = Math.floor(Math.min(...activeRules.map((r) => r.startMinute)) / 60);
-    const endHour = Math.ceil(Math.max(...activeRules.map((r) => r.endMinute)) / 60);
-    const chunks = splitAtHourBoundaries(dayPeriods);
-    const byHour = {};
+    const startSlot = Math.floor(Math.min(...activeRules.map((r) => r.startMinute)) / 30);
+    const endSlot = Math.ceil(Math.max(...activeRules.map((r) => r.endMinute)) / 30);
+    const chunks = splitAtHalfHourBoundaries(dayPeriods);
+    const bySlot = {};
     for (const chunk of chunks) {
-      const h = new Date(chunk.startsAt).getHours();
-      if (!byHour[h]) byHour[h] = [];
-      byHour[h].push(chunk);
+      const d = new Date(chunk.startsAt);
+      const key = d.getHours() * 2 + (d.getMinutes() >= 30 ? 1 : 0);
+      if (!bySlot[key]) bySlot[key] = [];
+      bySlot[key].push(chunk);
     }
-    return Array.from({ length: endHour - startHour }, (_, i) => {
-      const h = startHour + i;
-      return { hour: h, items: byHour[h] ?? [] };
+    return Array.from({ length: endSlot - startSlot }, (_, i) => {
+      const slot = startSlot + i;
+      return { slotIndex: slot, items: bySlot[slot] ?? [] };
     });
   }, [dayPeriods, selectedDate, workingHoursRules]);
 
@@ -174,10 +175,12 @@ export function TherapistMonthCalendar({
         {hourRows.length === 0 ? (
           <Text style={{ fontSize: 13, color: c.muted }}>Keine Arbeitszeit an diesem Tag.</Text>
         ) : (
-          hourRows.map(({ hour, items }) => {
-            const hourLabel = `${String(hour).padStart(2, '0')}:00`;
+          hourRows.map(({ slotIndex, items }) => {
+            const h = Math.floor(slotIndex / 2);
+            const m = (slotIndex % 2) * 30;
+            const hourLabel = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
             return (
-              <View key={hour} style={{ marginBottom: 2 }}>
+              <View key={slotIndex} style={{ marginBottom: 2 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
                   <Text style={{ fontSize: 12, fontWeight: '700', color: c.muted, width: 44, letterSpacing: 0.2 }}>{hourLabel}</Text>
                   <View style={{ flex: 1, height: 1, backgroundColor: c.border }} />

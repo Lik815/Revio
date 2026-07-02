@@ -490,6 +490,7 @@ export {
   computeDayPeriods,
   hasWorkingHoursOnDay,
   splitAtHourBoundaries,
+  splitAtHalfHourBoundaries,
 };
 
 function formatDayHeader(isoString, locale = 'de-DE') {
@@ -643,6 +644,31 @@ function splitAtHourBoundaries(periods) {
       nextHour.setMinutes(0, 0, 0);
       if (nextHour.getTime() <= s) nextHour.setHours(nextHour.getHours() + 1);
       const chunkEnd = Math.min(nextHour.getTime(), e);
+      if (chunkEnd - s >= 60_000) {
+        result.push({ ...period, startsAt: new Date(s).toISOString(), endsAt: new Date(chunkEnd).toISOString() });
+      }
+      s = chunkEnd;
+    }
+  }
+  return result;
+}
+
+function splitAtHalfHourBoundaries(periods) {
+  const result = [];
+  for (const period of periods) {
+    let s = new Date(period.startsAt).getTime();
+    const e = new Date(period.endsAt).getTime();
+    while (s < e) {
+      const next = new Date(s);
+      const m = next.getMinutes();
+      if (m < 30) {
+        next.setMinutes(30, 0, 0);
+      } else {
+        next.setMinutes(0, 0, 0);
+        next.setHours(next.getHours() + 1);
+      }
+      if (next.getTime() <= s) next.setMinutes(next.getMinutes() + 30, 0, 0);
+      const chunkEnd = Math.min(next.getTime(), e);
       if (chunkEnd - s >= 60_000) {
         result.push({ ...period, startsAt: new Date(s).toISOString(), endsAt: new Date(chunkEnd).toISOString() });
       }

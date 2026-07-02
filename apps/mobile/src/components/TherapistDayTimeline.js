@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { RADIUS, SHADOW, computeDayPeriods, splitAtHourBoundaries } from '../utils/app-utils';
+import { RADIUS, SHADOW, computeDayPeriods, splitAtHalfHourBoundaries } from '../utils/app-utils';
 
 const TIME_COL_WIDTH = 52;
 
@@ -21,12 +21,18 @@ function formatDuration(startsAt, endsAt) {
   return m === 0 ? `${h} Std` : `${h} Std ${m} Min`;
 }
 
-function HourBlock({ c, hour, items, onOpenBooking }) {
+function slotLabel(slotIndex) {
+  const h = Math.floor(slotIndex / 2);
+  const m = (slotIndex % 2) * 30;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+function HourBlock({ c, slotIndex, items, onOpenBooking }) {
   return (
     <View style={{ marginBottom: 2 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
         <Text style={{ fontSize: 12, fontWeight: '700', color: c.muted, width: TIME_COL_WIDTH, letterSpacing: 0.2 }}>
-          {formatHour(hour)}
+          {slotLabel(slotIndex)}
         </Text>
         <View style={{ flex: 1, height: 1, backgroundColor: c.border }} />
       </View>
@@ -133,20 +139,21 @@ export function TherapistDayTimeline({
     });
     if (!activeRules.length) return [];
 
-    const startHour = Math.floor(Math.min(...activeRules.map((r) => r.startMinute)) / 60);
-    const endHour = Math.ceil(Math.max(...activeRules.map((r) => r.endMinute)) / 60);
+    const startSlot = Math.floor(Math.min(...activeRules.map((r) => r.startMinute)) / 30);
+    const endSlot = Math.ceil(Math.max(...activeRules.map((r) => r.endMinute)) / 30);
 
-    const chunks = splitAtHourBoundaries(periods);
-    const byHour = {};
+    const chunks = splitAtHalfHourBoundaries(periods);
+    const bySlot = {};
     for (const chunk of chunks) {
-      const h = new Date(chunk.startsAt).getHours();
-      if (!byHour[h]) byHour[h] = [];
-      byHour[h].push(chunk);
+      const d = new Date(chunk.startsAt);
+      const key = d.getHours() * 2 + (d.getMinutes() >= 30 ? 1 : 0);
+      if (!bySlot[key]) bySlot[key] = [];
+      bySlot[key].push(chunk);
     }
 
-    return Array.from({ length: endHour - startHour }, (_, i) => {
-      const h = startHour + i;
-      return { hour: h, items: byHour[h] ?? [] };
+    return Array.from({ length: endSlot - startSlot }, (_, i) => {
+      const slot = startSlot + i;
+      return { slotIndex: slot, items: bySlot[slot] ?? [] };
     });
   }, [periods, selectedDate, workingHoursRules]);
 
@@ -173,8 +180,8 @@ export function TherapistDayTimeline({
           </Text>
         </View>
       ) : (
-        hourRows.map(({ hour, items }) => (
-          <HourBlock key={hour} c={c} hour={hour} items={items} onOpenBooking={onOpenBooking} />
+        hourRows.map(({ slotIndex, items }) => (
+          <HourBlock key={slotIndex} c={c} slotIndex={slotIndex} items={items} onOpenBooking={onOpenBooking} />
         ))
       )}
     </View>
