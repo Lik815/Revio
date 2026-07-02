@@ -287,6 +287,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
         firstName: (userWithProfile as any).firstName ?? '',
         lastName: (userWithProfile as any).lastName ?? '',
         phone: (userWithProfile as any).phone ?? null,
+        kassenart: (userWithProfile as any).kassenart ?? null,
         createdAt: userWithProfile.createdAt,
       };
     }
@@ -390,12 +391,13 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       include: { therapistProfile: true },
     });
 
-    // Patient profile update — only firstName/lastName
+    // Patient profile update
     if (user?.role === 'patient') {
       const patientSchema = z.object({
         firstName: z.string().min(1).optional(),
         lastName: z.string().min(1).optional(),
         phone: z.string().max(30).nullable().optional(),
+        kassenart: z.enum(['gesetzlich', 'privat', 'selbstzahler']).nullable().optional(),
       });
       const parsed = patientSchema.safeParse(request.body);
       if (!parsed.success) return reply.badRequest(parsed.error.flatten().toString());
@@ -405,6 +407,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
           ...(parsed.data.firstName !== undefined ? { firstName: parsed.data.firstName } : {}),
           ...(parsed.data.lastName !== undefined ? { lastName: parsed.data.lastName } : {}),
           ...(parsed.data.phone !== undefined ? { phone: parsed.data.phone } : {}),
+          ...(parsed.data.kassenart !== undefined ? { kassenart: parsed.data.kassenart } : {}),
         },
       });
       return {
@@ -414,6 +417,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
         firstName: updated.firstName ?? '',
         lastName: updated.lastName ?? '',
         phone: (updated as any).phone ?? null,
+        kassenart: (updated as any).kassenart ?? null,
       };
     }
 

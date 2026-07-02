@@ -9,6 +9,7 @@ import { OptionsContent } from './OptionsContent';
 import { FeedbackModal } from '../../modals/FeedbackModal';
 import { ChangePasswordModal } from '../../modals/ChangePasswordModal';
 import { PatientPhoneModal } from '../../modals/PatientPhoneModal';
+import { PatientKassenartModal } from '../../modals/PatientKassenartModal';
 import { AuthDebugScreen } from '../AuthDebugScreen';
 import { useAuth } from '../../context/AuthContext';
 import { WorkingHoursScreen } from '../therapy/WorkingHoursScreen';
@@ -37,6 +38,7 @@ export function OptionsTabScreen() {
   const [showFeedback, setShowFeedback] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [showPhoneEdit, setShowPhoneEdit] = useState(false);
+  const [showKassenartEdit, setShowKassenartEdit] = useState(false);
   const [showDebug, setShowDebug] = useState(false);
   const [showWorkingHours, setShowWorkingHours] = useState(false);
   const [showServices, setShowServices] = useState(false);
@@ -75,6 +77,7 @@ export function OptionsTabScreen() {
         onShowWorkingHours={() => setShowWorkingHours(true)}
         onShowServices={() => setShowServices(true)}
         onShowBlockedTimes={() => setShowBlockedTimes(true)}
+        onShowKassenartEdit={() => setShowKassenartEdit(true)}
         c={c}
         t={t}
         styles={appStyles}
@@ -103,6 +106,15 @@ export function OptionsTabScreen() {
         authToken={authToken}
         currentPhone={loggedInPatient?.phone ?? ''}
         onSaved={(phone) => { updatePatientProfile({ phone }); setShowPhoneEdit(false); }}
+        c={c}
+      />
+
+      <PatientKassenartModal
+        visible={showKassenartEdit}
+        onClose={() => setShowKassenartEdit(false)}
+        authToken={authToken}
+        currentKassenart={loggedInPatient?.kassenart ?? null}
+        onSaved={(kassenart) => { updatePatientProfile({ kassenart }); setShowKassenartEdit(false); }}
         c={c}
       />
 

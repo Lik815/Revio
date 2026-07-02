@@ -102,6 +102,7 @@ export function BookingRequestForm({ c, t, therapist, authToken, onSuccess, onCl
   const insets = useSafeAreaInsets();
   const { heilmittelOptions } = useConfigOptions();
   const loggedInPatient = useAppStore(appStoreSelectors.loggedInPatient);
+  const updatePatientProfile = useAppStore((s) => s.updatePatientProfile);
 
   // Schritt 1 überspringen wenn Kassenart bereits im Profil bekannt
   const knownKassenart = loggedInPatient?.kassenart ?? null;
@@ -119,6 +120,7 @@ export function BookingRequestForm({ c, t, therapist, authToken, onSuccess, onCl
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [saveKassenart, setSaveKassenart] = useState(false);
   const [bookedStartsAt, setBookedStartsAt] = useState(null);
   const [bookedEndsAt, setBookedEndsAt] = useState(null);
   const [expandedDate, setExpandedDate] = useState(null);
@@ -173,11 +175,21 @@ export function BookingRequestForm({ c, t, therapist, authToken, onSuccess, onCl
     setStep((s) => s - 1);
   }
 
-  function handleNext() {
+  async function handleNext() {
     setError('');
     if (step === 1 && !selectedKassenart) {
       setError('Bitte wähle deine Versicherungsart aus.');
       return;
+    }
+    if (step === 1 && saveKassenart && selectedKassenart && authToken) {
+      try {
+        const res = await fetch(`${getBaseUrl()}/auth/me`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
+          body: JSON.stringify({ kassenart: selectedKassenart }),
+        });
+        if (res.ok) updatePatientProfile({ kassenart: selectedKassenart });
+      } catch {}
     }
     if (step === 2 && !selectedHeilmittel) {
       setError('Bitte wähle ein Heilmittel aus.');
@@ -299,6 +311,22 @@ export function BookingRequestForm({ c, t, therapist, authToken, onSuccess, onCl
               onSelect={setSelectedKassenart}
               c={c}
             />
+            {loggedInPatient && !loggedInPatient.kassenart && selectedKassenart && (
+              <Pressable
+                onPress={() => setSaveKassenart((v) => !v)}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: SPACE.md, paddingVertical: 4 }}
+              >
+                <View style={{
+                  width: 20, height: 20, borderRadius: 5, borderWidth: 2,
+                  borderColor: saveKassenart ? c.primary : c.border,
+                  backgroundColor: saveKassenart ? c.primary : 'transparent',
+                  alignItems: 'center', justifyContent: 'center',
+                }}>
+                  {saveKassenart && <Ionicons name="checkmark" size={13} color="#fff" />}
+                </View>
+                <Text style={{ fontSize: 13, color: c.muted }}>In meinem Profil speichern</Text>
+              </Pressable>
+            )}
           </View>
         )}
 

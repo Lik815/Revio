@@ -8,7 +8,7 @@ export function OptionsContent({
   loggedInTherapist, loggedInPatient,
   themeMode, setThemeMode,
   onShowLogin, onShowRegister,
-  onShowFeedback, onShowChangePassword, onShowPhoneEdit, onLogout,
+  onShowFeedback, onShowChangePassword, onShowPhoneEdit, onShowKassenartEdit, onLogout,
   onShowDebug,
   onShowWorkingHours, onShowServices, onShowBlockedTimes,
   c, t, styles,
@@ -172,6 +172,17 @@ const renderOptions = () => {
                   subtitle={loggedInPatient.phone ? loggedInPatient.phone : 'Noch nicht hinterlegt'}
                   icon="call-outline"
                   onPress={onShowPhoneEdit}
+                  valueColor={c.primary}
+                />
+              )}
+              {loggedInPatient && (
+                <OptionRow
+                  label="Versicherungsart"
+                  subtitle={loggedInPatient.kassenart
+                    ? ({ gesetzlich: 'Gesetzlich', privat: 'Privat', selbstzahler: 'Selbstzahler' }[loggedInPatient.kassenart] ?? loggedInPatient.kassenart)
+                    : 'Noch nicht hinterlegt'}
+                  icon="card-outline"
+                  onPress={onShowKassenartEdit}
                   valueColor={c.primary}
                 />
               )}
