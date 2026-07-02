@@ -52,53 +52,75 @@ const PatientListRow = React.memo(function PatientListRow({ c, patient, onSelect
   );
 });
 
+const FILTER_MODES = [
+  { key: 'all', label: 'Alle' },
+  { key: 'upcoming', label: 'Bevorstehend' },
+  { key: 'az', label: 'A–Z' },
+];
+
 export function PatientsPane({
   patients, patientsLoading, patientsLastLoadedAt, onSelectPatient, c,
   headerContent = null, therapyRefreshing = false, onRefresh = null,
 }) {
   const [query, setQuery] = useState('');
-  const [upcomingOnly, setUpcomingOnly] = useState(false);
+  const [filterMode, setFilterMode] = useState('all');
   const showLoading = patientsLoading && patientsLastLoadedAt === 0;
   const safePatients = Array.isArray(patients) ? patients : [];
   const filteredPatients = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    return safePatients
-      .filter((patient) => {
-        if (upcomingOnly && !patient.nextAppointmentAt) return false;
-        if (!needle) return true;
-        return [patient.fullName, patient.phone, patient.email]
-          .filter(Boolean)
-          .some((value) => String(value).toLowerCase().includes(needle));
-      })
-      .sort((a, b) => {
-        if (!upcomingOnly) return 0;
-        return new Date(a.nextAppointmentAt ?? 0) - new Date(b.nextAppointmentAt ?? 0);
-      });
-  }, [query, safePatients, upcomingOnly]);
+    const filtered = safePatients.filter((patient) => {
+      if (filterMode === 'upcoming' && !patient.nextAppointmentAt) return false;
+      if (!needle) return true;
+      return [patient.fullName, patient.phone, patient.email]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(needle));
+    });
+    if (filterMode === 'upcoming') {
+      return [...filtered].sort((a, b) => new Date(a.nextAppointmentAt) - new Date(b.nextAppointmentAt));
+    }
+    if (filterMode === 'az') {
+      return [...filtered].sort((a, b) => (a.fullName ?? '').localeCompare(b.fullName ?? '', 'de'));
+    }
+    return filtered;
+  }, [query, safePatients, filterMode]);
 
   const handleSelect = useCallback((patientId) => {
     onSelectPatient(patientId);
   }, [onSelectPatient]);
 
   const renderSearch = () => (
-    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: c.card, borderRadius: RADIUS.md, borderWidth: 1, borderColor: c.border, minHeight: 44, paddingLeft: 12, marginBottom: SPACE.md, ...SHADOW.card }}>
-      <Ionicons name="search-outline" size={18} color={c.muted} />
-      <TextInput
-        value={query}
-        onChangeText={setQuery}
-        placeholder="Patienten suchen..."
-        placeholderTextColor={c.muted}
-        style={{ flex: 1, color: c.text, fontSize: 14, paddingHorizontal: 10, paddingVertical: 0 }}
-        autoCapitalize="none"
-        autoCorrect={false}
-      />
-      <Pressable
-        onPress={() => setUpcomingOnly((value) => !value)}
-        hitSlop={8}
-        style={{ width: 44, alignSelf: 'stretch', borderLeftWidth: 1, borderLeftColor: c.border, alignItems: 'center', justifyContent: 'center', borderTopRightRadius: RADIUS.md, borderBottomRightRadius: RADIUS.md, backgroundColor: upcomingOnly ? c.primaryBg : 'transparent' }}
-      >
-        <Ionicons name="options-outline" size={18} color={upcomingOnly ? c.primary : c.text} />
-      </Pressable>
+    <View style={{ gap: SPACE.sm, marginBottom: SPACE.md }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: c.card, borderRadius: RADIUS.md, borderWidth: 1, borderColor: c.border, minHeight: 44, paddingLeft: 12, ...SHADOW.card }}>
+        <Ionicons name="search-outline" size={18} color={c.muted} />
+        <TextInput
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Patienten suchen..."
+          placeholderTextColor={c.muted}
+          style={{ flex: 1, color: c.text, fontSize: 14, paddingHorizontal: 10, paddingVertical: 0 }}
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+        {query.length > 0 && (
+          <Pressable onPress={() => setQuery('')} hitSlop={8} style={{ paddingHorizontal: 12 }}>
+            <Ionicons name="close-circle" size={16} color={c.muted} />
+          </Pressable>
+        )}
+      </View>
+      <View style={{ flexDirection: 'row', gap: 8 }}>
+        {FILTER_MODES.map(({ key, label }) => {
+          const active = filterMode === key;
+          return (
+            <Pressable
+              key={key}
+              onPress={() => setFilterMode(key)}
+              style={{ paddingVertical: 7, paddingHorizontal: 14, borderRadius: RADIUS.full, borderWidth: 1, borderColor: active ? c.primary : c.border, backgroundColor: active ? c.primaryBg : c.card }}
+            >
+              <Text style={{ fontSize: 13, fontWeight: '600', color: active ? c.primary : c.muted }}>{label}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
     </View>
   );
 
@@ -125,6 +147,14 @@ export function PatientsPane({
           <Text style={{ fontSize: 13, color: c.muted, textAlign: 'center', lineHeight: 20 }}>
             Sobald jemand einen Termin bei dir bucht, erscheint die Person hier.
           </Text>
+        </View>
+      );
+    }
+    if (filterMode === 'upcoming') {
+      return (
+        <View style={{ borderWidth: 1, borderColor: c.border, borderRadius: RADIUS.lg, paddingVertical: 28, paddingHorizontal: 20, alignItems: 'center', gap: 8 }}>
+          <Ionicons name="calendar-outline" size={30} color={c.muted} />
+          <Text style={{ fontSize: 15, fontWeight: '700', color: c.text, textAlign: 'center' }}>Keine bevorstehenden Termine</Text>
         </View>
       );
     }
