@@ -31,7 +31,7 @@ export function TherapistSummaryCard({
   c, confirmedCount, pendingCount, onPressBooked, onPressPending,
 }) {
   return (
-    <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
+    <View style={{ flexDirection: 'row', gap: 8 }}>
       <StatChip c={c} value={confirmedCount} label="Gebucht" dotColor={c.primary} onPress={onPressBooked} />
       <StatChip c={c} value={pendingCount} label="Anfragen" dotColor={c.warning ?? '#B78700'} onPress={onPressPending} />
     </View>

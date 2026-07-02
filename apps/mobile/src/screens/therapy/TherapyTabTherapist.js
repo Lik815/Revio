@@ -166,8 +166,6 @@ export function TherapyTabTherapist({
         bottom: insets.bottom + 8,
         left: 16,
         right: 16,
-        flexDirection: 'row',
-        gap: 8,
       }}>
         <TherapistSummaryCard
           c={c}
