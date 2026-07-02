@@ -8,7 +8,6 @@ import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../hooks/use-theme';
 import { useNotifications } from '../../context/NotificationContext';
 import { useToast } from '../../hooks/use-toast';
-import { useFavorites } from '../../hooks/use-favorites';
 import { appStyles } from '../../styles/app-styles';
 import { translations } from '../../i18n/translations';
 import { ROOT_ROUTES, TAB_ROUTES } from '../../navigation/route-names';
@@ -40,8 +39,7 @@ export function ProfileTabScreen() {
   const { certificationOptions, specializationOptions, heilmittelOptions } = useConfigOptions();
   const { toastMsg, toastAnim, showToast } = useToast();
 
-  const { myAppointments } = useTherapyData();
-  const { favorites } = useFavorites({ authToken });
+  const { myAppointments, favorites } = useTherapyData();
 
   const {
     showReviewNotificationModal, reviewNotification, markReviewNotificationSeen,
