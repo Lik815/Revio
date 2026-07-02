@@ -327,8 +327,13 @@ export async function bookingRoutes(fastify: FastifyInstance) {
     if (!canUseBookingMode(therapist)) {
       return reply.status(400).send({ error: 'This therapist does not accept booking requests' });
     }
-    if (!splitList(therapist.heilmittel ?? '').includes(heilmittel)) {
-      return reply.status(400).send({ error: 'Dieses Heilmittel wird von diesem Therapeuten nicht angeboten.' });
+    const therapistHeilmittelList = splitList(therapist.heilmittel ?? '');
+    if (!therapistHeilmittelList.includes(heilmittel)) {
+      // therapist.heilmittel kann Labels statt Keys enthalten (Legacy-Daten).
+      const hmOption = await fastify.prisma.heilmittelOption.findUnique({ where: { key: heilmittel } });
+      if (!hmOption || !therapistHeilmittelList.includes(hmOption.label)) {
+        return reply.status(400).send({ error: 'Dieses Heilmittel wird von diesem Therapeuten nicht angeboten.' });
+      }
     }
 
     const now = new Date();
