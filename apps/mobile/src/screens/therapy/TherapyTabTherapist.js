@@ -115,7 +115,7 @@ export function TherapyTabTherapist({
 
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: 8, paddingTop: 8 }]}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: 8, paddingTop: isListView ? 8 : insets.top + 12 }]}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={therapyRefreshing} onRefresh={onRefresh} tintColor={c.primary} />}
       >
