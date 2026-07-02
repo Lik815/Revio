@@ -588,7 +588,7 @@ export function TherapistProfileContent(props) {
         {hasOnlineBooking ? (
           <Pressable
             style={{ backgroundColor: c.primary, borderRadius: 14, paddingVertical: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 }}
-            onPress={() => setShowBookingModal(true)}
+            onPress={() => onBookingRequest(th)}
           >
             <Ionicons name="calendar-outline" size={20} color="#fff" />
             <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>Freie Termine ansehen</Text>
