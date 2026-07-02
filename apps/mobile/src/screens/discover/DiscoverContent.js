@@ -114,6 +114,7 @@ export function DiscoverContent(props) {
     setSearchRadius,
     requestableOnly,
     setRequestableOnly,
+    bannerExtraPadding = 0,
   } = props;
 
   const insets = useSafeAreaInsets();
@@ -720,7 +721,7 @@ export function DiscoverContent(props) {
       <ScrollView
         ref={discoverScrollRef}
         scrollEnabled={mapScrollEnabled}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: 80 }]}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: 80 + bannerExtraPadding }]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >

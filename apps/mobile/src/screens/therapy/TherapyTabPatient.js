@@ -6,6 +6,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { AccountHeader } from '../../components/AccountHeader';
 import { PatientAppointmentCard, PatientNextAppointmentCard } from './AppointmentCards';
+import { getAppointmentDate, getNextPatientAppointment } from '../../utils/app-utils';
 
 const shouldShowSectionLoading = (isLoading, lastLoadedAt) => isLoading && lastLoadedAt === 0;
 
@@ -19,24 +20,22 @@ export function TherapyTabPatient({
   // which list renders below — not an inline expansion, so only one list
   // is ever on screen at a time, in the same spot.
   const [activeView, setActiveView] = useState('kommend');
-  const getDate = (a) => new Date(a.startsAt ?? a.slot?.startsAt ?? a.confirmedSlotAt ?? 0);
 
   const { kommend, vergangen } = useMemo(() => {
     const now = new Date();
     const upcoming = [...myAppointments]
-      .filter(a => ['CONFIRMED', 'PENDING'].includes(a.status) && getDate(a) >= now)
-      .sort((a, b) => getDate(a) - getDate(b));
+      .filter(a => ['CONFIRMED', 'PENDING'].includes(a.status) && getAppointmentDate(a) >= now)
+      .sort((a, b) => getAppointmentDate(a) - getAppointmentDate(b));
     const past = [...myAppointments]
       .filter(a =>
         ['CANCELLED', 'DECLINED', 'EXPIRED'].includes(a.status) ||
-        (a.status === 'CONFIRMED' && getDate(a) < now)
+        (a.status === 'CONFIRMED' && getAppointmentDate(a) < now)
       )
-      .sort((a, b) => getDate(b) - getDate(a));
+      .sort((a, b) => getAppointmentDate(b) - getAppointmentDate(a));
     return { kommend: upcoming, vergangen: past };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [myAppointments]);
 
-  const nextApt = kommend[0] ?? null;
+  const nextApt = getNextPatientAppointment(myAppointments);
   const isPastView = activeView === 'vergangen';
   const activeList = isPastView ? vergangen : kommend;
 

@@ -1,19 +1,23 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { Alert, Linking } from 'react-native';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
+import { useCallback } from 'react';
 import { appStoreSelectors, useAppStore } from '../../store/useStore';
 import { useTheme } from '../../hooks/use-theme';
 import { useFavorites } from '../../hooks/use-favorites';
 import { useToast } from '../../hooks/use-toast';
 import { useSearch } from '../../hooks/use-search';
 import { translations } from '../../i18n/translations';
-import { ROOT_ROUTES } from '../../navigation/route-names';
+import { ROOT_ROUTES, TAB_ROUTES } from '../../navigation/route-names';
 import { HeartButton } from '../../components/HeartButton';
 import { SkeletonCard } from '../../components/SkeletonCard';
 import { ToastOverlay } from '../../components/ToastOverlay';
 import { LocationSheet } from '../../modals/LocationSheet';
 import { appStyles } from '../../styles/app-styles';
 import { DiscoverContent } from './DiscoverContent';
+import { NextAppointmentBanner, NEXT_APPOINTMENT_BANNER_HEIGHT } from '../../components/NextAppointmentBanner';
+import { useTherapyData } from '../../context/TherapyContext';
+import { getNextPatientAppointment } from '../../utils/app-utils';
 
 const t = (key) => translations.de[key] ?? key;
 
@@ -33,6 +37,8 @@ export function DiscoverTabScreen() {
   const route = useRoute();
 
   const authToken = useAppStore(appStoreSelectors.authToken);
+  const accountType = useAppStore(appStoreSelectors.accountType);
+  const loggedInTherapist = useAppStore(appStoreSelectors.loggedInTherapist);
   const { c } = useTheme();
   const { toastMsg, toastAnim, showToast } = useToast();
 
@@ -41,11 +47,30 @@ export function DiscoverTabScreen() {
   const search = useSearch({ t });
   const discoverScrollRef = useRef(null);
 
+  const {
+    myAppointments,
+    appointmentsLastLoadedAt,
+    refreshTherapyTab,
+  } = useTherapyData();
+
+  // Nachladen wenn eingeloggt und Termine veraltet/nie geladen
+  useFocusEffect(
+    useCallback(() => {
+      if (!authToken || accountType !== 'patient') return;
+      refreshTherapyTab(authToken, accountType, loggedInTherapist, { force: false });
+    }, [authToken, accountType, loggedInTherapist, refreshTherapyTab]),
+  );
+
   useEffect(() => {
     if (!route.params?.resetToHomeAt) return;
     search.resetDiscoverState();
     discoverScrollRef.current?.scrollTo?.({ y: 0, animated: false });
   }, [route.params?.resetToHomeAt]);
+
+  const nextAppointment = useMemo(() => {
+    if (accountType !== 'patient') return null;
+    return getNextPatientAppointment(myAppointments);
+  }, [myAppointments, accountType]);
 
   const ThemedHeartButton = (props) => (
     <HeartButton {...props} savedColor={c.saved} unsavedColor={props.unsavedColor ?? c.muted} />
@@ -53,6 +78,10 @@ export function DiscoverTabScreen() {
 
   const openTherapistById = (id, fallback = null) => {
     navigation.navigate(ROOT_ROUTES.THERAPIST_PROFILE, { therapistId: id, therapist: fallback });
+  };
+
+  const handleBannerPress = () => {
+    navigation.navigate(ROOT_ROUTES.MAIN_TABS, { screen: TAB_ROUTES.THERAPY });
   };
 
   return (
@@ -111,6 +140,13 @@ export function DiscoverTabScreen() {
         toggleFortbildung={search.toggleFortbildung}
         userCoords={search.userCoords}
         viewMode={search.viewMode}
+        bannerExtraPadding={nextAppointment ? NEXT_APPOINTMENT_BANNER_HEIGHT + 16 : 0}
+      />
+
+      <NextAppointmentBanner
+        appointment={nextAppointment}
+        onPress={handleBannerPress}
+        c={c}
       />
 
       <LocationSheet

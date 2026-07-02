@@ -443,6 +443,18 @@ const GERMAN_CITIES = [
 
 const ICON_HIT_SLOP = { top: 12, bottom: 12, left: 12, right: 12 };
 
+function getAppointmentDate(a) {
+  return new Date(a.startsAt ?? a.slot?.startsAt ?? a.confirmedSlotAt ?? 0);
+}
+
+function getNextPatientAppointment(appointments, now = new Date()) {
+  if (!Array.isArray(appointments)) return null;
+  const candidates = appointments
+    .filter((a) => ['CONFIRMED', 'PENDING'].includes(a.status) && getAppointmentDate(a) >= now)
+    .sort((a, b) => getAppointmentDate(a) - getAppointmentDate(b));
+  return candidates[0] ?? null;
+}
+
 export {
   COLORS,
   SPACE,
@@ -491,6 +503,8 @@ export {
   hasWorkingHoursOnDay,
   splitAtHourBoundaries,
   splitAtHalfHourBoundaries,
+  getNextPatientAppointment,
+  getAppointmentDate,
 };
 
 function formatDayHeader(isoString, locale = 'de-DE') {
