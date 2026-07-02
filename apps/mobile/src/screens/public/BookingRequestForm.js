@@ -13,7 +13,9 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getBaseUrl, kassenartOptions, RADIUS, SPACE, TUNNEL_HEADERS, TYPE } from '../../utils/app-utils';
 import { useConfigOptions } from '../../hooks/use-config-options';
+import { useAppStore, appStoreSelectors } from '../../store/useStore';
 
+const TOTAL_STEPS = 4;
 
 function formatSlot(startsAt, endsAt) {
   if (!startsAt) return '—';
@@ -33,20 +35,67 @@ function getDateRange() {
   return { from: from.toISOString(), to: to.toISOString() };
 }
 
-// Buchungsformular im dynamischen Buchungssystem:
-// Patient wählt zuerst das Heilmittel; Zeitfenster werden dann live berechnet.
-// Props availableSlots/slotsLoading/onReloadSlots werden nicht mehr genutzt
-// (Slots werden intern per GET /therapists/:id/available-slots geladen).
+function ProgressBar({ step, c }) {
+  return (
+    <View style={{ flexDirection: 'row', gap: 4, marginBottom: SPACE.lg }}>
+      {Array.from({ length: TOTAL_STEPS }, (_, i) => (
+        <View
+          key={i}
+          style={{
+            flex: 1, height: 3, borderRadius: 2,
+            backgroundColor: i < step ? c.primary : c.border,
+          }}
+        />
+      ))}
+    </View>
+  );
+}
+
+function ChipRow({ options, selected, onSelect, c }) {
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+      {options.map((opt) => {
+        const active = selected === opt.key;
+        return (
+          <Pressable
+            key={opt.key}
+            onPress={() => onSelect(opt.key)}
+            style={{
+              flexDirection: 'row', alignItems: 'center', gap: 6,
+              paddingVertical: 8, paddingHorizontal: 14,
+              borderRadius: RADIUS.lg, borderWidth: 1.5,
+              borderColor: active ? c.primary : c.border,
+              backgroundColor: active ? c.primaryBg : c.mutedBg,
+            }}
+          >
+            {active && <Ionicons name="checkmark" size={14} color={c.primary} />}
+            <Text style={{ fontSize: 13, color: active ? c.primary : c.muted, fontWeight: active ? '600' : '400' }}>
+              {opt.label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+// Buchungsformular im dynamischen Buchungssystem — 4-Schritte-Stepper.
 export function BookingRequestForm({ c, t, therapist, authToken, onSuccess, onClose }) {
   const insets = useSafeAreaInsets();
   const { heilmittelOptions } = useConfigOptions();
+  const loggedInPatient = useAppStore(appStoreSelectors.loggedInPatient);
 
+  // Schritt 1 überspringen wenn Kassenart bereits im Profil bekannt
+  const knownKassenart = loggedInPatient?.kassenart ?? null;
+  const firstStep = knownKassenart ? 2 : 1;
+
+  const [step, setStep] = useState(firstStep);
+  const [selectedKassenart, setSelectedKassenart] = useState(knownKassenart);
   const [selectedHeilmittel, setSelectedHeilmittel] = useState(null);
   const [slots, setSlots] = useState([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [selectedStartsAt, setSelectedStartsAt] = useState(null);
   const [selectedEndsAt, setSelectedEndsAt] = useState(null);
-  const [selectedKassenart, setSelectedKassenart] = useState(null);
   const [message, setMessage] = useState('');
   const [consent, setConsent] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -91,14 +140,35 @@ export function BookingRequestForm({ c, t, therapist, authToken, onSuccess, onCl
     finally { setSlotsLoading(false); }
   }, [therapist?.id]);
 
+  // Slots im Hintergrund laden sobald Heilmittel gewählt — bereit wenn Schritt 3 erscheint
   useEffect(() => {
     if (selectedHeilmittel) loadSlots(selectedHeilmittel);
   }, [selectedHeilmittel, loadSlots]);
 
+  function handleBack() {
+    setError('');
+    if (step <= firstStep) { onClose(); return; }
+    setStep((s) => s - 1);
+  }
+
+  function handleNext() {
+    setError('');
+    if (step === 1 && !selectedKassenart) {
+      setError('Bitte wähle deine Versicherungsart aus.');
+      return;
+    }
+    if (step === 2 && !selectedHeilmittel) {
+      setError('Bitte wähle ein Heilmittel aus.');
+      return;
+    }
+    if (step === 3 && !selectedStartsAt) {
+      setError('Bitte wähle einen Termin aus.');
+      return;
+    }
+    setStep((s) => s + 1);
+  }
+
   async function handleSubmit() {
-    if (!selectedHeilmittel) { setError('Bitte wähle zuerst ein Heilmittel aus.'); return; }
-    if (!selectedStartsAt) { setError('Bitte wähle einen Termin aus.'); return; }
-    if (!selectedKassenart) { setError('Bitte gib an, wie du versichert bist.'); return; }
     if (!consent) { setError('Bitte stimme der Datenschutzerklärung zu.'); return; }
     setError('');
     setLoading(true);
@@ -118,9 +188,9 @@ export function BookingRequestForm({ c, t, therapist, authToken, onSuccess, onCl
       const data = await res.json();
       if (!res.ok) {
         if (res.status === 409) {
-          // Zeitfenster wurde in der Zwischenzeit vergeben — neu laden
-          setError('');
+          setError('Dieser Termin wurde soeben vergeben. Bitte wähle einen anderen.');
           loadSlots(selectedHeilmittel);
+          setStep(3);
         } else {
           setError(data.error ?? 'Buchung fehlgeschlagen. Bitte erneut versuchen.');
         }
@@ -164,57 +234,79 @@ export function BookingRequestForm({ c, t, therapist, authToken, onSuccess, onCl
     );
   }
 
+  const stepTitles = { 1: 'Versicherung', 2: 'Heilmittel', 3: 'Termin', 4: 'Nachricht' };
+
   return (
     <KeyboardAvoidingView
       style={{ flex: 1, backgroundColor: c.background }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <View style={{ flexDirection: 'row', alignItems: 'center', padding: SPACE.lg, paddingBottom: SPACE.sm, backgroundColor: c.background, borderBottomWidth: 1, borderBottomColor: c.border }}>
-        <Pressable onPress={onClose} style={{ marginRight: 12, padding: 4 }} hitSlop={12}>
-          <Ionicons name="close" size={24} color={c.muted} />
+      {/* Header */}
+      <View style={{
+        flexDirection: 'row', alignItems: 'center',
+        padding: SPACE.lg, paddingBottom: SPACE.sm,
+        backgroundColor: c.background, borderBottomWidth: 1, borderBottomColor: c.border,
+      }}>
+        <Pressable onPress={handleBack} style={{ marginRight: 12, padding: 4 }} hitSlop={12}>
+          <Ionicons name={step <= firstStep ? 'close' : 'arrow-back'} size={24} color={c.muted} />
         </Pressable>
         <Text style={{ ...TYPE.h2, color: c.text, flex: 1 }}>Termin buchen</Text>
+        <Text style={{ fontSize: 13, color: c.muted }}>{stepTitles[step]}</Text>
       </View>
-      <ScrollView contentContainerStyle={{ padding: SPACE.lg, paddingBottom: insets.bottom + 40 }} keyboardShouldPersistTaps="handled">
 
+      <ScrollView
+        contentContainerStyle={{ padding: SPACE.lg, paddingBottom: insets.bottom + 40 }}
+        keyboardShouldPersistTaps="handled"
+      >
         <Text style={{ ...TYPE.caption, color: c.muted, marginBottom: SPACE.md }}>
           {therapist.fullName} · {therapist.professionalTitle}
         </Text>
 
-        {/* Schritt 1: Heilmittel wählen */}
-        {availableHeilmittel.length > 0 && (
-          <View style={{ marginBottom: SPACE.md }}>
-            <Text style={{ ...TYPE.label, color: c.text, marginBottom: SPACE.sm }}>Heilmittel wählen</Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-              {availableHeilmittel.map((opt) => {
-                const active = selectedHeilmittel === opt.key;
-                return (
-                  <Pressable
-                    key={opt.key}
-                    onPress={() => setSelectedHeilmittel(opt.key)}
-                    style={{
-                      flexDirection: 'row', alignItems: 'center', gap: 6,
-                      paddingVertical: 8, paddingHorizontal: 14,
-                      borderRadius: RADIUS.lg, borderWidth: 1.5,
-                      borderColor: active ? c.primary : c.border,
-                      backgroundColor: active ? c.primaryBg : c.mutedBg,
-                    }}
-                  >
-                    {active && <Ionicons name="checkmark" size={14} color={c.primary} />}
-                    <Text style={{ fontSize: 13, color: active ? c.primary : c.muted, fontWeight: active ? '600' : '400' }}>
-                      {opt.label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
+        <ProgressBar step={step} c={c} />
+
+        {/* Schritt 1: Versicherung */}
+        {step === 1 && (
+          <View>
+            <Text style={{ ...TYPE.h2, color: c.text, marginBottom: SPACE.xs }}>Wie bist du versichert?</Text>
+            <Text style={{ ...TYPE.caption, color: c.muted, marginBottom: SPACE.md }}>
+              Diese Information wird an den Therapeuten weitergegeben.
+            </Text>
+            <ChipRow
+              options={insuranceOptions}
+              selected={selectedKassenart}
+              onSelect={setSelectedKassenart}
+              c={c}
+            />
           </View>
         )}
 
-        {/* Schritt 2: Zeitfenster wählen (nur wenn Heilmittel gewählt) */}
-        {selectedHeilmittel && (
-          <View style={{ marginBottom: SPACE.md }}>
-            <Text style={{ ...TYPE.label, color: c.text, marginBottom: SPACE.sm }}>Termin wählen</Text>
+        {/* Schritt 2: Heilmittel */}
+        {step === 2 && (
+          <View>
+            <Text style={{ ...TYPE.h2, color: c.text, marginBottom: SPACE.xs }}>Heilmittel wählen</Text>
+            <Text style={{ ...TYPE.caption, color: c.muted, marginBottom: SPACE.md }}>
+              Welche Leistung benötigst du?
+            </Text>
+            {availableHeilmittel.length === 0 ? (
+              <Text style={{ ...TYPE.small, color: c.muted }}>Keine Leistungen verfügbar.</Text>
+            ) : (
+              <ChipRow
+                options={availableHeilmittel}
+                selected={selectedHeilmittel}
+                onSelect={setSelectedHeilmittel}
+                c={c}
+              />
+            )}
+          </View>
+        )}
+
+        {/* Schritt 3: Termin */}
+        {step === 3 && (
+          <View>
+            <Text style={{ ...TYPE.h2, color: c.text, marginBottom: SPACE.xs }}>Termin wählen</Text>
+            <Text style={{ ...TYPE.caption, color: c.muted, marginBottom: SPACE.md }}>
+              Nächste freie Termine der kommenden 14 Tage.
+            </Text>
             {slotsLoading ? (
               <View style={{ alignItems: 'center', paddingVertical: SPACE.lg }}>
                 <ActivityIndicator color={c.primary} />
@@ -236,9 +328,7 @@ export function BookingRequestForm({ c, t, therapist, authToken, onSuccess, onCl
                       onPress={() => { setSelectedStartsAt(slot.startsAt); setSelectedEndsAt(slot.endsAt); }}
                       style={{
                         flexDirection: 'row', alignItems: 'center',
-                        padding: SPACE.sm,
-                        borderRadius: RADIUS.sm,
-                        borderWidth: 1.5,
+                        padding: SPACE.sm, borderRadius: RADIUS.sm, borderWidth: 1.5,
                         borderColor: active ? c.primary : c.border,
                         backgroundColor: active ? c.primaryBg : c.card,
                       }}
@@ -256,89 +346,103 @@ export function BookingRequestForm({ c, t, therapist, authToken, onSuccess, onCl
           </View>
         )}
 
-        {/* Schritt 3: Kassenart */}
-        <View style={{ marginBottom: SPACE.md }}>
-          <Text style={{ ...TYPE.label, color: c.text, marginBottom: SPACE.sm }}>Wie bist du versichert?</Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-            {insuranceOptions.map((opt) => {
-              const active = selectedKassenart === opt.key;
-              return (
-                <Pressable
-                  key={opt.key}
-                  onPress={() => setSelectedKassenart(opt.key)}
-                  style={{
-                    flexDirection: 'row', alignItems: 'center', gap: 6,
-                    paddingVertical: 8, paddingHorizontal: 14,
-                    borderRadius: RADIUS.lg, borderWidth: 1.5,
-                    borderColor: active ? c.primary : c.border,
-                    backgroundColor: active ? c.primaryBg : c.mutedBg,
-                  }}
-                >
-                  {active && <Ionicons name="checkmark" size={14} color={c.primary} />}
-                  <Text style={{ fontSize: 13, color: active ? c.primary : c.muted, fontWeight: active ? '600' : '400' }}>
-                    {opt.label}
+        {/* Schritt 4: Nachricht + Einwilligung */}
+        {step === 4 && (
+          <View>
+            <Text style={{ ...TYPE.h2, color: c.text, marginBottom: SPACE.xs }}>Nachricht</Text>
+            <Text style={{ ...TYPE.caption, color: c.muted, marginBottom: SPACE.md }}>
+              Optional — teile dem Therapeuten etwas mit.
+            </Text>
+
+            {/* Zusammenfassung */}
+            <View style={{ backgroundColor: c.mutedBg, borderRadius: RADIUS.sm, padding: SPACE.sm, marginBottom: SPACE.md, gap: 4 }}>
+              {selectedKassenart && (
+                <Text style={{ fontSize: 13, color: c.muted }}>
+                  Versicherung: <Text style={{ color: c.text, fontWeight: '600' }}>
+                    {insuranceOptions.find((o) => o.key === selectedKassenart)?.label ?? selectedKassenart}
                   </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
+                </Text>
+              )}
+              {selectedHeilmittel && (
+                <Text style={{ fontSize: 13, color: c.muted }}>
+                  Heilmittel: <Text style={{ color: c.text, fontWeight: '600' }}>
+                    {availableHeilmittel.find((o) => o.key === selectedHeilmittel)?.label ?? selectedHeilmittel}
+                  </Text>
+                </Text>
+              )}
+              {selectedStartsAt && (
+                <Text style={{ fontSize: 13, color: c.muted }}>
+                  Termin: <Text style={{ color: c.primary, fontWeight: '600' }}>{formatSlot(selectedStartsAt, selectedEndsAt)}</Text>
+                </Text>
+              )}
+            </View>
 
-        {/* Nachricht */}
-        <Text style={{ ...TYPE.label, color: c.text, marginBottom: SPACE.xs }}>Nachricht (optional)</Text>
-        <TextInput
-          value={message}
-          onChangeText={setMessage}
-          placeholder="Was möchtest du dem Therapeuten mitteilen?"
-          placeholderTextColor={c.muted}
-          multiline
-          numberOfLines={3}
-          style={{
-            borderWidth: 1, borderColor: c.border, borderRadius: RADIUS.sm,
-            backgroundColor: c.mutedBg, color: c.text, fontSize: 15,
-            padding: 12, minHeight: 80, textAlignVertical: 'top', marginBottom: SPACE.md,
-          }}
-        />
+            <TextInput
+              value={message}
+              onChangeText={setMessage}
+              placeholder="Was möchtest du dem Therapeuten mitteilen?"
+              placeholderTextColor={c.muted}
+              multiline
+              numberOfLines={3}
+              style={{
+                borderWidth: 1, borderColor: c.border, borderRadius: RADIUS.sm,
+                backgroundColor: c.mutedBg, color: c.text, fontSize: 15,
+                padding: 12, minHeight: 80, textAlignVertical: 'top', marginBottom: SPACE.md,
+              }}
+            />
 
-        {/* Einwilligung */}
-        <Pressable
-          onPress={() => setConsent((v) => !v)}
-          style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: SPACE.md, gap: 10 }}
-        >
-          <View style={{
-            width: 22, height: 22, borderRadius: 4,
-            borderWidth: 1.5, borderColor: consent ? c.primary : c.border,
-            backgroundColor: consent ? c.primary : 'transparent',
-            alignItems: 'center', justifyContent: 'center', marginTop: 1,
-          }}>
-            {consent && <Ionicons name="checkmark" size={14} color="#fff" />}
+            <Pressable
+              onPress={() => setConsent((v) => !v)}
+              style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: SPACE.md, gap: 10 }}
+            >
+              <View style={{
+                width: 22, height: 22, borderRadius: 4,
+                borderWidth: 1.5, borderColor: consent ? c.primary : c.border,
+                backgroundColor: consent ? c.primary : 'transparent',
+                alignItems: 'center', justifyContent: 'center', marginTop: 1,
+              }}>
+                {consent && <Ionicons name="checkmark" size={14} color="#fff" />}
+              </View>
+              <Text style={{ ...TYPE.small, color: c.muted, flex: 1, lineHeight: 20 }}>
+                Ich stimme zu, dass meine Kontaktdaten zur Terminvermittlung verwendet werden.
+              </Text>
+            </Pressable>
           </View>
-          <Text style={{ ...TYPE.small, color: c.muted, flex: 1, lineHeight: 20 }}>
-            Ich stimme zu, dass meine Kontaktdaten zur Terminvermittlung verwendet werden.
-          </Text>
-        </Pressable>
+        )}
 
         {/* Fehler */}
         {!!error && (
-          <View style={{ backgroundColor: c.errorBg, borderRadius: RADIUS.sm, padding: 12, marginBottom: SPACE.sm, flexDirection: 'row', gap: 8 }}>
+          <View style={{ backgroundColor: c.errorBg, borderRadius: RADIUS.sm, padding: 12, marginVertical: SPACE.sm, flexDirection: 'row', gap: 8 }}>
             <Ionicons name="alert-circle-outline" size={16} color={c.error} />
             <Text style={{ ...TYPE.small, color: c.error, flex: 1 }}>{error}</Text>
           </View>
         )}
 
-        {/* Buchen */}
-        {selectedStartsAt && (
-          <Pressable
-            onPress={handleSubmit}
-            disabled={loading}
-            style={{ backgroundColor: loading ? c.border : c.primary, borderRadius: RADIUS.md, paddingVertical: 16, alignItems: 'center' }}
-          >
-            {loading
-              ? <ActivityIndicator color="#fff" />
-              : <Text style={{ ...TYPE.label, color: '#fff', fontSize: 16 }}>Jetzt buchen</Text>
-            }
-          </Pressable>
-        )}
+        {/* Action */}
+        <View style={{ marginTop: SPACE.sm }}>
+          {step < 4 ? (
+            <Pressable
+              onPress={handleNext}
+              style={{ backgroundColor: c.primary, borderRadius: RADIUS.md, paddingVertical: 16, alignItems: 'center' }}
+            >
+              <Text style={{ ...TYPE.label, color: '#fff', fontSize: 16 }}>Weiter</Text>
+            </Pressable>
+          ) : (
+            <Pressable
+              onPress={handleSubmit}
+              disabled={loading || !consent}
+              style={{
+                backgroundColor: loading || !consent ? c.border : c.primary,
+                borderRadius: RADIUS.md, paddingVertical: 16, alignItems: 'center',
+              }}
+            >
+              {loading
+                ? <ActivityIndicator color="#fff" />
+                : <Text style={{ ...TYPE.label, color: '#fff', fontSize: 16 }}>Anfrage senden</Text>
+              }
+            </Pressable>
+          )}
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
