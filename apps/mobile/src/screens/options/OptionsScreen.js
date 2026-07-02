@@ -8,6 +8,7 @@ import { ROOT_ROUTES, TAB_ROUTES } from '../../navigation/route-names';
 import { OptionsContent } from './OptionsContent';
 import { FeedbackModal } from '../../modals/FeedbackModal';
 import { ChangePasswordModal } from '../../modals/ChangePasswordModal';
+import { PatientPhoneModal } from '../../modals/PatientPhoneModal';
 import { AuthDebugScreen } from '../AuthDebugScreen';
 import { useAuth } from '../../context/AuthContext';
 import { WorkingHoursScreen } from '../therapy/WorkingHoursScreen';
@@ -27,6 +28,7 @@ export function OptionsTabScreen() {
   const loggedInPatient = useAppStore(appStoreSelectors.loggedInPatient);
   const loggedInTherapist = useAppStore(appStoreSelectors.loggedInTherapist);
   const signOut = useAppStore((s) => s.signOut);
+  const updatePatientProfile = useAppStore((s) => s.updatePatientProfile);
 
   const { themeMode, setThemeMode, c } = useTheme();
 
@@ -34,6 +36,7 @@ export function OptionsTabScreen() {
 
   const [showFeedback, setShowFeedback] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
+  const [showPhoneEdit, setShowPhoneEdit] = useState(false);
   const [showDebug, setShowDebug] = useState(false);
   const [showWorkingHours, setShowWorkingHours] = useState(false);
   const [showServices, setShowServices] = useState(false);
@@ -66,6 +69,7 @@ export function OptionsTabScreen() {
         onShowRegister={() => navigation.navigate(ROOT_ROUTES.REGISTRATION)}
         onShowFeedback={() => setShowFeedback(true)}
         onShowChangePassword={() => setShowChangePassword(true)}
+        onShowPhoneEdit={() => setShowPhoneEdit(true)}
         onLogout={handleLogout}
         onShowDebug={() => setShowDebug(true)}
         onShowWorkingHours={() => setShowWorkingHours(true)}
@@ -91,6 +95,15 @@ export function OptionsTabScreen() {
         authToken={authToken}
         c={c}
         t={t}
+      />
+
+      <PatientPhoneModal
+        visible={showPhoneEdit}
+        onClose={() => setShowPhoneEdit(false)}
+        authToken={authToken}
+        currentPhone={loggedInPatient?.phone ?? ''}
+        onSaved={(phone) => { updatePatientProfile({ phone }); setShowPhoneEdit(false); }}
+        c={c}
       />
 
       <AuthDebugScreen

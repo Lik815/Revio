@@ -8,7 +8,7 @@ export function OptionsContent({
   loggedInTherapist, loggedInPatient,
   themeMode, setThemeMode,
   onShowLogin, onShowRegister,
-  onShowFeedback, onShowChangePassword, onLogout,
+  onShowFeedback, onShowChangePassword, onShowPhoneEdit, onLogout,
   onShowDebug,
   onShowWorkingHours, onShowServices, onShowBlockedTimes,
   c, t, styles,
@@ -166,6 +166,15 @@ const renderOptions = () => {
           <>
             <SectionHeader title={t('accountSection')} />
             <OptionGroup>
+              {loggedInPatient && (
+                <OptionRow
+                  label="Telefonnummer"
+                  subtitle={loggedInPatient.phone ? loggedInPatient.phone : 'Noch nicht hinterlegt'}
+                  icon="call-outline"
+                  onPress={onShowPhoneEdit}
+                  valueColor={c.primary}
+                />
+              )}
               <OptionRow
                 label={t('changePassword')}
                 subtitle={t('changePasswordHint')}
