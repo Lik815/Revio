@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  RefreshControl, ScrollView, View,
+  Modal, Pressable, RefreshControl, ScrollView, Text, View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { RADIUS } from '../../utils/app-utils';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HeilmittelSelectModal } from '../../modals/HeilmittelSelectModal';
-import { TherapistSummaryCard } from '../../components/TherapistSummaryCard';
 import { TherapistWeekStrip } from '../../components/TherapistWeekStrip';
 import { TherapistDayTimeline } from '../../components/TherapistDayTimeline';
 import { TherapistMonthCalendar } from '../../components/TherapistMonthCalendar';
@@ -27,6 +28,7 @@ export function TherapyTabTherapist({
   const bookingEnabled = loggedInTherapist?.bookingMode === 'FIRST_APPOINTMENT_REQUEST';
   const reviewApproved = loggedInTherapist?.reviewStatus === 'APPROVED';
   const [filterListKind, setFilterListKind] = useState(null);
+  const [showStatsModal, setShowStatsModal] = useState(false);
 
   const activation = useBookingActivation({ onActivateBookingRequests });
   const calendarView = useTherapistCalendarView();
@@ -109,6 +111,7 @@ export function TherapyTabTherapist({
             onNextWeek={calendarView.handleNextWeek}
             onPressCalendar={calendarView.handleOpenCalendar}
             onPressToday={calendarView.handleGoToToday}
+            onPressStats={() => setShowStatsModal(true)}
           />
         </View>
       )}
@@ -159,16 +162,46 @@ export function TherapyTabTherapist({
         )}
       </ScrollView>
 
-      {/* Gebucht / Anfragen — im normalen Flow ganz unten */}
-      <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>
-        <TherapistSummaryCard
-          c={c}
-          confirmedCount={confirmedCount}
-          pendingCount={pendingCount}
-          onPressBooked={() => setFilterListKind('booked')}
-          onPressPending={() => setFilterListKind('pending')}
-        />
-      </View>
+      <Modal
+        visible={showStatsModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowStatsModal(false)}
+      >
+        <Pressable
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end' }}
+          onPress={() => setShowStatsModal(false)}
+        >
+          <Pressable onPress={() => {}}>
+            <View style={{ backgroundColor: c.background, borderTopLeftRadius: RADIUS.lg, borderTopRightRadius: RADIUS.lg, padding: 24, paddingBottom: insets.bottom + 24 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+                <Text style={{ fontSize: 17, fontWeight: '800', color: c.text }}>Statistik</Text>
+                <Pressable onPress={() => setShowStatsModal(false)} hitSlop={8}>
+                  <Ionicons name="close" size={22} color={c.muted} />
+                </Pressable>
+              </View>
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <Pressable
+                  onPress={() => { setShowStatsModal(false); setFilterListKind('booked'); }}
+                  style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: c.card, borderWidth: 1, borderColor: c.border, borderRadius: RADIUS.full, paddingVertical: 14 }}
+                >
+                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: c.primary }} />
+                  <Text style={{ fontSize: 20, fontWeight: '800', color: c.text }}>{confirmedCount}</Text>
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: c.text }}>Gebucht</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => { setShowStatsModal(false); setFilterListKind('pending'); }}
+                  style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: c.card, borderWidth: 1, borderColor: c.border, borderRadius: RADIUS.full, paddingVertical: 14 }}
+                >
+                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: c.warning ?? '#B78700' }} />
+                  <Text style={{ fontSize: 20, fontWeight: '800', color: c.text }}>{pendingCount}</Text>
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: c.text }}>Anfragen</Text>
+                </Pressable>
+              </View>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       <HeilmittelSelectModal
         visible={activation.showHeilmittelModal}

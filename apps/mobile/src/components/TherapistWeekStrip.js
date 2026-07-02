@@ -8,7 +8,7 @@ const SWIPE_THRESHOLD = 40;
 
 export function TherapistWeekStrip({
   c, selectedDate, visibleWeekStart, incomingBookings, workingHoursRules = [],
-  onSelectDate, onPrevWeek, onNextWeek, onPressCalendar, onPressToday,
+  onSelectDate, onPrevWeek, onNextWeek, onPressCalendar, onPressToday, onPressStats,
 }) {
   const days = useMemo(
     () => Array.from({ length: 7 }, (_, i) => addDays(visibleWeekStart, i)),
@@ -62,13 +62,25 @@ export function TherapistWeekStrip({
           </Text>
         </View>
 
-        <Pressable
-          onPress={onPressToday}
-          hitSlop={8}
-          style={{ height: 32, paddingHorizontal: 12, borderRadius: 16, backgroundColor: c.card, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' }}
-        >
-          <Text style={{ fontSize: 13, fontWeight: '600', color: c.primary }}>Heute</Text>
-        </Pressable>
+        <View style={{ flexDirection: 'row', gap: 6 }}>
+          {onPressStats && (
+            <Pressable
+              onPress={onPressStats}
+              hitSlop={8}
+              style={{ height: 32, paddingHorizontal: 10, borderRadius: 16, backgroundColor: c.card, borderWidth: 1, borderColor: c.border, flexDirection: 'row', alignItems: 'center', gap: 5 }}
+            >
+              <Ionicons name="bar-chart-outline" size={14} color={c.text} />
+              <Text style={{ fontSize: 13, fontWeight: '600', color: c.text }}>Statistik</Text>
+            </Pressable>
+          )}
+          <Pressable
+            onPress={onPressToday}
+            hitSlop={8}
+            style={{ height: 32, paddingHorizontal: 12, borderRadius: 16, backgroundColor: c.card, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' }}
+          >
+            <Text style={{ fontSize: 13, fontWeight: '600', color: c.primary }}>Heute</Text>
+          </Pressable>
+        </View>
       </View>
 
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
