@@ -1,7 +1,7 @@
 import React from 'react';
 import { Image, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { RADIUS, SHADOW, resolveMediaUrl } from '../utils/app-utils';
+import { RADIUS, resolveMediaUrl } from '../utils/app-utils';
 
 function getDate(a) {
   return new Date(a.startsAt ?? a.slot?.startsAt ?? a.confirmedSlotAt ?? 0);
@@ -73,7 +73,6 @@ export function NextAppointmentBanner({ appointment, onPress, c }) {
           borderWidth: 1,
           borderColor: c.border,
           opacity: pressed ? 0.85 : 1,
-          ...SHADOW.modal,
         })}
       >
         <TherapistAvatar name={therapistName} photo={therapistPhoto} c={c} />
