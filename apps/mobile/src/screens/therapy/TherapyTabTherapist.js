@@ -99,18 +99,20 @@ export function TherapyTabTherapist({
     <View style={{ flex: 1 }}>
       {/* WeekStrip fixiert oben — scrollt nicht mit */}
       {isListView && (
-        <TherapistWeekStrip
-          c={c}
-          selectedDate={calendarView.selectedDate}
-          visibleWeekStart={calendarView.visibleWeekStart}
-          incomingBookings={incomingBookings}
-          workingHoursRules={workingHoursRules}
-          onSelectDate={calendarView.setSelectedDate}
-          onPrevWeek={calendarView.handlePrevWeek}
-          onNextWeek={calendarView.handleNextWeek}
-          onPressCalendar={calendarView.handleOpenCalendar}
-          onPressToday={calendarView.handleGoToToday}
-        />
+        <View style={{ paddingTop: insets.top, backgroundColor: c.background, paddingHorizontal: 24 }}>
+          <TherapistWeekStrip
+            c={c}
+            selectedDate={calendarView.selectedDate}
+            visibleWeekStart={calendarView.visibleWeekStart}
+            incomingBookings={incomingBookings}
+            workingHoursRules={workingHoursRules}
+            onSelectDate={calendarView.setSelectedDate}
+            onPrevWeek={calendarView.handlePrevWeek}
+            onNextWeek={calendarView.handleNextWeek}
+            onPressCalendar={calendarView.handleOpenCalendar}
+            onPressToday={calendarView.handleGoToToday}
+          />
+        </View>
       )}
 
       <ScrollView
