@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { StackActions } from '@react-navigation/native';
 import { Animated, Pressable, Text, useWindowDimensions, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../hooks/use-theme';
 import { RADIUS, SHADOW, SPACE } from '../utils/app-utils';
@@ -11,7 +11,18 @@ import { translations } from '../i18n/translations';
 
 const PILL_SIZE = 44;
 
-function TabIcon({ baseIcon, focused, color }) {
+function TabIcon({ baseIcon, focused, color, routeName }) {
+  if (routeName === TAB_ROUTES.OPTIONS) {
+    return (
+      <MaterialCommunityIcons
+        name={focused ? 'account-cog' : 'account-cog-outline'}
+        size={focused ? 31 : 25}
+        color={color}
+        style={{ includeFontPadding: false, textAlignVertical: 'center', textAlign: 'center' }}
+      />
+    );
+  }
+
   return (
     <Ionicons
       name={focused ? baseIcon : `${baseIcon}-outline`}
@@ -69,16 +80,15 @@ export function CustomTabBar({ state, descriptors, navigation, badgeCounts = {} 
 
     if (loginStateChanged) {
       contentOpacity.setValue(0);
-      Animated.spring(navWidth, {
+      Animated.timing(navWidth, {
         toValue: targetNavWidth,
+        duration: 200,
         useNativeDriver: false,
-        speed: 16,
-        bounciness: 4,
       }).start(({ finished }) => {
         if (finished) {
           Animated.timing(contentOpacity, {
             toValue: 1,
-            duration: 180,
+            duration: 100,
             useNativeDriver: true,
           }).start();
         }
