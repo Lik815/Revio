@@ -234,7 +234,7 @@ export function BookingRequestForm({ c, t, therapist, authToken, onSuccess, onCl
     );
   }
 
-  const stepTitles = { 1: 'Versicherung', 2: 'Heilmittel', 3: 'Termin', 4: 'Nachricht' };
+  const stepTitles = { 1: 'Versicherung', 2: 'Terminart', 3: 'Termin', 4: 'Nachricht' };
 
   return (
     <KeyboardAvoidingView
@@ -283,7 +283,7 @@ export function BookingRequestForm({ c, t, therapist, authToken, onSuccess, onCl
         {/* Schritt 2: Heilmittel */}
         {step === 2 && (
           <View>
-            <Text style={{ ...TYPE.h2, color: c.text, marginBottom: SPACE.xs }}>Heilmittel wählen</Text>
+            <Text style={{ ...TYPE.h2, color: c.text, marginBottom: SPACE.xs }}>Terminart wählen</Text>
             <Text style={{ ...TYPE.caption, color: c.muted, marginBottom: SPACE.md }}>
               Welche Leistung benötigst du?
             </Text>
@@ -365,7 +365,7 @@ export function BookingRequestForm({ c, t, therapist, authToken, onSuccess, onCl
               )}
               {selectedHeilmittel && (
                 <Text style={{ fontSize: 13, color: c.muted }}>
-                  Heilmittel: <Text style={{ color: c.text, fontWeight: '600' }}>
+                  Terminart: <Text style={{ color: c.text, fontWeight: '600' }}>
                     {availableHeilmittel.find((o) => o.key === selectedHeilmittel)?.label ?? selectedHeilmittel}
                   </Text>
                 </Text>
