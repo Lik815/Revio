@@ -71,9 +71,7 @@ function HourBlock({ c, slotIndex, items, onOpenBooking }) {
             );
           }
 
-          const title = item.kind === 'requested'
-            ? 'Neue Anfrage'
-            : (item.booking?.patientName ?? 'Gebucht');
+          const title = item.booking?.patientName ?? (item.kind === 'requested' ? 'Neue Anfrage' : 'Gebucht');
           const cardBg = item.kind === 'requested'
             ? (c.warningBg ?? '#FEF5DC')
             : (c.successBg ?? '#EAF4F1');
@@ -142,13 +140,15 @@ export function TherapistDayTimeline({
     const startSlot = Math.floor(Math.min(...activeRules.map((r) => r.startMinute)) / 30);
     const endSlot = Math.ceil(Math.max(...activeRules.map((r) => r.endMinute)) / 30);
 
-    const chunks = splitAtHalfHourBoundaries(periods);
     const bySlot = {};
-    for (const chunk of chunks) {
-      const d = new Date(chunk.startsAt);
-      const key = d.getHours() * 2 + (d.getMinutes() >= 30 ? 1 : 0);
-      if (!bySlot[key]) bySlot[key] = [];
-      bySlot[key].push(chunk);
+    for (const period of periods) {
+      const chunks = period.kind === 'free' ? splitAtHalfHourBoundaries([period]) : [period];
+      for (const chunk of chunks) {
+        const d = new Date(chunk.startsAt);
+        const key = d.getHours() * 2 + (d.getMinutes() >= 30 ? 1 : 0);
+        if (!bySlot[key]) bySlot[key] = [];
+        bySlot[key].push(chunk);
+      }
     }
 
     return Array.from({ length: endSlot - startSlot }, (_, i) => {
