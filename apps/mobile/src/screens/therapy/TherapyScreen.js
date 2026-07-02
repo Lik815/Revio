@@ -264,22 +264,6 @@ export function TherapyTabScreen() {
     );
   }
 
-  if (selectedTherapistPatientAppointment) {
-    return (
-      <TherapistAppointmentDetail
-        appointment={selectedTherapistPatientAppointment.appointment}
-        patient={selectedTherapistPatientAppointment.patient}
-        onBack={() => setSelectedTherapistPatientAppointment(null)}
-        onRespond={handleTherapistRespond}
-        onCancelRequest={() => {
-          setTherapistCancelBookingId(selectedTherapistPatientAppointment.appointment.id);
-          setShowTherapistCancelModal(true);
-        }}
-        c={c}
-        styles={appStyles}
-      />
-    );
-  }
 
   if (accountType === 'patient') {
     return (
@@ -335,6 +319,37 @@ export function TherapyTabScreen() {
           booking={incomingBookings.find((b) => b.id === therapistCancelBookingId) ?? null}
           c={c}
         />
+
+        <Modal
+          visible={!!selectedTherapistPatientAppointment}
+          animationType="slide"
+          transparent
+          onRequestClose={() => setSelectedTherapistPatientAppointment(null)}
+        >
+          <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' }}>
+            <Pressable
+              style={{ flex: 1 }}
+              onPress={() => setSelectedTherapistPatientAppointment(null)}
+            />
+            <View style={{ height: '92%' }}>
+              {selectedTherapistPatientAppointment && (
+                <TherapistAppointmentDetail
+                  appointment={selectedTherapistPatientAppointment.appointment}
+                  patient={selectedTherapistPatientAppointment.patient}
+                  onBack={() => setSelectedTherapistPatientAppointment(null)}
+                  onRespond={handleTherapistRespond}
+                  onCancelRequest={() => {
+                    setTherapistCancelBookingId(selectedTherapistPatientAppointment.appointment.id);
+                    setShowTherapistCancelModal(true);
+                    setSelectedTherapistPatientAppointment(null);
+                  }}
+                  isModal
+                  c={c}
+                />
+              )}
+            </View>
+          </View>
+        </Modal>
       </>
     );
   }
