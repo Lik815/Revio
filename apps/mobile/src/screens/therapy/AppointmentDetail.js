@@ -28,7 +28,6 @@ export function AppointmentDetail({
   const therapistTitle = therapist?.professionalTitle ?? 'Physiotherapeut';
   const therapistPhoto = resolveMediaUrl(therapist?.photo);
   const hasMessage = typeof appointment?.message === 'string' && appointment.message.trim().length > 0;
-  const isActive = appointment?.status === 'PENDING' || appointment?.status === 'CONFIRMED';
   const { heilmittelOptions } = useConfigOptions();
   const heilmittelLabel = heilmittelOptions.find((opt) => opt.key === appointment?.heilmittel)?.label ?? null;
   const kassenartLabel = appointment?.kassenart
@@ -53,6 +52,7 @@ export function AppointmentDetail({
       : 'close-circle-outline';
 
   const isPastConfirmed = appointment?.status === 'CONFIRMED' && date && date.getTime() < Date.now();
+  const isActive = (appointment?.status === 'PENDING' || appointment?.status === 'CONFIRMED') && !isPastConfirmed;
   const [reviewEligibility, setReviewEligibility] = useState(null);
   const [showReviewModal, setShowReviewModal] = useState(false);
 
