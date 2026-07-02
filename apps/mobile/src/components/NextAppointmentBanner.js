@@ -1,8 +1,7 @@
 import React from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Image, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { RADIUS, SHADOW } from '../utils/app-utils';
+import { RADIUS, SHADOW, resolveMediaUrl } from '../utils/app-utils';
 
 function getDate(a) {
   return new Date(a.startsAt ?? a.slot?.startsAt ?? a.confirmedSlotAt ?? 0);
@@ -15,36 +14,42 @@ function formatBannerDate(date) {
   return `${weekday}, ${day} · ${time} Uhr`;
 }
 
-function Initials({ name, c }) {
+function TherapistAvatar({ name, photo, c }) {
+  const photoUrl = resolveMediaUrl(photo);
   const parts = (name ?? '').trim().split(/\s+/);
   const letters = parts.length >= 2
     ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
     : (name ?? '?').slice(0, 2).toUpperCase();
+
   return (
     <View style={{
-      width: 38,
-      height: 38,
-      borderRadius: 19,
+      width: 42,
+      height: 42,
+      borderRadius: 21,
       backgroundColor: c.primaryBg ?? `${c.primary}20`,
       alignItems: 'center',
       justifyContent: 'center',
       flexShrink: 0,
+      overflow: 'hidden',
     }}>
-      <Text style={{ fontSize: 13, fontWeight: '800', color: c.primary }}>{letters}</Text>
+      {photoUrl ? (
+        <Image source={{ uri: photoUrl }} style={{ width: 42, height: 42, borderRadius: 21 }} />
+      ) : (
+        <Text style={{ fontSize: 13, fontWeight: '800', color: c.primary }}>{letters}</Text>
+      )}
     </View>
   );
 }
 
-// BANNER_HEIGHT is exported so callers can offset their scroll content.
 export const NEXT_APPOINTMENT_BANNER_HEIGHT = 72;
 
 export function NextAppointmentBanner({ appointment, onPress, c }) {
-  const insets = useSafeAreaInsets();
-
   if (!appointment) return null;
 
   const date = getDate(appointment);
-  const therapistName = appointment.therapist?.fullName ?? appointment.therapistName ?? null;
+  const therapist = appointment.therapist ?? null;
+  const therapistName = therapist?.fullName ?? appointment.therapistName ?? null;
+  const therapistPhoto = therapist?.photo ?? null;
   const isPending = appointment.status === 'PENDING';
 
   return (
@@ -52,7 +57,7 @@ export function NextAppointmentBanner({ appointment, onPress, c }) {
       position: 'absolute',
       left: 16,
       right: 16,
-      bottom: insets.bottom + 92,
+      bottom: 16,
       zIndex: 50,
     }}>
       <Pressable
@@ -71,7 +76,7 @@ export function NextAppointmentBanner({ appointment, onPress, c }) {
           ...SHADOW.modal,
         })}
       >
-        <Initials name={therapistName} c={c} />
+        <TherapistAvatar name={therapistName} photo={therapistPhoto} c={c} />
 
         <View style={{ flex: 1, gap: 2 }}>
           <Text style={{ fontSize: 11, fontWeight: '700', color: c.muted, textTransform: 'uppercase', letterSpacing: 0.5 }}>
