@@ -1,9 +1,19 @@
 import React from 'react';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Pressable, Text, View } from 'react-native';
 import { RADIUS } from '../utils/app-utils';
 
 function BottomNavIcon({ tab, active, color }) {
+  if (tab.key === 'options') {
+    return (
+      <MaterialCommunityIcons
+        name={active ? 'account-cog' : 'account-cog-outline'}
+        size={24}
+        color={color}
+      />
+    );
+  }
+
   return (
     <Ionicons
       name={active ? tab.icon : `${tab.icon}-outline`}
