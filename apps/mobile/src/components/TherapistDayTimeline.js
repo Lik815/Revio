@@ -1,12 +1,11 @@
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { RADIUS, SHADOW, computeDayPeriods } from '../utils/app-utils';
 
 const PIXELS_PER_MIN = 2.0;
 const TIME_COL_WIDTH = 52;
 const CARD_GAP = 6;
-const TIMELINE_MAX_HEIGHT = 440;
 
 function formatTimeFromMin(totalMin) {
   const h = Math.floor(totalMin / 60);
@@ -128,8 +127,7 @@ export function TherapistDayTimeline({
           </Text>
         </View>
       ) : (
-        <ScrollView style={{ maxHeight: TIMELINE_MAX_HEIGHT }} showsVerticalScrollIndicator={false} nestedScrollEnabled>
-          <View
+        <View
             style={{ height: timeline.totalHeight, position: 'relative' }}
             onLayout={(e) => setCardAreaWidth(e.nativeEvent.layout.width - TIME_COL_WIDTH - CARD_GAP)}
           >
@@ -209,7 +207,6 @@ export function TherapistDayTimeline({
               );
             })}
           </View>
-        </ScrollView>
       )}
     </View>
   );
