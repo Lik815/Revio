@@ -1,7 +1,7 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { RADIUS, SHADOW, isSameDay, startOfDay, activeBookingItems, hasWorkingHoursOnDay, computeDayPeriods, splitAtHalfHourBoundaries } from '../utils/app-utils';
+import { RADIUS, SHADOW, isSameDay, startOfDay, activeBookingItems, hasWorkingHoursOnDay, computeDayPeriods } from '../utils/app-utils';
 import { buildCalendar } from '../utils/recurring-slots';
 
 const WEEKDAY_LABELS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
@@ -59,9 +59,14 @@ export function TherapistMonthCalendar({
     [workingHoursRules, blockedTimes, incomingBookings, selectedDate],
   );
 
-  // Stündliches Raster für das Tagesdetail
-  const hourRows = useMemo(() => {
-    if (!dayPeriods.length) return [];
+  const [calCardAreaWidth, setCalCardAreaWidth] = useState(0);
+
+  const CAL_PIXELS_PER_MIN = 2.0;
+  const CAL_TIME_COL = 44;
+  const CAL_CARD_GAP = 5;
+
+  const dayTimeline = useMemo(() => {
+    if (!dayPeriods.length) return null;
     const weekday = selectedDate.getDay();
     const activeRules = (Array.isArray(workingHoursRules) ? workingHoursRules : []).filter((r) => {
       if (!r.isActive || r.weekday !== weekday) return false;
@@ -69,23 +74,39 @@ export function TherapistMonthCalendar({
       if (r.effectiveUntil && new Date(r.effectiveUntil) < selectedDate) return false;
       return true;
     });
-    if (!activeRules.length) return [];
-    const startSlot = Math.floor(Math.min(...activeRules.map((r) => r.startMinute)) / 30);
-    const endSlot = Math.ceil(Math.max(...activeRules.map((r) => r.endMinute)) / 30);
-    const bySlot = {};
-    for (const period of dayPeriods) {
-      const chunks = period.kind === 'free' ? splitAtHalfHourBoundaries([period]) : [period];
-      for (const chunk of chunks) {
-        const d = new Date(chunk.startsAt);
-        const key = d.getHours() * 2 + (d.getMinutes() >= 30 ? 1 : 0);
-        if (!bySlot[key]) bySlot[key] = [];
-        bySlot[key].push(chunk);
-      }
-    }
-    return Array.from({ length: endSlot - startSlot }, (_, i) => {
-      const slot = startSlot + i;
-      return { slotIndex: slot, items: bySlot[slot] ?? [] };
+    if (!activeRules.length) return null;
+    const dayStartMin = Math.min(...activeRules.map((r) => r.startMinute));
+    const dayEndMin = Math.max(...activeRules.map((r) => r.endMinute));
+    const totalHeight = (dayEndMin - dayStartMin) * CAL_PIXELS_PER_MIN;
+    const startSlot = Math.floor(dayStartMin / 30);
+    const endSlot = Math.ceil(dayEndMin / 30);
+    const gridLines = Array.from({ length: endSlot - startSlot }, (_, i) => {
+      const slotMin = (startSlot + i) * 30;
+      const h = Math.floor(slotMin / 60);
+      const m = slotMin % 60;
+      return { label: `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`, top: (slotMin - dayStartMin) * CAL_PIXELS_PER_MIN };
     });
+    const nonFree = dayPeriods.filter((p) => p.kind !== 'free');
+    const sorted = [...nonFree].sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt));
+    const colEnds = [];
+    const withCols = sorted.map((item) => {
+      const start = new Date(item.startsAt).getTime();
+      const end = new Date(item.endsAt).getTime();
+      let col = colEnds.findIndex((ce) => ce <= start);
+      if (col === -1) col = colEnds.length;
+      colEnds[col] = end;
+      return { item, col };
+    });
+    const positioned = withCols.map(({ item, col }) => {
+      const start = new Date(item.startsAt).getTime();
+      const end = new Date(item.endsAt).getTime();
+      const maxCol = Math.max(...withCols.filter(({ item: o }) => new Date(o.startsAt).getTime() < end && new Date(o.endsAt).getTime() > start).map(({ col: c }) => c));
+      const d = new Date(item.startsAt);
+      const itemMin = d.getHours() * 60 + d.getMinutes() - dayStartMin;
+      const durationMin = Math.round((end - start) / 60_000);
+      return { item, col, totalCols: maxCol + 1, top: itemMin * CAL_PIXELS_PER_MIN, height: Math.max(28, durationMin * CAL_PIXELS_PER_MIN) };
+    });
+    return { totalHeight, gridLines, positioned };
   }, [dayPeriods, selectedDate, workingHoursRules]);
 
   const dayHeading = selectedDate.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
@@ -174,59 +195,51 @@ export function TherapistMonthCalendar({
           })()}
         </View>
 
-        {hourRows.length === 0 ? (
+        {!dayTimeline ? (
           <Text style={{ fontSize: 13, color: c.muted }}>Keine Arbeitszeit an diesem Tag.</Text>
         ) : (
-          hourRows.map(({ slotIndex, items }) => {
-            const h = Math.floor(slotIndex / 2);
-            const m = (slotIndex % 2) * 30;
-            const hourLabel = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-            return (
-              <View key={slotIndex} style={{ marginBottom: 2 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: c.muted, width: 44, letterSpacing: 0.2 }}>{hourLabel}</Text>
-                  <View style={{ flex: 1, height: 1, backgroundColor: c.border }} />
-                </View>
-                <View style={{ paddingLeft: 44, gap: 5, marginBottom: 6 }}>
-                  {items.map((item, idx) => {
-                    const startTime = new Date(item.startsAt).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-                    const durationMin = Math.round((new Date(item.endsAt) - new Date(item.startsAt)) / 60_000);
-                    const durationLabel = durationMin < 60 ? `${durationMin} Min` : (() => { const h = Math.floor(durationMin / 60); const m = durationMin % 60; return m === 0 ? `${h} Std` : `${h} Std ${m} Min`; })();
-
-                    if (item.kind === 'free') {
-                      const height = Math.min(Math.max(24, durationMin * 0.8), 120);
-                      return <View key={`free-${idx}`} style={{ height }} />;
-                    }
-                    if (item.kind === 'blocked') {
-                      return (
-                        <View key={`blocked-${idx}`} style={{ paddingVertical: 10, paddingHorizontal: 12, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: c.border, backgroundColor: c.mutedBg ?? '#F3F4F6' }}>
-                          <Text style={{ fontSize: 14, fontWeight: '700', color: c.text }}>{item.blockedTime?.title ?? 'Blockiert'}</Text>
-                          <Text style={{ fontSize: 12, color: c.muted, marginTop: 2 }}>{startTime} · {durationLabel}</Text>
-                        </View>
-                      );
-                    }
-                    const title = item.kind === 'requested' ? 'Neue Anfrage' : (item.booking?.patientName ?? 'Gebucht');
-                    const cardBg = item.kind === 'requested' ? (c.warningBg ?? '#FEF5DC') : (c.successBg ?? '#EAF4F1');
-                    return (
-                      <Pressable key={item.booking?.id ?? `booking-${idx}`} onPress={() => onOpenBooking?.(item.booking)} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10, paddingHorizontal: 12, borderRadius: RADIUS.sm, backgroundColor: cardBg }}>
-                        <View style={{ flex: 1 }}>
-                          <Text style={{ fontSize: 14, fontWeight: '700', color: c.text }}>{title}</Text>
-                          <Text style={{ fontSize: 12, color: c.muted, marginTop: 2 }}>{startTime} · {durationLabel}</Text>
-                        </View>
-                        {item.kind === 'requested' ? (
-                          <View style={{ backgroundColor: c.warning ?? '#B78700', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, marginLeft: 8 }}>
-                            <Text style={{ fontSize: 10, fontWeight: '700', color: '#fff' }}>NEU</Text>
-                          </View>
-                        ) : (
-                          <Ionicons name="chevron-forward" size={16} color={c.muted} />
-                        )}
-                      </Pressable>
-                    );
-                  })}
-                </View>
+          <View
+            style={{ height: dayTimeline.totalHeight, position: 'relative' }}
+            onLayout={(e) => setCalCardAreaWidth(e.nativeEvent.layout.width - CAL_TIME_COL - CAL_CARD_GAP)}
+          >
+            {dayTimeline.gridLines.map(({ label, top }) => (
+              <View key={label} style={{ position: 'absolute', top, left: 0, right: 0, flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={{ fontSize: 11, fontWeight: '600', color: c.muted, width: CAL_TIME_COL }}>{label}</Text>
+                <View style={{ flex: 1, height: 1, backgroundColor: c.border }} />
               </View>
-            );
-          })
+            ))}
+            {calCardAreaWidth > 0 && dayTimeline.positioned.map(({ item, col, totalCols, top, height }) => {
+              const colW = (calCardAreaWidth - CAL_CARD_GAP * (totalCols - 1)) / totalCols;
+              const cardLeft = CAL_TIME_COL + CAL_CARD_GAP + col * (colW + CAL_CARD_GAP);
+              const showSub = height >= 40;
+              const startTime = new Date(item.startsAt).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+              const durationMin = Math.round((new Date(item.endsAt) - new Date(item.startsAt)) / 60_000);
+              const durationLabel = durationMin < 60 ? `${durationMin} Min` : (() => { const hh = Math.floor(durationMin / 60); const mm = durationMin % 60; return mm === 0 ? `${hh} Std` : `${hh} Std ${mm} Min`; })();
+              if (item.kind === 'blocked') {
+                return (
+                  <View key={`blocked-${item.blockedTime?.id ?? item.startsAt}`} style={{ position: 'absolute', top, left: cardLeft, width: colW, height, paddingVertical: 4, paddingHorizontal: 8, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: c.border, backgroundColor: c.mutedBg ?? '#F3F4F6', justifyContent: 'center', overflow: 'hidden' }}>
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: c.text }} numberOfLines={1}>{item.blockedTime?.title ?? 'Blockiert'}</Text>
+                    {showSub ? <Text style={{ fontSize: 11, color: c.muted }} numberOfLines={1}>{startTime} · {durationLabel}</Text> : null}
+                  </View>
+                );
+              }
+              const title = item.booking?.patientName ?? (item.kind === 'requested' ? 'Neue Anfrage' : 'Gebucht');
+              const cardBg = item.kind === 'requested' ? (c.warningBg ?? '#FEF5DC') : (c.successBg ?? '#EAF4F1');
+              return (
+                <Pressable key={item.booking?.id ?? `booking-${item.startsAt}`} onPress={() => onOpenBooking?.(item.booking)} style={{ position: 'absolute', top, left: cardLeft, width: colW, height, paddingVertical: 4, paddingHorizontal: 8, borderRadius: RADIUS.sm, backgroundColor: cardBg, justifyContent: 'center', overflow: 'hidden' }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: c.text, flex: 1 }} numberOfLines={1}>{title}</Text>
+                    {item.kind === 'requested' ? (
+                      <View style={{ backgroundColor: c.warning ?? '#B78700', borderRadius: 4, paddingHorizontal: 5, paddingVertical: 2, marginLeft: 4 }}>
+                        <Text style={{ fontSize: 9, fontWeight: '700', color: '#fff' }}>NEU</Text>
+                      </View>
+                    ) : <Ionicons name="chevron-forward" size={13} color={c.muted} />}
+                  </View>
+                  {showSub ? <Text style={{ fontSize: 11, color: c.muted, marginTop: 1 }} numberOfLines={1}>{startTime} · {durationLabel}</Text> : null}
+                </Pressable>
+              );
+            })}
+          </View>
         )}
       </View>
     </View>

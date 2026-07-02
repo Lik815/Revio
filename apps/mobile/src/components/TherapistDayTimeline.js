@@ -1,12 +1,17 @@
-import React, { useMemo } from 'react';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { RADIUS, SHADOW, computeDayPeriods, splitAtHalfHourBoundaries } from '../utils/app-utils';
+import { RADIUS, SHADOW, computeDayPeriods } from '../utils/app-utils';
 
+const PIXELS_PER_MIN = 2.0;
 const TIME_COL_WIDTH = 52;
+const CARD_GAP = 6;
+const TIMELINE_MAX_HEIGHT = 440;
 
-function formatHour(h) {
-  return `${String(h).padStart(2, '0')}:00`;
+function formatTimeFromMin(totalMin) {
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
 function formatTime(iso) {
@@ -21,100 +26,37 @@ function formatDuration(startsAt, endsAt) {
   return m === 0 ? `${h} Std` : `${h} Std ${m} Min`;
 }
 
-function slotLabel(slotIndex) {
-  const h = Math.floor(slotIndex / 2);
-  const m = (slotIndex % 2) * 30;
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+// Greedy interval scheduling: assigns each item a column to avoid visual overlaps.
+function assignColumns(items) {
+  const sorted = [...items].sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt));
+  const colEnds = [];
+
+  const withCols = sorted.map((item) => {
+    const start = new Date(item.startsAt).getTime();
+    const end = new Date(item.endsAt).getTime();
+    let col = colEnds.findIndex((ce) => ce <= start);
+    if (col === -1) col = colEnds.length;
+    colEnds[col] = end;
+    return { item, col };
+  });
+
+  return withCols.map(({ item, col }) => {
+    const start = new Date(item.startsAt).getTime();
+    const end = new Date(item.endsAt).getTime();
+    const maxCol = Math.max(...withCols
+      .filter(({ item: o }) => new Date(o.startsAt).getTime() < end && new Date(o.endsAt).getTime() > start)
+      .map(({ col: c }) => c));
+    return { item, col, totalCols: maxCol + 1 };
+  });
 }
 
-function HourBlock({ c, slotIndex, items, onOpenBooking }) {
-  return (
-    <View style={{ marginBottom: 2 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-        <Text style={{ fontSize: 12, fontWeight: '700', color: c.muted, width: TIME_COL_WIDTH, letterSpacing: 0.2 }}>
-          {slotLabel(slotIndex)}
-        </Text>
-        <View style={{ flex: 1, height: 1, backgroundColor: c.border }} />
-      </View>
-
-      <View style={{ paddingLeft: TIME_COL_WIDTH, gap: 5, marginBottom: 8 }}>
-        {items.map((item, idx) => {
-          const startTime = formatTime(item.startsAt);
-          const duration = formatDuration(item.startsAt, item.endsAt);
-
-          if (item.kind === 'free') {
-            const durationMin = Math.round((new Date(item.endsAt) - new Date(item.startsAt)) / 60_000);
-            const height = Math.min(Math.max(24, durationMin * 0.8), 120);
-            return <View key={`free-${idx}`} style={{ height }} />;
-          }
-
-          if (item.kind === 'blocked') {
-            return (
-              <View
-                key={`blocked-${idx}`}
-                style={{
-                  paddingVertical: 10,
-                  paddingHorizontal: 12,
-                  borderRadius: RADIUS.sm,
-                  borderWidth: 1,
-                  borderColor: c.border,
-                  backgroundColor: c.mutedBg ?? '#F3F4F6',
-                }}
-              >
-                <Text style={{ fontSize: 14, fontWeight: '700', color: c.text }}>
-                  {item.blockedTime?.title ?? 'Blockiert'}
-                </Text>
-                <Text style={{ fontSize: 12, color: c.muted, marginTop: 2 }}>
-                  {startTime} · {duration}
-                </Text>
-              </View>
-            );
-          }
-
-          const title = item.booking?.patientName ?? (item.kind === 'requested' ? 'Neue Anfrage' : 'Gebucht');
-          const cardBg = item.kind === 'requested'
-            ? (c.warningBg ?? '#FEF5DC')
-            : (c.successBg ?? '#EAF4F1');
-
-          return (
-            <Pressable
-              key={item.booking?.id ?? `booking-${idx}`}
-              onPress={() => onOpenBooking?.(item.booking)}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                paddingVertical: 10,
-                paddingHorizontal: 12,
-                borderRadius: RADIUS.sm,
-                backgroundColor: cardBg,
-              }}
-            >
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 14, fontWeight: '700', color: c.text }}>{title}</Text>
-                <Text style={{ fontSize: 12, color: c.muted, marginTop: 2 }}>{startTime} · {duration}</Text>
-              </View>
-              {item.kind === 'requested' ? (
-                <View style={{ backgroundColor: c.warning ?? '#B78700', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, marginLeft: 8 }}>
-                  <Text style={{ fontSize: 10, fontWeight: '700', color: '#fff' }}>NEU</Text>
-                </View>
-              ) : (
-                <Ionicons name="chevron-forward" size={16} color={c.muted} />
-              )}
-            </Pressable>
-          );
-        })}
-      </View>
-    </View>
-  );
-}
-
-// Tagesansicht: zeigt die gesamte Arbeitszeit als stündliches Raster.
 export function TherapistDayTimeline({
   c, selectedDate, incomingBookings, workingHoursRules, blockedTimes,
   incomingBookingsLoading, incomingBookingsLastLoadedAt,
   onOpenBooking,
 }) {
+  const [cardAreaWidth, setCardAreaWidth] = useState(0);
+
   const periods = useMemo(
     () => computeDayPeriods(workingHoursRules, blockedTimes, incomingBookings, selectedDate),
     [workingHoursRules, blockedTimes, incomingBookings, selectedDate],
@@ -125,9 +67,7 @@ export function TherapistDayTimeline({
     [selectedDate],
   );
 
-  const hourRows = useMemo(() => {
-    if (!periods.length) return [];
-
+  const timeline = useMemo(() => {
     const weekday = selectedDate.getDay();
     const activeRules = (Array.isArray(workingHoursRules) ? workingHoursRules : []).filter((r) => {
       if (!r.isActive || r.weekday !== weekday) return false;
@@ -135,26 +75,34 @@ export function TherapistDayTimeline({
       if (r.effectiveUntil && new Date(r.effectiveUntil) < selectedDate) return false;
       return true;
     });
-    if (!activeRules.length) return [];
+    if (!activeRules.length) return null;
 
-    const startSlot = Math.floor(Math.min(...activeRules.map((r) => r.startMinute)) / 30);
-    const endSlot = Math.ceil(Math.max(...activeRules.map((r) => r.endMinute)) / 30);
+    const dayStartMin = Math.min(...activeRules.map((r) => r.startMinute));
+    const dayEndMin = Math.max(...activeRules.map((r) => r.endMinute));
+    const totalHeight = (dayEndMin - dayStartMin) * PIXELS_PER_MIN;
 
-    const bySlot = {};
-    for (const period of periods) {
-      const chunks = period.kind === 'free' ? splitAtHalfHourBoundaries([period]) : [period];
-      for (const chunk of chunks) {
-        const d = new Date(chunk.startsAt);
-        const key = d.getHours() * 2 + (d.getMinutes() >= 30 ? 1 : 0);
-        if (!bySlot[key]) bySlot[key] = [];
-        bySlot[key].push(chunk);
-      }
-    }
-
-    return Array.from({ length: endSlot - startSlot }, (_, i) => {
-      const slot = startSlot + i;
-      return { slotIndex: slot, items: bySlot[slot] ?? [] };
+    const startSlot = Math.floor(dayStartMin / 30);
+    const endSlot = Math.ceil(dayEndMin / 30);
+    const gridLines = Array.from({ length: endSlot - startSlot }, (_, i) => {
+      const slotMin = (startSlot + i) * 30;
+      return { slotMin, top: (slotMin - dayStartMin) * PIXELS_PER_MIN };
     });
+
+    const nonFree = periods.filter((p) => p.kind !== 'free');
+    const positioned = assignColumns(nonFree).map(({ item, col, totalCols }) => {
+      const d = new Date(item.startsAt);
+      const itemMinFromStart = d.getHours() * 60 + d.getMinutes() - dayStartMin;
+      const durationMin = Math.round((new Date(item.endsAt) - new Date(item.startsAt)) / 60_000);
+      return {
+        item,
+        col,
+        totalCols,
+        top: itemMinFromStart * PIXELS_PER_MIN,
+        height: Math.max(28, durationMin * PIXELS_PER_MIN),
+      };
+    });
+
+    return { totalHeight, gridLines, positioned };
   }, [periods, selectedDate, workingHoursRules]);
 
   const showLoading = incomingBookingsLoading && incomingBookingsLastLoadedAt === 0;
@@ -169,7 +117,7 @@ export function TherapistDayTimeline({
         <View style={{ alignItems: 'center', paddingVertical: 24 }}>
           <ActivityIndicator color={c.primary} />
         </View>
-      ) : hourRows.length === 0 ? (
+      ) : !timeline ? (
         <View style={{ alignItems: 'center', paddingVertical: 20 }}>
           <Ionicons name="calendar-outline" size={28} color={c.muted} style={{ marginBottom: 8 }} />
           <Text style={{ fontSize: 14, fontWeight: '600', color: c.text, textAlign: 'center' }}>
@@ -180,9 +128,88 @@ export function TherapistDayTimeline({
           </Text>
         </View>
       ) : (
-        hourRows.map(({ slotIndex, items }) => (
-          <HourBlock key={slotIndex} c={c} slotIndex={slotIndex} items={items} onOpenBooking={onOpenBooking} />
-        ))
+        <ScrollView style={{ maxHeight: TIMELINE_MAX_HEIGHT }} showsVerticalScrollIndicator={false} nestedScrollEnabled>
+          <View
+            style={{ height: timeline.totalHeight, position: 'relative' }}
+            onLayout={(e) => setCardAreaWidth(e.nativeEvent.layout.width - TIME_COL_WIDTH - CARD_GAP)}
+          >
+            {timeline.gridLines.map(({ slotMin, top }) => (
+              <View
+                key={slotMin}
+                style={{ position: 'absolute', top, left: 0, right: 0, flexDirection: 'row', alignItems: 'center' }}
+              >
+                <Text style={{ fontSize: 11, fontWeight: '600', color: c.muted, width: TIME_COL_WIDTH }}>
+                  {formatTimeFromMin(slotMin)}
+                </Text>
+                <View style={{ flex: 1, height: 1, backgroundColor: c.border }} />
+              </View>
+            ))}
+
+            {cardAreaWidth > 0 && timeline.positioned.map(({ item, col, totalCols, top, height }) => {
+              const colW = (cardAreaWidth - CARD_GAP * (totalCols - 1)) / totalCols;
+              const cardLeft = TIME_COL_WIDTH + CARD_GAP + col * (colW + CARD_GAP);
+              const showSubtitle = height >= 40;
+
+              if (item.kind === 'blocked') {
+                return (
+                  <View
+                    key={`blocked-${item.blockedTime?.id ?? item.startsAt}`}
+                    style={{
+                      position: 'absolute', top, left: cardLeft, width: colW, height,
+                      paddingVertical: 4, paddingHorizontal: 8,
+                      borderRadius: RADIUS.sm, borderWidth: 1, borderColor: c.border,
+                      backgroundColor: c.mutedBg ?? '#F3F4F6',
+                      justifyContent: 'center', overflow: 'hidden',
+                    }}
+                  >
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: c.text }} numberOfLines={1}>
+                      {item.blockedTime?.title ?? 'Blockiert'}
+                    </Text>
+                    {showSubtitle ? (
+                      <Text style={{ fontSize: 11, color: c.muted }} numberOfLines={1}>
+                        {formatTime(item.startsAt)} · {formatDuration(item.startsAt, item.endsAt)}
+                      </Text>
+                    ) : null}
+                  </View>
+                );
+              }
+
+              const title = item.booking?.patientName ?? (item.kind === 'requested' ? 'Neue Anfrage' : 'Gebucht');
+              const cardBg = item.kind === 'requested' ? (c.warningBg ?? '#FEF5DC') : (c.successBg ?? '#EAF4F1');
+
+              return (
+                <Pressable
+                  key={item.booking?.id ?? `booking-${item.startsAt}`}
+                  onPress={() => onOpenBooking?.(item.booking)}
+                  style={{
+                    position: 'absolute', top, left: cardLeft, width: colW, height,
+                    paddingVertical: 4, paddingHorizontal: 8,
+                    borderRadius: RADIUS.sm, backgroundColor: cardBg,
+                    justifyContent: 'center', overflow: 'hidden',
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: c.text, flex: 1 }} numberOfLines={1}>
+                      {title}
+                    </Text>
+                    {item.kind === 'requested' ? (
+                      <View style={{ backgroundColor: c.warning ?? '#B78700', borderRadius: 4, paddingHorizontal: 5, paddingVertical: 2, marginLeft: 4 }}>
+                        <Text style={{ fontSize: 9, fontWeight: '700', color: '#fff' }}>NEU</Text>
+                      </View>
+                    ) : (
+                      <Ionicons name="chevron-forward" size={13} color={c.muted} />
+                    )}
+                  </View>
+                  {showSubtitle ? (
+                    <Text style={{ fontSize: 11, color: c.muted, marginTop: 1 }} numberOfLines={1}>
+                      {formatTime(item.startsAt)} · {formatDuration(item.startsAt, item.endsAt)}
+                    </Text>
+                  ) : null}
+                </Pressable>
+              );
+            })}
+          </View>
+        </ScrollView>
       )}
     </View>
   );
