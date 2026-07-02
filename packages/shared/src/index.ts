@@ -154,6 +154,8 @@ export interface SearchInput {
   specialization?: string;
   heilmittel?: string;
   kassenart?: string;
+  gender?: 'female' | 'male';
+  requestable?: boolean;
 }
 
 export interface SearchPractice {

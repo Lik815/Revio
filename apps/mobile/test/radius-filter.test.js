@@ -1,5 +1,10 @@
 import { describe, test, expect } from 'vitest';
-import { haversine, radiusOptions } from '../src/utils/app-utils.js';
+import {
+  haversine,
+  radiusOptions,
+  resolveKassenartFilterValues,
+  searchKassenartOptions,
+} from '../src/utils/app-utils.js';
 
 describe('haversine distance calculation', () => {
   test('returns ~0 for identical coordinates', () => {
@@ -40,6 +45,23 @@ describe('radiusOptions', () => {
       expect(km).toBeGreaterThan(0);
       expect(Number.isInteger(km)).toBe(true);
     });
+  });
+});
+
+describe('searchKassenartOptions', () => {
+  test('fasst privat und selbstzahler in einer Suchoption zusammen', () => {
+    expect(searchKassenartOptions).toContainEqual({
+      key: 'privat_selbstzahler',
+      label: 'Privat/Selbstzahler',
+    });
+  });
+
+  test('privat_selbstzahler matcht beide internen Werte', () => {
+    expect(resolveKassenartFilterValues('privat_selbstzahler')).toEqual(['privat', 'selbstzahler']);
+  });
+
+  test('gesetzlich bleibt ein einzelner Filterwert', () => {
+    expect(resolveKassenartFilterValues('gesetzlich')).toEqual(['gesetzlich']);
   });
 });
 

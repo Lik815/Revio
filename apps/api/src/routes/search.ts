@@ -184,6 +184,7 @@ const searchBodySchema = z.object({
   specialization: z.string().optional(),
   heilmittel: z.string().optional(),
   kassenart: z.string().optional(),
+  gender: z.enum(['female', 'male']).optional(),
   requestable: z.boolean().optional(),
 }).refine((data) => Boolean(data.city) || Boolean(data.origin), {
   message: 'city oder origin ist erforderlich',
@@ -231,7 +232,13 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
       if (typeof input.homeVisit === 'boolean' && t.homeVisit !== input.homeVisit) return false;
       if (input.specialization && !specializations.includes(input.specialization.toLowerCase())) return false;
       if (input.heilmittel && !heilmittel.includes(input.heilmittel.toLowerCase())) return false;
-      if (input.kassenart && !kassenarten.includes(input.kassenart.toLowerCase())) return false;
+      if (input.kassenart) {
+        const acceptedKassenarten = input.kassenart.toLowerCase() === 'privat_selbstzahler'
+          ? ['privat', 'selbstzahler']
+          : [input.kassenart.toLowerCase()];
+        if (!acceptedKassenarten.some((value) => kassenarten.includes(value))) return false;
+      }
+      if (input.gender && t.gender !== input.gender) return false;
 
       return true;
     };
@@ -339,6 +346,7 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
         practices,
         bookingMode: tAny.bookingMode ?? 'DIRECTORY_ONLY',
         requestable: requestability.requestable,
+        gender: (t as any).gender ?? null,
         cityMatch,
         radiusMatch,
         // Neue Felder für mobile Therapeuten

@@ -16,10 +16,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   formatDist,
   getSearchMatchLabel,
-  kassenartOptions,
   quickChips,
   radiusOptions,
   RADIUS,
+  searchKassenartOptions,
   SPACE,
   TYPE,
 } from '../../utils/app-utils';
@@ -124,6 +124,16 @@ export function DiscoverContent(props) {
   const matchedResultsCount = safeResults.filter(
     (r) => r.cityMatch !== false && r.radiusMatch !== false
   ).length;
+  const hasResultsOutsideSelection = searched && safeResults.length > 0 && matchedResultsCount === 0;
+  const resultsSummaryLabel = hasResultsOutsideSelection
+    ? t('noResultsInRadiusTitle')
+    : searched
+      ? `${matchedResultsCount} ${matchedResultsCount !== 1 ? t('resultsLabelPlural') : t('resultsLabel')}`
+      : t('suggestions');
+  const resultsLocationLabel = city ? `In ${city}` : t('locationPlaceholder');
+  const outsideSelectionBody = t('noResultsInRadiusBody')
+    .replace('{radius}', searchRadius)
+    .replace('{location}', locationLabel || city || t('locationPlaceholder'));
   const safeMapTherapists = Array.isArray(mapTherapists) ? mapTherapists : [];
   const safeFortbildungen = Array.isArray(fortbildungen) ? fortbildungen : [];
   const safeCertificationOptions = Array.isArray(certificationOptions)
@@ -351,7 +361,7 @@ export function DiscoverContent(props) {
       <View style={styles.filterCompactSection}>
         <Text style={[styles.filterCompactSectionTitle, { color: c.muted }]}>{t('kassenartLabel')}</Text>
         <View style={[styles.kassenartCompactToggle, { backgroundColor: c.mutedBg, borderColor: c.border }]}>
-          {kassenartOptions.map((option) => {
+          {searchKassenartOptions.map((option) => {
             const active = kassenart === option.key;
             return (
               <Pressable
@@ -534,25 +544,9 @@ export function DiscoverContent(props) {
           {locationRadiusChip}
           {(searched || safeResults.length > 0) && (
             <Text style={{ ...TYPE.meta, color: mutedText }}>
-              {searched ? `${matchedResultsCount} ${matchedResultsCount !== 1 ? t('resultsLabelPlural') : t('resultsLabel')}` : t('suggestions')}
+              {resultsSummaryLabel}
             </Text>
           )}
-        </View>
-
-        {/* Radius selector bar */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', paddingHorizontal: 20, paddingVertical: 10, borderTopWidth: 1, borderBottomWidth: 1, borderColor: c.border, backgroundColor: c.background }}>
-          {[1, 3, 5, 10, 25].map((km) => {
-            const active = searchRadius === km;
-            return (
-              <Pressable
-                key={km}
-                onPress={() => setSearchRadius(km)}
-                style={{ minWidth: 52, alignItems: 'center', borderRadius: 22, paddingVertical: 7, paddingHorizontal: 12, backgroundColor: active ? c.primary : 'transparent' }}
-              >
-                <Text style={{ fontSize: 14, fontWeight: '700', color: active ? '#fff' : c.text }}>{km} km</Text>
-              </Pressable>
-            );
-          })}
         </View>
 
         {/* Fullscreen map */}
@@ -808,10 +802,10 @@ export function DiscoverContent(props) {
         <View style={styles.sectionRow}>
           <View style={{ flex: 1, gap: 4 }}>
             <Text style={{ ...TYPE.meta, color: mutedText }}>
-              {searched ? `${matchedResultsCount} ${matchedResultsCount !== 1 ? t('resultsLabelPlural') : t('resultsLabel')}` : t('suggestions')}
+              {resultsSummaryLabel}
             </Text>
             <Text style={{ ...TYPE.meta, color: mutedText }}>
-              {city ? `In ${city}` : t('locationPlaceholder')}
+              {resultsLocationLabel}
               {activeFilterCount > 0 ? ` · ${activeFilterCount} Filter` : ''}
             </Text>
           </View>
@@ -821,6 +815,36 @@ export function DiscoverContent(props) {
       {viewMode === 'list' && searchLoading && [1, 2, 3].map((item) => (
         <SkeletonCard key={item} C={c} />
       ))}
+
+      {viewMode === 'list' && !searchLoading && hasResultsOutsideSelection ? (
+        <View style={[styles.emptyState, { backgroundColor: c.card, borderColor: c.border, alignItems: 'flex-start', marginBottom: 14 }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: c.primaryBg, alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="navigate-outline" size={18} color={c.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.emptyTitle, { color: c.text, textAlign: 'left' }]}>{t('noResultsInRadiusTitle')}</Text>
+              <Text style={[styles.emptyBody, { color: c.muted, textAlign: 'left', marginTop: 4 }]}>
+                {outsideSelectionBody}
+              </Text>
+            </View>
+          </View>
+          <View style={[styles.emptyActions, { marginTop: 14 }]}>
+            <Pressable
+              onPress={() => setShowRadiusPicker(true)}
+              style={[styles.emptyActionBtn, { backgroundColor: c.primary }]}
+            >
+              <Text style={[styles.emptyActionText, { color: '#fff' }]}>{t('changeRadius')}</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => { setLocationSheetCity(locationLabel || city); setShowLocationSheet(true); }}
+              style={[styles.emptyActionBtn, { backgroundColor: c.mutedBg, borderColor: c.border, borderWidth: 1 }]}
+            >
+              <Text style={[styles.emptyActionText, { color: c.text }]}>{t('changeLocation')}</Text>
+            </Pressable>
+          </View>
+        </View>
+      ) : null}
 
       {viewMode === 'list' && !searchLoading && safeResults.map((therapist, index) => {
         const spec = (therapist.specializations ?? [])[0] ?? null;

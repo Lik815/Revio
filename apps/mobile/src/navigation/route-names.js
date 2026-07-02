@@ -9,6 +9,7 @@ export const ROOT_ROUTES = {
 };
 
 export const TAB_ROUTES = {
+  DASHBOARD:  'DashboardTab',
   DISCOVER:   'DiscoverTab',
   THERAPY:    'TherapyTab',
   FAVORITES:  'FavoritesTab',

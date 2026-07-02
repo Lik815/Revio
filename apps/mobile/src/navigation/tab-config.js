@@ -1,6 +1,7 @@
 import { TAB_ROUTES } from './route-names';
 
 export const TAB_ICON_BY_ROUTE = {
+  [TAB_ROUTES.DASHBOARD]:  'grid',
   [TAB_ROUTES.DISCOVER]:   'search',
   [TAB_ROUTES.THERAPY]:    'calendar',
   [TAB_ROUTES.FAVORITES]:  'heart',
@@ -11,6 +12,7 @@ export const TAB_ICON_BY_ROUTE = {
 };
 
 export const TAB_TRANSLATION_KEYS = {
+  [TAB_ROUTES.DASHBOARD]:  'tabDashboard',
   [TAB_ROUTES.DISCOVER]:   'tabSearch',
   [TAB_ROUTES.THERAPY]:    'tabTherapy',
   [TAB_ROUTES.FAVORITES]:  'tabFavorites',
@@ -25,6 +27,7 @@ export const TAB_TRANSLATION_KEYS = {
 // profile screen is currently open on top of it. Tabs without a nested
 // stack (e.g. Options) are omitted.
 export const TAB_HOME_ROUTES = {
+  [TAB_ROUTES.DASHBOARD]:  'DashboardHome',
   [TAB_ROUTES.DISCOVER]:   'DiscoverHome',
   [TAB_ROUTES.THERAPY]:    'TherapyHome',
   [TAB_ROUTES.FAVORITES]:  'FavoritesHome',

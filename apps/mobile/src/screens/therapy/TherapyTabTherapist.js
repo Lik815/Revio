@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Modal, Pressable, RefreshControl, ScrollView, Text, View,
 } from 'react-native';
@@ -13,7 +13,7 @@ import { TherapistActivationPrompt } from '../../components/TherapistActivationP
 import { TherapistFilteredSlotsScreen } from './TherapistFilteredSlotsScreen';
 import { useBookingActivation } from '../../hooks/use-booking-activation';
 import { useTherapistCalendarView } from '../../hooks/use-therapist-calendar-view';
-import { getBaseUrl, TUNNEL_HEADERS } from '../../utils/app-utils';
+import { useTherapistScheduleData } from '../../hooks/use-therapist-schedule-data';
 
 export function TherapyTabTherapist({
   authToken,
@@ -34,34 +34,7 @@ export function TherapyTabTherapist({
   const calendarView = useTherapistCalendarView();
 
   // Arbeitszeiten und Blockzeiten laden — Grundlage für die Tagesansicht.
-  const [workingHoursRules, setWorkingHoursRules] = useState([]);
-  const [blockedTimes, setBlockedTimes] = useState([]);
-
-  useEffect(() => {
-    if (!authToken) return;
-    let cancelled = false;
-
-    fetch(`${getBaseUrl()}/therapist/working-hours`, {
-      headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
-    })
-      .then((r) => (r.ok ? r.json() : { rules: [] }))
-      .then((d) => { if (!cancelled) setWorkingHoursRules(d.rules ?? []); })
-      .catch(() => {});
-
-    const from = new Date();
-    from.setDate(from.getDate() - 7);
-    const to = new Date();
-    to.setDate(to.getDate() + 90);
-    fetch(
-      `${getBaseUrl()}/therapist/blocked-times?from=${from.toISOString()}&to=${to.toISOString()}`,
-      { headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` } },
-    )
-      .then((r) => (r.ok ? r.json() : { blockedTimes: [] }))
-      .then((d) => { if (!cancelled) setBlockedTimes(d.blockedTimes ?? []); })
-      .catch(() => {});
-
-    return () => { cancelled = true; };
-  }, [authToken]);
+  const { workingHoursRules, blockedTimes } = useTherapistScheduleData({ authToken });
 
   const pendingCount = useMemo(
     () => incomingBookings.filter((r) => r.status === 'PENDING').length,

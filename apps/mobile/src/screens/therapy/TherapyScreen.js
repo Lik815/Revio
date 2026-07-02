@@ -95,6 +95,25 @@ export function TherapyTabScreen() {
     }
   }, [route.params?.openAppointmentId, myAppointments]);
 
+  // Dashboard-Tap — Therapeut öffnet Buchungsdetail direkt via openBookingId.
+  useEffect(() => {
+    const openId = route.params?.openBookingId;
+    if (!openId || !incomingBookings.length) return;
+    const booking = incomingBookings.find((b) => b.id === openId);
+    if (booking) {
+      setSelectedTherapistPatientAppointment({
+        appointment: booking,
+        patient: {
+          fullName: booking.patientName ?? null,
+          phone: booking.patientPhone ?? null,
+          email: booking.patientEmail ?? null,
+          addressLine: null,
+        },
+      });
+      navigation.setParams({ openBookingId: undefined });
+    }
+  }, [route.params?.openBookingId, incomingBookings]);
+
   const openTherapistById = (id, fallback = null) => {
     navigation.navigate(ROOT_ROUTES.THERAPIST_PROFILE, { therapistId: id, therapist: fallback });
   };

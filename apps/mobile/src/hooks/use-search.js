@@ -8,6 +8,8 @@ import {
   getBaseUrl,
   haversine,
   mapApiTherapist,
+  normalizeKassenarten,
+  resolveKassenartFilterValues,
 } from '../utils/app-utils';
 
 const webNavigator = typeof globalThis !== 'undefined' ? globalThis.navigator : undefined;
@@ -209,7 +211,11 @@ export function useSearch({ t }) {
     const safeList = Array.isArray(list) ? list : [];
     return safeList.filter((th) => {
       if (homeVisit && !th.homeVisit) return false;
-      if (kassenart && th.kassenart && th.kassenart !== kassenart) return false;
+      if (kassenart) {
+        const accepted = resolveKassenartFilterValues(kassenart);
+        const therapistKassenarten = normalizeKassenarten(th.kassenarten ?? th.kassenart);
+        if (!accepted.some((value) => therapistKassenarten.includes(value))) return false;
+      }
       if (gender && th.gender !== gender) return false;
       if (fortbildungen.length > 0) {
         const certs = Array.isArray(th?.fortbildungen)

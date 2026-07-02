@@ -121,6 +121,14 @@ const kassenartOptions = [
   { key: 'selbstzahler', label: 'Selbstzahler' }
 ];
 
+const PRIVATE_SELF_PAYER_KASSENARTS = ['privat', 'selbstzahler'];
+
+const searchKassenartOptions = [
+  { key: null, label: 'Alle' },
+  { key: 'gesetzlich', label: 'Gesetzlich' },
+  { key: 'privat_selbstzahler', label: 'Privat/Selbstzahler' },
+];
+
 const fortbildungOptions = [
   { key: 'MT', label: 'MT – Manuelle Therapie' },
   { key: 'Bobath', label: 'Neurologie (Bobath, PNF)' },
@@ -262,6 +270,13 @@ const normalizeKassenarten = (values) => {
   return normalized;
 };
 
+const resolveKassenartFilterValues = (value) => {
+  if (!value) return [];
+  return value === 'privat_selbstzahler'
+    ? PRIVATE_SELF_PAYER_KASSENARTS
+    : [String(value).toLowerCase()];
+};
+
 const normalizeLanguageCode = (value) => {
   if (typeof value !== 'string') return '';
   return value.trim().toUpperCase();
@@ -320,6 +335,7 @@ const mapApiTherapist = (t) => ({
   website: t.website ?? '',
   bookingMode: t.bookingMode ?? 'DIRECTORY_ONLY',
   requestable: t.requestable ?? false,
+  gender: t.gender ?? null,
 });
 
 const normalizeTherapistProfile = (therapist) => {
@@ -485,7 +501,9 @@ export {
   normalizeTherapistProfile,
   quickChips,
   regSpecOptions,
+  resolveKassenartFilterValues,
   resolveMediaUrl,
+  searchKassenartOptions,
   softenErrorMessage,
   tabs,
   ICON_HIT_SLOP,

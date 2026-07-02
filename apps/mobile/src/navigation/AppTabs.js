@@ -11,6 +11,7 @@ import { OptionsTabScreen } from '../screens/options/OptionsScreen';
 import { ProfileTabScreen } from '../screens/profile/ProfileScreen';
 import { TherapistProfileScreen } from '../screens/public/TherapistProfileScreen';
 import { PracticeProfileScreen } from '../screens/public/PracticeProfileScreen';
+import { TherapistDashboardScreen } from '../screens/dashboard/TherapistDashboardScreen';
 import { LoginScreen } from '../screens/auth/LoginScreen';
 import { translations } from '../i18n/translations';
 import { CustomTabBar } from './CustomTabBar';
@@ -45,18 +46,21 @@ const FavoritesStack = withProfileScreens(FavoritesTabScreen, 'FavoritesHome');
 const TherapyStack = withProfileScreens(TherapyTabScreen, 'TherapyHome');
 const NotificationsStack = withProfileScreens(NotificationsTabScreen, 'NotificationsHome');
 const OptionsStack = withProfileScreens(OptionsTabScreen, 'OptionsHome');
+const DashboardStack = withProfileScreens(TherapistDashboardScreen, 'DashboardHome');
 
 const translate = (key) => translations.de[key] ?? key;
 
 function AuthTabScreen({ navigation }) {
   const { c } = useTheme();
+  const { accountType } = useAuth();
+  const isTherapist = accountType === 'therapist';
 
   return (
     <LoginScreen
       c={c}
       t={translate}
       styles={appStyles}
-      onClose={() => navigation.navigate(TAB_ROUTES.DISCOVER)}
+      onClose={() => navigation.navigate(isTherapist ? TAB_ROUTES.THERAPY : TAB_ROUTES.DISCOVER)}
       showBackButton={false}
     />
   );
@@ -80,19 +84,28 @@ export function AppTabs() {
       )}
       screenOptions={{ headerShown: false }}
     >
-      <Tab.Screen
-        component={DiscoverStack}
-        name={TAB_ROUTES.DISCOVER}
-        options={{ title: t[TAB_TRANSLATION_KEYS[TAB_ROUTES.DISCOVER]] }}
-      />
+      {!isTherapist && (
+        <Tab.Screen
+          component={DiscoverStack}
+          name={TAB_ROUTES.DISCOVER}
+          options={{ title: t[TAB_TRANSLATION_KEYS[TAB_ROUTES.DISCOVER]] }}
+        />
+      )}
       {isLoggedIn ? (
         <>
           {isTherapist ? (
-            <Tab.Screen
-              component={CustomersTabScreen}
-              name={TAB_ROUTES.CUSTOMERS}
-              options={{ title: t[TAB_TRANSLATION_KEYS[TAB_ROUTES.CUSTOMERS]] }}
-            />
+            <>
+              <Tab.Screen
+                component={DashboardStack}
+                name={TAB_ROUTES.DASHBOARD}
+                options={{ title: t[TAB_TRANSLATION_KEYS[TAB_ROUTES.DASHBOARD]] }}
+              />
+              <Tab.Screen
+                component={CustomersTabScreen}
+                name={TAB_ROUTES.CUSTOMERS}
+                options={{ title: t[TAB_TRANSLATION_KEYS[TAB_ROUTES.CUSTOMERS]] }}
+              />
+            </>
           ) : (
             <Tab.Screen
               component={FavoritesStack}
