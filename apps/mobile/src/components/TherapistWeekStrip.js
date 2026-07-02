@@ -76,9 +76,9 @@ export function TherapistWeekStrip({
           <Pressable
             onPress={onPressToday}
             hitSlop={8}
-            style={{ height: 32, paddingHorizontal: 12, borderRadius: 16, backgroundColor: c.card, borderWidth: 1, borderColor: c.border, alignItems: 'center', justifyContent: 'center' }}
+            style={{ height: 32, paddingHorizontal: 12, borderRadius: 16, backgroundColor: isSameDay(selectedDate, today) ? c.success : c.card, borderWidth: 1, borderColor: isSameDay(selectedDate, today) ? c.success : c.border, alignItems: 'center', justifyContent: 'center' }}
           >
-            <Text style={{ fontSize: 13, fontWeight: '600', color: c.primary }}>Heute</Text>
+            <Text style={{ fontSize: 13, fontWeight: '600', color: isSameDay(selectedDate, today) ? '#fff' : c.primary }}>Heute</Text>
           </Pressable>
         </View>
       </View>
