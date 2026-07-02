@@ -93,14 +93,31 @@ export function TherapyTabTherapist({
 
   const SUMMARY_BAR_HEIGHT = 60;
 
+  const isListView = bookingEnabled && calendarView.viewMode !== 'calendar';
+
   return (
     <View style={{ flex: 1 }}>
+      {/* WeekStrip fixiert oben — scrollt nicht mit */}
+      {isListView && (
+        <TherapistWeekStrip
+          c={c}
+          selectedDate={calendarView.selectedDate}
+          visibleWeekStart={calendarView.visibleWeekStart}
+          incomingBookings={incomingBookings}
+          workingHoursRules={workingHoursRules}
+          onSelectDate={calendarView.setSelectedDate}
+          onPrevWeek={calendarView.handlePrevWeek}
+          onNextWeek={calendarView.handleNextWeek}
+          onPressCalendar={calendarView.handleOpenCalendar}
+          onPressToday={calendarView.handleGoToToday}
+        />
+      )}
+
       <ScrollView
         contentContainerStyle={[styles.scrollContent, { paddingBottom: SUMMARY_BAR_HEIGHT + 16, paddingTop: 8 }]}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={therapyRefreshing} onRefresh={onRefresh} tintColor={c.primary} />}
       >
-
         {bookingEnabled ? (
           calendarView.viewMode === 'calendar' ? (
             <TherapistMonthCalendar
@@ -118,31 +135,16 @@ export function TherapyTabTherapist({
               onOpenBooking={onOpenBookingDetail}
             />
           ) : (
-            <>
-              <TherapistWeekStrip
-                c={c}
-                selectedDate={calendarView.selectedDate}
-                visibleWeekStart={calendarView.visibleWeekStart}
-                incomingBookings={incomingBookings}
-                workingHoursRules={workingHoursRules}
-                onSelectDate={calendarView.setSelectedDate}
-                onPrevWeek={calendarView.handlePrevWeek}
-                onNextWeek={calendarView.handleNextWeek}
-                onPressCalendar={calendarView.handleOpenCalendar}
-                onPressToday={calendarView.handleGoToToday}
-              />
-
-              <TherapistDayTimeline
-                c={c}
-                selectedDate={calendarView.selectedDate}
-                incomingBookings={incomingBookings}
-                workingHoursRules={workingHoursRules}
-                blockedTimes={blockedTimes}
-                incomingBookingsLoading={incomingBookingsLoading}
-                incomingBookingsLastLoadedAt={incomingBookingsLastLoadedAt}
-                onOpenBooking={onOpenBookingDetail}
-              />
-            </>
+            <TherapistDayTimeline
+              c={c}
+              selectedDate={calendarView.selectedDate}
+              incomingBookings={incomingBookings}
+              workingHoursRules={workingHoursRules}
+              blockedTimes={blockedTimes}
+              incomingBookingsLoading={incomingBookingsLoading}
+              incomingBookingsLastLoadedAt={incomingBookingsLastLoadedAt}
+              onOpenBooking={onOpenBookingDetail}
+            />
           )
         ) : (
           <TherapistActivationPrompt
