@@ -18,6 +18,7 @@ import {
   getSearchMatchLabel,
   kassenartOptions,
   quickChips,
+  radiusOptions,
   RADIUS,
   SPACE,
   TYPE,
@@ -138,6 +139,79 @@ export function DiscoverContent(props) {
   const iconHitSlop = { top: 10, bottom: 10, left: 10, right: 10 };
   const showHeaderToggle = viewMode === 'map' || searched || safeResults.length > 0;
   const [fortbildungQuery, setFortbildungQuery] = React.useState('');
+  const [showRadiusPicker, setShowRadiusPicker] = React.useState(false);
+
+  const locationRadiusChip = (
+    <View style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', borderRadius: RADIUS.full, borderWidth: 1, borderColor: c.border, backgroundColor: c.card, overflow: 'hidden' }}>
+      <Pressable
+        onPress={() => { setLocationSheetCity(locationLabel || city); setShowLocationSheet(true); }}
+        style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 7, paddingLeft: 10, paddingRight: userCoords ? 8 : 10 }}
+        hitSlop={4}
+      >
+        <Ionicons name="location-outline" size={13} color={city ? c.primary : mutedText} />
+        <Text style={{ fontSize: 13, fontWeight: '600', color: city ? c.primary : mutedText }}>
+          {locationLabel || city || 'Standort wählen'}
+        </Text>
+      </Pressable>
+      {userCoords && (
+        <>
+          <View style={{ width: 1, backgroundColor: c.border, alignSelf: 'stretch' }} />
+          <Pressable
+            onPress={() => setShowRadiusPicker(true)}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 7, paddingHorizontal: 10 }}
+            hitSlop={4}
+          >
+            <Text style={{ fontSize: 13, fontWeight: '600', color: c.text }}>{searchRadius} km</Text>
+            <Ionicons name="chevron-down" size={11} color={mutedText} />
+          </Pressable>
+        </>
+      )}
+    </View>
+  );
+
+  const radiusPickerModal = (
+    <Modal
+      visible={showRadiusPicker}
+      transparent
+      animationType="fade"
+      onRequestClose={() => setShowRadiusPicker(false)}
+    >
+      <Pressable
+        style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end' }}
+        onPress={() => setShowRadiusPicker(false)}
+      >
+        <Pressable onPress={() => {}}>
+          <View style={{ backgroundColor: c.background, borderTopLeftRadius: RADIUS.lg, borderTopRightRadius: RADIUS.lg, padding: 24, paddingBottom: 40 }}>
+            <Text style={{ fontSize: 17, fontWeight: '800', color: c.text, marginBottom: 4 }}>Umkreis</Text>
+            {city ? (
+              <Text style={{ fontSize: 13, color: mutedText, marginBottom: 16 }}>
+                Suche um {locationLabel || city}
+              </Text>
+            ) : (
+              <Text style={{ fontSize: 13, color: mutedText, marginBottom: 16 }}>
+                Kein Standort gesetzt — Umkreis wird nicht angewendet.
+              </Text>
+            )}
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+              {radiusOptions.map((km) => {
+                const active = searchRadius === km;
+                return (
+                  <Pressable
+                    key={km}
+                    onPress={() => { setSearchRadius(km); setShowRadiusPicker(false); }}
+                    style={{ paddingVertical: 10, paddingHorizontal: 20, borderRadius: RADIUS.full, backgroundColor: active ? c.primary : c.card, borderWidth: 1, borderColor: active ? c.primary : c.border }}
+                  >
+                    <Text style={{ fontSize: 15, fontWeight: '700', color: active ? '#fff' : c.text }}>{km} km</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+
   const selectedCertificationOptions = safeFortbildungen.map((key) =>
     safeCertificationOptions.find((option) => option.key === key) ?? { key, label: key }
   );
@@ -456,6 +530,8 @@ export function DiscoverContent(props) {
             </View>
           </View>
           {filtersPanel}
+          {radiusPickerModal}
+          {locationRadiusChip}
           {(searched || safeResults.length > 0) && (
             <Text style={{ ...TYPE.meta, color: mutedText }}>
               {searched ? `${matchedResultsCount} ${matchedResultsCount !== 1 ? t('resultsLabelPlural') : t('resultsLabel')}` : t('suggestions')}
@@ -684,6 +760,9 @@ export function DiscoverContent(props) {
             </View>
           )}
         </View>
+
+        {locationRadiusChip}
+        {radiusPickerModal}
 
         {!showFilters && (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACE.sm }}>
