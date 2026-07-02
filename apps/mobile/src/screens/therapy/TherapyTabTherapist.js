@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   RefreshControl, ScrollView, View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HeilmittelSelectModal } from '../../modals/HeilmittelSelectModal';
 import { TherapistSummaryCard } from '../../components/TherapistSummaryCard';
 import { TherapistWeekStrip } from '../../components/TherapistWeekStrip';
@@ -69,6 +70,8 @@ export function TherapyTabTherapist({
     [incomingBookings],
   );
 
+  const insets = useSafeAreaInsets();
+
   const handleOpenDetail = (booking) => {
     onOpenBookingDetail(booking);
   };
@@ -88,20 +91,15 @@ export function TherapyTabTherapist({
     );
   }
 
+  const SUMMARY_BAR_HEIGHT = 60;
+
   return (
     <View style={{ flex: 1 }}>
       <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: 32, paddingTop: 8 }]}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: SUMMARY_BAR_HEIGHT + 16, paddingTop: 8 }]}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={therapyRefreshing} onRefresh={onRefresh} tintColor={c.primary} />}
       >
-        <TherapistSummaryCard
-          c={c}
-          confirmedCount={confirmedCount}
-          pendingCount={pendingCount}
-          onPressBooked={() => setFilterListKind('booked')}
-          onPressPending={() => setFilterListKind('pending')}
-        />
 
         {bookingEnabled ? (
           calendarView.viewMode === 'calendar' ? (
@@ -157,6 +155,24 @@ export function TherapyTabTherapist({
           />
         )}
       </ScrollView>
+
+      {/* Gebucht / Anfragen — fixed am unteren Rand */}
+      <View style={{
+        position: 'absolute',
+        bottom: insets.bottom + 8,
+        left: 16,
+        right: 16,
+        flexDirection: 'row',
+        gap: 8,
+      }}>
+        <TherapistSummaryCard
+          c={c}
+          confirmedCount={confirmedCount}
+          pendingCount={pendingCount}
+          onPressBooked={() => setFilterListKind('booked')}
+          onPressPending={() => setFilterListKind('pending')}
+        />
+      </View>
 
       <HeilmittelSelectModal
         visible={activation.showHeilmittelModal}
