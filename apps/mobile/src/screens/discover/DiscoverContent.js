@@ -761,7 +761,7 @@ export function DiscoverContent(props) {
           )}
         </View>
 
-        {locationRadiusChip}
+        {searched && safeResults.length > 0 && userCoords && locationRadiusChip}
         {radiusPickerModal}
 
         {!showFilters && (
