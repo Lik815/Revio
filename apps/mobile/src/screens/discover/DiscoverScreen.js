@@ -84,7 +84,10 @@ export function DiscoverTabScreen() {
   };
 
   const handleBannerPress = () => {
-    navigation.navigate(ROOT_ROUTES.MAIN_TABS, { screen: TAB_ROUTES.THERAPY });
+    navigation.navigate(ROOT_ROUTES.MAIN_TABS, {
+      screen: TAB_ROUTES.THERAPY,
+      params: { openAppointmentId: nextAppointment?.id },
+    });
   };
 
   return (

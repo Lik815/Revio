@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Ionicons, } from '@expo/vector-icons';
 import { Alert, Modal, Pressable, ScrollView, Text, View } from 'react-native';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import { appStoreSelectors, useAppStore } from '../../store/useStore';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../hooks/use-theme';
@@ -26,6 +26,7 @@ const t = (key) => translations.de[key] ?? key;
 
 export function TherapyTabScreen() {
   const navigation = useNavigation();
+  const route = useRoute();
 
   const authToken = useAppStore(appStoreSelectors.authToken);
   const accountType = useAppStore(appStoreSelectors.accountType);
@@ -82,6 +83,17 @@ export function TherapyTabScreen() {
       setSelectedTherapistPatientAppointment((prev) => (prev ? { ...prev, appointment: updated } : prev));
     }
   }, [incomingBookings, selectedTherapistPatientAppointment]);
+
+  // Banner-Tap aus DiscoverScreen — Termin direkt öffnen wenn Param gesetzt.
+  useEffect(() => {
+    const openId = route.params?.openAppointmentId;
+    if (!openId || !myAppointments.length) return;
+    const apt = myAppointments.find((a) => a.id === openId);
+    if (apt) {
+      setSelectedAppointment(apt);
+      navigation.setParams({ openAppointmentId: undefined });
+    }
+  }, [route.params?.openAppointmentId, myAppointments]);
 
   const openTherapistById = (id, fallback = null) => {
     navigation.navigate(ROOT_ROUTES.THERAPIST_PROFILE, { therapistId: id, therapist: fallback });
