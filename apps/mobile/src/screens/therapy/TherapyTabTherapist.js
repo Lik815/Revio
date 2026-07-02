@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   RefreshControl, ScrollView, View,
 } from 'react-native';
-import { AccountHeader } from '../../components/AccountHeader';
 import { HeilmittelSelectModal } from '../../modals/HeilmittelSelectModal';
 import { TherapistSummaryCard } from '../../components/TherapistSummaryCard';
 import { TherapistWeekStrip } from '../../components/TherapistWeekStrip';
@@ -91,8 +90,6 @@ export function TherapyTabTherapist({
 
   return (
     <View style={{ flex: 1 }}>
-      <AccountHeader c={c} subtitle="Termine" />
-
       <ScrollView
         contentContainerStyle={[styles.scrollContent, { paddingBottom: 32, paddingTop: 8 }]}
         showsVerticalScrollIndicator={false}
