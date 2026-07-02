@@ -67,10 +67,13 @@ export function DiscoverTabScreen() {
     discoverScrollRef.current?.scrollTo?.({ y: 0, animated: false });
   }, [route.params?.resetToHomeAt]);
 
+  const isSearchActive = !!(search.searched || search.query);
+
   const nextAppointment = useMemo(() => {
     if (accountType !== 'patient') return null;
+    if (isSearchActive) return null;
     return getNextPatientAppointment(myAppointments);
-  }, [myAppointments, accountType]);
+  }, [myAppointments, accountType, isSearchActive]);
 
   const ThemedHeartButton = (props) => (
     <HeartButton {...props} savedColor={c.saved} unsavedColor={props.unsavedColor ?? c.muted} />
