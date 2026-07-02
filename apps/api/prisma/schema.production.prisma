@@ -89,6 +89,7 @@ model User {
   emailOtpCode                String?
   emailOtpExpiresAt           DateTime?
   phone                       String?
+  kassenart                   String?
   expoPushToken               String?
   createdAt              DateTime                @default(now())
   updatedAt              DateTime                @updatedAt
