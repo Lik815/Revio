@@ -91,15 +91,13 @@ export function TherapyTabTherapist({
     );
   }
 
-  const SUMMARY_BAR_HEIGHT = 60;
-
   const isListView = bookingEnabled && calendarView.viewMode !== 'calendar';
 
   return (
     <View style={{ flex: 1 }}>
       {/* WeekStrip fixiert oben — scrollt nicht mit */}
       {isListView && (
-        <View style={{ paddingTop: insets.top, backgroundColor: c.background, paddingHorizontal: 24 }}>
+        <View style={{ paddingTop: insets.top + 12, backgroundColor: c.background, paddingHorizontal: 24 }}>
           <TherapistWeekStrip
             c={c}
             selectedDate={calendarView.selectedDate}
@@ -116,7 +114,8 @@ export function TherapyTabTherapist({
       )}
 
       <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: SUMMARY_BAR_HEIGHT + 16, paddingTop: 8 }]}
+        style={{ flex: 1 }}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: 8, paddingTop: 8 }]}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={therapyRefreshing} onRefresh={onRefresh} tintColor={c.primary} />}
       >
@@ -160,13 +159,8 @@ export function TherapyTabTherapist({
         )}
       </ScrollView>
 
-      {/* Gebucht / Anfragen — fixed am unteren Rand */}
-      <View style={{
-        position: 'absolute',
-        bottom: insets.bottom + 8,
-        left: 16,
-        right: 16,
-      }}>
+      {/* Gebucht / Anfragen — im normalen Flow ganz unten */}
+      <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>
         <TherapistSummaryCard
           c={c}
           confirmedCount={confirmedCount}
