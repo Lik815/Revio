@@ -80,9 +80,7 @@ module.exports = {
       },
     },
     owner: 'my-revio',
-    runtimeVersion: {
-      policy: 'appVersion',
-    },
+    runtimeVersion: '0.1.0',
     updates: {
       url: 'https://u.expo.dev/77125a37-7ed9-4354-9b2f-614fadd5eeb0',
     },

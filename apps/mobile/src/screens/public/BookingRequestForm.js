@@ -226,7 +226,7 @@ export function BookingRequestForm({ c, t, therapist, authToken, onSuccess, onCl
           loadSlots(selectedHeilmittel);
           setStep(3);
         } else {
-          setError(data.error ?? 'Buchung fehlgeschlagen. Bitte erneut versuchen.');
+          setError((data.error ?? 'Buchung fehlgeschlagen.') + (data._debug ? `\n[${data._debug}]` : ''));
         }
       } else {
         setBookedStartsAt(data.startsAt ?? selectedStartsAt);

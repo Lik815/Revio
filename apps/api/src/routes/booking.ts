@@ -432,7 +432,11 @@ export async function bookingRoutes(fastify: FastifyInstance) {
         return reply.status(err.code).send({ error: err.message });
       }
       fastify.log.error({ err }, 'POST /bookings unexpected error');
-      return reply.status(500).send({ error: 'Buchung konnte nicht abgeschlossen werden. Bitte versuche es erneut.' });
+      return reply.status(500).send({
+        error: 'Buchung konnte nicht abgeschlossen werden. Bitte versuche es erneut.',
+        _debug: String(err?.message ?? err),
+        _prismaCode: err?.code,
+      });
     }
   });
 
