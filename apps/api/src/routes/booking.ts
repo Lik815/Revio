@@ -372,7 +372,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
         // Advisory Lock: serialisiert gleichzeitige Buchungen desselben Therapeuten
         // (nur PostgreSQL; SQLite überspringen — kein $queryRaw-Support für diese Syntax).
         if (isPostgres()) {
-          await tx.$queryRawUnsafe(`SELECT pg_advisory_xact_lock(${therapistLockId(therapistId)}::bigint)`);
+          await tx.$executeRawUnsafe(`SELECT pg_advisory_xact_lock(${therapistLockId(therapistId)}::bigint)`);
         }
 
         // Race-Condition-Schutz: Überschneidung mit bestehenden PENDING/CONFIRMED-Buchungen
