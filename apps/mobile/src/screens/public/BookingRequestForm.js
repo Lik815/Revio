@@ -13,7 +13,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getBaseUrl, kassenartOptions, RADIUS, SPACE, TUNNEL_HEADERS, TYPE } from '../../utils/app-utils';
 import { useConfigOptions } from '../../hooks/use-config-options';
-import { useAuth } from '../../context/AuthContext';
+
 
 function formatSlot(startsAt, endsAt) {
   if (!startsAt) return '—';
@@ -40,7 +40,6 @@ function getDateRange() {
 export function BookingRequestForm({ c, t, therapist, authToken, onSuccess, onClose }) {
   const insets = useSafeAreaInsets();
   const { heilmittelOptions } = useConfigOptions();
-  const { loggedInPatient, setLoggedInPatient } = useAuth();
 
   const [selectedHeilmittel, setSelectedHeilmittel] = useState(null);
   const [slots, setSlots] = useState([]);
@@ -50,16 +49,11 @@ export function BookingRequestForm({ c, t, therapist, authToken, onSuccess, onCl
   const [selectedKassenart, setSelectedKassenart] = useState(null);
   const [message, setMessage] = useState('');
   const [consent, setConsent] = useState(false);
-  const [phone, setPhone] = useState(loggedInPatient?.phone ?? '');
-  const [phoneConfirm, setPhoneConfirm] = useState(loggedInPatient?.phone ?? '');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [bookedStartsAt, setBookedStartsAt] = useState(null);
   const [bookedEndsAt, setBookedEndsAt] = useState(null);
-
-  const storedPhone = (loggedInPatient?.phone ?? '').trim();
-  const phoneConfirmNeeded = !storedPhone || phone.trim() !== storedPhone;
 
   const availableHeilmittel = (Array.isArray(therapist?.heilmittel) ? therapist.heilmittel : [])
     .map((item) => {
@@ -105,30 +99,10 @@ export function BookingRequestForm({ c, t, therapist, authToken, onSuccess, onCl
     if (!selectedHeilmittel) { setError('Bitte wähle zuerst ein Heilmittel aus.'); return; }
     if (!selectedStartsAt) { setError('Bitte wähle einen Termin aus.'); return; }
     if (!selectedKassenart) { setError('Bitte gib an, wie du versichert bist.'); return; }
-    if (!phone.trim()) { setError('Bitte gib deine Telefonnummer ein.'); return; }
-    if (phoneConfirmNeeded && phone.trim() !== phoneConfirm.trim()) {
-      setError('Die Telefonnummern stimmen nicht überein.');
-      return;
-    }
     if (!consent) { setError('Bitte stimme der Datenschutzerklärung zu.'); return; }
     setError('');
     setLoading(true);
     try {
-      if (phone.trim() !== (loggedInPatient?.phone ?? '')) {
-        const phoneRes = await fetch(`${getBaseUrl()}/auth/me`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
-          body: JSON.stringify({ phone: phone.trim() }),
-        });
-        const phoneData = await phoneRes.json().catch(() => ({}));
-        if (!phoneRes.ok) {
-          setError(phoneData.message ?? 'Telefonnummer konnte nicht gespeichert werden.');
-          setLoading(false);
-          return;
-        }
-        setLoggedInPatient((prev) => ({ ...prev, phone: phoneData.phone ?? phone.trim() }));
-      }
-
       const res = await fetch(`${getBaseUrl()}/bookings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
@@ -308,40 +282,6 @@ export function BookingRequestForm({ c, t, therapist, authToken, onSuccess, onCl
               );
             })}
           </View>
-        </View>
-
-        {/* Telefonnummer */}
-        <View style={{ marginBottom: SPACE.md }}>
-          <Text style={{ ...TYPE.label, color: c.text, marginBottom: SPACE.xs }}>Telefonnummer</Text>
-          <TextInput
-            value={phone}
-            onChangeText={setPhone}
-            placeholder={t('phonePlaceholder') ?? '+49 …'}
-            placeholderTextColor={c.muted}
-            keyboardType="phone-pad"
-            style={{
-              borderWidth: 1, borderColor: c.border, borderRadius: RADIUS.sm,
-              backgroundColor: c.mutedBg, color: c.text, fontSize: 15,
-              padding: 12, marginBottom: phoneConfirmNeeded ? SPACE.sm : 0,
-            }}
-          />
-          {phoneConfirmNeeded ? (
-            <>
-              <Text style={{ ...TYPE.label, color: c.text, marginBottom: SPACE.xs }}>Telefonnummer bestätigen</Text>
-              <TextInput
-                value={phoneConfirm}
-                onChangeText={setPhoneConfirm}
-                placeholder={t('phonePlaceholder') ?? '+49 …'}
-                placeholderTextColor={c.muted}
-                keyboardType="phone-pad"
-                style={{
-                  borderWidth: 1, borderColor: c.border, borderRadius: RADIUS.sm,
-                  backgroundColor: c.mutedBg, color: c.text, fontSize: 15,
-                  padding: 12,
-                }}
-              />
-            </>
-          ) : null}
         </View>
 
         {/* Nachricht */}
