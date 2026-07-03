@@ -6,6 +6,11 @@ import {
   getTodayBookings,
   getNextTherapistBooking,
   computeTherapistDashboardStats,
+  isBookingActive,
+  getBookingProgress,
+  getBookingRemainingMs,
+  formatDuration,
+  getNextDayBookingAfter,
 } from '../src/utils/therapist-dashboard.js';
 
 const NOW = new Date('2026-07-02T10:00:00.000Z');
@@ -135,6 +140,111 @@ describe('getNextTherapistBooking', () => {
   test('PENDING wird ignoriert', () => {
     const b = booking({ startsAt: TOMORROW.toISOString(), status: 'PENDING' });
     expect(getNextTherapistBooking([b], NOW)).toBeNull();
+  });
+});
+
+describe('isBookingActive', () => {
+  test('laufender Termin → true', () => {
+    const start = new Date(NOW.getTime() - 5 * 60_000);
+    const end = new Date(NOW.getTime() + 15 * 60_000);
+    const b = booking({ startsAt: start.toISOString(), endsAt: end.toISOString() });
+    expect(isBookingActive(b, NOW)).toBe(true);
+  });
+
+  test('noch nicht begonnen → false', () => {
+    const start = new Date(NOW.getTime() + 5 * 60_000);
+    const end = new Date(NOW.getTime() + 25 * 60_000);
+    const b = booking({ startsAt: start.toISOString(), endsAt: end.toISOString() });
+    expect(isBookingActive(b, NOW)).toBe(false);
+  });
+
+  test('bereits beendet → false', () => {
+    const start = new Date(NOW.getTime() - 25 * 60_000);
+    const end = new Date(NOW.getTime() - 5 * 60_000);
+    const b = booking({ startsAt: start.toISOString(), endsAt: end.toISOString() });
+    expect(isBookingActive(b, NOW)).toBe(false);
+  });
+});
+
+describe('getBookingProgress', () => {
+  test('halbzeit → 0.5', () => {
+    const start = new Date(NOW.getTime() - 10 * 60_000);
+    const end = new Date(NOW.getTime() + 10 * 60_000);
+    const b = booking({ startsAt: start.toISOString(), endsAt: end.toISOString() });
+    expect(getBookingProgress(b, NOW)).toBeCloseTo(0.5);
+  });
+
+  test('vor Beginn → 0', () => {
+    const start = new Date(NOW.getTime() + 10 * 60_000);
+    const end = new Date(NOW.getTime() + 30 * 60_000);
+    const b = booking({ startsAt: start.toISOString(), endsAt: end.toISOString() });
+    expect(getBookingProgress(b, NOW)).toBe(0);
+  });
+
+  test('nach Ende → 1', () => {
+    const start = new Date(NOW.getTime() - 30 * 60_000);
+    const end = new Date(NOW.getTime() - 10 * 60_000);
+    const b = booking({ startsAt: start.toISOString(), endsAt: end.toISOString() });
+    expect(getBookingProgress(b, NOW)).toBe(1);
+  });
+});
+
+describe('getBookingRemainingMs', () => {
+  test('gibt verbleibende Millisekunden zurück', () => {
+    const end = new Date(NOW.getTime() + 8 * 60_000);
+    const b = booking({ endsAt: end.toISOString() });
+    expect(getBookingRemainingMs(b, NOW)).toBe(8 * 60_000);
+  });
+
+  test('vergangener Termin → 0', () => {
+    const end = new Date(NOW.getTime() - 5 * 60_000);
+    const b = booking({ endsAt: end.toISOString() });
+    expect(getBookingRemainingMs(b, NOW)).toBe(0);
+  });
+});
+
+describe('formatDuration', () => {
+  test('nur Minuten', () => {
+    expect(formatDuration(8 * 60_000)).toBe('8 Min.');
+  });
+
+  test('nur Stunden', () => {
+    expect(formatDuration(120 * 60_000)).toBe('2 Std.');
+  });
+
+  test('Stunden und Minuten', () => {
+    expect(formatDuration(68 * 60_000)).toBe('1 Std. 8 Min.');
+  });
+
+  test('rundet auf volle Minuten auf', () => {
+    expect(formatDuration(30_000)).toBe('1 Min.');
+  });
+});
+
+describe('getNextDayBookingAfter', () => {
+  const A_START = new Date('2026-07-02T08:00:00.000Z');
+  const B_START = new Date('2026-07-02T09:00:00.000Z');
+  const C_START = new Date('2026-07-02T10:00:00.000Z');
+
+  const a = { id: 'a', status: 'CONFIRMED', startsAt: A_START.toISOString() };
+  const b = { id: 'b', status: 'CONFIRMED', startsAt: B_START.toISOString() };
+  const c = { id: 'c', status: 'CONFIRMED', startsAt: C_START.toISOString() };
+  const pending = { id: 'p', status: 'PENDING', startsAt: B_START.toISOString() };
+
+  test('gibt nächsten CONFIRMED nach aktuellem zurück', () => {
+    expect(getNextDayBookingAfter([a, b, c], a)).toEqual(b);
+  });
+
+  test('letzter Termin → null', () => {
+    expect(getNextDayBookingAfter([a, b, c], c)).toBeNull();
+  });
+
+  test('PENDING wird ignoriert', () => {
+    expect(getNextDayBookingAfter([a, pending], a)).toBeNull();
+  });
+
+  test('leere Liste → null', () => {
+    expect(getNextDayBookingAfter([], a)).toBeNull();
   });
 });
 
