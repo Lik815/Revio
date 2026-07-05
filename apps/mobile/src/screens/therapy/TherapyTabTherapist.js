@@ -3,12 +3,13 @@ import {
   Modal, Pressable, RefreshControl, ScrollView, Text, View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import Animated, { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated';
 import { RADIUS } from '../../utils/app-utils';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HeilmittelSelectModal } from '../../modals/HeilmittelSelectModal';
 import { TherapistWeekStrip } from '../../components/TherapistWeekStrip';
 import { TherapistDayTimeline } from '../../components/TherapistDayTimeline';
-import { TherapistMonthCalendar } from '../../components/TherapistMonthCalendar';
+import { TherapistCalendarGrid } from '../../components/TherapistCalendarGrid';
 import { TherapistActivationPrompt } from '../../components/TherapistActivationPrompt';
 import { TherapistFilteredSlotsScreen } from './TherapistFilteredSlotsScreen';
 import { useBookingActivation } from '../../hooks/use-booking-activation';
@@ -33,6 +34,10 @@ export function TherapyTabTherapist({
 
   const activation = useBookingActivation({ onActivateBookingRequests });
   const calendarView = useTherapistCalendarView();
+  const scrollY = useSharedValue(0);
+  const scrollHandler = useAnimatedScrollHandler((e) => {
+    scrollY.value = e.contentOffset.y;
+  });
 
   // Arbeitszeiten und Blockzeiten laden — Grundlage für die Tagesansicht.
   const { workingHoursRules, blockedTimes } = useTherapistScheduleData({ authToken });
@@ -70,10 +75,11 @@ export function TherapyTabTherapist({
   }
 
   const isListView = bookingEnabled && calendarView.viewMode !== 'calendar';
+  const isCalendarMode = bookingEnabled && calendarView.viewMode === 'calendar';
 
   return (
     <View style={{ flex: 1 }}>
-      {/* WeekStrip fixiert oben — scrollt nicht mit */}
+      {/* WeekStrip fixiert oben (Listenansicht) */}
       {isListView && (
         <View style={{ paddingTop: insets.top + 12, backgroundColor: c.background, paddingHorizontal: 24 }}>
           <TherapistWeekStrip
@@ -92,19 +98,14 @@ export function TherapyTabTherapist({
         </View>
       )}
 
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: 8, paddingTop: isListView ? 8 : insets.top + 12 }]}
-        showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={therapyRefreshing} onRefresh={onRefresh} tintColor={c.primary} />}
-      >
-        {bookingEnabled ? (
-          calendarView.viewMode === 'calendar' ? (
-            <TherapistMonthCalendar
+      {isCalendarMode ? (
+        // KALENDERANSICHT: Monatsraster als kollabierender Header, Tagesinhalt scrollt darunter.
+        <>
+          <View style={{ paddingTop: insets.top + 12, backgroundColor: c.background }}>
+            <TherapistCalendarGrid
               c={c}
               incomingBookings={incomingBookings}
               workingHoursRules={workingHoursRules}
-              blockedTimes={blockedTimes}
               selectedDate={calendarView.selectedDate}
               onSelectDate={calendarView.handleSelectCalendarDate}
               visibleMonth={calendarView.visibleMonth}
@@ -112,10 +113,17 @@ export function TherapyTabTherapist({
               onNextMonth={calendarView.handleNextMonth}
               onPressList={calendarView.handleShowList}
               onPressToday={calendarView.handleGoToToday}
-              onOpenBooking={onOpenBookingDetail}
-              servicesByKey={servicesByKey}
+              scrollY={scrollY}
             />
-          ) : (
+          </View>
+          <Animated.ScrollView
+            onScroll={scrollHandler}
+            scrollEventThrottle={16}
+            style={{ flex: 1 }}
+            contentContainerStyle={[styles.scrollContent, { paddingBottom: 24, paddingTop: 8 }]}
+            showsVerticalScrollIndicator={false}
+            refreshControl={<RefreshControl refreshing={therapyRefreshing} onRefresh={onRefresh} tintColor={c.primary} />}
+          >
             <TherapistDayTimeline
               c={c}
               selectedDate={calendarView.selectedDate}
@@ -127,18 +135,40 @@ export function TherapyTabTherapist({
               onOpenBooking={onOpenBookingDetail}
               servicesByKey={servicesByKey}
             />
-          )
-        ) : (
-          <TherapistActivationPrompt
-            reviewApproved={reviewApproved}
-            activationLoading={activation.activationLoading}
-            activationError={activation.activationError}
-            onActivate={activation.handleActivate}
-            c={c}
-            styles={styles}
-          />
-        )}
-      </ScrollView>
+          </Animated.ScrollView>
+        </>
+      ) : (
+        // LISTENANSICHT / DEAKTIVIERT: normaler ScrollView
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: 8, paddingTop: isListView ? 8 : insets.top + 12 }]}
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={therapyRefreshing} onRefresh={onRefresh} tintColor={c.primary} />}
+        >
+          {bookingEnabled ? (
+            <TherapistDayTimeline
+              c={c}
+              selectedDate={calendarView.selectedDate}
+              incomingBookings={incomingBookings}
+              workingHoursRules={workingHoursRules}
+              blockedTimes={blockedTimes}
+              incomingBookingsLoading={incomingBookingsLoading}
+              incomingBookingsLastLoadedAt={incomingBookingsLastLoadedAt}
+              onOpenBooking={onOpenBookingDetail}
+              servicesByKey={servicesByKey}
+            />
+          ) : (
+            <TherapistActivationPrompt
+              reviewApproved={reviewApproved}
+              activationLoading={activation.activationLoading}
+              activationError={activation.activationError}
+              onActivate={activation.handleActivate}
+              c={c}
+              styles={styles}
+            />
+          )}
+        </ScrollView>
+      )}
 
       <Modal
         visible={showStatsModal}
