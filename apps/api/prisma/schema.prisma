@@ -371,6 +371,7 @@ model TherapistService {
   bufferAfterMin  Int       @default(0)
   slotIntervalMin Int?
   isActive        Boolean   @default(true)
+  colorHex        String?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 

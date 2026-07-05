@@ -14,6 +14,7 @@ import { TherapistFilteredSlotsScreen } from './TherapistFilteredSlotsScreen';
 import { useBookingActivation } from '../../hooks/use-booking-activation';
 import { useTherapistCalendarView } from '../../hooks/use-therapist-calendar-view';
 import { useTherapistScheduleData } from '../../hooks/use-therapist-schedule-data';
+import { useTherapistServices } from '../../hooks/use-therapist-services';
 
 export function TherapyTabTherapist({
   authToken,
@@ -35,6 +36,8 @@ export function TherapyTabTherapist({
 
   // Arbeitszeiten und Blockzeiten laden — Grundlage für die Tagesansicht.
   const { workingHoursRules, blockedTimes } = useTherapistScheduleData({ authToken });
+  // Leistungsfarben laden fuer Timeline- und Kalender-Einfaerbung.
+  const { servicesByKey } = useTherapistServices({ authToken });
 
   const pendingCount = useMemo(
     () => incomingBookings.filter((r) => r.status === 'PENDING').length,
@@ -110,6 +113,7 @@ export function TherapyTabTherapist({
               onPressList={calendarView.handleShowList}
               onPressToday={calendarView.handleGoToToday}
               onOpenBooking={onOpenBookingDetail}
+              servicesByKey={servicesByKey}
             />
           ) : (
             <TherapistDayTimeline
@@ -121,6 +125,7 @@ export function TherapyTabTherapist({
               incomingBookingsLoading={incomingBookingsLoading}
               incomingBookingsLastLoadedAt={incomingBookingsLastLoadedAt}
               onOpenBooking={onOpenBookingDetail}
+              servicesByKey={servicesByKey}
             />
           )
         ) : (

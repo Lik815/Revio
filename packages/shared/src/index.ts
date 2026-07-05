@@ -358,6 +358,7 @@ export interface TherapistService {
   bufferAfterMin: number;
   slotIntervalMin: number | null;
   isActive: boolean;
+  colorHex: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -382,6 +383,7 @@ export interface PutTherapistServiceInput {
   bufferAfterMin?: number;
   slotIntervalMin?: number | null;
   isActive?: boolean;
+  colorHex?: string | null;
 }
 
 export interface GetBlockedTimesResponse {

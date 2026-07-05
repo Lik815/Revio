@@ -9,10 +9,19 @@ const STATUS_RANK = { requested: 2, booked: 1 };
 
 // Monatskalender: markiert Tage mit Terminen und zeigt die Termine des
 // gewählten Tages. Quelle: incomingBookings (per startsAt) — keine Slots.
+function hexLightBg(hex) {
+  if (!hex || !/^#[0-9A-Fa-f]{6}$/.test(hex)) return null;
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r},${g},${b},0.13)`;
+}
+
 export function TherapistMonthCalendar({
   c, incomingBookings, workingHoursRules = [], blockedTimes = [], selectedDate, onSelectDate,
   visibleMonth, onPrevMonth, onNextMonth, onPressList, onPressToday,
   onOpenBooking,
+  servicesByKey = {},
 }) {
   const items = useMemo(() => activeBookingItems(incomingBookings), [incomingBookings]);
 
@@ -224,9 +233,16 @@ export function TherapistMonthCalendar({
                 );
               }
               const title = item.booking?.patientName ?? (item.kind === 'requested' ? 'Neue Anfrage' : 'Gebucht');
-              const cardBg = item.kind === 'requested' ? (c.warningBg ?? '#FEF5DC') : (c.successBg ?? '#EAF4F1');
+              const heilmittel = item.booking?.heilmittel;
+              const serviceColor = heilmittel ? (servicesByKey[heilmittel]?.colorHex ?? null) : null;
+              const cardBg = item.kind === 'requested'
+                ? (c.warningBg ?? '#FEF5DC')
+                : (hexLightBg(serviceColor) ?? c.successBg ?? '#EAF4F1');
+              const accentColor = item.kind === 'requested'
+                ? (c.warning ?? '#B78700')
+                : (serviceColor ?? c.primary);
               return (
-                <Pressable key={item.booking?.id ?? `booking-${item.startsAt}`} onPress={() => onOpenBooking?.(item.booking)} style={{ position: 'absolute', top, left: cardLeft, width: colW, height, paddingVertical: 4, paddingHorizontal: 8, borderRadius: RADIUS.sm, backgroundColor: cardBg, justifyContent: 'center', overflow: 'hidden' }}>
+                <Pressable key={item.booking?.id ?? `booking-${item.startsAt}`} onPress={() => onOpenBooking?.(item.booking)} style={{ position: 'absolute', top, left: cardLeft, width: colW, height, paddingVertical: 4, paddingHorizontal: 8, borderRadius: RADIUS.sm, backgroundColor: cardBg, borderLeftWidth: 3, borderLeftColor: accentColor, justifyContent: 'center', overflow: 'hidden' }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                     <Text style={{ fontSize: 13, fontWeight: '700', color: c.text, flex: 1 }} numberOfLines={1}>{title}</Text>
                     {item.kind === 'requested' ? (

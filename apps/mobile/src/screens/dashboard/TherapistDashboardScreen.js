@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { useTherapyData } from '../../context/TherapyContext';
 import { useTherapistScheduleData } from '../../hooks/use-therapist-schedule-data';
+import { useTherapistServices } from '../../hooks/use-therapist-services';
 import { useTheme } from '../../hooks/use-theme';
 import { TAB_ROUTES } from '../../navigation/route-names';
 import { getBaseUrl, RADIUS } from '../../utils/app-utils';
@@ -23,6 +24,16 @@ import {
   formatDuration,
   formatTimeRange,
 } from '../../utils/therapist-dashboard';
+
+// ─── Farb-Hilfe ──────────────────────────────────────────────────────────────
+
+function hexLightBg(hex) {
+  if (!hex || !/^#[0-9A-Fa-f]{6}$/.test(hex)) return null;
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r},${g},${b},0.13)`;
+}
 
 // ─── Formatierungshilfen ──────────────────────────────────────────────────────
 
@@ -164,17 +175,17 @@ function FreeGapRow({ gap, c }) {
 
 // ─── ProgressBar ─────────────────────────────────────────────────────────────
 
-function ProgressBar({ progress, c }) {
+function ProgressBar({ progress, color, c }) {
   return (
     <View style={{ height: 4, borderRadius: 2, backgroundColor: c.border, overflow: 'hidden', marginTop: 8 }}>
-      <View style={{ height: 4, borderRadius: 2, backgroundColor: c.primary, width: `${Math.round(progress * 100)}%` }} />
+      <View style={{ height: 4, borderRadius: 2, backgroundColor: color ?? c.primary, width: `${Math.round(progress * 100)}%` }} />
     </View>
   );
 }
 
 // ─── StatusCard ──────────────────────────────────────────────────────────────
 
-function StatusCard({ agendaState, nextFreeGap, now, c }) {
+function StatusCard({ agendaState, nextFreeGap, now, servicesByKey = {}, c }) {
   const { activeItem, nextItem, isFree } = agendaState;
   const successColor = c.success ?? '#2AAE6E';
 
@@ -199,17 +210,19 @@ function StatusCard({ agendaState, nextFreeGap, now, c }) {
     const remainingMs = getBookingRemainingMs({ endsAt: end.toISOString() }, now);
     const b = activeItem.booking;
     const durationMin = Math.round((end.getTime() - start.getTime()) / 60_000);
+    const activeServiceColor = b?.heilmittel ? (servicesByKey[b.heilmittel]?.colorHex ?? null) : null;
+    const activeAccent = activeServiceColor ?? c.primary;
 
     return (
       <View style={[cardStyle(c), { padding: 16 }]}>
         <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 14 }}>
           <StatusIcon variant="active" c={c} />
           <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 17, fontWeight: '800', color: c.primary }}>Läuft gerade</Text>
+            <Text style={{ fontSize: 17, fontWeight: '800', color: activeAccent }}>Läuft gerade</Text>
             <Text style={{ fontSize: 13, color: c.text, marginTop: 4 }} numberOfLines={1}>
               {`${fmtTime(start)} · ${b?.patientName ?? 'Patient'} · ${b?.heilmittel ?? ''} · ${durationMin} Min`}
             </Text>
-            <ProgressBar progress={progress} c={c} />
+            <ProgressBar progress={progress} color={activeAccent} c={c} />
             <Text style={{ fontSize: 12, color: c.muted, marginTop: 4 }}>
               Noch {formatDuration(remainingMs)}
             </Text>
@@ -263,12 +276,12 @@ function StatusCard({ agendaState, nextFreeGap, now, c }) {
 
 // ─── AgendaRow ───────────────────────────────────────────────────────────────
 
-function AgendaBookingRow({ item, isHighlighted, onPress, c }) {
+function AgendaBookingRow({ item, isHighlighted, onPress, servicesByKey = {}, c }) {
   const { booking: b, startsAt, endsAt, status } = item;
   const isPending = status === 'PENDING';
   const durationMin = Math.round((endsAt.getTime() - startsAt.getTime()) / 60_000);
-  const timeColor = isHighlighted ? c.primary : (c.muted);
-  const accentColor = isPending ? (c.warning ?? '#B78700') : c.primary;
+  const serviceColor = b?.heilmittel ? (servicesByKey[b.heilmittel]?.colorHex ?? null) : null;
+  const accentColor = isPending ? (c.warning ?? '#B78700') : (serviceColor ?? c.primary);
 
   return (
     <Pressable
@@ -325,7 +338,7 @@ function AgendaFreeRow({ item, c }) {
   );
 }
 
-function AgendaCard({ items, agendaState, onPressBooking, onPressAll, c }) {
+function AgendaCard({ items, agendaState, onPressBooking, onPressAll, servicesByKey = {}, c }) {
   const MAX_VISIBLE = 5;
   const displayItems = items.slice(0, MAX_VISIBLE);
   const bookingCount = items.filter((i) => i.type === 'booking').length;
@@ -364,6 +377,7 @@ function AgendaCard({ items, agendaState, onPressBooking, onPressAll, c }) {
                 item={item}
                 isHighlighted={isHighlighted}
                 onPress={() => onPressBooking(item.booking)}
+                servicesByKey={servicesByKey}
                 c={c}
               />
             ) : (
@@ -452,6 +466,7 @@ export function TherapistDashboardScreen() {
   } = useTherapyData();
 
   const { workingHoursRules, blockedTimes, refreshScheduleData } = useTherapistScheduleData({ authToken });
+  const { servicesByKey } = useTherapistServices({ authToken });
 
   const [selectedDate] = useState(() => {
     const d = new Date();
@@ -541,7 +556,7 @@ export function TherapistDashboardScreen() {
         {noWorkingHours ? (
           <EmptyDayCard c={c} />
         ) : (
-          <StatusCard agendaState={agendaState} nextFreeGap={nextFreeGap} now={now} c={c} />
+          <StatusCard agendaState={agendaState} nextFreeGap={nextFreeGap} now={now} servicesByKey={servicesByKey} c={c} />
         )}
 
         <AgendaCard
@@ -549,6 +564,7 @@ export function TherapistDashboardScreen() {
           agendaState={agendaState}
           onPressBooking={openBooking}
           onPressAll={openAllBookings}
+          servicesByKey={servicesByKey}
           c={c}
         />
 

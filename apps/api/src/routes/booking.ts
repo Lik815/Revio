@@ -677,6 +677,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
       bufferAfterMin: z.number().int().min(0).max(60).optional(),
       slotIntervalMin: z.number().int().min(5).max(180).nullable().optional(),
       isActive: z.boolean().optional(),
+      colorHex: z.string().regex(/^#[0-9A-Fa-f]{6}$/).nullable().optional(),
     });
 
     const parsed = schema.safeParse(request.body);
@@ -691,12 +692,14 @@ export async function bookingRoutes(fastify: FastifyInstance) {
         bufferAfterMin: parsed.data.bufferAfterMin ?? 0,
         slotIntervalMin: parsed.data.slotIntervalMin ?? null,
         isActive: parsed.data.isActive ?? true,
+        colorHex: parsed.data.colorHex ?? null,
       },
       update: {
         durationMin: parsed.data.durationMin,
         bufferAfterMin: parsed.data.bufferAfterMin ?? 0,
         slotIntervalMin: parsed.data.slotIntervalMin ?? null,
         ...(parsed.data.isActive !== undefined ? { isActive: parsed.data.isActive } : {}),
+        ...(parsed.data.colorHex !== undefined ? { colorHex: parsed.data.colorHex } : {}),
       },
     });
 

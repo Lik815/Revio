@@ -49,10 +49,20 @@ function assignColumns(items) {
   });
 }
 
+// Gibt eine leichte Hintergrundfarbe fuer eine Hex-Farbe zurueck (80% Transparenz).
+function hexLightBg(hex) {
+  if (!hex || !/^#[0-9A-Fa-f]{6}$/.test(hex)) return null;
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r},${g},${b},0.13)`;
+}
+
 export function TherapistDayTimeline({
   c, selectedDate, incomingBookings, workingHoursRules, blockedTimes,
   incomingBookingsLoading, incomingBookingsLastLoadedAt,
   onOpenBooking,
+  servicesByKey = {},
 }) {
   const [cardAreaWidth, setCardAreaWidth] = useState(0);
 
@@ -173,7 +183,14 @@ export function TherapistDayTimeline({
               }
 
               const title = item.booking?.patientName ?? (item.kind === 'requested' ? 'Neue Anfrage' : 'Gebucht');
-              const cardBg = item.kind === 'requested' ? (c.warningBg ?? '#FEF5DC') : (c.successBg ?? '#EAF4F1');
+              const heilmittel = item.booking?.heilmittel;
+              const serviceColor = heilmittel ? (servicesByKey[heilmittel]?.colorHex ?? null) : null;
+              const cardBg = item.kind === 'requested'
+                ? (c.warningBg ?? '#FEF5DC')
+                : (hexLightBg(serviceColor) ?? c.successBg ?? '#EAF4F1');
+              const accentColor = item.kind === 'requested'
+                ? (c.warning ?? '#B78700')
+                : (serviceColor ?? c.primary);
 
               return (
                 <Pressable
@@ -183,6 +200,7 @@ export function TherapistDayTimeline({
                     position: 'absolute', top, left: cardLeft, width: colW, height,
                     paddingVertical: 4, paddingHorizontal: 8,
                     borderRadius: RADIUS.sm, backgroundColor: cardBg,
+                    borderLeftWidth: 3, borderLeftColor: accentColor,
                     justifyContent: 'center', overflow: 'hidden',
                   }}
                 >
