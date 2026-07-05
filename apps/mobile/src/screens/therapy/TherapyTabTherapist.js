@@ -1,6 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Modal, Pressable, RefreshControl, ScrollView, Text, View,
+  LayoutAnimation, Modal, Pressable, RefreshControl, ScrollView, Text, View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { RADIUS } from '../../utils/app-utils';
@@ -33,6 +33,41 @@ export function TherapyTabTherapist({
 
   const activation = useBookingActivation({ onActivateBookingRequests });
   const calendarView = useTherapistCalendarView();
+  const [calendarCollapsed, setCalendarCollapsed] = useState(false);
+  const calendarCollapsedRef = useRef(false);
+
+  // Beim Wechsel in Kalenderansicht immer aufklappen.
+  useEffect(() => {
+    if (calendarView.viewMode === 'calendar') {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setCalendarCollapsed(false);
+      calendarCollapsedRef.current = false;
+    }
+  }, [calendarView.viewMode]);
+
+  // Scroll-Handler: klappt Kalender zu/auf wenn Schwelle überschritten wird.
+  const onCalendarScroll = useCallback((e) => {
+    const y = e.nativeEvent.contentOffset.y;
+    const shouldCollapse = y > 60;
+    if (shouldCollapse !== calendarCollapsedRef.current) {
+      calendarCollapsedRef.current = shouldCollapse;
+      LayoutAnimation.configureNext({
+        duration: 220,
+        update: { type: LayoutAnimation.Types.easeInEaseOut },
+      });
+      setCalendarCollapsed(shouldCollapse);
+    }
+  }, []);
+
+  // Datum-Wahl: Kalender aufklappen damit die neue Woche im Monat sichtbar ist.
+  const handleSelectCalendarDate = useCallback((date) => {
+    if (calendarCollapsedRef.current) {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setCalendarCollapsed(false);
+      calendarCollapsedRef.current = false;
+    }
+    calendarView.handleSelectCalendarDate(date);
+  }, [calendarView]);
 
   // Arbeitszeiten und Blockzeiten laden — Grundlage für die Tagesansicht.
   const { workingHoursRules, blockedTimes } = useTherapistScheduleData({ authToken });
@@ -102,18 +137,21 @@ export function TherapyTabTherapist({
               incomingBookings={incomingBookings}
               workingHoursRules={workingHoursRules}
               selectedDate={calendarView.selectedDate}
-              onSelectDate={calendarView.handleSelectCalendarDate}
+              onSelectDate={handleSelectCalendarDate}
               visibleMonth={calendarView.visibleMonth}
               onPrevMonth={calendarView.handlePrevMonth}
               onNextMonth={calendarView.handleNextMonth}
               onPressList={calendarView.handleShowList}
               onPressToday={calendarView.handleGoToToday}
+              collapsed={calendarCollapsed}
             />
           </View>
           <ScrollView
             style={{ flex: 1 }}
             contentContainerStyle={[styles.scrollContent, { paddingBottom: 24, paddingTop: 8 }]}
             showsVerticalScrollIndicator={false}
+            scrollEventThrottle={32}
+            onScroll={onCalendarScroll}
             refreshControl={<RefreshControl refreshing={therapyRefreshing} onRefresh={onRefresh} tintColor={c.primary} />}
           >
             <TherapistDayTimeline
