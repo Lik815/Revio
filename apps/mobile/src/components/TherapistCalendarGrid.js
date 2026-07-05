@@ -3,6 +3,7 @@ import { Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { RADIUS, activeBookingItems, hasWorkingHoursOnDay, isSameDay, startOfDay } from '../utils/app-utils';
 import { buildCalendar } from '../utils/recurring-slots';
+import { TherapistWeekStrip } from './TherapistWeekStrip';
 
 const WEEKDAY_LABELS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
 const STATUS_RANK = { requested: 2, booked: 1 };
@@ -15,6 +16,7 @@ export function TherapistCalendarGrid({
   c, incomingBookings, workingHoursRules = [], selectedDate, onSelectDate,
   visibleMonth, onPrevMonth, onNextMonth, onPressList, onPressToday,
   collapsed = false,
+  visibleWeekStart, onPrevWeek, onNextWeek, onPressCalendar,
 }) {
   const items = useMemo(() => activeBookingItems(incomingBookings), [incomingBookings]);
 
@@ -54,18 +56,24 @@ export function TherapistCalendarGrid({
   );
   const today = startOfDay(new Date());
 
-  // Welche Zeile enthält das gewählte Datum? (0-basiert)
-  const selectedRowIndex = useMemo(() => {
-    const cells = buildCalendar(visibleMonth.year, visibleMonth.month);
-    const idx = cells.findIndex(
-      (d) => d !== null && isSameDay(new Date(visibleMonth.year, visibleMonth.month, d), selectedDate),
+  if (collapsed) {
+    return (
+      <View style={{ paddingHorizontal: 24 }}>
+        <TherapistWeekStrip
+          c={c}
+          selectedDate={selectedDate}
+          visibleWeekStart={visibleWeekStart}
+          incomingBookings={incomingBookings}
+          workingHoursRules={workingHoursRules}
+          onSelectDate={onSelectDate}
+          onPrevWeek={onPrevWeek}
+          onNextWeek={onNextWeek}
+          onPressCalendar={onPressCalendar}
+          onPressToday={onPressToday}
+        />
+      </View>
     );
-    return idx >= 0 ? Math.floor(idx / 7) : 0;
-  }, [selectedDate, visibleMonth.year, visibleMonth.month]);
-
-  // Clip-Höhe und Verschiebung je nach Zustand
-  const gridClipHeight = collapsed ? CALENDAR_ROW_H : rows.length * CALENDAR_ROW_H;
-  const gridTranslateY = collapsed ? -(selectedRowIndex * CALENDAR_ROW_H) : 0;
+  }
 
   return (
     <View style={{ paddingHorizontal: 24, paddingTop: 12 }}>
@@ -106,43 +114,39 @@ export function TherapistCalendarGrid({
         ))}
       </View>
 
-      {/* Raster — Clip-Container hat feste Höhe, innere View verschiebt sich */}
-      <View style={{ height: gridClipHeight, overflow: 'hidden' }}>
-        <View style={{ transform: [{ translateY: gridTranslateY }] }}>
-          {rows.map((row, ri) => (
-            <View key={ri} style={{ flexDirection: 'row', marginBottom: 6 }}>
-              {row.map((day, ci) => {
-                if (!day) return <View key={ci} style={{ flex: 1 }} />;
-                const date = new Date(visibleMonth.year, visibleMonth.month, day);
-                const isSelected = isSameDay(date, selectedDate);
-                const isToday = isSameDay(date, today);
-                const status = dayStatuses[day];
-                return (
-                  <Pressable key={ci} onPress={() => onSelectDate(date)} style={{ flex: 1, alignItems: 'center' }}>
-                    <View
-                      style={{
-                        width: 38, height: 38, borderRadius: RADIUS.md,
-                        alignItems: 'center', justifyContent: 'center',
-                        backgroundColor: isSelected ? c.text : 'transparent',
-                      }}
-                    >
-                      <Text style={{ fontSize: 15, fontWeight: '800', color: isSelected ? '#fff' : (isToday ? c.primary : c.text) }}>
-                        {day}
-                      </Text>
-                    </View>
-                    <View
-                      style={{
-                        width: 6, height: 6, borderRadius: 3, marginTop: 3,
-                        backgroundColor: isSelected ? '#fff' : (status ? dotColorFor(status) : c.border),
-                      }}
-                    />
-                  </Pressable>
-                );
-              })}
-            </View>
-          ))}
+      {/* Raster */}
+      {rows.map((row, ri) => (
+        <View key={ri} style={{ flexDirection: 'row', marginBottom: 6 }}>
+          {row.map((day, ci) => {
+            if (!day) return <View key={ci} style={{ flex: 1 }} />;
+            const date = new Date(visibleMonth.year, visibleMonth.month, day);
+            const isSelected = isSameDay(date, selectedDate);
+            const isToday = isSameDay(date, today);
+            const status = dayStatuses[day];
+            return (
+              <Pressable key={ci} onPress={() => onSelectDate(date)} style={{ flex: 1, alignItems: 'center' }}>
+                <View
+                  style={{
+                    width: 38, height: 38, borderRadius: RADIUS.md,
+                    alignItems: 'center', justifyContent: 'center',
+                    backgroundColor: isSelected ? c.text : 'transparent',
+                  }}
+                >
+                  <Text style={{ fontSize: 15, fontWeight: '800', color: isSelected ? '#fff' : (isToday ? c.primary : c.text) }}>
+                    {day}
+                  </Text>
+                </View>
+                <View
+                  style={{
+                    width: 6, height: 6, borderRadius: 3, marginTop: 3,
+                    backgroundColor: isSelected ? '#fff' : (status ? dotColorFor(status) : c.border),
+                  }}
+                />
+              </Pressable>
+            );
+          })}
         </View>
-      </View>
+      ))}
     </View>
   );
 }

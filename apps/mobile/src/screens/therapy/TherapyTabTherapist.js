@@ -69,6 +69,13 @@ export function TherapyTabTherapist({
     calendarView.handleSelectCalendarDate(date);
   }, [calendarView]);
 
+  // Kalender-Icon im WeekStrip (Collapsed-Zustand) → aufklappen.
+  const handleExpandCalendar = useCallback(() => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setCalendarCollapsed(false);
+    calendarCollapsedRef.current = false;
+  }, []);
+
   // Arbeitszeiten und Blockzeiten laden — Grundlage für die Tagesansicht.
   const { workingHoursRules, blockedTimes } = useTherapistScheduleData({ authToken });
   // Leistungsfarben laden fuer Timeline- und Kalender-Einfaerbung.
@@ -144,6 +151,10 @@ export function TherapyTabTherapist({
               onPressList={calendarView.handleShowList}
               onPressToday={calendarView.handleGoToToday}
               collapsed={calendarCollapsed}
+              visibleWeekStart={calendarView.visibleWeekStart}
+              onPrevWeek={calendarView.handlePrevWeek}
+              onNextWeek={calendarView.handleNextWeek}
+              onPressCalendar={handleExpandCalendar}
             />
           </View>
           <ScrollView
