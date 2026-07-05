@@ -1,6 +1,6 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
-  Animated, Modal, Pressable, RefreshControl, ScrollView, Text, View,
+  Modal, Pressable, RefreshControl, ScrollView, Text, View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { RADIUS } from '../../utils/app-utils';
@@ -33,11 +33,6 @@ export function TherapyTabTherapist({
 
   const activation = useBookingActivation({ onActivateBookingRequests });
   const calendarView = useTherapistCalendarView();
-  const scrollY = useRef(new Animated.Value(0)).current;
-  const onCalendarScroll = Animated.event(
-    [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-    { useNativeDriver: false },
-  );
 
   // Arbeitszeiten und Blockzeiten laden — Grundlage für die Tagesansicht.
   const { workingHoursRules, blockedTimes } = useTherapistScheduleData({ authToken });
@@ -113,12 +108,9 @@ export function TherapyTabTherapist({
               onNextMonth={calendarView.handleNextMonth}
               onPressList={calendarView.handleShowList}
               onPressToday={calendarView.handleGoToToday}
-              scrollY={scrollY}
             />
           </View>
-          <Animated.ScrollView
-            onScroll={onCalendarScroll}
-            scrollEventThrottle={16}
+          <ScrollView
             style={{ flex: 1 }}
             contentContainerStyle={[styles.scrollContent, { paddingBottom: 24, paddingTop: 8 }]}
             showsVerticalScrollIndicator={false}
@@ -135,7 +127,7 @@ export function TherapyTabTherapist({
               onOpenBooking={onOpenBookingDetail}
               servicesByKey={servicesByKey}
             />
-          </Animated.ScrollView>
+          </ScrollView>
         </>
       ) : (
         // LISTENANSICHT / DEAKTIVIERT: normaler ScrollView
