@@ -1,12 +1,6 @@
-import React, { useEffect, useMemo } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import React, { useMemo, useRef } from 'react';
+import { Animated, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import Animated, {
-  Extrapolation,
-  interpolate,
-  useAnimatedStyle,
-  useSharedValue,
-} from 'react-native-reanimated';
 import { RADIUS, activeBookingItems, hasWorkingHoursOnDay, isSameDay, startOfDay } from '../utils/app-utils';
 import { buildCalendar } from '../utils/recurring-slots';
 
@@ -15,8 +9,8 @@ const STATUS_RANK = { requested: 2, booked: 1 };
 const ROW_H = 53;
 const COLLAPSE_DIST = 90;
 
-// Calendar grid header with Reanimated-driven collapse.
-// scrollY: Reanimated SharedValue<number> driven by the day-timeline ScrollView below.
+// Calendar grid header with RN Animated-driven collapse.
+// scrollY: Animated.Value driven by the day-timeline ScrollView below.
 export function TherapistCalendarGrid({
   c, incomingBookings, workingHoursRules = [], selectedDate, onSelectDate,
   visibleMonth, onPrevMonth, onNextMonth, onPressList, onPressToday,
@@ -68,31 +62,18 @@ export function TherapistCalendarGrid({
     return idx >= 0 ? Math.floor(idx / 7) : 0;
   }, [selectedDate, visibleMonth.year, visibleMonth.month]);
 
-  const rowIndexSV = useSharedValue(selectedRowIndex);
-  const numRowsSV = useSharedValue(rows.length);
+  // Animated interpolations — recalculated on render when rows/selectedRow change.
+  const gridHeight = scrollY.interpolate({
+    inputRange: [0, COLLAPSE_DIST],
+    outputRange: [rows.length * ROW_H, ROW_H],
+    extrapolate: 'clamp',
+  });
 
-  useEffect(() => { rowIndexSV.value = selectedRowIndex; }, [selectedRowIndex]);
-  useEffect(() => { numRowsSV.value = rows.length; }, [rows.length]);
-
-  const animatedClipStyle = useAnimatedStyle(() => ({
-    height: interpolate(
-      scrollY.value,
-      [0, COLLAPSE_DIST],
-      [numRowsSV.value * ROW_H, ROW_H],
-      Extrapolation.CLAMP,
-    ),
-  }));
-
-  const animatedTranslateStyle = useAnimatedStyle(() => ({
-    transform: [{
-      translateY: interpolate(
-        scrollY.value,
-        [0, COLLAPSE_DIST],
-        [0, -(rowIndexSV.value * ROW_H)],
-        Extrapolation.CLAMP,
-      ),
-    }],
-  }));
+  const gridTranslateY = scrollY.interpolate({
+    inputRange: [0, COLLAPSE_DIST],
+    outputRange: [0, -(selectedRowIndex * ROW_H)],
+    extrapolate: 'clamp',
+  });
 
   return (
     <View style={{ paddingHorizontal: 24, paddingTop: 12 }}>
@@ -133,10 +114,9 @@ export function TherapistCalendarGrid({
         ))}
       </View>
 
-      {/* Raster – Clip-Container schrumpft auf eine Zeile beim Scrollen */}
-      <Animated.View style={[{ overflow: 'hidden' }, animatedClipStyle]}>
-        {/* Innere View verschiebt das Raster nach oben, sodass die gewählte Zeile sichtbar bleibt */}
-        <Animated.View style={animatedTranslateStyle}>
+      {/* Raster – Clip-Container schrumpft beim Scrollen auf eine Zeile */}
+      <Animated.View style={{ height: gridHeight, overflow: 'hidden' }}>
+        <Animated.View style={{ transform: [{ translateY: gridTranslateY }] }}>
           {rows.map((row, ri) => (
             <View key={ri} style={{ flexDirection: 'row', marginBottom: 6 }}>
               {row.map((day, ci) => {

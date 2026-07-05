@@ -1,9 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
-  Modal, Pressable, RefreshControl, ScrollView, Text, View,
+  Animated, Modal, Pressable, RefreshControl, ScrollView, Text, View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import Animated, { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated';
 import { RADIUS } from '../../utils/app-utils';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HeilmittelSelectModal } from '../../modals/HeilmittelSelectModal';
@@ -34,10 +33,11 @@ export function TherapyTabTherapist({
 
   const activation = useBookingActivation({ onActivateBookingRequests });
   const calendarView = useTherapistCalendarView();
-  const scrollY = useSharedValue(0);
-  const scrollHandler = useAnimatedScrollHandler((e) => {
-    scrollY.value = e.contentOffset.y;
-  });
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const onCalendarScroll = Animated.event(
+    [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+    { useNativeDriver: false },
+  );
 
   // Arbeitszeiten und Blockzeiten laden — Grundlage für die Tagesansicht.
   const { workingHoursRules, blockedTimes } = useTherapistScheduleData({ authToken });
@@ -117,7 +117,7 @@ export function TherapyTabTherapist({
             />
           </View>
           <Animated.ScrollView
-            onScroll={scrollHandler}
+            onScroll={onCalendarScroll}
             scrollEventThrottle={16}
             style={{ flex: 1 }}
             contentContainerStyle={[styles.scrollContent, { paddingBottom: 24, paddingTop: 8 }]}
