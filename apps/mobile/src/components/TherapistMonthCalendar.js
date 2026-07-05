@@ -243,6 +243,9 @@ export function TherapistMonthCalendar({
                 : (serviceColor ?? c.primary);
               return (
                 <Pressable key={item.booking?.id ?? `booking-${item.startsAt}`} onPress={() => onOpenBooking?.(item.booking)} style={{ position: 'absolute', top, left: cardLeft, width: colW, height, paddingVertical: 4, paddingHorizontal: 8, borderRadius: RADIUS.sm, backgroundColor: cardBg, borderLeftWidth: 3, borderLeftColor: accentColor, justifyContent: 'center', overflow: 'hidden' }}>
+                  {showSub && heilmittel ? (
+                    <Text style={{ fontSize: 10, fontWeight: '700', color: accentColor, marginBottom: 2 }} numberOfLines={1}>{heilmittel}</Text>
+                  ) : null}
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                     <Text style={{ fontSize: 13, fontWeight: '700', color: c.text, flex: 1 }} numberOfLines={1}>{title}</Text>
                     {item.kind === 'requested' ? (

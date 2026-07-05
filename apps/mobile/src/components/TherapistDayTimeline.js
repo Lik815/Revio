@@ -204,6 +204,12 @@ export function TherapistDayTimeline({
                     justifyContent: 'center', overflow: 'hidden',
                   }}
                 >
+                  {/* Heilmittel-Tag oben links, wenn Karte gross genug */}
+                  {showSubtitle && heilmittel && (
+                    <Text style={{ fontSize: 10, fontWeight: '700', color: accentColor, marginBottom: 2 }} numberOfLines={1}>
+                      {heilmittel}
+                    </Text>
+                  )}
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                     <Text style={{ fontSize: 13, fontWeight: '700', color: c.text, flex: 1 }} numberOfLines={1}>
                       {title}
