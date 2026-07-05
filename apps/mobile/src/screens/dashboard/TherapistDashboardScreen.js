@@ -1,95 +1,168 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import {
+  Image, Pressable, RefreshControl, ScrollView, Text, View,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { useTherapyData } from '../../context/TherapyContext';
+import { useTherapistScheduleData } from '../../hooks/use-therapist-schedule-data';
 import { useTheme } from '../../hooks/use-theme';
-import { translations } from '../../i18n/translations';
 import { TAB_ROUTES } from '../../navigation/route-names';
-import { RADIUS } from '../../utils/app-utils';
+import { getBaseUrl, RADIUS } from '../../utils/app-utils';
 import {
-  getTodayBookings,
+  getDayAgendaItems,
+  getCurrentAgendaState,
+  getNextFreeGap,
+  getTotalBookedMinutes,
   getBookingStart,
   getBookingEnd,
-  isBookingActive,
   getBookingProgress,
   getBookingRemainingMs,
   formatDuration,
-  getNextDayBookingAfter,
+  formatTimeRange,
 } from '../../utils/therapist-dashboard';
-import { AccountHeader } from '../../components/AccountHeader';
 
-const t = (key) => translations.de[key] ?? key;
-
-function isSameDay(a, b) {
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  );
-}
+// ─── Formatierungshilfen ──────────────────────────────────────────────────────
 
 function fmtTime(date) {
   if (!date) return '';
   return date.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
 }
 
-function fmtDateLabel(date) {
+function fmtDateMeta(date) {
   const today = new Date();
-  if (isSameDay(date, today)) return 'Heute';
-  const tomorrow = new Date(today);
-  tomorrow.setDate(today.getDate() + 1);
-  if (isSameDay(date, tomorrow)) return 'Morgen';
-  const yesterday = new Date(today);
-  yesterday.setDate(today.getDate() - 1);
-  if (isSameDay(date, yesterday)) return 'Gestern';
-  return date.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' });
+  const isToday =
+    date.getFullYear() === today.getFullYear() &&
+    date.getMonth() === today.getMonth() &&
+    date.getDate() === today.getDate();
+  const dayStr = date.toLocaleDateString('de-DE', { day: 'numeric', month: 'long' });
+  return isToday ? `Heute, ${dayStr}` : dayStr;
 }
 
-function addDays(date, n) {
-  const d = new Date(date);
-  d.setDate(d.getDate() + n);
-  return d;
+function formatTotalHours(totalMin) {
+  const h = Math.floor(totalMin / 60);
+  const m = Math.round(totalMin % 60);
+  if (h === 0) return `${m} Min`;
+  if (m === 0) return `${h} Std`;
+  return `${h}:${String(m).padStart(2, '0')} Std`;
 }
 
-function DateNavRow({ selectedDate, onPrev, onNext, pendingCount, c }) {
-  const isToday = isSameDay(selectedDate, new Date());
+function getNextInLabel(nextStartsAt, now) {
+  const diffMs = nextStartsAt.getTime() - now.getTime();
+  if (diffMs <= 0) return null;
+  const min = Math.ceil(diffMs / 60_000);
+  if (min < 60) return `Nächster Termin in ${min} Min`;
+  return `Nächster Termin um ${fmtTime(nextStartsAt)} Uhr`;
+}
+
+function resolvePhotoUri(photo) {
+  if (!photo) return null;
+  return photo.startsWith('http') ? photo : `${getBaseUrl()}${photo}`;
+}
+
+function initialsFromName(name) {
+  return (name ?? '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((w) => w[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase() || null;
+}
+
+// ─── DashboardHeader ─────────────────────────────────────────────────────────
+
+const AVATAR_SIZE = 48;
+
+function DashboardHeader({ name, photo, selectedDate, bookingCount, totalMin, c, insets, onPressAvatar }) {
+  const initials = photo ? null : initialsFromName(name);
+  const metaParts = [fmtDateMeta(selectedDate)];
+  if (bookingCount > 0) metaParts.push(`${bookingCount} ${bookingCount === 1 ? 'Termin' : 'Termine'}`);
+  if (totalMin > 0) metaParts.push(formatTotalHours(totalMin));
+
   return (
     <View style={{
-      flexDirection: 'row', alignItems: 'center',
-      paddingHorizontal: 16, paddingVertical: 10,
-      borderBottomWidth: 1, borderBottomColor: c.border,
+      flexDirection: 'row', alignItems: 'center', gap: 12,
+      paddingHorizontal: 16,
+      paddingTop: insets.top + 14,
+      paddingBottom: 14,
       backgroundColor: c.background,
+      borderBottomWidth: 1,
+      borderBottomColor: c.border,
     }}>
-      <Pressable onPress={onPrev} hitSlop={12} style={{ padding: 4 }}>
-        <Ionicons name="chevron-back" size={22} color={c.text} />
+      <Pressable onPress={onPressAvatar} hitSlop={10}>
+        <View style={{
+          width: AVATAR_SIZE, height: AVATAR_SIZE,
+          borderRadius: AVATAR_SIZE / 2,
+          backgroundColor: c.primaryBg,
+          alignItems: 'center', justifyContent: 'center',
+          overflow: 'hidden',
+        }}>
+          {photo
+            ? <Image source={{ uri: photo }} style={{ width: AVATAR_SIZE, height: AVATAR_SIZE }} />
+            : <Text style={{ fontSize: 16, fontWeight: '700', color: c.primary }}>{initials ?? '?'}</Text>
+          }
+        </View>
       </Pressable>
 
-      <View style={{ flex: 1, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 }}>
-        <Text style={{ fontSize: 16, fontWeight: '700', color: isToday ? c.primary : c.text }}>
-          {fmtDateLabel(selectedDate)}
-        </Text>
-        {pendingCount > 0 && (
-          <View style={{
-            backgroundColor: c.warning ?? '#B78700',
-            borderRadius: RADIUS.full,
-            minWidth: 20, height: 20,
-            paddingHorizontal: 6,
-            alignItems: 'center', justifyContent: 'center',
-          }}>
-            <Text style={{ fontSize: 11, fontWeight: '800', color: '#fff' }}>{pendingCount}</Text>
-          </View>
+      <View style={{ flex: 1 }}>
+        <Text style={{ fontSize: 17, fontWeight: '800', color: c.text }} numberOfLines={1}>{name}</Text>
+        <Text style={{ fontSize: 12, color: c.muted, marginTop: 1 }}>Mein Tag</Text>
+        {metaParts.length > 0 && (
+          <Text style={{ fontSize: 12, color: c.muted, marginTop: 2 }}>{metaParts.join(' · ')}</Text>
         )}
       </View>
-
-      <Pressable onPress={onNext} hitSlop={12} style={{ padding: 4 }}>
-        <Ionicons name="chevron-forward" size={22} color={c.text} />
-      </Pressable>
     </View>
   );
 }
+
+// ─── StatusIcon ──────────────────────────────────────────────────────────────
+
+function StatusIcon({ variant, c }) {
+  if (variant === 'active') {
+    return (
+      <View style={{
+        width: 44, height: 44, borderRadius: 22,
+        backgroundColor: c.primaryBg ?? '#E8F0FF',
+        alignItems: 'center', justifyContent: 'center',
+      }}>
+        <Ionicons name="play-circle" size={28} color={c.primary} />
+      </View>
+    );
+  }
+  return (
+    <View style={{
+      width: 44, height: 44, borderRadius: 22,
+      backgroundColor: (c.successBg ?? '#E6F9F0'),
+      alignItems: 'center', justifyContent: 'center',
+    }}>
+      <Ionicons name="checkmark-circle-outline" size={28} color={c.success ?? '#2AAE6E'} />
+    </View>
+  );
+}
+
+// ─── FreeGapRow ──────────────────────────────────────────────────────────────
+
+function FreeGapRow({ gap, c }) {
+  const gapMin = Math.round((gap.endsAt.getTime() - gap.startsAt.getTime()) / 60_000);
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 }}>
+      <Ionicons name="calendar-outline" size={14} color={c.muted} />
+      <Text style={{ fontSize: 12, color: c.muted }}>
+        {'Nächste Lücke: '}
+        <Text style={{ color: c.success ?? '#2AAE6E', fontWeight: '600' }}>
+          {formatTimeRange(gap.startsAt, gap.endsAt)}
+        </Text>
+        {` · ${gapMin} Min frei`}
+      </Text>
+    </View>
+  );
+}
+
+// ─── ProgressBar ─────────────────────────────────────────────────────────────
 
 function ProgressBar({ progress, c }) {
   return (
@@ -99,137 +172,270 @@ function ProgressBar({ progress, c }) {
   );
 }
 
-function DashboardAppointmentCard({ booking, dayBookings, now, onPress, c }) {
-  const start = getBookingStart(booking);
-  const end = getBookingEnd(booking);
-  const isPending = booking.status === 'PENDING';
-  const active = isBookingActive(booking, now);
-  const progress = active ? getBookingProgress(booking, now) : 0;
-  const remainingMs = active ? getBookingRemainingMs(booking, now) : 0;
-  const accentColor = isPending ? (c.warning ?? '#B78700') : c.primary;
+// ─── StatusCard ──────────────────────────────────────────────────────────────
 
-  const durationMin = start && end
-    ? Math.round((end.getTime() - start.getTime()) / 60_000)
+function StatusCard({ agendaState, nextFreeGap, now, c }) {
+  const { activeItem, nextItem, isFree } = agendaState;
+  const successColor = c.success ?? '#2AAE6E';
+
+  const hasContent = activeItem || nextItem || nextFreeGap;
+  if (!hasContent) {
+    return (
+      <View style={[cardStyle(c), { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16 }]}>
+        <StatusIcon variant="free" c={c} />
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: 17, fontWeight: '800', color: successColor }}>Jetzt frei</Text>
+          <Text style={{ fontSize: 13, color: c.muted, marginTop: 2 }}>Heute kein weiterer Termin</Text>
+        </View>
+      </View>
+    );
+  }
+
+  if (!isFree && activeItem) {
+    // Termin läuft gerade
+    const start = activeItem.startsAt;
+    const end = activeItem.endsAt;
+    const progress = getBookingProgress({ startsAt: start.toISOString(), endsAt: end.toISOString() }, now);
+    const remainingMs = getBookingRemainingMs({ endsAt: end.toISOString() }, now);
+    const b = activeItem.booking;
+    const durationMin = Math.round((end.getTime() - start.getTime()) / 60_000);
+
+    return (
+      <View style={[cardStyle(c), { padding: 16 }]}>
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 14 }}>
+          <StatusIcon variant="active" c={c} />
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 17, fontWeight: '800', color: c.primary }}>Läuft gerade</Text>
+            <Text style={{ fontSize: 13, color: c.text, marginTop: 4 }} numberOfLines={1}>
+              {`${fmtTime(start)} · ${b?.patientName ?? 'Patient'} · ${b?.heilmittel ?? ''} · ${durationMin} Min`}
+            </Text>
+            <ProgressBar progress={progress} c={c} />
+            <Text style={{ fontSize: 12, color: c.muted, marginTop: 4 }}>
+              Noch {formatDuration(remainingMs)}
+            </Text>
+          </View>
+        </View>
+        {nextFreeGap && (
+          <>
+            <View style={{ height: 1, backgroundColor: c.border, marginVertical: 10 }} />
+            <FreeGapRow gap={nextFreeGap} c={c} />
+          </>
+        )}
+      </View>
+    );
+  }
+
+  // Jetzt frei — nächster Termin vorhanden oder nur Lücke
+  const nextInLabel = nextItem ? getNextInLabel(nextItem.startsAt, now) : null;
+  const b = nextItem?.booking;
+  const nextDuration = nextItem
+    ? Math.round((nextItem.endsAt.getTime() - nextItem.startsAt.getTime()) / 60_000)
     : null;
 
-  const nextBooking = getNextDayBookingAfter(dayBookings, booking);
-  const nextStart = nextBooking ? getBookingStart(nextBooking) : null;
-  const nextInMs = nextStart && start ? nextStart.getTime() - (end?.getTime() ?? start.getTime()) : null;
+  return (
+    <View style={[cardStyle(c), { padding: 16 }]}>
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 14 }}>
+        <StatusIcon variant="free" c={c} />
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: 17, fontWeight: '800', color: successColor }}>Jetzt frei</Text>
+          {nextInLabel && (
+            <Text style={{ fontSize: 13, color: c.muted, marginTop: 2 }}>{nextInLabel}</Text>
+          )}
+          {nextItem && b && (
+            <Text style={{ fontSize: 13, fontWeight: '600', color: c.primary, marginTop: 4 }} numberOfLines={1}>
+              {`${fmtTime(nextItem.startsAt)} · ${b.patientName ?? 'Patient'} · ${b.heilmittel ?? ''} · ${nextDuration} Min`}
+            </Text>
+          )}
+          {!nextItem && (
+            <Text style={{ fontSize: 13, color: c.muted, marginTop: 2 }}>Heute kein weiterer Termin</Text>
+          )}
+        </View>
+      </View>
+      {nextFreeGap && (
+        <>
+          <View style={{ height: 1, backgroundColor: c.border, marginVertical: 10 }} />
+          <FreeGapRow gap={nextFreeGap} c={c} />
+        </>
+      )}
+    </View>
+  );
+}
 
-  let nextLabel = null;
-  if (nextStart) {
-    nextLabel = `Nächster Termin: ${fmtTime(nextStart)} Uhr`;
-  } else if (!isPending) {
-    nextLabel = 'Kein weiterer Termin';
-  }
+// ─── AgendaRow ───────────────────────────────────────────────────────────────
+
+function AgendaBookingRow({ item, isHighlighted, onPress, c }) {
+  const { booking: b, startsAt, endsAt, status } = item;
+  const isPending = status === 'PENDING';
+  const durationMin = Math.round((endsAt.getTime() - startsAt.getTime()) / 60_000);
+  const timeColor = isHighlighted ? c.primary : (c.muted);
+  const accentColor = isPending ? (c.warning ?? '#B78700') : c.primary;
 
   return (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => ({
-        flexDirection: 'row',
-        backgroundColor: pressed ? c.mutedBg : c.card,
-        borderRadius: RADIUS.md,
-        borderWidth: 1,
-        borderColor: active ? accentColor + '55' : c.border,
-        marginBottom: 10,
-        overflow: 'hidden',
+        flexDirection: 'row', alignItems: 'center',
+        paddingVertical: 11, paddingHorizontal: 14,
+        backgroundColor: pressed ? c.mutedBg : 'transparent',
       })}
     >
-      {/* Left accent bar */}
-      <View style={{ width: 4, backgroundColor: accentColor }} />
-
-      {/* Time column */}
-      <View style={{ width: 52, alignItems: 'center', justifyContent: 'center', paddingVertical: 14, paddingLeft: 10 }}>
-        <Text style={{ fontSize: 14, fontWeight: '700', color: accentColor }}>{fmtTime(start)}</Text>
-        {end && (
-          <Text style={{ fontSize: 11, color: c.muted, marginTop: 2 }}>{fmtTime(end)}</Text>
-        )}
-        {durationMin != null && (
-          <Text style={{ fontSize: 10, color: c.muted, marginTop: 2 }}>{durationMin} Min</Text>
-        )}
-      </View>
-
-      {/* Main content */}
-      <View style={{ flex: 1, paddingVertical: 12, paddingHorizontal: 12 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Text style={{ fontSize: 14, fontWeight: '700', color: c.text, flex: 1 }} numberOfLines={1}>
-            {booking.patientName ?? 'Patient'}
-          </Text>
-          {isPending ? (
-            <View style={{
-              backgroundColor: (c.warningBg ?? '#FFF9E6'),
-              borderRadius: RADIUS.sm,
-              paddingHorizontal: 7, paddingVertical: 2,
-              marginLeft: 8,
-            }}>
-              <Text style={{ fontSize: 11, fontWeight: '700', color: c.warning ?? '#B78700' }}>Anfrage</Text>
-            </View>
-          ) : (
-            <Ionicons name="chevron-forward" size={15} color={c.muted} style={{ marginLeft: 8 }} />
-          )}
-        </View>
-
-        {booking.heilmittel ? (
-          <Text style={{ fontSize: 12, color: c.muted, marginTop: 2 }} numberOfLines={1}>{booking.heilmittel}</Text>
+      {isHighlighted && (
+        <View style={{ position: 'absolute', left: 0, top: 6, bottom: 6, width: 3, borderRadius: 2, backgroundColor: accentColor }} />
+      )}
+      <Text style={{ width: 46, fontSize: 14, fontWeight: isHighlighted ? '700' : '500', color: isHighlighted ? accentColor : c.muted }}>
+        {fmtTime(startsAt)}
+      </Text>
+      <View style={{ flex: 1, paddingLeft: 6 }}>
+        <Text style={{ fontSize: 14, fontWeight: '600', color: c.text }} numberOfLines={1}>
+          {b?.patientName ?? 'Patient'}
+        </Text>
+        {b?.heilmittel ? (
+          <Text style={{ fontSize: 12, color: c.muted, marginTop: 1 }} numberOfLines={1}>{b.heilmittel}</Text>
         ) : null}
-
-        {active && (
-          <>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: c.primary }} />
-                <Text style={{ fontSize: 11, fontWeight: '600', color: c.primary }}>Läuft gerade</Text>
-              </View>
-              <Text style={{ fontSize: 11, color: c.muted }}>Noch {formatDuration(remainingMs)}</Text>
-            </View>
-            <ProgressBar progress={progress} c={c} />
-          </>
+      </View>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        {isPending && (
+          <View style={{ backgroundColor: c.warningBg ?? '#FFF9E6', borderRadius: RADIUS.sm, paddingHorizontal: 6, paddingVertical: 2 }}>
+            <Text style={{ fontSize: 10, fontWeight: '700', color: c.warning ?? '#B78700' }}>Anfrage</Text>
+          </View>
         )}
-
-        {nextLabel && (
-          <Text style={{ fontSize: 11, color: c.muted, marginTop: 6 }}>{nextLabel}</Text>
-        )}
+        <Text style={{ fontSize: 12, color: c.muted }}>{durationMin} Min</Text>
+        <Ionicons name="chevron-forward" size={14} color={c.muted} />
       </View>
     </Pressable>
   );
 }
 
+function AgendaFreeRow({ item, c }) {
+  const { startsAt, endsAt } = item;
+  const freeMin = Math.round((endsAt.getTime() - startsAt.getTime()) / 60_000);
+  const successColor = c.success ?? '#2AAE6E';
+
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 14 }}>
+      <Text style={{ width: 46, fontSize: 13, fontWeight: '600', color: successColor }}>
+        {fmtTime(startsAt)}
+      </Text>
+      <View style={{ flex: 1, paddingLeft: 6 }}>
+        <Text style={{ fontSize: 13, color: successColor }}>{formatTimeRange(startsAt, endsAt)}</Text>
+        <Text style={{ fontSize: 12, color: successColor, marginTop: 1 }}>Freie Zeit</Text>
+      </View>
+      <Text style={{ fontSize: 12, color: successColor, fontWeight: '600' }}>{freeMin} Min</Text>
+    </View>
+  );
+}
+
+function AgendaCard({ items, agendaState, onPressBooking, onPressAll, c }) {
+  const MAX_VISIBLE = 5;
+  const displayItems = items.slice(0, MAX_VISIBLE);
+  const bookingCount = items.filter((i) => i.type === 'booking').length;
+  const freeCount = items.filter((i) => i.type === 'free').length;
+
+  let badgeText = '';
+  if (bookingCount > 0 && freeCount > 0) badgeText = `${bookingCount} Termine + ${freeCount} ${freeCount === 1 ? 'Lücke' : 'Lücken'}`;
+  else if (bookingCount > 0) badgeText = `${bookingCount} ${bookingCount === 1 ? 'Termin' : 'Termine'}`;
+  else if (freeCount > 0) badgeText = `${freeCount} ${freeCount === 1 ? 'Lücke' : 'Lücken'}`;
+
+  if (items.length === 0) return null;
+
+  return (
+    <View style={cardStyle(c)}>
+      {/* Kopfzeile */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingTop: 14, paddingBottom: 10 }}>
+        <Text style={{ fontSize: 15, fontWeight: '700', color: c.text }}>Nächste Termine</Text>
+        {badgeText ? (
+          <View style={{ backgroundColor: c.mutedBg ?? c.border, borderRadius: RADIUS.full, paddingHorizontal: 10, paddingVertical: 4 }}>
+            <Text style={{ fontSize: 11, color: c.muted, fontWeight: '600' }}>{badgeText}</Text>
+          </View>
+        ) : null}
+      </View>
+
+      {/* Zeilen */}
+      {displayItems.map((item, idx) => {
+        const isLast = idx === displayItems.length - 1;
+        const isHighlighted = item.type === 'booking' && (
+          agendaState.activeItem === item || agendaState.nextItem === item
+        );
+        return (
+          <View key={`${item.type}-${item.startsAt.getTime()}`}>
+            {idx > 0 && <View style={{ height: 1, backgroundColor: c.border, marginHorizontal: 14 }} />}
+            {item.type === 'booking' ? (
+              <AgendaBookingRow
+                item={item}
+                isHighlighted={isHighlighted}
+                onPress={() => onPressBooking(item.booking)}
+                c={c}
+              />
+            ) : (
+              <AgendaFreeRow item={item} c={c} />
+            )}
+          </View>
+        );
+      })}
+
+      {/* Alle Termine anzeigen */}
+      <View style={{ height: 1, backgroundColor: c.border, marginHorizontal: 14 }} />
+      <Pressable
+        onPress={onPressAll}
+        style={({ pressed }) => ({
+          flexDirection: 'row', alignItems: 'center', gap: 8,
+          paddingHorizontal: 14, paddingVertical: 13,
+          backgroundColor: pressed ? c.mutedBg : 'transparent',
+        })}
+      >
+        <Ionicons name="calendar-outline" size={16} color={c.primary} />
+        <Text style={{ flex: 1, fontSize: 14, fontWeight: '600', color: c.primary }}>Alle Termine anzeigen</Text>
+        <Ionicons name="chevron-forward" size={14} color={c.primary} />
+      </Pressable>
+    </View>
+  );
+}
+
+// ─── Placeholder-Cards ───────────────────────────────────────────────────────
+
+function IconLinkCard({ iconName, title, subtitle, c }) {
+  return (
+    <View style={[cardStyle(c), { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 14 }]}>
+      <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: c.mutedBg ?? c.border, alignItems: 'center', justifyContent: 'center' }}>
+        <Ionicons name={iconName} size={20} color={c.text} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={{ fontSize: 14, fontWeight: '700', color: c.text }}>{title}</Text>
+        <Text style={{ fontSize: 12, color: c.muted, marginTop: 2 }} numberOfLines={2}>{subtitle}</Text>
+      </View>
+      <Ionicons name="chevron-forward" size={16} color={c.muted} />
+    </View>
+  );
+}
+
+// ─── EmptyDayCard ────────────────────────────────────────────────────────────
+
 function EmptyDayCard({ c }) {
   return (
-    <View style={{
-      backgroundColor: c.card, borderRadius: RADIUS.md,
-      padding: 24, alignItems: 'center',
-      borderWidth: 1, borderColor: c.border,
-    }}>
+    <View style={[cardStyle(c), { padding: 24, alignItems: 'center' }]}>
       <Ionicons name="calendar-outline" size={32} color={c.muted} style={{ marginBottom: 10 }} />
-      <Text style={{ fontSize: 14, fontWeight: '600', color: c.text, marginBottom: 4 }}>Keine Termine</Text>
+      <Text style={{ fontSize: 14, fontWeight: '600', color: c.text, marginBottom: 4 }}>Kein Arbeitstag</Text>
       <Text style={{ fontSize: 12, color: c.muted, textAlign: 'center' }}>
-        An diesem Tag sind keine Termine eingetragen.
+        Für diesen Tag sind keine Arbeitszeiten eingetragen.
       </Text>
     </View>
   );
 }
 
-function NewsCard({ c }) {
-  return (
-    <View style={{
-      backgroundColor: c.card, borderRadius: RADIUS.md,
-      padding: 16, borderWidth: 1, borderColor: c.border,
-      marginTop: 8,
-    }}>
-      <Text style={{ fontSize: 12, fontWeight: '700', color: c.muted, textTransform: 'uppercase', letterSpacing: 0.7, marginBottom: 6 }}>
-        Neuigkeiten
-      </Text>
-      <Text style={{ fontSize: 14, fontWeight: '700', color: c.text, marginBottom: 4 }}>
-        Neuigkeiten fur Therapeuten
-      </Text>
-      <Text style={{ fontSize: 13, color: c.muted }}>
-        Wir haben neue Funktionen und Verbesserungen fur dich.
-      </Text>
-    </View>
-  );
+// ─── Stil-Hilfe ──────────────────────────────────────────────────────────────
+
+function cardStyle(c) {
+  return {
+    backgroundColor: c.card,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: c.border,
+    overflow: 'hidden',
+    marginBottom: 12,
+  };
 }
+
+// ─── Hauptscreen ─────────────────────────────────────────────────────────────
 
 export function TherapistDashboardScreen() {
   const { c } = useTheme();
@@ -238,17 +444,21 @@ export function TherapistDashboardScreen() {
   const { authToken, loggedInTherapist, accountType } = useAuth();
 
   const {
-    incomingBookings, incomingBookingsLoading,
-    therapyRefreshing, handleTherapyRefresh, refreshTherapyTab,
+    incomingBookings,
+    incomingBookingsLoading,
+    therapyRefreshing,
+    handleTherapyRefresh,
+    refreshTherapyTab,
   } = useTherapyData();
 
-  const [selectedDate, setSelectedDate] = useState(() => {
+  const { workingHoursRules, blockedTimes, refreshScheduleData } = useTherapistScheduleData({ authToken });
+
+  const [selectedDate] = useState(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
     return d;
   });
 
-  // Tick every 30s so progress bars and Restzeit stay fresh
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 30_000);
@@ -257,63 +467,104 @@ export function TherapistDashboardScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      if (authToken) refreshTherapyTab(authToken, accountType, loggedInTherapist, { force: true });
-    }, [authToken, accountType, loggedInTherapist, refreshTherapyTab]),
+      if (authToken) {
+        refreshTherapyTab(authToken, accountType, loggedInTherapist, { force: true });
+        refreshScheduleData();
+      }
+    }, [authToken, accountType, loggedInTherapist, refreshTherapyTab, refreshScheduleData]),
   );
 
-  const dayBookings = useMemo(() => {
-    const list = getTodayBookings(incomingBookings, selectedDate);
-    return list.sort((a, b) => (getBookingStart(a) ?? 0) - (getBookingStart(b) ?? 0));
-  }, [incomingBookings, selectedDate]);
-
-  const pendingCount = useMemo(
-    () => dayBookings.filter((b) => b.status === 'PENDING').length,
-    [dayBookings],
+  const agendaItems = useMemo(
+    () => getDayAgendaItems({ bookings: incomingBookings, workingHoursRules, blockedTimes, date: selectedDate }),
+    [incomingBookings, workingHoursRules, blockedTimes, selectedDate],
   );
 
-  const openBooking = useCallback((booking) => {
-    navigation.navigate(TAB_ROUTES.THERAPY, { openBookingId: booking.id });
-  }, [navigation]);
+  const agendaState = useMemo(() => getCurrentAgendaState(agendaItems, now), [agendaItems, now]);
+  const nextFreeGap = useMemo(() => getNextFreeGap(agendaItems, now), [agendaItems, now]);
+
+  const bookingCount = useMemo(
+    () => agendaItems.filter((i) => i.type === 'booking').length,
+    [agendaItems],
+  );
+  const totalMin = useMemo(
+    () => getTotalBookedMinutes(incomingBookings, selectedDate),
+    [incomingBookings, selectedDate],
+  );
+
+  const noWorkingHours = agendaItems.length === 0;
+
+  const name = loggedInTherapist?.fullName ?? 'Mein Konto';
+  const photo = resolvePhotoUri(loggedInTherapist?.photo);
+
+  const openBooking = useCallback(
+    (booking) => {
+      if (!booking) return;
+      navigation.navigate(TAB_ROUTES.THERAPY, { openBookingId: booking.id });
+    },
+    [navigation],
+  );
+
+  const openAllBookings = useCallback(
+    () => navigation.navigate(TAB_ROUTES.THERAPY),
+    [navigation],
+  );
+
+  const isRefreshing = therapyRefreshing || incomingBookingsLoading;
 
   return (
     <View style={{ flex: 1, backgroundColor: c.background }}>
-      <AccountHeader c={c} subtitle="Mein Tag" />
-
-      <DateNavRow
+      <DashboardHeader
+        name={name}
+        photo={photo}
         selectedDate={selectedDate}
-        onPrev={() => setSelectedDate((d) => addDays(d, -1))}
-        onNext={() => setSelectedDate((d) => addDays(d, 1))}
-        pendingCount={pendingCount}
+        bookingCount={bookingCount}
+        totalMin={totalMin}
         c={c}
+        insets={insets}
+        onPressAvatar={() => {}}
       />
 
       <ScrollView
-        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 24 }}
+        contentContainerStyle={{ paddingHorizontal: 14, paddingTop: 14, paddingBottom: 32 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
-            refreshing={therapyRefreshing || incomingBookingsLoading}
-            onRefresh={() => handleTherapyRefresh(authToken, accountType, loggedInTherapist)}
+            refreshing={isRefreshing}
+            onRefresh={() => {
+              handleTherapyRefresh(authToken, accountType, loggedInTherapist);
+              refreshScheduleData();
+            }}
             tintColor={c.primary}
           />
         }
       >
-        {dayBookings.length === 0 ? (
+        {noWorkingHours ? (
           <EmptyDayCard c={c} />
         ) : (
-          dayBookings.map((b) => (
-            <DashboardAppointmentCard
-              key={b.id}
-              booking={b}
-              dayBookings={dayBookings}
-              now={now}
-              onPress={() => openBooking(b)}
-              c={c}
-            />
-          ))
+          <StatusCard agendaState={agendaState} nextFreeGap={nextFreeGap} now={now} c={c} />
         )}
 
-        <NewsCard c={c} />
+        <AgendaCard
+          items={agendaItems}
+          agendaState={agendaState}
+          onPressBooking={openBooking}
+          onPressAll={openAllBookings}
+          c={c}
+        />
+
+        <IconLinkCard
+          iconName="clipboard-outline"
+          title="Offene Aufgaben"
+          subtitle="2 Dokumentationen · 1 Bestätigung ausstehend"
+          c={c}
+        />
+
+        <IconLinkCard
+          iconName="megaphone-outline"
+          title="Neuigkeiten"
+          subtitle="Neue Funktionen für Therapeuten verfügbar"
+          c={c}
+        />
       </ScrollView>
     </View>
   );

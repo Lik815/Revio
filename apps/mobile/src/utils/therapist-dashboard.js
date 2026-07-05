@@ -1,5 +1,10 @@
 import { computeDayPeriods } from './app-utils';
 
+function _fmtTime(date) {
+  if (!date) return '';
+  return date.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+}
+
 export function getTodayRange(date = new Date()) {
   const start = new Date(date);
   start.setHours(0, 0, 0, 0);
@@ -129,4 +134,70 @@ export function computeTherapistDashboardStats({
     freeMinutes,
     utilizationPercent,
   };
+}
+
+// ─── Tagesagenda ─────────────────────────────────────────────────────────────
+
+/**
+ * Wandelt computeDayPeriods-Ergebnis in typisierte Agenda-Items um.
+ * kind=blocked wird nicht angezeigt (kein eintrag im Mockup).
+ */
+export function getDayAgendaItems({ bookings, workingHoursRules, blockedTimes, date }) {
+  const periods = computeDayPeriods(
+    Array.isArray(workingHoursRules) ? workingHoursRules : [],
+    Array.isArray(blockedTimes) ? blockedTimes : [],
+    Array.isArray(bookings) ? bookings : [],
+    date,
+  );
+  const items = [];
+  for (const p of periods) {
+    if (p.kind === 'booked') {
+      items.push({ type: 'booking', booking: p.booking, startsAt: p.startsAt, endsAt: p.endsAt, status: 'CONFIRMED' });
+    } else if (p.kind === 'requested') {
+      items.push({ type: 'booking', booking: p.booking, startsAt: p.startsAt, endsAt: p.endsAt, status: 'PENDING' });
+    } else if (p.kind === 'free') {
+      items.push({ type: 'free', startsAt: p.startsAt, endsAt: p.endsAt });
+    }
+    // 'blocked' wird nicht in Agenda angezeigt
+  }
+  return items; // bereits sortiert durch computeDayPeriods
+}
+
+/**
+ * Bestimmt den aktuellen Tagesstatus aus den Agenda-Items.
+ * Gibt { activeItem, nextItem, isFree } zurueck.
+ */
+export function getCurrentAgendaState(items, now = new Date()) {
+  const bookingItems = items.filter((i) => i.type === 'booking');
+  const activeItem = bookingItems.find((i) => now >= i.startsAt && now < i.endsAt) ?? null;
+  const nextItem = bookingItems.find((i) => i.startsAt > now) ?? null;
+  return { activeItem, nextItem, isFree: !activeItem };
+}
+
+/** Gibt die naechste freie Luecke zurueck, die noch nicht vorbei ist. */
+export function getNextFreeGap(items, now = new Date()) {
+  return items.find((i) => i.type === 'free' && i.endsAt > now) ?? null;
+}
+
+/** Summiert die Minuten aller CONFIRMED-Buchungen am angegebenen Tag. */
+export function getTotalBookedMinutes(bookings, date) {
+  if (!Array.isArray(bookings)) return 0;
+  const { start, end } = getTodayRange(date);
+  return bookings
+    .filter((b) => {
+      if (b?.status !== 'CONFIRMED') return false;
+      const s = getBookingStart(b);
+      return s && s >= start && s <= end;
+    })
+    .reduce((sum, b) => {
+      const s = getBookingStart(b);
+      const e = getBookingEnd(b);
+      if (!s || !e) return sum;
+      return sum + Math.max(0, (e.getTime() - s.getTime()) / 60_000);
+    }, 0);
+}
+
+/** Formatiert einen Zeitbereich als "09:20–10:05". */
+export function formatTimeRange(startsAt, endsAt) {
+  return `${_fmtTime(startsAt)}–${_fmtTime(endsAt)}`;
 }
