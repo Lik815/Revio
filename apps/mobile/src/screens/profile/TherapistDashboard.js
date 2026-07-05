@@ -37,6 +37,7 @@ import { ProfileChecklist } from '../../components/ProfileChecklist';
 import { ProfileCompletionWizard } from '../../components/ProfileCompletionWizard';
 import { DeleteAccountModal } from '../../modals/DeleteAccountModal';
 import { useAuth } from '../../context/AuthContext';
+import { TherapistServicesScreen } from '../therapy/TherapistServicesScreen';
 
 const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024;
 
@@ -136,8 +137,8 @@ export function TherapistDashboardScreen({ c, t, styles, certificationOptions, s
   const [editTaxRegistrationStatus, setEditTaxRegistrationStatus] = useState(null);
   const [editHealthAuthorityStatus, setEditHealthAuthorityStatus] = useState(null);
   const [editCertifications, setEditCertifications] = useState([]);
-  const [editHeilmittel, setEditHeilmittel] = useState([]);
   const [profileSaving, setProfileSaving] = useState(false);
+  const [showServicesScreen, setShowServicesScreen] = useState(false);
   const [therapistDocuments, setTherapistDocuments] = useState([]);
   const [documentUploading, setDocumentUploading] = useState(false);
 
@@ -190,16 +191,11 @@ export function TherapistDashboardScreen({ c, t, styles, certificationOptions, s
     setEditTaxRegistrationStatus(nextCompliance.taxRegistrationStatus);
     setEditHealthAuthorityStatus(nextCompliance.healthAuthorityStatus);
     setEditCertifications(Array.isArray(th.certifications) ? th.certifications : []);
-    setEditHeilmittel(Array.isArray(th.heilmittel) ? th.heilmittel : []);
     setEditMode(true);
   };
 
   const handleSaveProfile = async () => {
     if (!authToken || !loggedInTherapist?.id) return;
-    if (editBookingMode === 'FIRST_APPOINTMENT_REQUEST' && editHeilmittel.length === 0) {
-      Alert.alert(t('alertHint') ?? 'Hinweis', 'Bitte wähle mindestens ein Heilmittel, bevor du Terminanfragen aktivierst.');
-      return;
-    }
     setProfileSaving(true);
     const complianceDraftKey = getTherapistComplianceDraftKey(loggedInTherapist.id);
     const compliancePayload = {
@@ -213,7 +209,6 @@ export function TherapistDashboardScreen({ c, t, styles, certificationOptions, s
         specializations: editSpecializations.split(',').map(s => s.trim()).filter(Boolean),
         languages: editLanguages.map(l => l.toLowerCase()),
         certifications: editCertifications,
-        heilmittel: editHeilmittel,
         homeVisit: editHomeVisit,
         serviceRadiusKm: editHomeVisit ? (editServiceRadius ?? null) : null,
         kassenarten: editKassenarten, gender: editGender,
@@ -359,6 +354,10 @@ export function TherapistDashboardScreen({ c, t, styles, certificationOptions, s
     ...(th.homeVisit ? [{ icon: 'home-outline', label: t('homeVisitLabel'), color: c.success }] : []),
     { icon: 'document-outline', label: docCount > 0 ? t('existsLabel') : t('missingLabel'), color: docCount > 0 ? c.success : c.warning ?? '#d97706' },
   ];
+
+  if (showServicesScreen) {
+    return <TherapistServicesScreen c={c} authToken={authToken} onBack={() => setShowServicesScreen(false)} />;
+  }
 
   return (
     <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 40, paddingTop: 12 }]}>
@@ -556,10 +555,6 @@ export function TherapistDashboardScreen({ c, t, styles, certificationOptions, s
             <Switch
               value={editBookingMode === 'FIRST_APPOINTMENT_REQUEST'}
               onValueChange={(val) => {
-                if (val && editHeilmittel.length === 0) {
-                  Alert.alert(t('alertHint') ?? 'Hinweis', 'Bitte wähle zuerst weiter unten, welche Heilmittel du behandelst.');
-                  return;
-                }
                 setEditBookingMode(val ? 'FIRST_APPOINTMENT_REQUEST' : 'DIRECTORY_ONLY');
               }}
               trackColor={{ true: c.primary }}
@@ -571,39 +566,17 @@ export function TherapistDashboardScreen({ c, t, styles, certificationOptions, s
               Terminanfragen werden nach der Profilprüfung freigeschaltet.
             </Text>
           )}
-          {Array.isArray(heilmittelOptions) && heilmittelOptions.length > 0 && (
-            <View style={{ marginTop: 14 }}>
-              <Text style={[styles.detailInfoLabel, { color: c.muted, marginBottom: 4 }]}>Heilmittel</Text>
-              <Text style={{ fontSize: 12, color: c.muted, marginBottom: 8 }}>
-                Welche Heilmittel behandelst du? Patient:innen sehen das automatisch, ohne es selbst angeben zu müssen.
-              </Text>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                {heilmittelOptions.map((opt) => {
-                  const active = (editHeilmittel ?? []).includes(opt.label);
-                  return (
-                    <Pressable
-                      key={opt.key}
-                      onPress={() => setEditHeilmittel(prev =>
-                        prev.includes(opt.label) ? prev.filter(l => l !== opt.label) : [...prev, opt.label]
-                      )}
-                      style={{
-                        flexDirection: 'row', alignItems: 'center', gap: 6,
-                        paddingVertical: 7, paddingHorizontal: 12,
-                        borderRadius: 20, borderWidth: 1.5,
-                        borderColor: active ? c.primary : c.border,
-                        backgroundColor: active ? c.primaryBg : c.mutedBg,
-                      }}
-                    >
-                      {active && <Ionicons name="checkmark" size={13} color={c.primary} />}
-                      <Text style={{ fontSize: 13, color: active ? c.primary : c.muted, fontWeight: active ? '600' : '400' }}>
-                        {opt.label}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </View>
-          )}
+          <View style={{ marginTop: 14 }}>
+            <Text style={[styles.detailInfoLabel, { color: c.muted, marginBottom: 6 }]}>Leistungen</Text>
+            <Pressable
+              onPress={() => setShowServicesScreen(true)}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, paddingHorizontal: 14, borderRadius: RADIUS.sm, backgroundColor: c.card, borderWidth: 1, borderColor: c.border }}
+            >
+              <Ionicons name="medical-outline" size={16} color={c.primary} />
+              <Text style={{ fontSize: 13, color: c.primary, fontWeight: '600', flex: 1 }}>Leistungen verwalten</Text>
+              <Ionicons name="chevron-forward" size={14} color={c.muted} />
+            </Pressable>
+          </View>
           <Text style={[styles.detailInfoLabel, { color: c.muted, marginTop: 14, marginBottom: 4 }]}>{t('availabilityLabel')}</Text>
           <TextInput
             style={[styles.registerInput, { color: c.text, borderColor: c.border, backgroundColor: c.card }]}
@@ -777,10 +750,16 @@ export function TherapistDashboardScreen({ c, t, styles, certificationOptions, s
             )}
           </View>
 
-          {/* ── Heilmittel ───────────────────────────────────────────── */}
-          {Array.isArray(th.heilmittel) && th.heilmittel.length > 0 && (
-            <View style={{ backgroundColor: c.card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: c.border, padding: SPACE.lg, marginBottom: SPACE.md }}>
-              <Text style={{ fontSize: 15, fontWeight: '700', color: c.text, marginBottom: SPACE.md }}>Heilmittel</Text>
+          {/* ── Leistungen ───────────────────────────────────────────── */}
+          <View style={{ backgroundColor: c.card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: c.border, padding: SPACE.lg, marginBottom: SPACE.md }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: Array.isArray(th.heilmittel) && th.heilmittel.length > 0 ? SPACE.md : 0 }}>
+              <Text style={{ fontSize: 15, fontWeight: '700', color: c.text }}>Leistungen</Text>
+              <Pressable onPress={() => setShowServicesScreen(true)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <Text style={{ fontSize: 13, color: c.primary, fontWeight: '600' }}>Verwalten</Text>
+                <Ionicons name="chevron-forward" size={14} color={c.primary} />
+              </Pressable>
+            </View>
+            {Array.isArray(th.heilmittel) && th.heilmittel.length > 0 ? (
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                 {th.heilmittel.map((item) => (
                   <View key={item} style={{ backgroundColor: c.primary, borderRadius: 20, paddingVertical: 5, paddingHorizontal: 12 }}>
@@ -788,8 +767,10 @@ export function TherapistDashboardScreen({ c, t, styles, certificationOptions, s
                   </View>
                 ))}
               </View>
-            </View>
-          )}
+            ) : (
+              <Text style={{ fontSize: 13, color: c.muted }}>Noch keine Leistungen konfiguriert.</Text>
+            )}
+          </View>
 
           {/* ── Spezialisierungen ────────────────────────────────────── */}
           {(th.specializations ?? []).length > 0 && (

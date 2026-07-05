@@ -6,6 +6,7 @@ import { getTherapistPublicationState, getTherapistRequestabilityState } from '.
 import { expireStaleBookings } from '../utils/booking-expiry.js';
 import { normalizeKassenarten } from '../utils/kassenarten.js';
 import { generateAvailableSlots } from '../utils/slot-generator.js';
+import { getTherapistOfferedHeilmittelKeys } from '../utils/therapist-services.js';
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
@@ -596,14 +597,9 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
     const { requestable } = getTherapistRequestabilityState(therapist, { links: therapist.links });
     if (!requestable) return reply.status(404).send({ error: 'Therapeut nicht buchbar.' });
 
-    const therapistHeilmittelList = splitList(therapist.heilmittel ?? '');
-    if (!therapistHeilmittelList.includes(heilmittel)) {
-      // therapist.heilmittel can store labels instead of keys (legacy data).
-      // Fall back to checking whether the requested key's label is in the list.
-      const option = await fastify.prisma.heilmittelOption.findUnique({ where: { key: heilmittel } });
-      if (!option || !therapistHeilmittelList.includes(option.label)) {
-        return reply.status(404).send({ error: 'Leistung wird von diesem Therapeuten nicht angeboten.' });
-      }
+    const offeredKeys = await getTherapistOfferedHeilmittelKeys(fastify.prisma, therapist);
+    if (!offeredKeys.includes(heilmittel)) {
+      return reply.status(404).send({ error: 'Leistung wird von diesem Therapeuten nicht angeboten.' });
     }
 
     const slots = await generateAvailableSlots(fastify, id, heilmittel, { from: fromDate, to: toDate }, now);

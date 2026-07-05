@@ -11,6 +11,7 @@ import {
 import { normalizeKassenarten, serializeKassenarten } from '../utils/kassenarten.js';
 import { geocodeAddress } from '../utils/geocode.js';
 import { sendPasswordResetEmail } from '../utils/mailer.js';
+import { getTherapistOfferedHeilmittelKeys, syncTherapistHeilmittelFromServices } from '../utils/therapist-services.js';
 
 export { hashPassword, verifyPassword, getToken };
 
@@ -330,7 +331,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       specializations: splitList(therapist.specializations),
       languages: splitList(therapist.languages),
       certifications: splitList(therapist.certifications),
-      heilmittel: splitList((therapist as any).heilmittel ?? ''),
+      heilmittel: await getTherapistOfferedHeilmittelKeys(fastify.prisma, therapist),
       photo: therapist.photo,
       isVisible: therapist.isVisible,
       availability: therapist.availability,
@@ -447,20 +448,43 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     if (data.specializations !== undefined) updateData.specializations = data.specializations.join(', ');
     if (data.languages !== undefined) updateData.languages = data.languages.join(', ');
     if (data.certifications !== undefined) updateData.certifications = data.certifications.join(', ');
-    if (data.heilmittel !== undefined) updateData.heilmittel = data.heilmittel.join(', ');
+    if (data.heilmittel !== undefined) {
+      // Legacy path: sync TherapistService rows from the incoming heilmittel array.
+      // New clients manage services directly via PUT /therapist/services.
+      updateData.heilmittel = data.heilmittel.join(', ');
+      const allOptions = await fastify.prisma.heilmittelOption.findMany({
+        where: { isActive: true },
+        select: { key: true, label: true, defaultDurationMin: true },
+      });
+      const byKey = new Map(allOptions.map(o => [o.key, o]));
+      const byLabel = new Map(allOptions.map(o => [o.label, o]));
+      const newKeys = data.heilmittel
+        .map(item => byKey.get(item)?.key ?? byLabel.get(item)?.key)
+        .filter((k): k is string => !!k);
+      for (const key of newKeys) {
+        const opt = byKey.get(key)!;
+        await fastify.prisma.therapistService.upsert({
+          where: { therapistId_heilmittelKey: { therapistId: therapist.id, heilmittelKey: key } },
+          create: { therapistId: therapist.id, heilmittelKey: key, durationMin: opt.defaultDurationMin, isActive: true },
+          update: { isActive: true },
+        });
+      }
+      if (newKeys.length > 0) {
+        await fastify.prisma.therapistService.updateMany({
+          where: { therapistId: therapist.id, heilmittelKey: { notIn: newKeys } },
+          data: { isActive: false },
+        });
+      }
+    }
     if (data.photo !== undefined) updateData.photo = data.photo;
     if (data.bookingMode !== undefined) {
       if (therapist.reviewStatus !== 'APPROVED') {
         return reply.badRequest('Terminanfragen können erst nach der Profilprüfung aktiviert werden.');
       }
       if (data.bookingMode === 'FIRST_APPOINTMENT_REQUEST') {
-        // Heilmittel sind Voraussetzung für Online-Terminanfragen: Patient:innen
-        // müssen sofort sehen können, was angeboten wird, ohne es selbst angeben
-        // zu müssen. Berücksichtigt sowohl bereits gespeicherte als auch in
-        // diesem Request mitgesendete Heilmittel.
         const effectiveHeilmittel = data.heilmittel !== undefined
           ? data.heilmittel
-          : splitList((therapist as any).heilmittel ?? '');
+          : await getTherapistOfferedHeilmittelKeys(fastify.prisma, therapist);
         if (effectiveHeilmittel.length === 0) {
           return reply.badRequest('Bitte wähle zuerst, welche Heilmittel du behandelst, bevor du Terminanfragen aktivierst.');
         }

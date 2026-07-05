@@ -6,7 +6,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getBaseUrl, RADIUS, TUNNEL_HEADERS } from '../../utils/app-utils';
 import { useConfigOptions } from '../../hooks/use-config-options';
-import { appStoreSelectors, useAppStore } from '../../store/useStore';
 import { useToast } from '../../hooks/use-toast';
 import { ToastOverlay } from '../../components/ToastOverlay';
 import { BackButton } from '../../components/BackButton';
@@ -26,14 +25,7 @@ const COLOR_PALETTE = [
 export function TherapistServicesScreen({ c, authToken, onBack }) {
   const insets = useSafeAreaInsets();
   const { heilmittelOptions } = useConfigOptions();
-  const loggedInTherapist = useAppStore(appStoreSelectors.loggedInTherapist);
   const { toastMsg, toastAnim, showToast } = useToast();
-
-  const ownHeilmittel = (loggedInTherapist?.heilmittel ?? []);
-  const ownSet = new Set(Array.isArray(ownHeilmittel) ? ownHeilmittel : String(ownHeilmittel).split(',').map(s => s.trim()).filter(Boolean));
-  const filteredHeilmittelOptions = heilmittelOptions.filter(
-    (opt) => ownSet.has(opt.key) || ownSet.has(opt.label),
-  );
 
   // { heilmittelKey: { durationMin, isActive, colorHex } }
   const [services, setServices] = useState({});
@@ -115,7 +107,7 @@ export function TherapistServicesScreen({ c, authToken, onBack }) {
             Lege fest, wie lange eine Behandlung bei dir dauert und wähle eine Farbe für die Kalenderansicht.
           </Text>
 
-          {filteredHeilmittelOptions.map((opt) => {
+          {heilmittelOptions.map((opt) => {
             const current = services[opt.key];
             const isActive = current?.isActive ?? false;
             const durationMin = String(current?.durationMin ?? 20);

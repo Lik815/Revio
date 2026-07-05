@@ -2775,8 +2775,85 @@ describe('Dynamic Booking', () => {
       headers: { authorization: `Bearer ${therapistToken}` },
     });
     expect(res.statusCode).toBe(200);
-    expect(res.json().services).toHaveLength(1);
-    expect(res.json().services[0].durationMin).toBe(30);
+    // GET now returns ALL active HeilmittelOptions merged with configs
+    const services = res.json().services;
+    const kg = services.find((s: { heilmittelKey: string }) => s.heilmittelKey === 'KG');
+    expect(kg).toBeDefined();
+    expect(kg.durationMin).toBe(30);
+    expect(typeof kg.label).toBe('string');
+  });
+
+  // ── Heilmittel-Konsolidierung (Phase 1) ───────────────────────────────────
+
+  it('GET /therapist/services — gibt alle aktiven HeilmittelOptionen zurück (inkl. unkonfigurierte)', async () => {
+    const res = await app.inject({
+      method: 'GET', url: '/therapist/services',
+      headers: { authorization: `Bearer ${therapistToken}` },
+    });
+    expect(res.statusCode).toBe(200);
+    const services = res.json().services;
+    expect(Array.isArray(services)).toBe(true);
+    expect(services.length).toBeGreaterThan(0);
+    // Alle Einträge haben label und isActive
+    for (const svc of services) {
+      expect(typeof svc.label).toBe('string');
+      expect(typeof svc.isActive).toBe('boolean');
+      expect(typeof svc.heilmittelKey).toBe('string');
+      expect(typeof svc.durationMin).toBe('number');
+    }
+  });
+
+  it('PUT /therapist/services/:key — syncTherapistHeilmittel aktualisiert therapist.heilmittel', async () => {
+    await prisma.heilmittelOption.upsert({
+      where: { key: 'KG' },
+      create: { key: 'KG', label: 'KG', defaultDurationMin: 20 },
+      update: {},
+    });
+    // Aktiviere KG → sollte therapist.heilmittel = 'KG' setzen
+    await app.inject({
+      method: 'PUT', url: '/therapist/services/KG',
+      headers: { authorization: `Bearer ${therapistToken}`, 'content-type': 'application/json' },
+      payload: { durationMin: 20, isActive: true },
+    });
+    const therapist = await prisma.therapist.findUnique({ where: { id: therapistId } });
+    expect((therapist as any).heilmittel).toContain('KG');
+  });
+
+  it('GET /auth/me — heilmittel wird aus aktiven Services abgeleitet', async () => {
+    await prisma.heilmittelOption.upsert({
+      where: { key: 'MT' },
+      create: { key: 'MT', label: 'MT', defaultDurationMin: 25 },
+      update: {},
+    });
+    await prisma.therapistService.upsert({
+      where: { therapistId_heilmittelKey: { therapistId, heilmittelKey: 'MT' } },
+      create: { therapistId, heilmittelKey: 'MT', durationMin: 25, isActive: true },
+      update: { isActive: true },
+    });
+    const res = await app.inject({
+      method: 'GET', url: '/auth/me',
+      headers: { authorization: `Bearer ${therapistToken}` },
+    });
+    expect(res.statusCode).toBe(200);
+    const profile = res.json();
+    expect(profile.heilmittel).toContain('MT');
+    // Cleanup
+    await prisma.therapistService.deleteMany({ where: { therapistId, heilmittelKey: 'MT' } });
+  });
+
+  it('GET /auth/me — heilmittel fällt auf legacy therapist.heilmittel zurück (kein Service vorhanden)', async () => {
+    await prisma.therapistService.deleteMany({ where: { therapistId } });
+    await (prisma.therapist as any).update({
+      where: { id: therapistId },
+      data: { heilmittel: 'KG, MT' },
+    });
+    const res = await app.inject({
+      method: 'GET', url: '/auth/me',
+      headers: { authorization: `Bearer ${therapistToken}` },
+    });
+    expect(res.statusCode).toBe(200);
+    const profile = res.json();
+    expect(profile.heilmittel).toContain('KG');
   });
 
   // ── /therapist/blocked-times ──────────────────────────────────────────────
@@ -3658,8 +3735,9 @@ describe('E2E — Therapeut legt neue Terminzeiten an', () => {
       method: 'POST', url: '/bookings', headers: pH,
       payload: { therapistId, heilmittel: 'KG', startsAt: at(monday, 8, 0).toISOString(), consentAccepted: true },
     });
-    console.log('[10] KG deaktiviert → slots:', s3.json().slots.length, '| Buchung:', bookOff.statusCode);
-    expect(s3.json().slots).toHaveLength(0);
+    // Nach Sync ist KG nicht mehr angeboten → available-slots 404, Buchung 400
+    console.log('[10] KG deaktiviert → available-slots:', s3.statusCode, '| Buchung:', bookOff.statusCode);
+    expect(s3.statusCode).toBe(404);
     expect(bookOff.statusCode).toBe(400);
   });
 });

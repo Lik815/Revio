@@ -6,6 +6,7 @@ import type {
 import { sendPushNotification } from '../utils/push.js';
 import { expireStaleBookings } from '../utils/booking-expiry.js';
 import { generateAvailableSlots, resolveServiceConfig } from '../utils/slot-generator.js';
+import { getTherapistOfferedHeilmittelKeys, syncTherapistHeilmittelFromServices } from '../utils/therapist-services.js';
 
 // true auf PostgreSQL (prod), false auf SQLite (dev) — steuert Advisory-Lock-Nutzung.
 function isPostgres(): boolean {
@@ -327,13 +328,9 @@ export async function bookingRoutes(fastify: FastifyInstance) {
     if (!canUseBookingMode(therapist)) {
       return reply.status(400).send({ error: 'This therapist does not accept booking requests' });
     }
-    const therapistHeilmittelList = splitList(therapist.heilmittel ?? '');
-    if (!therapistHeilmittelList.includes(heilmittel)) {
-      // therapist.heilmittel kann Labels statt Keys enthalten (Legacy-Daten).
-      const hmOption = await fastify.prisma.heilmittelOption.findUnique({ where: { key: heilmittel } });
-      if (!hmOption || !therapistHeilmittelList.includes(hmOption.label)) {
-        return reply.status(400).send({ error: 'Dieses Heilmittel wird von diesem Therapeuten nicht angeboten.' });
-      }
+    const offeredKeys = await getTherapistOfferedHeilmittelKeys(fastify.prisma, therapist);
+    if (!offeredKeys.includes(heilmittel)) {
+      return reply.status(400).send({ error: 'Dieses Heilmittel wird von diesem Therapeuten nicht angeboten.' });
     }
 
     const now = new Date();
@@ -647,9 +644,32 @@ export async function bookingRoutes(fastify: FastifyInstance) {
     const therapist = await resolveTherapist(fastify, token);
     if (!therapist) return reply.status(403).send({ error: 'Only therapists can manage services' });
 
-    const services = await fastify.prisma.therapistService.findMany({
-      where: { therapistId: therapist.id },
-      orderBy: { heilmittelKey: 'asc' },
+    const [allOptions, existingServices] = await Promise.all([
+      fastify.prisma.heilmittelOption.findMany({
+        where: { isActive: true },
+        orderBy: [{ sortOrder: 'asc' }, { key: 'asc' }],
+      }),
+      fastify.prisma.therapistService.findMany({
+        where: { therapistId: therapist.id },
+      }),
+    ]);
+
+    const serviceMap = new Map(existingServices.map(s => [s.heilmittelKey, s]));
+    const services = allOptions.map(opt => {
+      const existing = serviceMap.get(opt.key);
+      return {
+        id: existing?.id ?? null,
+        therapistId: therapist.id,
+        heilmittelKey: opt.key,
+        label: opt.label,
+        durationMin: existing?.durationMin ?? opt.defaultDurationMin,
+        bufferAfterMin: existing?.bufferAfterMin ?? 0,
+        slotIntervalMin: existing?.slotIntervalMin ?? null,
+        isActive: existing?.isActive ?? false,
+        colorHex: existing?.colorHex ?? null,
+        createdAt: existing?.createdAt?.toISOString() ?? null,
+        updatedAt: existing?.updatedAt?.toISOString() ?? null,
+      };
     });
 
     return { services };
@@ -702,6 +722,8 @@ export async function bookingRoutes(fastify: FastifyInstance) {
         ...(parsed.data.colorHex !== undefined ? { colorHex: parsed.data.colorHex } : {}),
       },
     });
+
+    await syncTherapistHeilmittelFromServices(fastify.prisma, therapist.id);
 
     return reply.send(service);
   });

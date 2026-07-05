@@ -374,8 +374,23 @@ export interface TherapistBlockedTime {
   updatedAt: string;
 }
 
+/** Merged entry returned by GET /therapist/services — includes unconfigured options as stubs (id=null). */
+export interface TherapistServiceItem {
+  id: string | null;
+  therapistId: string;
+  heilmittelKey: string;
+  label: string;
+  durationMin: number;
+  bufferAfterMin: number;
+  slotIntervalMin: number | null;
+  isActive: boolean;
+  colorHex: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
 export interface GetTherapistServicesResponse {
-  services: TherapistService[];
+  services: TherapistServiceItem[];
 }
 
 export interface PutTherapistServiceInput {
