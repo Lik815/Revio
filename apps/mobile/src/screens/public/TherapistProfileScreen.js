@@ -11,7 +11,7 @@ import { ROOT_ROUTES, TAB_ROUTES } from '../../navigation/route-names';
 import { getBaseUrl, mapApiTherapist, TUNNEL_HEADERS } from '../../utils/app-utils';
 import { HeartButton } from '../../components/HeartButton';
 import { ToastOverlay } from '../../components/ToastOverlay';
-import { BookingRequestForm } from './BookingRequestForm';
+import { InquiryRequestForm } from './InquiryRequestForm';
 import { TherapistProfileContent } from './TherapistProfileContent';
 
 const t = (key) => translations.de[key] ?? key;
@@ -91,7 +91,7 @@ export function TherapistProfileScreen() {
         presentationStyle="pageSheet"
         onRequestClose={() => setShowBookingForm(false)}
       >
-        <BookingRequestForm
+        <InquiryRequestForm
           c={c}
           t={t}
           therapist={therapist}

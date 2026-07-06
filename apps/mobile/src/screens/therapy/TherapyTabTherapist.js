@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  LayoutAnimation, Modal, Pressable, RefreshControl, ScrollView, Text, View,
+  ActivityIndicator, LayoutAnimation, Modal, Pressable, RefreshControl, ScrollView, Text, View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { RADIUS, isSameDay, startOfDay } from '../../utils/app-utils';
+import { RADIUS, isSameDay, startOfDay, SPACE } from '../../utils/app-utils';
+import { InquiryCard } from '../../components/InquiryCard';
 import { computeTherapistDashboardStats } from '../../utils/therapist-dashboard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HeilmittelSelectModal } from '../../modals/HeilmittelSelectModal';
@@ -21,6 +22,8 @@ export function TherapyTabTherapist({
   authToken,
   incomingBookings, incomingBookingsLoading,
   therapyRefreshing, incomingBookingsLastLoadedAt,
+  incomingInquiries, incomingInquiriesLoading,
+  onInquiryUpdate,
   onRefresh, onOpenBookingDetail, onSelectTherapistDetailBooking, onTherapistCancelRequest,
   loggedInTherapist,
   onActivateBookingRequests,
@@ -31,6 +34,10 @@ export function TherapyTabTherapist({
   const reviewApproved = loggedInTherapist?.reviewStatus === 'APPROVED';
   const [filterListKind, setFilterListKind] = useState(null);
   const [showStatsModal, setShowStatsModal] = useState(false);
+  const [therapistTab, setTherapistTab] = useState('termine');
+
+  const pendingInquiries = useMemo(() => (incomingInquiries ?? []).filter((q) => ['SENT', 'SEEN', 'COUNTER_PROPOSED'].includes(q.status)), [incomingInquiries]);
+  const pendingInquiryCount = pendingInquiries.length;
 
   const activation = useBookingActivation({ onActivateBookingRequests });
   const calendarView = useTherapistCalendarView();
@@ -116,7 +123,7 @@ export function TherapyTabTherapist({
   return (
     <View style={{ flex: 1 }}>
       {/* WeekStrip fixiert oben (Listenansicht) */}
-      {isListView && (
+      {isListView && therapistTab === 'termine' && (
         <View style={{ paddingTop: insets.top + 12, backgroundColor: c.background, paddingHorizontal: 24 }}>
           <TherapistWeekStrip
             c={c}
@@ -179,35 +186,87 @@ export function TherapyTabTherapist({
         </>
       ) : (
         // LISTENANSICHT / DEAKTIVIERT: normaler ScrollView
-        <ScrollView
-          style={{ flex: 1 }}
-          contentContainerStyle={[styles.scrollContent, { paddingBottom: 8, paddingTop: isListView ? 8 : insets.top + 12 }]}
-          showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={therapyRefreshing} onRefresh={onRefresh} tintColor={c.primary} />}
-        >
-          {bookingEnabled ? (
-            <TherapistDayTimeline
-              c={c}
-              selectedDate={calendarView.selectedDate}
-              incomingBookings={incomingBookings}
-              workingHoursRules={workingHoursRules}
-              blockedTimes={blockedTimes}
-              incomingBookingsLoading={incomingBookingsLoading}
-              incomingBookingsLastLoadedAt={incomingBookingsLastLoadedAt}
-              onOpenBooking={onOpenBookingDetail}
-              servicesByKey={servicesByKey}
-            />
-          ) : (
-            <TherapistActivationPrompt
-              reviewApproved={reviewApproved}
-              activationLoading={activation.activationLoading}
-              activationError={activation.activationError}
-              onActivate={activation.handleActivate}
-              c={c}
-              styles={styles}
-            />
+        <>
+          {/* Tab-Umschalter Termine | Anfragen — nur wenn Buchung aktiv */}
+          {bookingEnabled && (
+            <View style={{ paddingTop: isListView ? 10 : insets.top + 12, paddingHorizontal: 20, paddingBottom: 4, backgroundColor: c.background }}>
+              <View style={{ flexDirection: 'row', backgroundColor: c.mutedBg ?? c.card, borderRadius: RADIUS.md, padding: 3, borderWidth: 1, borderColor: c.border }}>
+                {[
+                  { key: 'termine', label: 'Termine' },
+                  { key: 'anfragen', label: pendingInquiryCount > 0 ? `Anfragen  ${pendingInquiryCount}` : 'Anfragen' },
+                ].map((tab) => (
+                  <Pressable
+                    key={tab.key}
+                    onPress={() => setTherapistTab(tab.key)}
+                    style={{ flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: RADIUS.sm - 2, backgroundColor: therapistTab === tab.key ? c.card : 'transparent' }}
+                  >
+                    <Text style={{ fontSize: 13, fontWeight: therapistTab === tab.key ? '700' : '500', color: therapistTab === tab.key ? c.primary : c.muted }}>
+                      {tab.label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
           )}
-        </ScrollView>
+
+          {therapistTab === 'anfragen' ? (
+            <ScrollView
+              style={{ flex: 1 }}
+              contentContainerStyle={{ padding: SPACE.md, gap: 10, paddingBottom: 32 }}
+              showsVerticalScrollIndicator={false}
+              refreshControl={<RefreshControl refreshing={therapyRefreshing} onRefresh={onRefresh} tintColor={c.primary} />}
+            >
+              {incomingInquiriesLoading && (!incomingInquiries || incomingInquiries.length === 0) ? (
+                <ActivityIndicator color={c.primary} style={{ marginTop: 40 }} />
+              ) : !incomingInquiries || incomingInquiries.length === 0 ? (
+                <View style={{ alignItems: 'center', paddingTop: 60, gap: 10 }}>
+                  <Ionicons name="mail-open-outline" size={40} color={c.muted} />
+                  <Text style={{ fontSize: 15, color: c.muted, textAlign: 'center' }}>Keine Anfragen vorhanden</Text>
+                </View>
+              ) : (
+                (incomingInquiries ?? []).map((inquiry) => (
+                  <InquiryCard
+                    key={inquiry.id}
+                    inquiry={inquiry}
+                    authToken={authToken}
+                    c={c}
+                    onUpdate={onInquiryUpdate}
+                  />
+                ))
+              )}
+            </ScrollView>
+          ) : (
+            <ScrollView
+              style={{ flex: 1 }}
+              contentContainerStyle={[styles.scrollContent, { paddingBottom: 8, paddingTop: isListView ? 8 : insets.top + 12 }]}
+              showsVerticalScrollIndicator={false}
+              refreshControl={<RefreshControl refreshing={therapyRefreshing} onRefresh={onRefresh} tintColor={c.primary} />}
+            >
+              {bookingEnabled ? (
+                <TherapistDayTimeline
+                  c={c}
+                  selectedDate={calendarView.selectedDate}
+                  incomingBookings={incomingBookings}
+                  workingHoursRules={workingHoursRules}
+                  blockedTimes={blockedTimes}
+                  incomingBookingsLoading={incomingBookingsLoading}
+                  incomingBookingsLastLoadedAt={incomingBookingsLastLoadedAt}
+                  onOpenBooking={onOpenBookingDetail}
+                  servicesByKey={servicesByKey}
+                />
+              ) : (
+                <TherapistActivationPrompt
+                  reviewApproved={reviewApproved}
+                  activationLoading={activation.activationLoading}
+                  activationError={activation.activationError}
+                  onActivate={activation.handleActivate}
+                  c={c}
+                  styles={styles}
+                />
+              )}
+            </ScrollView>
+          )}
+        </>
       )}
 
       <Modal

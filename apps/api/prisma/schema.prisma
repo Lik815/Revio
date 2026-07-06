@@ -70,6 +70,28 @@ enum CancelledBy {
   THERAPIST
 }
 
+// Phase 1 — Datenmodell MVP
+
+enum AbsenceGrund {
+  URLAUB
+  FORTBILDUNG
+  KRANKHEIT
+  SONSTIGES
+}
+
+enum ScheduledSlotStatus {
+  SCHEDULED
+  CANCELLED
+  COMPLETED
+}
+
+enum QualifikationStatus {
+  UNGEPRÜFT
+  EINGEREICHT
+  VERIFIZIERT
+  ABGELAUFEN
+}
+
 model User {
   id                     String                  @id @default(cuid())
   email                  String                  @unique
@@ -95,6 +117,7 @@ model User {
   therapistProfile       Therapist?              @relation("TherapistUser")
   favoriteTherapists     UserFavoriteTherapist[]
   bookingRequests        BookingRequest[]
+  patientRequests        PatientRequest[]        @relation("PatientRequests")
   appFeedbacks           AppFeedback[]
   therapistReviews       TherapistReview[]
 }
@@ -138,6 +161,10 @@ model Therapist {
   workingHoursRules     TherapistWorkingHoursRule[]
   services              TherapistService[]
   blockedTimes          TherapistBlockedTime[]
+  capacityRule          TherapistCapacityRule?
+  absences              TherapistAbsence[]
+  scheduledSlots        ScheduledSlot[]
+  inquiries             Inquiry[]               @relation("TherapistInquiries")
   // Location (added via migration 20260409150000)
   postalCode            String?
   street                String?
@@ -153,6 +180,9 @@ model Therapist {
   gender                String?
   // Phone (added via migration 20260511090000)
   phone                 String?
+  // Phase 1 — Zertifikats-Verifikation
+  qualifikationenStatus QualifikationStatus @default(UNGEPRÜFT)
+  qualifikationenVerifiziertAt DateTime?
   createdAt             DateTime     @default(now())
   updatedAt             DateTime     @updatedAt
   links                 TherapistPracticeLink[]
@@ -295,6 +325,7 @@ model BookingRequest {
   respondedAt          DateTime?
   confirmedSlotAt      DateTime?
   review               TherapistReview?
+  scheduledSlots       ScheduledSlot[]
 
   @@index([therapistId, status, createdAt])
   @@index([patientUserId, status, createdAt])
@@ -372,6 +403,8 @@ model TherapistService {
   slotIntervalMin Int?
   isActive        Boolean   @default(true)
   colorHex        String?
+  // Phase 1 — Kassenarten die diese Leistung akzeptiert (CSV: "GKV,PKV,SELBSTZAHLER")
+  kassenarten     String    @default("")
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
@@ -423,4 +456,190 @@ model UserFavoriteTherapist {
 
   @@unique([userId, therapistId])
   @@index([userId])
+}
+
+// ─── Phase 1: Angebotsseite + Kalender-Fundament ─────────────────────────────
+
+// Kapazitäts-Drossel: wie viele neue Serien nimmt ein:e Therapeut:in pro Woche an.
+// Schützt vor Überbuchung durch das grobe Verfügbarkeitsmodell.
+model TherapistCapacityRule {
+  id                             String    @id @default(cuid())
+  therapistId                    String    @unique
+  therapist                      Therapist @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+  maxNeueSerienProWoche          Int       @default(2)
+  laufendeNeuaufnahmenDieseWoche Int       @default(0)
+  weekResetAt                    DateTime?
+  maxAnfragenOffen               Int       @default(5)
+  autoPauseBeiFullCapacity       Boolean   @default(true)
+  // belegungsfaktor 0.0–1.0: welcher Anteil der Zeitfenster gilt als bereits belegt.
+  // Default 0.4 (Cold Start < 5 Anfragen), steigt auf 0.5 nach Kalibrierung.
+  belegungsfaktor                Float     @default(0.4)
+  abgeschlosseneInquiriesCount   Int       @default(0)
+  createdAt                      DateTime  @default(now())
+  updatedAt                      DateTime  @updatedAt
+}
+
+// Mehrtägige Abwesenheiten (Urlaub, Fortbildung, Krankheit).
+// Ergänzt TherapistBlockedTime (tagesinnere Blöcke) — beide Modelle bleiben
+// nebeneinander bestehen: BlockedTime für Stunden-Blöcke, Absence für Tage.
+model TherapistAbsence {
+  id          String       @id @default(cuid())
+  therapistId String
+  therapist   Therapist    @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+  von         DateTime
+  bis         DateTime
+  grund       AbsenceGrund @default(SONSTIGES)
+  // true = Abwesenheit gilt für alle Therapeut:innen der Praxis (MVP: nur Info-Feld)
+  ganzePraxis Boolean      @default(false)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([therapistId, von, bis])
+}
+
+// Denormalisierte Kalenderansicht: wird beim CONFIRM eines BookingRequest atomar
+// erzeugt und ist die einzige Datenquelle für Kalender, Timeline und Stats.
+// Verhindert O(n-Inquiries)-Aggregation bei jedem Kalenderaufruf.
+model ScheduledSlot {
+  id               String              @id @default(cuid())
+  bookingRequestId String
+  bookingRequest   BookingRequest      @relation(fields: [bookingRequestId], references: [id], onDelete: Cascade)
+  therapistId      String
+  therapist        Therapist           @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+  startsAt         DateTime
+  endsAt           DateTime
+  seriesIndex      Int                 @default(1)
+  heilmittel       String              @default("")
+  patientName      String
+  patientPhone     String?
+  status           ScheduledSlotStatus @default(SCHEDULED)
+  // Therapeuten-interne Kurz-Notiz (max. 200 Zeichen, nicht für Patienten sichtbar)
+  notiz            String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  @@index([therapistId, startsAt, status])
+  @@index([bookingRequestId])
+}
+
+// ─── Phase 2: Nachfrageseite + State Machine ──────────────────────────────────
+
+enum InquiryStatus {
+  SENT
+  SEEN
+  COUNTER_PROPOSED
+  CONFIRMED
+  CANCELLED
+  DECLINED
+  DECLINED_BY_PATIENT
+  WITHDRAWN
+  AUTO_CLOSED
+  EXPIRED
+}
+
+enum InquiryCancelReason {
+  PRAXIS_KRANKHEIT
+  PRAXIS_ABSAGE
+  PATIENT_WUNSCH
+  SONSTIGES
+}
+
+enum InquiryCancelActor {
+  PRAXIS
+  PATIENT
+}
+
+// Patientenseitige Behandlungsanfrage — Wurzel einer Buchungsserie.
+// Bis zu 3 Inquiries (je Therapeut eine) können einer PatientRequest zugeordnet sein.
+model PatientRequest {
+  id            String    @id @default(cuid())
+  patientUserId String
+  patientUser   User      @relation("PatientRequests", fields: [patientUserId], references: [id], onDelete: Cascade)
+  heilmittel    String
+  kassenart     String    @default("")
+  frequenz      String    @default("X1")
+  anzahlTermine Int       @default(6)
+  suchtyp       String    @default("SERIE")
+  message       String?
+  migrated      Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  timeWindows   PatientTimeWindow[]
+  prescription  PrescriptionData?
+  inquiries     Inquiry[]
+
+  @@index([patientUserId, createdAt])
+}
+
+// Zeitfenster-Präferenzen des Patienten (Wochentag + Uhrzeit-Korridor).
+// Ein Patient kann mehrere Fenster pro Wochentag angeben — überlappende
+// werden vor Matching-Prüfung normalisiert (zusammengeführt).
+model PatientTimeWindow {
+  id               String         @id @default(cuid())
+  patientRequestId String
+  patientRequest   PatientRequest @relation(fields: [patientRequestId], references: [id], onDelete: Cascade)
+  weekday          Int
+  vonMinute        Int
+  bisMinute        Int
+  createdAt        DateTime       @default(now())
+
+  @@index([patientRequestId])
+}
+
+// GKV-Rezeptdaten (Privatpatienten: prescription = null).
+model PrescriptionData {
+  id                    String         @id @default(cuid())
+  patientRequestId      String         @unique
+  patientRequest        PatientRequest @relation(fields: [patientRequestId], references: [id], onDelete: Cascade)
+  icdCode               String?
+  heilmittelposNr       String?
+  indikationsSchluessel String?
+  arztName              String?
+  arztDatum             DateTime?
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+}
+
+// Einzelne Anfrage bei einem Therapeuten.
+// Snapshot-Felder frieren PatientRequest-Daten zum Zeitpunkt der Erstellung ein.
+// parallelAnfragenAnzahl: Anzahl aktiver Parallel-Inquiries (DSGVO: nur Zahl, keine Namen).
+model Inquiry {
+  id                     String              @id @default(cuid())
+  patientRequestId       String
+  patientRequest         PatientRequest      @relation(fields: [patientRequestId], references: [id], onDelete: Cascade)
+  therapistId            String
+  therapist              Therapist           @relation("TherapistInquiries", fields: [therapistId], references: [id], onDelete: Cascade)
+  status                 InquiryStatus       @default(SENT)
+
+  // Snapshot-Felder
+  heilmittel             String
+  kassenart              String              @default("")
+  frequenz               String              @default("X1")
+  anzahlTermine          Int                 @default(6)
+  patientFreitext        String?
+  patientName            String
+  patientEmail           String?
+  patientPhone           String?
+  parallelAnfragenAnzahl Int                 @default(0)
+
+  // State-Machine-Felder
+  cancelReason           InquiryCancelReason?
+  cancelActor            InquiryCancelActor?
+  cancelledAt            DateTime?
+  ablehnungsgrund        String?
+  respondedAt            DateTime?
+  responseDueAt          DateTime
+  reminderSentAt         DateTime?
+
+  // Bestätigter Termin (Datum + Uhrzeit in Minuten seit Mitternacht)
+  confirmedDatum         DateTime?
+  confirmedUhrzeitVon    Int?
+  confirmedUhrzeitBis    Int?
+
+  migrated               Boolean             @default(false)
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
+
+  @@index([therapistId, status, createdAt])
+  @@index([patientRequestId])
 }

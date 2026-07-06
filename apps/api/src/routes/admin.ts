@@ -32,6 +32,7 @@ type TherapistRow = {
   serviceRadiusKm: number | null; kassenart: string;
   isVisible: boolean; isPublished: boolean;
   bookingMode?: string | null; nextFreeSlotAt?: Date | null;
+  qualifikationenStatus?: string | null; qualifikationenVerifiziertAt?: Date | null;
   createdAt: Date; updatedAt: Date;
   links?: Array<{ id: string; status: string; practice: { id: string; name: string; city: string; address: string | null; phone: string | null; hours: string | null; lat: number; lng: number; reviewStatus: string; createdAt: Date; updatedAt: Date } }>;
 };
@@ -81,6 +82,8 @@ function mapTherapist(t: TherapistRow) {
     bookingMode: t.bookingMode ?? 'DIRECTORY_ONLY',
     nextFreeSlotAt: t.nextFreeSlotAt?.toISOString() ?? null,
     requestability: getTherapistRequestabilityState(t, { links: t.links }),
+    qualifikationenStatus: t.qualifikationenStatus ?? 'UNGEPRÜFT',
+    qualifikationenVerifiziertAt: t.qualifikationenVerifiziertAt?.toISOString() ?? null,
   };
 }
 
@@ -887,6 +890,25 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
     if (!t) return reply.notFound('Therapist not found');
 
     return { message: 'Therapist suspended.' };
+  });
+
+  fastify.post('/therapists/:id/qualifikation-status', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const schema = z.object({
+      status: z.enum(['UNGEPRÜFT', 'EINGEREICHT', 'VERIFIZIERT', 'ABGELAUFEN']),
+    });
+    const parsed = schema.safeParse(request.body);
+    if (!parsed.success) return reply.badRequest('Ungültiger Status');
+    const now = new Date();
+    const t = await fastify.prisma.therapist.update({
+      where: { id },
+      data: {
+        qualifikationenStatus: parsed.data.status,
+        qualifikationenVerifiziertAt: parsed.data.status === 'VERIFIZIERT' ? now : undefined,
+      },
+    }).catch(() => null);
+    if (!t) return reply.notFound('Therapist not found');
+    return { qualifikationenStatus: (t as any).qualifikationenStatus, qualifikationenVerifiziertAt: (t as any).qualifikationenVerifiziertAt?.toISOString() ?? null };
   });
 
   // Practices

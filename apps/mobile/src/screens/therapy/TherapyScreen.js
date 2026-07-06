@@ -39,6 +39,8 @@ export function TherapyTabScreen() {
   const {
     myAppointments, myAppointmentsLoading, appointmentsLastLoadedAt, setMyAppointments,
     incomingBookings, incomingBookingsLoading, incomingBookingsLastLoadedAt, setIncomingBookings,
+    incomingInquiries, incomingInquiriesLoading, setIncomingInquiries,
+    myInquiries, myInquiriesLoading, setMyInquiries,
     patients, patientsLoading, patientsLastLoadedAt,
     therapyRefreshing,
     loadMyAppointments, loadIncomingBookings,
@@ -304,6 +306,10 @@ export function TherapyTabScreen() {
           myAppointmentsLoading={myAppointmentsLoading}
           therapyRefreshing={therapyRefreshing}
           appointmentsLastLoadedAt={appointmentsLastLoadedAt}
+          myInquiries={myInquiries}
+          myInquiriesLoading={myInquiriesLoading}
+          onInquiryWithdrawn={(id) => setMyInquiries((prev) => prev.map((r) => r.id === id ? { ...r, status: 'WITHDRAWN' } : r))}
+          authToken={authToken}
           onRefresh={() => handleTherapyRefresh(authToken, accountType, loggedInTherapist)}
           onOpenTherapistById={openTherapistById}
           onSelectAppointment={(appointment) => { markTap(appointment.id); setSelectedAppointment(appointment); }}
@@ -334,6 +340,9 @@ export function TherapyTabScreen() {
           incomingBookingsLoading={incomingBookingsLoading}
           therapyRefreshing={therapyRefreshing}
           incomingBookingsLastLoadedAt={incomingBookingsLastLoadedAt}
+          incomingInquiries={incomingInquiries}
+          incomingInquiriesLoading={incomingInquiriesLoading}
+          onInquiryUpdate={(updated) => setIncomingInquiries((prev) => prev.map((q) => q.id === updated.id ? updated : q))}
           onRefresh={() => handleTherapyRefresh(authToken, accountType, loggedInTherapist)}
           onTherapistCancelRequest={(id) => { setTherapistCancelBookingId(id); setShowTherapistCancelModal(true); }}
           onSelectTherapistDetailBooking={(booking) => { setTherapistCancelBookingId(booking.id); setShowTherapistCancelModal(true); }}

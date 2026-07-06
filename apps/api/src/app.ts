@@ -19,6 +19,9 @@ import { bookingRoutes } from './routes/booking.js';
 import { reviewRoutes } from './routes/reviews.js';
 import { feedbackRoutes } from './routes/feedback.js';
 import { notificationRoutes } from './routes/notifications.js';
+import { scheduleRoutes } from './routes/schedule.js';
+import { inquiryRoutes } from './routes/inquiry.js';
+import { matchRoutes } from './routes/match.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -48,25 +51,56 @@ export async function buildApp() {
   await app.register(reviewRoutes);
   await app.register(feedbackRoutes);
   await app.register(notificationRoutes);
+  await app.register(scheduleRoutes);
+  await app.register(inquiryRoutes);
+  await app.register(matchRoutes);
 
   // Scheduled expiry: mark stale PENDING bookings as EXPIRED every 5 min.
   // Im dynamischen Buchungssystem gibt es keine TherapistSlot-Statusänderung
   // mehr — der Zeitraum wird automatisch frei, sobald Status != PENDING|CONFIRMED.
   app.addHook('onReady', () => {
     const runExpiry = async () => {
+      const now = new Date();
       try {
+        // BookingRequest-Expiry (Legacy)
         const stale = await app.prisma.bookingRequest.findMany({
-          where: { status: 'PENDING', responseDueAt: { lt: new Date() } },
+          where: { status: 'PENDING', responseDueAt: { lt: now } },
           select: { id: true },
         });
-        if (stale.length === 0) return;
-        await app.prisma.bookingRequest.updateMany({
-          where: { id: { in: stale.map((b) => b.id) } },
-          data: { status: 'EXPIRED' },
+        if (stale.length > 0) {
+          await app.prisma.bookingRequest.updateMany({
+            where: { id: { in: stale.map((b) => b.id) } },
+            data: { status: 'EXPIRED' },
+          });
+          app.log.info(`[expiry] Expired ${stale.length} stale booking(s)`);
+        }
+
+        // Inquiry-Expiry (Phase 2 — SLA 2 Werktage)
+        const staleInquiries = await app.prisma.inquiry.findMany({
+          where: { status: { in: ['SENT', 'SEEN'] }, responseDueAt: { lt: now } },
+          select: { id: true },
         });
-        app.log.info(`[expiry] Expired ${stale.length} stale booking(s)`);
+        if (staleInquiries.length > 0) {
+          await app.prisma.inquiry.updateMany({
+            where: { id: { in: staleInquiries.map((i) => i.id) } },
+            data: { status: 'EXPIRED' },
+          });
+          app.log.info(`[expiry] Expired ${staleInquiries.length} stale inquiry/ies`);
+        }
+
+        // Inquiry-Reminder nach 1 Werktag (noch nicht gesendet)
+        const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        await app.prisma.inquiry.updateMany({
+          where: {
+            status: { in: ['SENT', 'SEEN'] },
+            createdAt: { lt: oneDayAgo },
+            reminderSentAt: null,
+            responseDueAt: { gt: now },
+          },
+          data: { reminderSentAt: now },
+        });
       } catch (err) {
-        app.log.error({ err }, '[expiry] Failed to expire stale bookings');
+        app.log.error({ err }, '[expiry] Failed to run expiry/reminder jobs');
       }
     };
 

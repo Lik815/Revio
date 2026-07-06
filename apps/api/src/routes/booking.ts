@@ -510,17 +510,51 @@ export async function bookingRoutes(fastify: FastifyInstance) {
 
     if (parsed.data.action === 'CONFIRM') {
       const confirmedAt = booking.startsAt ?? booking.confirmedSlotAt ?? now;
-      const updated = await fastify.prisma.bookingRequest.update({
-        where: { id },
-        data: { status: 'CONFIRMED', confirmedSlotAt: confirmedAt, respondedAt: now },
-      });
+      const endsAt = booking.endsAt ?? confirmedAt;
+
+      // Atomar: BookingRequest bestätigen + ScheduledSlot erzeugen
+      const [updated] = await fastify.prisma.$transaction([
+        fastify.prisma.bookingRequest.update({
+          where: { id },
+          data: { status: 'CONFIRMED', confirmedSlotAt: confirmedAt, respondedAt: now },
+        }),
+        fastify.prisma.scheduledSlot.upsert({
+          where: { id: `slot_${id}` },
+          create: {
+            id: `slot_${id}`,
+            bookingRequestId: id,
+            therapistId: booking.therapistId,
+            startsAt: confirmedAt,
+            endsAt,
+            heilmittel: booking.heilmittel ?? '',
+            patientName: booking.patientName,
+            patientPhone: booking.patientPhone ?? undefined,
+            status: 'SCHEDULED',
+          },
+          update: { startsAt: confirmedAt, endsAt, status: 'SCHEDULED' },
+        }),
+        // CapacityRule-Zähler inkrementieren (upsert falls noch keine Regel)
+        fastify.prisma.therapistCapacityRule.upsert({
+          where: { therapistId: booking.therapistId },
+          create: {
+            therapistId: booking.therapistId,
+            laufendeNeuaufnahmenDieseWoche: 1,
+            weekResetAt: now,
+            abgeschlosseneInquiriesCount: 1,
+          },
+          update: {
+            laufendeNeuaufnahmenDieseWoche: { increment: 1 },
+            abgeschlosseneInquiriesCount: { increment: 1 },
+          },
+        }),
+      ]);
 
       const patientUser = booking.patientUserId
         ? await fastify.prisma.user.findUnique({ where: { id: booking.patientUserId } })
         : null;
       if (patientUser?.expoPushToken) {
-        sendPushNotification(patientUser.expoPushToken, 'Termin bestätigt 🎉',
-          `${therapist.fullName} hat deinen Termin am ${confirmedAt.toLocaleDateString('de-DE')} bestätigt.`,
+        sendPushNotification(patientUser.expoPushToken, 'Termin bestaetigt',
+          `${therapist.fullName} hat deinen Termin am ${confirmedAt.toLocaleDateString('de-DE')} bestaetigt.`,
           { bookingId: booking.id, screen: 'bookings' });
       }
 
@@ -703,6 +737,12 @@ export async function bookingRoutes(fastify: FastifyInstance) {
     const parsed = schema.safeParse(request.body);
     if (!parsed.success) return reply.status(400).send({ error: 'Invalid request', details: parsed.error.flatten() });
 
+    // Qualifikations-Gate: Nur VERIFIZIERT darf isActive=true setzen
+    const qualStatus = (therapist as any).qualifikationenStatus ?? 'UNGEPRÜFT';
+    const qualOk = qualStatus === 'VERIFIZIERT';
+    const requestedActive = parsed.data.isActive ?? true;
+    const effectiveActive = requestedActive && qualOk;
+
     const service = await fastify.prisma.therapistService.upsert({
       where: { therapistId_heilmittelKey: { therapistId: therapist.id, heilmittelKey } },
       create: {
@@ -711,21 +751,24 @@ export async function bookingRoutes(fastify: FastifyInstance) {
         durationMin: parsed.data.durationMin,
         bufferAfterMin: parsed.data.bufferAfterMin ?? 0,
         slotIntervalMin: parsed.data.slotIntervalMin ?? null,
-        isActive: parsed.data.isActive ?? true,
+        isActive: effectiveActive,
         colorHex: parsed.data.colorHex ?? null,
       },
       update: {
         durationMin: parsed.data.durationMin,
         bufferAfterMin: parsed.data.bufferAfterMin ?? 0,
         slotIntervalMin: parsed.data.slotIntervalMin ?? null,
-        ...(parsed.data.isActive !== undefined ? { isActive: parsed.data.isActive } : {}),
+        ...(parsed.data.isActive !== undefined ? { isActive: effectiveActive } : {}),
         ...(parsed.data.colorHex !== undefined ? { colorHex: parsed.data.colorHex } : {}),
       },
     });
 
     await syncTherapistHeilmittelFromServices(fastify.prisma, therapist.id);
 
-    return reply.send(service);
+    return reply.send({
+      ...service,
+      ...(!qualOk && requestedActive ? { qualifikationWarnung: `Leistung ist inaktiv bis Qualifikationen verifiziert sind (aktuell: ${qualStatus})` } : {}),
+    });
   });
 
   // ── Therapeut: Blockzeiten ──────────────────────────────────────────────────

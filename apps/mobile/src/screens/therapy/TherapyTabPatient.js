@@ -1,19 +1,90 @@
 import React, { useMemo, useState } from 'react';
 import {
-  ActivityIndicator, FlatList, RefreshControl,
+  ActivityIndicator, Alert, FlatList, Pressable, RefreshControl,
   Text, View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AccountHeader } from '../../components/AccountHeader';
 import { PatientAppointmentCard, PatientNextAppointmentCard } from './AppointmentCards';
-import { getAppointmentDate, getNextPatientAppointment } from '../../utils/app-utils';
+import { getAppointmentDate, getNextPatientAppointment, getBaseUrl, RADIUS, TUNNEL_HEADERS } from '../../utils/app-utils';
 
 const shouldShowSectionLoading = (isLoading, lastLoadedAt) => isLoading && lastLoadedAt === 0;
+
+const INQUIRY_STATUS_LABEL = {
+  SENT: 'Gesendet', SEEN: 'Gesehen', COUNTER_PROPOSED: 'Gegenvorschlag',
+  CONFIRMED: 'Bestätigt', DECLINED: 'Abgelehnt', DECLINED_BY_PATIENT: 'Abgelehnt',
+  WITHDRAWN: 'Zurückgezogen', AUTO_CLOSED: 'Anderweitig', EXPIRED: 'Abgelaufen', CANCELLED: 'Abgesagt',
+};
+
+function PatientRequestCard({ request, authToken, onWithdrawn, c }) {
+  const [withdrawing, setWithdrawing] = useState(false);
+  const inquiries = request.inquiries ?? [];
+  const active = inquiries.filter((q) => !['WITHDRAWN', 'AUTO_CLOSED', 'DECLINED', 'DECLINED_BY_PATIENT', 'EXPIRED', 'CANCELLED'].includes(q.status));
+  const confirmed = inquiries.find((q) => q.status === 'CONFIRMED');
+  const canWithdraw = !confirmed && active.length > 0;
+
+  const handleWithdraw = () => {
+    Alert.alert('Anfrage zurueckziehen', 'Alle offenen Anfragen an Praxen werden zurueckgezogen.', [
+      { text: 'Abbrechen', style: 'cancel' },
+      {
+        text: 'Zurueckziehen', style: 'destructive', onPress: async () => {
+          setWithdrawing(true);
+          try {
+            await Promise.all(
+              active.map((q) => fetch(`${getBaseUrl()}/inquiry/${q.id}/withdraw`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
+              }))
+            );
+            onWithdrawn?.(request.id);
+          } catch {} finally { setWithdrawing(false); }
+        },
+      },
+    ]);
+  };
+
+  return (
+    <View style={{ backgroundColor: c.card, borderRadius: RADIUS.md, borderWidth: 1, borderColor: c.border, padding: 14, marginBottom: 10 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+        <Text style={{ fontSize: 14, fontWeight: '700', color: c.text }}>
+          {request.heilmittel} · {request.frequenz === 'X1' ? '1×/Woche' : request.frequenz === 'X2' ? '2×/Woche' : '3×/Woche'}
+        </Text>
+        <View style={{ backgroundColor: confirmed ? '#D1FAE5' : '#FEF3C7', borderRadius: 10, paddingVertical: 2, paddingHorizontal: 8 }}>
+          <Text style={{ fontSize: 11, fontWeight: '700', color: confirmed ? '#065F46' : '#92400E' }}>
+            {confirmed ? 'Bestaetigt' : `${active.length} offen`}
+          </Text>
+        </View>
+      </View>
+      {inquiries.length > 0 && (
+        <View style={{ gap: 4, marginBottom: canWithdraw ? 10 : 0 }}>
+          {inquiries.map((q) => (
+            <View key={q.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: q.status === 'CONFIRMED' ? '#10B981' : q.status === 'SEEN' ? '#3B82F6' : '#F59E0B' }} />
+              <Text style={{ fontSize: 12, color: c.muted }}>
+                {q.therapistName ?? 'Praxis'} · {INQUIRY_STATUS_LABEL[q.status] ?? q.status}
+              </Text>
+            </View>
+          ))}
+        </View>
+      )}
+      {canWithdraw && (
+        <Pressable onPress={handleWithdraw} disabled={withdrawing} style={{ borderTopWidth: 1, borderTopColor: c.border, paddingTop: 10, alignItems: 'center' }}>
+          {withdrawing
+            ? <ActivityIndicator size="small" color={c.muted} />
+            : <Text style={{ fontSize: 13, color: c.muted, fontWeight: '600' }}>Alle Anfragen zurueckziehen</Text>}
+        </Pressable>
+      )}
+    </View>
+  );
+}
 
 export function TherapyTabPatient({
   myAppointments, myAppointmentsLoading,
   therapyRefreshing, appointmentsLastLoadedAt,
+  myInquiries, myInquiriesLoading,
+  onInquiryWithdrawn,
   onRefresh, onOpenTherapistById, onSelectAppointment,
+  authToken,
   c, t, styles,
 }) {
   // Tapping the next-appointment card's Kommend/Vergangen counters swaps
@@ -124,6 +195,23 @@ export function TherapyTabPatient({
               onSelectKommend={() => setActiveView('kommend')}
               onSelectVergangen={() => setActiveView('vergangen')}
             />
+            {/* Offene Anfragen (Phase 2 Inquiry-System) */}
+            {Array.isArray(myInquiries) && myInquiries.length > 0 && (
+              <View style={{ marginBottom: 16 }}>
+                <Text style={{ fontSize: 16, fontWeight: '800', color: c.text, marginBottom: 10 }}>Offene Anfragen</Text>
+                {myInquiries
+                  .filter((r) => (r.inquiries ?? []).some((q) => !['WITHDRAWN', 'EXPIRED', 'CANCELLED', 'AUTO_CLOSED'].includes(q.status)))
+                  .map((request) => (
+                    <PatientRequestCard
+                      key={request.id}
+                      request={request}
+                      authToken={authToken}
+                      onWithdrawn={onInquiryWithdrawn}
+                      c={c}
+                    />
+                  ))}
+              </View>
+            )}
             <Text style={{ fontSize: 16, fontWeight: '800', color: c.text, marginBottom: 12 }}>{heading}</Text>
           </>
         )}

@@ -1,11 +1,12 @@
 import Link from 'next/link';
 import { PageShell } from '../../../../components/page-shell';
-import { TherapistActions } from '../../../../components/action-buttons';
+import { TherapistActions, QualifikationActions } from '../../../../components/action-buttons';
 import {
   approveTherapist,
   rejectTherapist,
   requestChangesTherapist,
   suspendTherapist,
+  setQualifikationStatus,
 } from '../../../../lib/actions';
 import { api } from '../../../../lib/api';
 import { getAdminVisibilityIssues } from '../../../../lib/visibility';
@@ -149,20 +150,48 @@ export default async function TherapistDetailPage({ params, searchParams }: Prop
           </p>
         </article>
 
+        <article className="card">
+          <div className="kicker">Qualifikationen</div>
+          <div className={`badge badge--${
+            therapist.qualifikationenStatus === 'VERIFIZIERT' ? 'APPROVED'
+            : therapist.qualifikationenStatus === 'EINGEREICHT' ? 'PENDING_REVIEW'
+            : therapist.qualifikationenStatus === 'ABGELAUFEN' ? 'REJECTED'
+            : 'DRAFT'
+          }`} style={{ width: 'fit-content', marginTop: 8 }}>
+            {therapist.qualifikationenStatus ?? 'UNGEPRÜFT'}
+          </div>
+          {therapist.qualifikationenVerifiziertAt && (
+            <p style={{ margin: '8px 0 0', color: 'var(--muted)', fontSize: 13 }}>
+              Verifiziert am {new Date(therapist.qualifikationenVerifiziertAt).toLocaleDateString('de-DE')}
+            </p>
+          )}
+        </article>
+
       </section>
 
       {/* Actions */}
-      <div style={{ display: 'flex', gap: 10, marginBottom: 32 }}>
-        <TherapistActions
-          id={therapist.id}
-          status={therapist.reviewStatus}
-          actions={{
-            approve: approveTherapist,
-            reject: rejectTherapist,
-            requestChanges: requestChangesTherapist,
-            suspend: suspendTherapist,
-          }}
-        />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 32 }}>
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Review</div>
+          <TherapistActions
+            id={therapist.id}
+            status={therapist.reviewStatus}
+            actions={{
+              approve: approveTherapist,
+              reject: rejectTherapist,
+              requestChanges: requestChangesTherapist,
+              suspend: suspendTherapist,
+            }}
+          />
+        </div>
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Qualifikationen</div>
+          <QualifikationActions
+            id={therapist.id}
+            currentStatus={therapist.qualifikationenStatus}
+            action={setQualifikationStatus}
+          />
+        </div>
       </div>
 
       {/* Profile details */}

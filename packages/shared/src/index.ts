@@ -117,6 +117,8 @@ export interface Therapist {
   createdAt: string;
   bookingMode?: BookingMode;
   nextFreeSlotAt?: string | null;
+  qualifikationenStatus?: string | null;
+  qualifikationenVerifiziertAt?: string | null;
 }
 
 export interface Practice {
@@ -413,4 +415,50 @@ export interface CreateBlockedTimeInput {
 
 export interface GetAvailableSlotsResponse {
   slots: AvailableSlot[];
+}
+
+// ─── Phase 3: Match-Scoring ───────────────────────────────────────────────────
+
+export type MatchSignal =
+  | 'HEILMITTEL_MATCH'
+  | 'KASSENART_MATCH'
+  | 'ZEITFENSTER_OVERLAP'
+  | 'KAPAZITAET_VERFUEGBAR'
+  | 'BELEGUNGSFAKTOR'
+  | 'DISTANZ'
+  | 'SPRACHE'
+  | 'GESCHLECHT'
+  | 'REVIEW_RATING'
+  | 'HEILMITTEL_MISMATCH'
+  | 'KASSENART_MISMATCH'
+  | 'KAPAZITAET_VOLL'
+  | 'QUALIFIKATION_NICHT_VERIFIZIERT';
+
+export interface MatchExplanation {
+  signal: MatchSignal;
+  /** Positiver Wert = Boost, negativer Wert = Malus */
+  delta: number;
+  detail?: string;
+}
+
+export interface MatchResult {
+  therapistId: string;
+  therapistName: string;
+  professionalTitle: string;
+  photo?: string | null;
+  city: string;
+  distKm?: number | null;
+  score: number;
+  scoreNormalized: number; // 0–1, relativ zum besten Ergebnis der Anfrage
+  explanations: MatchExplanation[];
+  zeitfensterOverlapMinutes: number;
+  kapazitaetVerfuegbar: boolean;
+  belegungsfaktor: number;
+  existingInquiryId?: string | null; // bereits laufende Anfrage für diese PatientRequest
+}
+
+export interface MatchResponse {
+  patientRequestId: string;
+  results: MatchResult[];
+  generatedAt: string; // ISO-8601
 }

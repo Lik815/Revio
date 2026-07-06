@@ -17,6 +17,12 @@ export function TherapyProvider({ children }) {
   const [myAppointmentsLoading, setMyAppointmentsLoading] = useState(false);
   const [incomingBookings, setIncomingBookings] = useState([]);
   const [incomingBookingsLoading, setIncomingBookingsLoading] = useState(false);
+  const [incomingInquiries, setIncomingInquiries] = useState([]);
+  const [incomingInquiriesLoading, setIncomingInquiriesLoading] = useState(false);
+  const [incomingInquiriesLastLoadedAt, setIncomingInquiriesLastLoadedAt] = useState(0);
+  const [myInquiries, setMyInquiries] = useState([]);
+  const [myInquiriesLoading, setMyInquiriesLoading] = useState(false);
+  const [myInquiriesLastLoadedAt, setMyInquiriesLastLoadedAt] = useState(0);
   const [mySlots, setMySlots] = useState([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [deletingSlotIds, setDeletingSlotIds] = useState([]);
@@ -80,6 +86,36 @@ export function TherapyProvider({ children }) {
       }
     } catch {} finally { setIncomingBookingsLoading(false); }
   }, [incomingBookingsLastLoadedAt]);
+
+  const loadIncomingInquiries = useCallback(async (token, { background = false } = {}) => {
+    if (!token) return;
+    if (!background || incomingInquiriesLastLoadedAt === 0) setIncomingInquiriesLoading(true);
+    try {
+      const res = await fetch(`${getBaseUrl()}/inquiry/incoming`, {
+        headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setIncomingInquiries(Array.isArray(data) ? data : []);
+        setIncomingInquiriesLastLoadedAt(Date.now());
+      }
+    } catch {} finally { setIncomingInquiriesLoading(false); }
+  }, [incomingInquiriesLastLoadedAt]);
+
+  const loadMyInquiries = useCallback(async (token, { background = false } = {}) => {
+    if (!token) return;
+    if (!background || myInquiriesLastLoadedAt === 0) setMyInquiriesLoading(true);
+    try {
+      const res = await fetch(`${getBaseUrl()}/inquiry/my`, {
+        headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setMyInquiries(Array.isArray(data) ? data : []);
+        setMyInquiriesLastLoadedAt(Date.now());
+      }
+    } catch {} finally { setMyInquiriesLoading(false); }
+  }, [myInquiriesLastLoadedAt]);
 
   const loadMySlots = useCallback(async (token, { background = false } = {}) => {
     if (!token) return;
@@ -162,6 +198,12 @@ export function TherapyProvider({ children }) {
     setFavorites([]);
     setMyAppointments([]);
     setIncomingBookings([]);
+    setIncomingInquiries([]);
+    setIncomingInquiriesLastLoadedAt(0);
+    setIncomingInquiriesLoading(false);
+    setMyInquiries([]);
+    setMyInquiriesLastLoadedAt(0);
+    setMyInquiriesLoading(false);
     setMySlots([]);
     setDeletingSlotIds([]);
     setPatients([]);
@@ -185,14 +227,17 @@ export function TherapyProvider({ children }) {
     if (force || isStale(favoritesLastLoadedAt)) jobs.push(loadFavorites(token, { background: true }));
     if (accountType === 'patient') {
       if (force || isStale(appointmentsLastLoadedAt)) jobs.push(loadMyAppointments(token, { background: true }));
+      if (force || isStale(myInquiriesLastLoadedAt)) jobs.push(loadMyInquiries(token, { background: true }));
     } else if (loggedInTherapist) {
       // Keine freien Slots mehr — Termine kommen aus incomingBookings.
       if (force || isStale(incomingBookingsLastLoadedAt)) jobs.push(loadIncomingBookings(token, { background: true }));
+      if (force || isStale(incomingInquiriesLastLoadedAt)) jobs.push(loadIncomingInquiries(token, { background: true }));
       if (force || isStale(patientsLastLoadedAt)) jobs.push(loadPatients(token, { background: true }));
     }
     if (jobs.length > 0) await Promise.allSettled(jobs);
-  }, [favoritesLastLoadedAt, appointmentsLastLoadedAt, incomingBookingsLastLoadedAt, patientsLastLoadedAt,
-      loadFavorites, loadMyAppointments, loadIncomingBookings, loadPatients]);
+  }, [favoritesLastLoadedAt, appointmentsLastLoadedAt, myInquiriesLastLoadedAt, incomingBookingsLastLoadedAt,
+      incomingInquiriesLastLoadedAt, patientsLastLoadedAt,
+      loadFavorites, loadMyAppointments, loadMyInquiries, loadIncomingBookings, loadIncomingInquiries, loadPatients]);
 
   const handleTherapyRefresh = useCallback(async (token, accountType, loggedInTherapist) => {
     if (!token) return;
@@ -229,6 +274,9 @@ export function TherapyProvider({ children }) {
     <TherapyContext.Provider value={{
       myAppointments, myAppointmentsLoading, setMyAppointments,
       incomingBookings, incomingBookingsLoading, setIncomingBookings,
+      incomingInquiries, incomingInquiriesLoading, setIncomingInquiries,
+      incomingInquiriesLastLoadedAt, loadIncomingInquiries,
+      myInquiries, myInquiriesLoading, setMyInquiries, loadMyInquiries,
       mySlots, slotsLoading, deletingSlotIds, setMySlots, setDeletingSlotIds,
       patients, patientsLoading, patientsLastLoadedAt, setPatients,
       patientDetails, loadPatientDetail, setPatientDetails,

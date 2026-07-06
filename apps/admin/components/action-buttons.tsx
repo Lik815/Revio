@@ -78,6 +78,30 @@ export function PracticeActions({ id, status, actions }: {
   );
 }
 
+export function QualifikationActions({ id, currentStatus, action }: {
+  id: string;
+  currentStatus: string | null | undefined;
+  action: (id: string, status: 'UNGEPRÜFT' | 'EINGEREICHT' | 'VERIFIZIERT' | 'ABGELAUFEN') => Promise<void>;
+}) {
+  const status = currentStatus ?? 'UNGEPRÜFT';
+  return (
+    <div className="action-row">
+      {status !== 'EINGEREICHT' && (
+        <ActionButton label="Als eingereicht markieren" variant="default" action={() => action(id, 'EINGEREICHT')} />
+      )}
+      {status !== 'VERIFIZIERT' && (
+        <ActionButton label="Verifizieren" variant="approve" action={() => action(id, 'VERIFIZIERT')} />
+      )}
+      {status !== 'ABGELAUFEN' && (
+        <ActionButton label="Als abgelaufen markieren" variant="warn" action={() => action(id, 'ABGELAUFEN')} />
+      )}
+      {status !== 'UNGEPRÜFT' && (
+        <ActionButton label="Zuruecksetzen" variant="default" action={() => action(id, 'UNGEPRÜFT')} />
+      )}
+    </div>
+  );
+}
+
 export function LinkActions({ id, status, actions }: {
   id: string;
   status: string;

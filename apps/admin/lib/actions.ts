@@ -116,6 +116,11 @@ export async function suspendTherapist(id: string) {
   revalidatePath('/');
 }
 
+export async function setQualifikationStatus(id: string, status: 'UNGEPRÜFT' | 'EINGEREICHT' | 'VERIFIZIERT' | 'ABGELAUFEN') {
+  await adminRequest(`/admin/therapists/${id}/qualifikation-status`, { body: { status } });
+  revalidatePath(`/therapists/${id}`);
+}
+
 export async function approvePractice(id: string) {
   await adminRequest(`/admin/practices/${id}/approve`);
   revalidatePath('/practices');
