@@ -374,6 +374,10 @@ export function TherapyTabScreen() {
                     setShowTherapistCancelModal(true);
                     setSelectedTherapistPatientAppointment(null);
                   }}
+                  onOpenPatient={(patientId) => {
+                    setSelectedTherapistPatientAppointment(null);
+                    setSelectedPatientId(patientId);
+                  }}
                   isModal
                   c={c}
                 />
