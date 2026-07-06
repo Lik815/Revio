@@ -3,7 +3,8 @@ import {
   LayoutAnimation, Modal, Pressable, RefreshControl, ScrollView, Text, View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { RADIUS } from '../../utils/app-utils';
+import { RADIUS, isSameDay, startOfDay } from '../../utils/app-utils';
+import { computeTherapistDashboardStats } from '../../utils/therapist-dashboard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HeilmittelSelectModal } from '../../modals/HeilmittelSelectModal';
 import { TherapistWeekStrip } from '../../components/TherapistWeekStrip';
@@ -81,14 +82,12 @@ export function TherapyTabTherapist({
   // Leistungsfarben laden fuer Timeline- und Kalender-Einfaerbung.
   const { servicesByKey } = useTherapistServices({ authToken });
 
-  const pendingCount = useMemo(
-    () => incomingBookings.filter((r) => r.status === 'PENDING').length,
-    [incomingBookings],
-  );
-  const confirmedCount = useMemo(
-    () => incomingBookings.filter((b) => b.status === 'CONFIRMED').length,
-    [incomingBookings],
-  );
+  const dayStats = useMemo(() => computeTherapistDashboardStats({
+    bookings: incomingBookings,
+    workingHoursRules,
+    blockedTimes,
+    date: calendarView.selectedDate,
+  }), [incomingBookings, workingHoursRules, blockedTimes, calendarView.selectedDate]);
 
   const insets = useSafeAreaInsets();
 
@@ -214,7 +213,7 @@ export function TherapyTabTherapist({
       <Modal
         visible={showStatsModal}
         transparent
-        animationType="fade"
+        animationType="slide"
         onRequestClose={() => setShowStatsModal(false)}
       >
         <Pressable
@@ -222,30 +221,83 @@ export function TherapyTabTherapist({
           onPress={() => setShowStatsModal(false)}
         >
           <Pressable onPress={() => {}}>
-            <View style={{ backgroundColor: c.background, borderTopLeftRadius: RADIUS.lg, borderTopRightRadius: RADIUS.lg, padding: 24, paddingBottom: insets.bottom + 24 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-                <Text style={{ fontSize: 17, fontWeight: '800', color: c.text }}>Statistik</Text>
-                <Pressable onPress={() => setShowStatsModal(false)} hitSlop={8}>
+            <View style={{ backgroundColor: c.background, borderTopLeftRadius: RADIUS.lg, borderTopRightRadius: RADIUS.lg, paddingHorizontal: 24, paddingTop: 20, paddingBottom: insets.bottom + 24 }}>
+              {/* Handle */}
+              <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: c.border, alignSelf: 'center', marginBottom: 20 }} />
+
+              {/* Header */}
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
+                <View>
+                  <Text style={{ fontSize: 22, fontWeight: '800', color: c.text }}>Statistik</Text>
+                  <Text style={{ fontSize: 13, color: c.muted, marginTop: 3 }}>
+                    {calendarView.selectedDate.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' })}
+                    {isSameDay(calendarView.selectedDate, startOfDay(new Date())) ? ' · Heute' : ''}
+                  </Text>
+                </View>
+                <Pressable onPress={() => setShowStatsModal(false)} hitSlop={12} style={{ padding: 4 }}>
                   <Ionicons name="close" size={22} color={c.muted} />
                 </Pressable>
               </View>
-              <View style={{ flexDirection: 'row', gap: 10 }}>
-                <Pressable
-                  onPress={() => { setShowStatsModal(false); setFilterListKind('booked'); }}
-                  style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: c.card, borderWidth: 1, borderColor: c.border, borderRadius: RADIUS.full, paddingVertical: 14 }}
-                >
-                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: c.primary }} />
-                  <Text style={{ fontSize: 20, fontWeight: '800', color: c.text }}>{confirmedCount}</Text>
-                  <Text style={{ fontSize: 14, fontWeight: '600', color: c.text }}>Gebucht</Text>
-                </Pressable>
+
+              {/* 2×2 Karten */}
+              <View style={{ flexDirection: 'row', gap: 10, marginBottom: 10 }}>
+                {/* Termine */}
+                <View style={{ flex: 1, backgroundColor: c.card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: c.border, padding: 16 }}>
+                  <View style={{ width: 40, height: 40, borderRadius: RADIUS.md, backgroundColor: `${c.primary}18`, alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
+                    <Ionicons name="calendar-outline" size={20} color={c.primary} />
+                  </View>
+                  <Text style={{ fontSize: 26, fontWeight: '800', color: c.text }}>{dayStats.confirmedToday.length}</Text>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: c.text, marginTop: 2 }}>Termine</Text>
+                  <Text style={{ fontSize: 12, color: c.muted, marginTop: 2 }}>heute gebucht</Text>
+                </View>
+
+                {/* Geplante Zeit */}
+                <View style={{ flex: 1, backgroundColor: c.card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: c.border, padding: 16 }}>
+                  <View style={{ width: 40, height: 40, borderRadius: RADIUS.md, backgroundColor: `${c.primary}18`, alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
+                    <Ionicons name="time-outline" size={20} color={c.primary} />
+                  </View>
+                  {(() => {
+                    const h = Math.floor(dayStats.bookedMinutes / 60);
+                    const m = Math.round(dayStats.bookedMinutes % 60);
+                    return (
+                      <Text style={{ fontSize: 22, fontWeight: '800', color: c.text }}>
+                        {h > 0 ? `${h}h ` : ''}{String(m).padStart(2, '0')}<Text style={{ fontSize: 14, fontWeight: '600' }}> Min</Text>
+                      </Text>
+                    );
+                  })()}
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: c.text, marginTop: 2 }}>Geplante Zeit</Text>
+                  <Text style={{ fontSize: 12, color: c.muted, marginTop: 2 }}>gesamt heute</Text>
+                </View>
+              </View>
+
+              <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16 }}>
+                {/* Anfragen */}
                 <Pressable
                   onPress={() => { setShowStatsModal(false); setFilterListKind('pending'); }}
-                  style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: c.card, borderWidth: 1, borderColor: c.border, borderRadius: RADIUS.full, paddingVertical: 14 }}
+                  style={{ flex: 1, backgroundColor: dayStats.pendingToday.length > 0 ? `${c.warning ?? '#B78700'}12` : c.card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: dayStats.pendingToday.length > 0 ? `${c.warning ?? '#B78700'}40` : c.border, padding: 16 }}
                 >
-                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: c.warning ?? '#B78700' }} />
-                  <Text style={{ fontSize: 20, fontWeight: '800', color: c.text }}>{pendingCount}</Text>
-                  <Text style={{ fontSize: 14, fontWeight: '600', color: c.text }}>Anfragen</Text>
+                  <View style={{ width: 40, height: 40, borderRadius: RADIUS.md, backgroundColor: `${c.warning ?? '#B78700'}18`, alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
+                    <Ionicons name="person-outline" size={20} color={c.warning ?? '#B78700'} />
+                  </View>
+                  <Text style={{ fontSize: 26, fontWeight: '800', color: dayStats.pendingToday.length > 0 ? (c.warning ?? '#B78700') : c.text }}>{dayStats.pendingToday.length}</Text>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: c.text, marginTop: 2 }}>Anfragen</Text>
+                  <Text style={{ fontSize: 12, color: c.muted, marginTop: 2 }}>{dayStats.pendingToday.length === 0 ? 'keine offen' : `${dayStats.pendingToday.length} offen`}</Text>
                 </Pressable>
+
+                {/* Auslastung */}
+                <View style={{ flex: 1, backgroundColor: c.card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: c.border, padding: 16 }}>
+                  <View style={{ width: 56, height: 56, borderRadius: 28, borderWidth: 5, borderColor: dayStats.utilizationPercent > 0 ? c.primary : c.border, alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
+                    <Text style={{ fontSize: 14, fontWeight: '800', color: dayStats.utilizationPercent > 0 ? c.primary : c.muted }}>{dayStats.utilizationPercent}%</Text>
+                  </View>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: c.text }}>Auslastung</Text>
+                  <Text style={{ fontSize: 12, color: c.muted, marginTop: 2 }}>von Arbeitszeit{'\n'}belegt</Text>
+                </View>
+              </View>
+
+              {/* Footer */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 4 }}>
+                <Ionicons name="information-circle-outline" size={16} color={c.muted} />
+                <Text style={{ fontSize: 12, color: c.muted, flex: 1 }}>Die Werte basieren auf dem Terminplan des gewaehlten Tages.</Text>
               </View>
             </View>
           </Pressable>
