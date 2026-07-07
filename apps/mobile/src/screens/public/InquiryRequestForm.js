@@ -152,7 +152,7 @@ function minutesFromIso(isoString) {
   return d.getHours() * 60 + d.getMinutes();
 }
 
-function SlotPicker({ therapistId, heilmittel, selectedSlot, onSelectSlot, c }) {
+function SlotPicker({ therapistId, heilmittel, selectedSlot, onSelectSlot, onPicked, c }) {
   const [slots, setSlots] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -253,7 +253,10 @@ function SlotPicker({ therapistId, heilmittel, selectedSlot, onSelectSlot, c }) 
                     return (
                       <Pressable
                         key={slot.startsAt}
-                        onPress={() => onSelectSlot(active ? null : slot)}
+                        onPress={() => {
+                          onSelectSlot(slot);
+                          onPicked?.(slot);
+                        }}
                         style={{
                           paddingVertical: 10, paddingHorizontal: 14,
                           borderRadius: RADIUS.sm, borderWidth: 1.5,
@@ -402,11 +405,10 @@ export function InquiryRequestForm({ c, t, therapist, authToken, onSuccess, onCl
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        if (res.status === 404) {
-          setError('Dieser Therapeut nimmt aktuell keine Anfragen an.');
-        } else {
-          setError(data.error ?? 'Anfrage fehlgeschlagen.');
-        }
+        const fallback = res.status === 404
+          ? 'Anfrage konnte nicht gesendet werden. Bitte prüfe, ob die App mit dem aktuellen API-Server verbunden ist.'
+          : 'Anfrage fehlgeschlagen.';
+        setError(data.error ?? fallback);
       } else {
         setSuccess(true);
       }
@@ -567,6 +569,7 @@ export function InquiryRequestForm({ c, t, therapist, authToken, onSuccess, onCl
               heilmittel={selectedHeilmittel}
               selectedSlot={selectedSlot}
               onSelectSlot={setSelectedSlot}
+              onPicked={() => setStep(4)}
               c={c}
             />
           </View>
@@ -687,6 +690,7 @@ export function InquiryRequestForm({ c, t, therapist, authToken, onSuccess, onCl
           </View>
         )}
 
+        {!(step === 3 && suchtyp === 'EINZELTERMIN') && (
         <View style={{ marginTop: SPACE.sm }}>
           {step < TOTAL_STEPS ? (
             <Pressable
@@ -710,6 +714,7 @@ export function InquiryRequestForm({ c, t, therapist, authToken, onSuccess, onCl
             </Pressable>
           )}
         </View>
+        )}
       </ScrollView>
     </KeyboardAvoidingView>
   );

@@ -85,11 +85,16 @@ export async function inquiryRoutes(fastify: FastifyInstance) {
 
     // Therapeuten prüfen
     const therapists = await fastify.prisma.therapist.findMany({
-      where: { id: { in: therapistIds }, reviewStatus: 'APPROVED', isVisible: true },
+      where: {
+        id: { in: therapistIds },
+        reviewStatus: 'APPROVED',
+        isVisible: true,
+        bookingMode: 'FIRST_APPOINTMENT_REQUEST',
+      },
       select: { id: true },
     });
     if (therapists.length === 0) {
-      return reply.status(400).send({ error: 'Keine der angegebenen Therapeut:innen ist buchbar' });
+      return reply.status(400).send({ error: 'Diese Therapeut:innen nehmen aktuell keine Anfragen an.' });
     }
 
     const patientName = [patient.firstName, patient.lastName].filter(Boolean).join(' ') || patient.email;

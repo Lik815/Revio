@@ -321,6 +321,7 @@ async function main() {
       homeVisit: true,
       serviceRadiusKm: 15,
       bookingMode: 'FIRST_APPOINTMENT_REQUEST',
+      isVisible: true,
       specializations: 'Manuelle Therapie, Sportphysiotherapie',
       languages: 'de, en',
       certifications: 'MT, KGG',
