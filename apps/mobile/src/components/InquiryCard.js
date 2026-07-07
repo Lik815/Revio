@@ -56,10 +56,10 @@ function TimeWindowChips({ timeWindows, c }) {
   );
 }
 
-function ConfirmModal({ visible, onClose, onConfirm, saving, c }) {
-  const [datum, setDatum] = useState('');
-  const [uhrzeitVon, setUhrzeitVon] = useState('');
-  const [uhrzeitBis, setUhrzeitBis] = useState('');
+function ConfirmModal({ visible, onClose, onConfirm, saving, initialDatum = '', initialUhrzeitVon = '', initialUhrzeitBis = '', c }) {
+  const [datum, setDatum] = useState(initialDatum);
+  const [uhrzeitVon, setUhrzeitVon] = useState(initialUhrzeitVon);
+  const [uhrzeitBis, setUhrzeitBis] = useState(initialUhrzeitBis);
 
   const handleConfirm = () => {
     const d = new Date(datum);
@@ -241,8 +241,18 @@ export function InquiryCard({ inquiry, authToken, c, onUpdate }) {
           </View>
         </View>
 
-        {/* Zeitfenster-Vorschau */}
-        {timeWindows.length > 0 && <TimeWindowChips timeWindows={timeWindows} c={c} />}
+        {/* Wunschtermin (Einzeltermin) oder Zeitfenster-Vorschau (Serie) */}
+        {inquiry.wunschDatum ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 }}>
+            <Ionicons name="calendar-outline" size={13} color={c.primary} />
+            <Text style={{ fontSize: 12, color: c.primary, fontWeight: '600' }}>
+              {new Date(inquiry.wunschDatum).toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'long' })}
+              {inquiry.wunschUhrzeitVon != null ? ` · ${formatMinutes(inquiry.wunschUhrzeitVon)}–${formatMinutes(inquiry.wunschUhrzeitBis)} Uhr` : ''}
+            </Text>
+          </View>
+        ) : (
+          timeWindows.length > 0 && <TimeWindowChips timeWindows={timeWindows} c={c} />
+        )}
       </Pressable>
 
       {/* Expanded-Details */}
@@ -306,7 +316,16 @@ export function InquiryCard({ inquiry, authToken, c, onUpdate }) {
         </View>
       )}
 
-      <ConfirmModal visible={showConfirmModal} onClose={() => setShowConfirmModal(false)} onConfirm={handleConfirm} saving={actionLoading} c={c} />
+      <ConfirmModal
+        visible={showConfirmModal}
+        onClose={() => setShowConfirmModal(false)}
+        onConfirm={handleConfirm}
+        saving={actionLoading}
+        initialDatum={inquiry.wunschDatum ? new Date(inquiry.wunschDatum).toISOString().slice(0, 10) : ''}
+        initialUhrzeitVon={inquiry.wunschUhrzeitVon != null ? formatMinutes(inquiry.wunschUhrzeitVon) : ''}
+        initialUhrzeitBis={inquiry.wunschUhrzeitBis != null ? formatMinutes(inquiry.wunschUhrzeitBis) : ''}
+        c={c}
+      />
       <CancelModal visible={showCancelModal} onClose={() => setShowCancelModal(false)} onCancel={handleCancel} saving={actionLoading} c={c} />
     </View>
   );

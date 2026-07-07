@@ -631,6 +631,11 @@ model Inquiry {
   responseDueAt          DateTime
   reminderSentAt         DateTime?
 
+  // Vom Patienten gewünschter Termin (nur bei suchtyp=EINZELTERMIN)
+  wunschDatum            DateTime?
+  wunschUhrzeitVon       Int?
+  wunschUhrzeitBis       Int?
+
   // Bestätigter Termin (Datum + Uhrzeit in Minuten seit Mitternacht)
   confirmedDatum         DateTime?
   confirmedUhrzeitVon    Int?

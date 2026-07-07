@@ -55,7 +55,10 @@ export async function inquiryRoutes(fastify: FastifyInstance) {
         weekday: z.number().int().min(0).max(6),
         vonMinute: z.number().int().min(0).max(1439),
         bisMinute: z.number().int().min(1).max(1440),
-      })).min(1).max(14),
+      })).min(0).max(14).default([]),
+      wunschDatum: z.string().datetime().optional(),
+      wunschUhrzeitVon: z.number().int().min(0).max(1439).optional(),
+      wunschUhrzeitBis: z.number().int().min(1).max(1440).optional(),
       prescription: z.object({
         icdCode: z.string().optional(),
         heilmittelposNr: z.string().optional(),
@@ -70,7 +73,15 @@ export async function inquiryRoutes(fastify: FastifyInstance) {
     if (!parsed.success) return reply.status(400).send({ error: 'Ungültige Daten', details: parsed.error.flatten() });
 
     const { heilmittel, kassenart, frequenz, anzahlTermine, suchtyp, message,
-            timeWindows, prescription, therapistIds } = parsed.data;
+            timeWindows, wunschDatum, wunschUhrzeitVon, wunschUhrzeitBis,
+            prescription, therapistIds } = parsed.data;
+
+    if (suchtyp === 'SERIE' && timeWindows.length === 0) {
+      return reply.status(400).send({ error: 'Für eine Behandlungsserie sind Wunschzeiten erforderlich.' });
+    }
+    if (suchtyp === 'EINZELTERMIN' && !wunschDatum) {
+      return reply.status(400).send({ error: 'Für einen Einzeltermin muss ein Wunschtermin angegeben werden.' });
+    }
 
     // Therapeuten prüfen
     const therapists = await fastify.prisma.therapist.findMany({
@@ -125,6 +136,11 @@ export async function inquiryRoutes(fastify: FastifyInstance) {
             patientPhone: patient.phone ?? undefined,
             parallelAnfragenAnzahl: parallelCount,
             responseDueAt,
+            ...(suchtyp === 'EINZELTERMIN' && wunschDatum ? {
+              wunschDatum: new Date(wunschDatum),
+              wunschUhrzeitVon: wunschUhrzeitVon ?? null,
+              wunschUhrzeitBis: wunschUhrzeitBis ?? null,
+            } : {}),
           },
         })
       ));

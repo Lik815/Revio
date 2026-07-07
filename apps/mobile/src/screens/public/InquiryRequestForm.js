@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import {
   ActivityIndicator, KeyboardAvoidingView, Platform,
@@ -78,7 +78,6 @@ function ChipRow({ options, selected, onSelect, c }) {
 function TimeWindowPicker({ selectedDays, selectedSlots, onToggleDay, onToggleSlot, c }) {
   return (
     <View style={{ gap: 16 }}>
-      {/* Wochentage */}
       <View>
         <Text style={{ fontSize: 13, fontWeight: '600', color: c.muted, marginBottom: 8 }}>Wochentage</Text>
         <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -104,7 +103,6 @@ function TimeWindowPicker({ selectedDays, selectedSlots, onToggleDay, onToggleSl
         </View>
       </View>
 
-      {/* Tageszeiten */}
       <View>
         <Text style={{ fontSize: 13, fontWeight: '600', color: c.muted, marginBottom: 8 }}>Tageszeiten</Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
@@ -135,6 +133,115 @@ function TimeWindowPicker({ selectedDays, selectedSlots, onToggleDay, onToggleSl
   );
 }
 
+function formatTime(isoString) {
+  const d = new Date(isoString);
+  return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+}
+
+function dateGroupKey(isoString) {
+  const d = new Date(isoString);
+  return d.toLocaleDateString('de-DE');
+}
+
+function dateGroupLabel(isoString) {
+  const d = new Date(isoString);
+  return d.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' });
+}
+
+function minutesFromIso(isoString) {
+  const d = new Date(isoString);
+  return d.getHours() * 60 + d.getMinutes();
+}
+
+function SlotPicker({ therapistId, heilmittel, selectedSlot, onSelectSlot, c }) {
+  const [slots, setSlots] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    setLoading(true);
+    setError('');
+    const now = new Date();
+    const to = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
+    fetch(
+      `${getBaseUrl()}/therapists/${therapistId}/available-slots?heilmittel=${encodeURIComponent(heilmittel)}&from=${now.toISOString()}&to=${to.toISOString()}`,
+      { headers: { ...TUNNEL_HEADERS } },
+    )
+      .then((r) => r.json())
+      .then((data) => { setSlots(data.slots ?? []); setLoading(false); })
+      .catch(() => { setError('Termine konnten nicht geladen werden.'); setLoading(false); });
+  }, [therapistId, heilmittel]);
+
+  const byDate = useMemo(() => {
+    const map = {};
+    for (const slot of slots) {
+      const key = dateGroupKey(slot.startsAt);
+      if (!map[key]) map[key] = { label: dateGroupLabel(slot.startsAt), slots: [] };
+      map[key].slots.push(slot);
+    }
+    return Object.values(map);
+  }, [slots]);
+
+  if (loading) {
+    return <ActivityIndicator color={c.primary} style={{ marginTop: 32 }} />;
+  }
+
+  if (error) {
+    return (
+      <View style={{ alignItems: 'center', marginTop: 24 }}>
+        <Ionicons name="alert-circle-outline" size={28} color={c.error ?? '#EF4444'} style={{ marginBottom: 8 }} />
+        <Text style={{ fontSize: 13, color: c.muted, textAlign: 'center' }}>{error}</Text>
+      </View>
+    );
+  }
+
+  if (byDate.length === 0) {
+    return (
+      <View style={{ alignItems: 'center', marginTop: 32 }}>
+        <Ionicons name="calendar-outline" size={36} color={c.muted} style={{ marginBottom: 12 }} />
+        <Text style={{ fontSize: 15, fontWeight: '700', color: c.text, textAlign: 'center' }}>Keine freien Termine</Text>
+        <Text style={{ fontSize: 13, color: c.muted, textAlign: 'center', marginTop: 6, lineHeight: 20 }}>
+          In den nächsten 14 Tagen sind keine freien Termine verfügbar.
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ gap: 20 }}>
+      {byDate.map((group) => (
+        <View key={group.label}>
+          <Text style={{ fontSize: 13, fontWeight: '700', color: c.muted, marginBottom: 8, textTransform: 'capitalize' }}>
+            {group.label}
+          </Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            {group.slots.map((slot) => {
+              const active = selectedSlot?.startsAt === slot.startsAt;
+              const label = `${formatTime(slot.startsAt)} – ${formatTime(slot.endsAt)}`;
+              return (
+                <Pressable
+                  key={slot.startsAt}
+                  onPress={() => onSelectSlot(active ? null : slot)}
+                  style={{
+                    paddingVertical: 9, paddingHorizontal: 14,
+                    borderRadius: RADIUS.sm, borderWidth: 1.5,
+                    borderColor: active ? c.primary : c.border,
+                    backgroundColor: active ? c.primaryBg : c.card,
+                  }}
+                >
+                  <Text style={{ fontSize: 14, fontWeight: active ? '700' : '500', color: active ? c.primary : c.text }}>
+                    {label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
 export function InquiryRequestForm({ c, t, therapist, authToken, onSuccess, onClose }) {
   const insets = useSafeAreaInsets();
   const { heilmittelOptions } = useConfigOptions();
@@ -149,6 +256,7 @@ export function InquiryRequestForm({ c, t, therapist, authToken, onSuccess, onCl
   const [selectedHeilmittel, setSelectedHeilmittel] = useState(null);
   const [selectedDays, setSelectedDays] = useState([]);
   const [selectedSlots, setSelectedSlots] = useState([]);
+  const [selectedSlot, setSelectedSlot] = useState(null); // für Einzeltermin
   const [frequenz, setFrequenz] = useState('X1');
   const [message, setMessage] = useState('');
   const [consent, setConsent] = useState(false);
@@ -175,7 +283,6 @@ export function InquiryRequestForm({ c, t, therapist, authToken, onSuccess, onCl
     prev.includes(key) ? prev.filter((s) => s !== key) : [...prev, key],
   );
 
-  // Zeitfenster: Kreuzprodukt Tage × Zeiten
   function buildTimeWindows() {
     const windows = [];
     for (const day of selectedDays) {
@@ -210,7 +317,11 @@ export function InquiryRequestForm({ c, t, therapist, authToken, onSuccess, onCl
       setError('Bitte wähle ein Heilmittel aus.');
       return;
     }
-    if (step === 3) {
+    if (step === 3 && suchtyp === 'EINZELTERMIN' && !selectedSlot) {
+      setError('Bitte wähle einen Termin aus.');
+      return;
+    }
+    if (step === 3 && suchtyp === 'SERIE') {
       if (selectedDays.length === 0) { setError('Bitte wähle mindestens einen Wochentag aus.'); return; }
       if (selectedSlots.length === 0) { setError('Bitte wähle mindestens eine Tageszeit aus.'); return; }
     }
@@ -222,20 +333,26 @@ export function InquiryRequestForm({ c, t, therapist, authToken, onSuccess, onCl
     setError('');
     setLoading(true);
     try {
-      const timeWindows = buildTimeWindows();
+      const isEinzel = suchtyp === 'EINZELTERMIN';
+      const body = {
+        heilmittel: selectedHeilmittel,
+        kassenart: selectedKassenart,
+        suchtyp,
+        frequenz: isEinzel ? 'X1' : frequenz,
+        anzahlTermine: isEinzel ? 1 : 6,
+        message: message.trim() || undefined,
+        therapistIds: [therapist.id],
+        timeWindows: isEinzel ? [] : buildTimeWindows(),
+        ...(isEinzel && selectedSlot ? {
+          wunschDatum: selectedSlot.startsAt,
+          wunschUhrzeitVon: minutesFromIso(selectedSlot.startsAt),
+          wunschUhrzeitBis: minutesFromIso(selectedSlot.endsAt),
+        } : {}),
+      };
       const res = await fetch(`${getBaseUrl()}/inquiry`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
-        body: JSON.stringify({
-          heilmittel: selectedHeilmittel,
-          kassenart: selectedKassenart,
-          suchtyp,
-          frequenz: suchtyp === 'EINZELTERMIN' ? 'X1' : frequenz,
-          anzahlTermine: suchtyp === 'EINZELTERMIN' ? 1 : 6,
-          timeWindows,
-          message: message.trim() || undefined,
-          therapistIds: [therapist.id],
-        }),
+        body: JSON.stringify(body),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -255,6 +372,7 @@ export function InquiryRequestForm({ c, t, therapist, authToken, onSuccess, onCl
   }
 
   if (success) {
+    const isEinzel = suchtyp === 'EINZELTERMIN';
     return (
       <View style={{ flex: 1, padding: SPACE.lg, alignItems: 'center', justifyContent: 'center', backgroundColor: c.background }}>
         <Ionicons name="checkmark-circle" size={64} color={c.success ?? '#1A7A40'} />
@@ -265,7 +383,9 @@ export function InquiryRequestForm({ c, t, therapist, authToken, onSuccess, onCl
           </Text>
         ) : null}
         <Text style={{ ...TYPE.body, color: c.muted, marginTop: SPACE.sm, textAlign: 'center' }}>
-          Der Therapeut prüft deine Wunschzeiten und bestätigt einen konkreten Termin.
+          {isEinzel
+            ? 'Der Therapeut prüft deine Anfrage und bestätigt den Termin.'
+            : 'Der Therapeut prüft deine Wunschzeiten und bestätigt einen konkreten Termin.'}
         </Text>
         <Pressable
           onPress={onSuccess}
@@ -277,7 +397,12 @@ export function InquiryRequestForm({ c, t, therapist, authToken, onSuccess, onCl
     );
   }
 
-  const stepTitles = { 1: 'Terminart', 2: 'Heilmittel', 3: 'Wunschzeiten', 4: 'Nachricht' };
+  const stepTitles = {
+    1: 'Terminart',
+    2: 'Heilmittel',
+    3: suchtyp === 'EINZELTERMIN' ? 'Termin wählen' : 'Wunschzeiten',
+    4: 'Nachricht',
+  };
 
   return (
     <KeyboardAvoidingView
@@ -309,7 +434,6 @@ export function InquiryRequestForm({ c, t, therapist, authToken, onSuccess, onCl
         {/* Schritt 1: Terminart + Versicherung */}
         {step === 1 && (
           <View style={{ gap: 24 }}>
-            {/* Terminart */}
             <View>
               <Text style={{ ...TYPE.h2, color: c.text, marginBottom: SPACE.xs }}>Was möchtest du anfragen?</Text>
               <View style={{ gap: 10, marginTop: SPACE.sm }}>
@@ -344,7 +468,6 @@ export function InquiryRequestForm({ c, t, therapist, authToken, onSuccess, onCl
               </View>
             </View>
 
-            {/* Versicherung */}
             <View>
               <Text style={{ fontSize: 15, fontWeight: '700', color: c.text, marginBottom: SPACE.sm }}>Wie bist du versichert?</Text>
               <ChipRow options={insuranceOptions} selected={selectedKassenart} onSelect={setSelectedKassenart} c={c} />
@@ -386,8 +509,24 @@ export function InquiryRequestForm({ c, t, therapist, authToken, onSuccess, onCl
           </View>
         )}
 
-        {/* Schritt 3: Zeitfenster */}
-        {step === 3 && (
+        {/* Schritt 3: Slot-Picker (Einzeltermin) oder Zeitfenster (Serie) */}
+        {step === 3 && suchtyp === 'EINZELTERMIN' && (
+          <View>
+            <Text style={{ ...TYPE.h2, color: c.text, marginBottom: SPACE.xs }}>Wann möchtest du kommen?</Text>
+            <Text style={{ ...TYPE.caption, color: c.muted, marginBottom: SPACE.md }}>
+              Wähle einen freien Termin aus. Der Therapeut bestätigt oder schlägt eine Alternative vor.
+            </Text>
+            <SlotPicker
+              therapistId={therapist.id}
+              heilmittel={selectedHeilmittel}
+              selectedSlot={selectedSlot}
+              onSelectSlot={setSelectedSlot}
+              c={c}
+            />
+          </View>
+        )}
+
+        {step === 3 && suchtyp === 'SERIE' && (
           <View>
             <Text style={{ ...TYPE.h2, color: c.text, marginBottom: SPACE.xs }}>Wann hast du Zeit?</Text>
             <Text style={{ ...TYPE.caption, color: c.muted, marginBottom: SPACE.md }}>
@@ -432,14 +571,21 @@ export function InquiryRequestForm({ c, t, therapist, authToken, onSuccess, onCl
                   {suchtyp === 'EINZELTERMIN' ? 'Einzeltermin' : `Serie · ${FREQUENZ_OPTIONS.find((f) => f.key === frequenz)?.label}`}
                 </Text>
               </Text>
-              {selectedDays.length > 0 && (
+              {suchtyp === 'EINZELTERMIN' && selectedSlot && (
+                <Text style={{ fontSize: 13, color: c.muted }}>
+                  Termin: <Text style={{ color: c.text, fontWeight: '600' }}>
+                    {dateGroupLabel(selectedSlot.startsAt)} · {formatTime(selectedSlot.startsAt)}–{formatTime(selectedSlot.endsAt)}
+                  </Text>
+                </Text>
+              )}
+              {suchtyp === 'SERIE' && selectedDays.length > 0 && (
                 <Text style={{ fontSize: 13, color: c.muted }}>
                   Tage: <Text style={{ color: c.text, fontWeight: '600' }}>
                     {selectedDays.map((d) => WOCHENTAGE.find((w) => w.key === d)?.label).join(', ')}
                   </Text>
                 </Text>
               )}
-              {selectedSlots.length > 0 && (
+              {suchtyp === 'SERIE' && selectedSlots.length > 0 && (
                 <Text style={{ fontSize: 13, color: c.muted }}>
                   Uhrzeiten: <Text style={{ color: c.text, fontWeight: '600' }}>
                     {selectedSlots.map((s) => ZEITFENSTER.find((z) => z.key === s)?.label).join(', ')}
