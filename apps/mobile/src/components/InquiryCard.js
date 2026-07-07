@@ -225,7 +225,11 @@ export function InquiryCard({ inquiry, authToken, c, onUpdate }) {
           <View style={{ flex: 1 }}>
             <Text style={{ fontSize: 15, fontWeight: '700', color: c.text }}>{inquiry.patientName}</Text>
             <Text style={{ fontSize: 12, color: c.muted }}>
-              {inquiry.heilmittel} · {FREQUENZ_LABELS[inquiry.frequenz] ?? inquiry.frequenz}
+              {inquiry.heilmittel}
+              {' · '}
+              {(inquiry.suchtyp ?? inquiry.patientRequest?.suchtyp) === 'EINZELTERMIN'
+                ? 'Einzeltermin'
+                : (FREQUENZ_LABELS[inquiry.frequenz] ?? inquiry.frequenz)}
               {inquiry.kassenart ? ` · ${inquiry.kassenart}` : ''}
             </Text>
           </View>

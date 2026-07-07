@@ -11,6 +11,11 @@ import { useAppStore, appStoreSelectors } from '../../store/useStore';
 
 const TOTAL_STEPS = 4;
 
+const BUCHUNGSTYP_OPTIONS = [
+  { key: 'SERIE',        label: 'Behandlungsserie', subtitle: 'Rezept, mehrere Einheiten' },
+  { key: 'EINZELTERMIN', label: 'Einzeltermin',      subtitle: 'Einmalig, Erstgespräch' },
+];
+
 const WOCHENTAGE = [
   { key: 1, label: 'Mo' },
   { key: 2, label: 'Di' },
@@ -137,9 +142,9 @@ export function InquiryRequestForm({ c, t, therapist, authToken, onSuccess, onCl
   const updatePatientProfile = useAppStore((s) => s.updatePatientProfile);
 
   const knownKassenart = loggedInPatient?.kassenart ?? null;
-  const firstStep = knownKassenart ? 2 : 1;
 
-  const [step, setStep] = useState(firstStep);
+  const [step, setStep] = useState(1);
+  const [suchtyp, setSuchtyp] = useState('SERIE');
   const [selectedKassenart, setSelectedKassenart] = useState(knownKassenart);
   const [selectedHeilmittel, setSelectedHeilmittel] = useState(null);
   const [selectedDays, setSelectedDays] = useState([]);
@@ -184,7 +189,7 @@ export function InquiryRequestForm({ c, t, therapist, authToken, onSuccess, onCl
 
   function handleBack() {
     setError('');
-    if (step <= firstStep) { onClose(); return; }
+    if (step <= 1) { onClose(); return; }
     setStep((s) => s - 1);
   }
 
@@ -224,7 +229,9 @@ export function InquiryRequestForm({ c, t, therapist, authToken, onSuccess, onCl
         body: JSON.stringify({
           heilmittel: selectedHeilmittel,
           kassenart: selectedKassenart,
-          frequenz,
+          suchtyp,
+          frequenz: suchtyp === 'EINZELTERMIN' ? 'X1' : frequenz,
+          anzahlTermine: suchtyp === 'EINZELTERMIN' ? 1 : 6,
           timeWindows,
           message: message.trim() || undefined,
           therapistIds: [therapist.id],
@@ -270,7 +277,7 @@ export function InquiryRequestForm({ c, t, therapist, authToken, onSuccess, onCl
     );
   }
 
-  const stepTitles = { 1: 'Versicherung', 2: 'Heilmittel', 3: 'Wunschzeiten', 4: 'Nachricht' };
+  const stepTitles = { 1: 'Terminart', 2: 'Heilmittel', 3: 'Wunschzeiten', 4: 'Nachricht' };
 
   return (
     <KeyboardAvoidingView
@@ -299,34 +306,69 @@ export function InquiryRequestForm({ c, t, therapist, authToken, onSuccess, onCl
 
         <ProgressBar step={step} c={c} />
 
-        {/* Schritt 1: Versicherung */}
+        {/* Schritt 1: Terminart + Versicherung */}
         {step === 1 && (
-          <View>
-            <Text style={{ ...TYPE.h2, color: c.text, marginBottom: SPACE.xs }}>Wie bist du versichert?</Text>
-            <Text style={{ ...TYPE.caption, color: c.muted, marginBottom: SPACE.md }}>
-              Diese Information wird an den Therapeuten weitergegeben.
-            </Text>
-            <ChipRow options={insuranceOptions} selected={selectedKassenart} onSelect={setSelectedKassenart} c={c} />
-            {loggedInPatient && !loggedInPatient.kassenart && selectedKassenart && (
-              <Pressable
-                onPress={() => setSaveKassenart((v) => !v)}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: SPACE.md, paddingVertical: 4 }}
-              >
-                <View style={{
-                  width: 20, height: 20, borderRadius: 5, borderWidth: 2,
-                  borderColor: saveKassenart ? c.primary : c.border,
-                  backgroundColor: saveKassenart ? c.primary : 'transparent',
-                  alignItems: 'center', justifyContent: 'center',
-                }}>
-                  {saveKassenart && <Ionicons name="checkmark" size={13} color="#fff" />}
-                </View>
-                <Text style={{ fontSize: 13, color: c.muted }}>In meinem Profil speichern</Text>
-              </Pressable>
-            )}
+          <View style={{ gap: 24 }}>
+            {/* Terminart */}
+            <View>
+              <Text style={{ ...TYPE.h2, color: c.text, marginBottom: SPACE.xs }}>Was möchtest du anfragen?</Text>
+              <View style={{ gap: 10, marginTop: SPACE.sm }}>
+                {BUCHUNGSTYP_OPTIONS.map((opt) => {
+                  const active = suchtyp === opt.key;
+                  return (
+                    <Pressable
+                      key={opt.key}
+                      onPress={() => setSuchtyp(opt.key)}
+                      style={{
+                        flexDirection: 'row', alignItems: 'center', gap: 14,
+                        padding: 14, borderRadius: RADIUS.md, borderWidth: 1.5,
+                        borderColor: active ? c.primary : c.border,
+                        backgroundColor: active ? c.primaryBg : c.card,
+                      }}
+                    >
+                      <View style={{
+                        width: 20, height: 20, borderRadius: 10, borderWidth: 2,
+                        borderColor: active ? c.primary : c.border,
+                        backgroundColor: active ? c.primary : 'transparent',
+                        alignItems: 'center', justifyContent: 'center',
+                      }}>
+                        {active && <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#fff' }} />}
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 15, fontWeight: '700', color: active ? c.primary : c.text }}>{opt.label}</Text>
+                        <Text style={{ fontSize: 12, color: c.muted, marginTop: 2 }}>{opt.subtitle}</Text>
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* Versicherung */}
+            <View>
+              <Text style={{ fontSize: 15, fontWeight: '700', color: c.text, marginBottom: SPACE.sm }}>Wie bist du versichert?</Text>
+              <ChipRow options={insuranceOptions} selected={selectedKassenart} onSelect={setSelectedKassenart} c={c} />
+              {loggedInPatient && !loggedInPatient.kassenart && selectedKassenart && (
+                <Pressable
+                  onPress={() => setSaveKassenart((v) => !v)}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: SPACE.md, paddingVertical: 4 }}
+                >
+                  <View style={{
+                    width: 20, height: 20, borderRadius: 5, borderWidth: 2,
+                    borderColor: saveKassenart ? c.primary : c.border,
+                    backgroundColor: saveKassenart ? c.primary : 'transparent',
+                    alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    {saveKassenart && <Ionicons name="checkmark" size={13} color="#fff" />}
+                  </View>
+                  <Text style={{ fontSize: 13, color: c.muted }}>In meinem Profil speichern</Text>
+                </Pressable>
+              )}
+            </View>
           </View>
         )}
 
-        {/* Schritt 2: Heilmittel + Frequenz */}
+        {/* Schritt 2: Heilmittel + (bei Serie) Frequenz */}
         {step === 2 && (
           <View style={{ gap: 20 }}>
             <View>
@@ -335,10 +377,12 @@ export function InquiryRequestForm({ c, t, therapist, authToken, onSuccess, onCl
                 ? <Text style={{ ...TYPE.small, color: c.muted }}>Keine Leistungen verfügbar.</Text>
                 : <ChipRow options={availableHeilmittel} selected={selectedHeilmittel} onSelect={setSelectedHeilmittel} c={c} />}
             </View>
-            <View>
-              <Text style={{ fontSize: 14, fontWeight: '600', color: c.text, marginBottom: 8 }}>Häufigkeit pro Woche</Text>
-              <ChipRow options={FREQUENZ_OPTIONS} selected={frequenz} onSelect={setFrequenz} c={c} />
-            </View>
+            {suchtyp === 'SERIE' && (
+              <View>
+                <Text style={{ fontSize: 14, fontWeight: '600', color: c.text, marginBottom: 8 }}>Häufigkeit pro Woche</Text>
+                <ChipRow options={FREQUENZ_OPTIONS} selected={frequenz} onSelect={setFrequenz} c={c} />
+              </View>
+            )}
           </View>
         )}
 
@@ -384,8 +428,8 @@ export function InquiryRequestForm({ c, t, therapist, authToken, onSuccess, onCl
                 </Text>
               )}
               <Text style={{ fontSize: 13, color: c.muted }}>
-                Frequenz: <Text style={{ color: c.text, fontWeight: '600' }}>
-                  {FREQUENZ_OPTIONS.find((f) => f.key === frequenz)?.label}
+                Art: <Text style={{ color: c.text, fontWeight: '600' }}>
+                  {suchtyp === 'EINZELTERMIN' ? 'Einzeltermin' : `Serie · ${FREQUENZ_OPTIONS.find((f) => f.key === frequenz)?.label}`}
                 </Text>
               </Text>
               {selectedDays.length > 0 && (

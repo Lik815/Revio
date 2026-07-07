@@ -47,11 +47,15 @@ function PatientRequestCard({ request, authToken, onWithdrawn, c }) {
     <View style={{ backgroundColor: c.card, borderRadius: RADIUS.md, borderWidth: 1, borderColor: c.border, padding: 14, marginBottom: 10 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
         <Text style={{ fontSize: 14, fontWeight: '700', color: c.text }}>
-          {request.heilmittel} · {request.frequenz === 'X1' ? '1×/Woche' : request.frequenz === 'X2' ? '2×/Woche' : '3×/Woche'}
+          {request.heilmittel}
+          {' · '}
+          {request.suchtyp === 'EINZELTERMIN'
+            ? 'Einzeltermin'
+            : request.frequenz === 'X1' ? '1×/Woche' : request.frequenz === 'X2' ? '2×/Woche' : '3×/Woche'}
         </Text>
         <View style={{ backgroundColor: confirmed ? '#D1FAE5' : '#FEF3C7', borderRadius: 10, paddingVertical: 2, paddingHorizontal: 8 }}>
           <Text style={{ fontSize: 11, fontWeight: '700', color: confirmed ? '#065F46' : '#92400E' }}>
-            {confirmed ? 'Bestaetigt' : `${active.length} offen`}
+            {confirmed ? 'Bestätigt' : `${active.length} offen`}
           </Text>
         </View>
       </View>
