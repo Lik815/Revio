@@ -99,12 +99,24 @@ export function CustomTabBar({ state, descriptors, navigation, badgeCounts = {} 
     }
   }, [targetNavWidth, isGuestTabBar]);
 
-  // Gast-Ansicht: einzelner breiter "Anmelden"-Button
+  // Gast-Ansicht: einzelner breiter Button
+  // Auf dem Auth-Tab selbst → "Suche" anzeigen (Anmelden wäre doppelt)
+  // Auf allen anderen Tabs → "Anmelden" anzeigen
   if (isGuestTabBar) {
+    const currentRoute = state.routes[state.index];
+    const onAuthTab = currentRoute?.name === TAB_ROUTES.AUTH;
+
     const authRoute = state.routes.find((r) => r.name === TAB_ROUTES.AUTH) ?? state.routes[state.routes.length - 1];
-    const onPressLogin = () => {
-      navigation.navigate(authRoute.name);
+    const discoverRoute = state.routes.find((r) => r.name === TAB_ROUTES.DISCOVER) ?? state.routes[0];
+
+    const onPress = () => {
+      if (onAuthTab) {
+        navigation.navigate(discoverRoute.name);
+      } else {
+        navigation.navigate(authRoute.name);
+      }
     };
+
     return (
       <View
         style={{
@@ -115,7 +127,7 @@ export function CustomTabBar({ state, descriptors, navigation, badgeCounts = {} 
         }}
       >
         <Pressable
-          onPress={onPressLogin}
+          onPress={onPress}
           style={({ pressed }) => ({
             backgroundColor: pressed ? c.primaryDark ?? c.primary : c.primary,
             borderRadius: RADIUS.full,
@@ -126,9 +138,9 @@ export function CustomTabBar({ state, descriptors, navigation, badgeCounts = {} 
             paddingVertical: 16,
           })}
         >
-          <Ionicons name="log-in-outline" size={22} color="#fff" />
+          <Ionicons name={onAuthTab ? 'search-outline' : 'log-in-outline'} size={22} color="#fff" />
           <Text style={{ fontSize: 16, fontWeight: '700', color: '#fff', letterSpacing: 0.2 }}>
-            Anmelden
+            {onAuthTab ? 'Suche' : 'Anmelden'}
           </Text>
         </Pressable>
       </View>
