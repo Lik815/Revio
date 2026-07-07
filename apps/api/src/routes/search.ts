@@ -388,15 +388,22 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
 
   fastify.get('/therapist/:id', async (request, reply) => {
     const { id } = request.params as { id: string };
-    const t = await fastify.prisma.therapist.findUnique({
-      where: { id },
-      include: {
-        links: {
-          where: { status: 'CONFIRMED' },
-          include: { practice: true },
+    const [t, reviewAgg] = await Promise.all([
+      fastify.prisma.therapist.findUnique({
+        where: { id },
+        include: {
+          links: {
+            where: { status: 'CONFIRMED' },
+            include: { practice: true },
+          },
         },
-      },
-    });
+      }),
+      (fastify.prisma as any).therapistReview.aggregate({
+        where: { therapistId: id, status: 'PUBLISHED' },
+        _avg: { rating: true },
+        _count: { id: true },
+      }),
+    ]);
     if (!t) return reply.notFound('Therapeut nicht gefunden');
     const publication = getTherapistPublicationState(t, { links: t.links });
     if (!publication.publicSearchEligible) return reply.notFound('Therapeut nicht gefunden');
@@ -412,6 +419,8 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
         logo: link.practice.logo ?? undefined, photos,
       };
     });
+    const reviewCount: number = reviewAgg?._count?.id ?? 0;
+    const avgRating: number | null = reviewCount > 0 ? (reviewAgg?._avg?.rating ?? null) : null;
     return {
       therapist: {
         id: t.id, fullName: t.fullName, professionalTitle: t.professionalTitle,
@@ -429,6 +438,8 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
         photo: t.photo ?? undefined, practices,
         bookingMode: (t as any).bookingMode ?? 'DIRECTORY_ONLY',
         requestable: requestability.requestable,
+        avgRating,
+        reviewCount,
       },
     };
   });

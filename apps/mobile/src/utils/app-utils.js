@@ -336,6 +336,8 @@ const mapApiTherapist = (t) => ({
   bookingMode: t.bookingMode ?? 'DIRECTORY_ONLY',
   requestable: t.requestable ?? false,
   gender: t.gender ?? null,
+  avgRating: typeof t.avgRating === 'number' ? t.avgRating : null,
+  reviewCount: typeof t.reviewCount === 'number' ? t.reviewCount : 0,
 });
 
 const normalizeTherapistProfile = (therapist) => {
