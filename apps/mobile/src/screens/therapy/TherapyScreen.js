@@ -39,7 +39,7 @@ export function TherapyTabScreen() {
   const {
     myAppointments, myAppointmentsLoading, appointmentsLastLoadedAt, setMyAppointments,
     incomingBookings, incomingBookingsLoading, incomingBookingsLastLoadedAt, setIncomingBookings,
-    incomingInquiries, incomingInquiriesLoading, setIncomingInquiries,
+    incomingInquiries, incomingInquiriesLoading, incomingInquiriesLastLoadedAt, setIncomingInquiries, loadIncomingInquiries,
     myInquiries, myInquiriesLoading, setMyInquiries,
     patients, patientsLoading, patientsLastLoadedAt,
     therapyRefreshing,
@@ -342,6 +342,8 @@ export function TherapyTabScreen() {
           incomingBookingsLastLoadedAt={incomingBookingsLastLoadedAt}
           incomingInquiries={incomingInquiries}
           incomingInquiriesLoading={incomingInquiriesLoading}
+          incomingInquiriesLastLoadedAt={incomingInquiriesLastLoadedAt}
+          loadIncomingInquiries={loadIncomingInquiries}
           onInquiryUpdate={(updated) => setIncomingInquiries((prev) => prev.map((q) => q.id === updated.id ? updated : q))}
           onRefresh={() => handleTherapyRefresh(authToken, accountType, loggedInTherapist)}
           onTherapistCancelRequest={(id) => { setTherapistCancelBookingId(id); setShowTherapistCancelModal(true); }}

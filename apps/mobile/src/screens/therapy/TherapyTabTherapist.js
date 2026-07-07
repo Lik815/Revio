@@ -22,7 +22,8 @@ export function TherapyTabTherapist({
   authToken,
   incomingBookings, incomingBookingsLoading,
   therapyRefreshing, incomingBookingsLastLoadedAt,
-  incomingInquiries, incomingInquiriesLoading,
+  incomingInquiries, incomingInquiriesLoading, incomingInquiriesLastLoadedAt,
+  loadIncomingInquiries,
   onInquiryUpdate,
   onRefresh, onOpenBookingDetail, onSelectTherapistDetailBooking, onTherapistCancelRequest,
   loggedInTherapist,
@@ -35,6 +36,13 @@ export function TherapyTabTherapist({
   const [filterListKind, setFilterListKind] = useState(null);
   const [showStatsModal, setShowStatsModal] = useState(false);
   const [therapistTab, setTherapistTab] = useState('termine');
+
+  // Eingehende Anfragen beim ersten Öffnen des Tabs nachladen wenn noch nicht geladen.
+  useEffect(() => {
+    if (therapistTab === 'anfragen' && incomingInquiriesLastLoadedAt === 0 && !incomingInquiriesLoading && authToken) {
+      loadIncomingInquiries?.(authToken);
+    }
+  }, [therapistTab]);
 
   const pendingInquiries = useMemo(() => (incomingInquiries ?? []).filter((q) => ['SENT', 'SEEN', 'COUNTER_PROPOSED'].includes(q.status)), [incomingInquiries]);
   const pendingInquiryCount = pendingInquiries.length;
