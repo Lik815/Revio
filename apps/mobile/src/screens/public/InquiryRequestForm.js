@@ -290,7 +290,7 @@ export function InquiryRequestForm({ c, t, therapist, authToken, onSuccess, onCl
         backgroundColor: c.background, borderBottomWidth: 1, borderBottomColor: c.border,
       }}>
         <Pressable onPress={handleBack} style={{ marginRight: 12, padding: 4 }} hitSlop={12}>
-          <Ionicons name={step <= firstStep ? 'close' : 'arrow-back'} size={24} color={c.muted} />
+          <Ionicons name={step <= 1 ? 'close' : 'arrow-back'} size={24} color={c.muted} />
         </Pressable>
         <Text style={{ ...TYPE.h2, color: c.text, flex: 1 }}>Termin anfragen</Text>
         <Text style={{ fontSize: 13, color: c.muted }}>{stepTitles[step]}</Text>
