@@ -99,6 +99,42 @@ export function CustomTabBar({ state, descriptors, navigation, badgeCounts = {} 
     }
   }, [targetNavWidth, isGuestTabBar]);
 
+  // Gast-Ansicht: einzelner breiter "Anmelden"-Button
+  if (isGuestTabBar) {
+    const authRoute = state.routes.find((r) => r.name === TAB_ROUTES.AUTH) ?? state.routes[state.routes.length - 1];
+    const onPressLogin = () => {
+      navigation.navigate(authRoute.name);
+    };
+    return (
+      <View
+        style={{
+          backgroundColor: c.background,
+          paddingHorizontal: SPACE.lg,
+          paddingTop: SPACE.sm,
+          paddingBottom: insets.bottom + SPACE.sm,
+        }}
+      >
+        <Pressable
+          onPress={onPressLogin}
+          style={({ pressed }) => ({
+            backgroundColor: pressed ? c.primaryDark ?? c.primary : c.primary,
+            borderRadius: RADIUS.full,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 10,
+            paddingVertical: 16,
+          })}
+        >
+          <Ionicons name="log-in-outline" size={22} color="#fff" />
+          <Text style={{ fontSize: 16, fontWeight: '700', color: '#fff', letterSpacing: 0.2 }}>
+            Anmelden
+          </Text>
+        </Pressable>
+      </View>
+    );
+  }
+
   return (
     <View
       onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}

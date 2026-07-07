@@ -230,9 +230,13 @@ export function InquiryRequestForm({ c, t, therapist, authToken, onSuccess, onCl
           therapistIds: [therapist.id],
         }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data.error ?? 'Anfrage fehlgeschlagen.');
+        if (res.status === 404) {
+          setError('Dieser Therapeut nimmt aktuell keine Anfragen an.');
+        } else {
+          setError(data.error ?? 'Anfrage fehlgeschlagen.');
+        }
       } else {
         setSuccess(true);
       }
@@ -254,7 +258,7 @@ export function InquiryRequestForm({ c, t, therapist, authToken, onSuccess, onCl
           </Text>
         ) : null}
         <Text style={{ ...TYPE.body, color: c.muted, marginTop: SPACE.sm, textAlign: 'center' }}>
-          Der Therapeut prueft deine Wunschzeiten und bestaetigt einen konkreten Termin.
+          Der Therapeut prüft deine Wunschzeiten und bestätigt einen konkreten Termin.
         </Text>
         <Pressable
           onPress={onSuccess}
@@ -343,7 +347,7 @@ export function InquiryRequestForm({ c, t, therapist, authToken, onSuccess, onCl
           <View>
             <Text style={{ ...TYPE.h2, color: c.text, marginBottom: SPACE.xs }}>Wann hast du Zeit?</Text>
             <Text style={{ ...TYPE.caption, color: c.muted, marginBottom: SPACE.md }}>
-              Waehle Wochentage und Tageszeiten, die dir am besten passen. Der Therapeut schlaegt dann einen konkreten Termin vor.
+              Wähle Wochentage und Tageszeiten, die dir am besten passen. Der Therapeut schlägt dann einen konkreten Termin vor.
             </Text>
             <TimeWindowPicker
               selectedDays={selectedDays}
@@ -391,21 +395,35 @@ export function InquiryRequestForm({ c, t, therapist, authToken, onSuccess, onCl
                   </Text>
                 </Text>
               )}
+              {selectedSlots.length > 0 && (
+                <Text style={{ fontSize: 13, color: c.muted }}>
+                  Uhrzeiten: <Text style={{ color: c.text, fontWeight: '600' }}>
+                    {selectedSlots.map((s) => ZEITFENSTER.find((z) => z.key === s)?.label).join(', ')}
+                  </Text>
+                </Text>
+              )}
             </View>
 
-            <TextInput
-              value={message}
-              onChangeText={setMessage}
-              placeholder="z.B. Diagnose, Vorerkrankungen, besondere Wuensche"
-              placeholderTextColor={c.muted}
-              multiline
-              numberOfLines={3}
-              style={{
-                borderWidth: 1, borderColor: c.border, borderRadius: RADIUS.sm,
-                backgroundColor: c.mutedBg, color: c.text, fontSize: 15,
-                padding: 12, minHeight: 80, textAlignVertical: 'top', marginBottom: SPACE.md,
-              }}
-            />
+            <View style={{ marginBottom: SPACE.md }}>
+              <TextInput
+                value={message}
+                onChangeText={(text) => setMessage(text.slice(0, 500))}
+                placeholder="z.B. Diagnose, Vorerkrankungen, besondere Wünsche"
+                placeholderTextColor={c.muted}
+                multiline
+                numberOfLines={3}
+                style={{
+                  borderWidth: 1, borderColor: message.length >= 480 ? c.error ?? '#EF4444' : c.border,
+                  borderRadius: RADIUS.sm, backgroundColor: c.mutedBg, color: c.text, fontSize: 15,
+                  padding: 12, minHeight: 80, textAlignVertical: 'top',
+                }}
+              />
+              {message.length > 0 && (
+                <Text style={{ fontSize: 11, color: message.length >= 480 ? c.error ?? '#EF4444' : c.muted, textAlign: 'right', marginTop: 4 }}>
+                  {message.length}/500
+                </Text>
+              )}
+            </View>
 
             <Pressable
               onPress={() => setConsent((v) => !v)}
