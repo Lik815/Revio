@@ -92,7 +92,6 @@ export function TherapistProfileContent(props) {
   const therapistCertifications = Array.isArray(th?.fortbildungen) && th.fortbildungen.length > 0
     ? th.fortbildungen
     : Array.isArray(th?.certifications) ? th.certifications : [];
-  const therapistHeilmittel = Array.isArray(th?.heilmittel) ? th.heilmittel : [];
   const therapistPhone = th?.phone || null;
   const displayEmail = th?.email || null;
   const iconHitSlop = { top: 10, bottom: 10, left: 10, right: 10 };
@@ -187,7 +186,6 @@ export function TherapistProfileContent(props) {
           c={c}
           styles={styles}
           t={t}
-          heilmittel={therapistHeilmittel}
           specializations={therapistSpecializations}
           areas={therapistAreas}
           certifications={therapistCertifications}
@@ -262,17 +260,12 @@ export function TherapistProfileContent(props) {
               <View style={{ alignItems: 'center', marginBottom: 12 }}>
                 <View style={{ width: 44, height: 5, borderRadius: 999, backgroundColor: c.border }} />
               </View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: therapistHeilmittel.length > 0 ? 4 : 16 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
                 <Text style={{ color: c.text, fontSize: 18, fontWeight: '700' }}>Freie Termine</Text>
                 <Pressable onPress={() => setShowBookingModal(false)} hitSlop={iconHitSlop}>
                   <Ionicons name="close-outline" size={26} color={c.muted} />
                 </Pressable>
               </View>
-              {therapistHeilmittel.length > 0 ? (
-                <Text style={{ color: c.muted, fontSize: 13, lineHeight: 18, marginBottom: 16 }} numberOfLines={2}>
-                  Behandelte Heilmittel: {therapistHeilmittel.join(', ')}
-                </Text>
-              ) : null}
               {bookingSlots.length > 0 ? (
                 <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingBottom: 4 }}>

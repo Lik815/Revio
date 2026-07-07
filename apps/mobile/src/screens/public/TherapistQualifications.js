@@ -24,20 +24,13 @@ function QualSection({ label, items, tagStyle, textStyle, c, styles, isFirst }) 
   );
 }
 
-export function TherapistQualifications({ c, styles, t, heilmittel, specializations, areas, certifications }) {
+export function TherapistQualifications({ c, styles, t, specializations, areas, certifications }) {
   const [expanded, setExpanded] = useState(false);
 
   const visibleCerts = expanded ? certifications : certifications.slice(0, CERT_INITIAL_LIMIT);
   const hasCollapse = certifications.length > CERT_INITIAL_LIMIT;
 
   const sections = [
-    heilmittel.length > 0 && {
-      key: 'heilmittel',
-      label: 'Heilmittel',
-      items: heilmittel,
-      tagStyle: { backgroundColor: c.primary },
-      textStyle: { color: '#fff' },
-    },
     specializations.length > 0 && {
       key: 'specs',
       label: t('specsLabel'),
