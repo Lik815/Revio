@@ -127,11 +127,12 @@ export function TherapyTabTherapist({
 
   const isListView = bookingEnabled && calendarView.viewMode !== 'calendar';
   const isCalendarMode = bookingEnabled && calendarView.viewMode === 'calendar';
+  const hasFixedWeekStrip = isListView && therapistTab === 'termine';
 
   return (
     <View style={{ flex: 1 }}>
       {/* WeekStrip fixiert oben (Listenansicht) */}
-      {isListView && therapistTab === 'termine' && (
+      {hasFixedWeekStrip && (
         <View style={{ paddingTop: insets.top + 12, backgroundColor: c.background, paddingHorizontal: 24 }}>
           <TherapistWeekStrip
             c={c}
@@ -197,7 +198,7 @@ export function TherapyTabTherapist({
         <>
           {/* Tab-Umschalter Termine | Anfragen — nur wenn Buchung aktiv */}
           {bookingEnabled && (
-            <View style={{ paddingTop: isListView ? 10 : insets.top + 12, paddingHorizontal: 20, paddingBottom: 4, backgroundColor: c.background }}>
+            <View style={{ paddingTop: hasFixedWeekStrip ? 10 : insets.top + 20, paddingHorizontal: 20, paddingBottom: 4, backgroundColor: c.background }}>
               <View style={{ flexDirection: 'row', backgroundColor: c.mutedBg ?? c.card, borderRadius: RADIUS.md, padding: 3, borderWidth: 1, borderColor: c.border }}>
                 {[
                   { key: 'termine', label: 'Termine' },
@@ -340,15 +341,15 @@ export function TherapyTabTherapist({
               <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16 }}>
                 {/* Anfragen */}
                 <Pressable
-                  onPress={() => { setShowStatsModal(false); setFilterListKind('pending'); }}
-                  style={{ flex: 1, backgroundColor: dayStats.pendingToday.length > 0 ? `${c.warning ?? '#B78700'}12` : c.card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: dayStats.pendingToday.length > 0 ? `${c.warning ?? '#B78700'}40` : c.border, padding: 16 }}
+                  onPress={() => { setShowStatsModal(false); setTherapistTab('anfragen'); }}
+                  style={{ flex: 1, backgroundColor: pendingInquiryCount > 0 ? `${c.warning ?? '#B78700'}12` : c.card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: pendingInquiryCount > 0 ? `${c.warning ?? '#B78700'}40` : c.border, padding: 16 }}
                 >
                   <View style={{ width: 40, height: 40, borderRadius: RADIUS.md, backgroundColor: `${c.warning ?? '#B78700'}18`, alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
                     <Ionicons name="person-outline" size={20} color={c.warning ?? '#B78700'} />
                   </View>
-                  <Text style={{ fontSize: 26, fontWeight: '800', color: dayStats.pendingToday.length > 0 ? (c.warning ?? '#B78700') : c.text }}>{dayStats.pendingToday.length}</Text>
+                  <Text style={{ fontSize: 26, fontWeight: '800', color: pendingInquiryCount > 0 ? (c.warning ?? '#B78700') : c.text }}>{pendingInquiryCount}</Text>
                   <Text style={{ fontSize: 13, fontWeight: '700', color: c.text, marginTop: 2 }}>Anfragen</Text>
-                  <Text style={{ fontSize: 12, color: c.muted, marginTop: 2 }}>{dayStats.pendingToday.length === 0 ? 'keine offen' : `${dayStats.pendingToday.length} offen`}</Text>
+                  <Text style={{ fontSize: 12, color: c.muted, marginTop: 2 }}>{pendingInquiryCount === 0 ? 'keine offen' : `${pendingInquiryCount} offen`}</Text>
                 </Pressable>
 
                 {/* Auslastung */}

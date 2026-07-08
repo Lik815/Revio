@@ -159,6 +159,7 @@ function SerieSlotList({ inquiry, authToken, onUpdate, saving, setSaving, c }) {
       const res = await fetch(`${getBaseUrl()}/inquiry/${inquiry.id}/slots/${slotId}/${action}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({}),
       });
       if (res.ok) {
         const updated = await res.json();
@@ -180,6 +181,7 @@ function SerieSlotList({ inquiry, authToken, onUpdate, saving, setSaving, c }) {
       const res = await fetch(`${getBaseUrl()}/inquiry/${inquiry.id}/confirm-all`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({}),
       });
       if (res.ok) {
         const updated = await res.json();
