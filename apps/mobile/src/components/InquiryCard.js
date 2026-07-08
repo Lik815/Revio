@@ -188,7 +188,12 @@ function SerieSlotList({ inquiry, authToken, onUpdate, saving, setSaving, c }) {
         onUpdate?.(updated);
       } else {
         const data = await res.json().catch(() => ({}));
-        Alert.alert('Fehler', data.error ?? 'Bestätigung fehlgeschlagen');
+        if (Array.isArray(data.conflicts) && data.conflicts.length > 0) {
+          const list = data.conflicts.map((c) => `${formatDatum(c.datum)} · ${c.von} Uhr`).join('\n');
+          Alert.alert('Zeitkonflikt', `Folgende Termine sind bereits belegt:\n\n${list}\n\nBitte die betroffenen Termine einzeln ablehnen.`);
+        } else {
+          Alert.alert('Fehler', data.error ?? 'Bestätigung fehlgeschlagen');
+        }
       }
     } catch {
       Alert.alert('Verbindungsfehler');
