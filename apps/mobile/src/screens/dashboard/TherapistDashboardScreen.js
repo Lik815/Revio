@@ -349,10 +349,8 @@ function AgendaCard({ items, agendaState, onPressBooking, onPressAll, servicesBy
   else if (bookingCount > 0) badgeText = `${bookingCount} ${bookingCount === 1 ? 'Termin' : 'Termine'}`;
   else if (freeCount > 0) badgeText = `${freeCount} ${freeCount === 1 ? 'Lücke' : 'Lücken'}`;
 
-  if (items.length === 0) return null;
-
   return (
-    <View style={cardStyle(c)}>
+    <View style={[cardStyle(c), { minHeight: 220 }]}>
       {/* Kopfzeile */}
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingTop: 14, paddingBottom: 10 }}>
         <Text style={{ fontSize: 15, fontWeight: '700', color: c.text }}>Nächste Termine</Text>
@@ -362,6 +360,14 @@ function AgendaCard({ items, agendaState, onPressBooking, onPressAll, servicesBy
           </View>
         ) : null}
       </View>
+
+      {/* Leer-Zustand */}
+      {items.length === 0 && (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 32 }}>
+          <Ionicons name="calendar-outline" size={32} color={c.border} />
+          <Text style={{ fontSize: 13, color: c.muted, marginTop: 10 }}>Keine weiteren Termine heute</Text>
+        </View>
+      )}
 
       {/* Zeilen */}
       {displayItems.map((item, idx) => {
