@@ -2691,6 +2691,7 @@ describe('Dynamic Booking', () => {
         isVisible: true,
         bookingMode: 'FIRST_APPOINTMENT_REQUEST',
         sessionToken: 'dyn-therapist-token',
+        qualifikationenStatus: 'VERIFIZIERT',
       },
     });
     therapistToken = 'dyn-therapist-token';
@@ -3630,6 +3631,7 @@ describe('E2E — Therapeut legt neue Terminzeiten an', () => {
         specializations: 'Rückenschmerzen', languages: 'Deutsch', heilmittel: 'KG,MT',
         reviewStatus: 'APPROVED', isVisible: true,
         bookingMode: 'FIRST_APPOINTMENT_REQUEST', sessionToken: FLOW_T,
+        qualifikationenStatus: 'VERIFIZIERT',
       },
     });
     const therapistId = therapist.id;
