@@ -204,7 +204,7 @@ export function TherapyTabPatient({
               <View style={{ marginBottom: 16 }}>
                 <Text style={{ fontSize: 16, fontWeight: '800', color: c.text, marginBottom: 10 }}>Offene Anfragen</Text>
                 {myInquiries
-                  .filter((r) => (r.inquiries ?? []).some((q) => !['WITHDRAWN', 'EXPIRED', 'CANCELLED', 'AUTO_CLOSED'].includes(q.status)))
+                  .filter((r) => (r.inquiries ?? []).some((q) => ['SENT', 'SEEN', 'COUNTER_PROPOSED'].includes(q.status)))
                   .map((request) => (
                     <PatientRequestCard
                       key={request.id}
