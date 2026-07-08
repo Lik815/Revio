@@ -85,6 +85,12 @@ enum ScheduledSlotStatus {
   COMPLETED
 }
 
+enum InquirySlotStatus {
+  PENDING
+  CONFIRMED
+  DECLINED
+}
+
 enum QualifikationStatus {
   UNGEPRÜFT
   EINGEREICHT
@@ -502,8 +508,11 @@ model TherapistAbsence {
 // Verhindert O(n-Inquiries)-Aggregation bei jedem Kalenderaufruf.
 model ScheduledSlot {
   id               String              @id @default(cuid())
-  bookingRequestId String
-  bookingRequest   BookingRequest      @relation(fields: [bookingRequestId], references: [id], onDelete: Cascade)
+  bookingRequestId String?
+  bookingRequest   BookingRequest?     @relation(fields: [bookingRequestId], references: [id], onDelete: Cascade)
+  inquiryId        String?
+  inquirySlotId    String?             @unique
+  inquirySlot      InquirySlot?        @relation(fields: [inquirySlotId], references: [id], onDelete: SetNull)
   therapistId      String
   therapist        Therapist           @relation(fields: [therapistId], references: [id], onDelete: Cascade)
   startsAt         DateTime
@@ -520,6 +529,7 @@ model ScheduledSlot {
 
   @@index([therapistId, startsAt, status])
   @@index([bookingRequestId])
+  @@index([inquiryId])
 }
 
 // ─── Phase 2: Nachfrageseite + State Machine ──────────────────────────────────
@@ -616,6 +626,7 @@ model Inquiry {
   kassenart              String              @default("")
   frequenz               String              @default("X1")
   anzahlTermine          Int                 @default(6)
+  suchtyp                String              @default("SERIE")
   patientFreitext        String?
   patientName            String
   patientEmail           String?
@@ -645,6 +656,25 @@ model Inquiry {
   createdAt              DateTime            @default(now())
   updatedAt              DateTime            @updatedAt
 
+  inquirySlots           InquirySlot[]
+
   @@index([therapistId, status, createdAt])
   @@index([patientRequestId])
+}
+
+// Einzelner Wunschtermin innerhalb einer Serien-Inquiry.
+// Jeder InquirySlot wird separat vom Therapeuten bestätigt oder abgelehnt.
+model InquirySlot {
+  id            String            @id @default(cuid())
+  inquiryId     String
+  inquiry       Inquiry           @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
+  datum         String            // YYYY-MM-DD
+  uhrzeitVon    Int               // Minuten seit Mitternacht
+  uhrzeitBis    Int
+  status        InquirySlotStatus @default(PENDING)
+  scheduledSlot ScheduledSlot?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@index([inquiryId])
 }

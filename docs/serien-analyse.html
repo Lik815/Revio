@@ -1,0 +1,1045 @@
+
+<title>Revio — Serienlogik: Ist-Analyse</title>
+<style>
+  :root {
+    --bg: #F8FAFC;
+    --surface: #FFFFFF;
+    --surface2: #F1F5F9;
+    --border: #E2E8F0;
+    --text: #0F172A;
+    --muted: #64748B;
+    --accent: #1D4ED8;
+    --accent-bg: #EFF6FF;
+    --warn: #B45309;
+    --warn-bg: #FEF3C7;
+    --ok: #065F46;
+    --ok-bg: #D1FAE5;
+    --err: #991B1B;
+    --err-bg: #FEE2E2;
+    --code-bg: #F1F5F9;
+    --mono: ui-monospace, 'Cascadia Code', 'SF Mono', Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0D1117;
+      --surface: #161B27;
+      --surface2: #1C2333;
+      --border: #2D3748;
+      --text: #E2E8F0;
+      --muted: #94A3B8;
+      --accent: #60A5FA;
+      --accent-bg: #1E3A5F;
+      --warn: #FCD34D;
+      --warn-bg: #292310;
+      --ok: #6EE7B7;
+      --ok-bg: #042F1E;
+      --err: #FCA5A5;
+      --err-bg: #3B0A0A;
+      --code-bg: #1C2333;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0D1117;
+    --surface: #161B27;
+    --surface2: #1C2333;
+    --border: #2D3748;
+    --text: #E2E8F0;
+    --muted: #94A3B8;
+    --accent: #60A5FA;
+    --accent-bg: #1E3A5F;
+    --warn: #FCD34D;
+    --warn-bg: #292310;
+    --ok: #6EE7B7;
+    --ok-bg: #042F1E;
+    --err: #FCA5A5;
+    --err-bg: #3B0A0A;
+    --code-bg: #1C2333;
+  }
+  :root[data-theme="light"] {
+    --bg: #F8FAFC;
+    --surface: #FFFFFF;
+    --surface2: #F1F5F9;
+    --border: #E2E8F0;
+    --text: #0F172A;
+    --muted: #64748B;
+    --accent: #1D4ED8;
+    --accent-bg: #EFF6FF;
+    --warn: #B45309;
+    --warn-bg: #FEF3C7;
+    --ok: #065F46;
+    --ok-bg: #D1FAE5;
+    --err: #991B1B;
+    --err-bg: #FEE2E2;
+    --code-bg: #F1F5F9;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    font-size: 15px;
+    line-height: 1.65;
+  }
+
+  .page {
+    max-width: 820px;
+    margin: 0 auto;
+    padding: 48px 24px 80px;
+  }
+
+  /* Header */
+  .doc-header {
+    border-bottom: 2px solid var(--border);
+    padding-bottom: 28px;
+    margin-bottom: 40px;
+  }
+  .doc-eyebrow {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+  h1 {
+    font-size: 28px;
+    font-weight: 800;
+    line-height: 1.2;
+    margin: 0 0 10px;
+    color: var(--text);
+    text-wrap: balance;
+  }
+  .doc-subtitle {
+    color: var(--muted);
+    font-size: 14px;
+    margin: 0;
+  }
+
+  /* Sections */
+  .section {
+    margin-bottom: 44px;
+  }
+  .section-header {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+  .section-num {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    flex-shrink: 0;
+    width: 24px;
+  }
+  h2 {
+    font-size: 18px;
+    font-weight: 700;
+    margin: 0;
+    color: var(--text);
+    text-wrap: balance;
+  }
+  h3 {
+    font-size: 14px;
+    font-weight: 700;
+    margin: 0 0 10px;
+    color: var(--text);
+  }
+  p { margin: 0 0 12px; }
+  p:last-child { margin-bottom: 0; }
+
+  /* Divider */
+  hr { border: none; border-top: 1px solid var(--border); margin: 40px 0; }
+
+  /* Status badges */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 20px;
+    vertical-align: middle;
+    white-space: nowrap;
+  }
+  .badge-ok   { background: var(--ok-bg);   color: var(--ok);   }
+  .badge-warn { background: var(--warn-bg); color: var(--warn); }
+  .badge-err  { background: var(--err-bg);  color: var(--err);  }
+  .badge-info { background: var(--accent-bg); color: var(--accent); }
+
+  /* Cards */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+    margin-bottom: 12px;
+  }
+  .card-title {
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card-body {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.55;
+  }
+  .card-body code {
+    font-family: var(--mono);
+    font-size: 12px;
+    background: var(--code-bg);
+    padding: 1px 5px;
+    border-radius: 4px;
+    color: var(--text);
+  }
+
+  /* Code blocks */
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 18px;
+    overflow-x: auto;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    line-height: 1.7;
+    margin: 0 0 14px;
+    color: var(--text);
+  }
+  .pre-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+
+  /* Tables */
+  .table-wrap { overflow-x: auto; margin-bottom: 14px; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  th {
+    text-align: left;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    border-bottom: 2px solid var(--border);
+    padding: 8px 12px 8px 0;
+  }
+  td {
+    padding: 10px 12px 10px 0;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+    font-variant-numeric: tabular-nums;
+  }
+  tr:last-child td { border-bottom: none; }
+  td code, th code {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    background: var(--code-bg);
+    padding: 1px 5px;
+    border-radius: 4px;
+    color: var(--text);
+  }
+
+  /* Flow diagram */
+  .flow {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin: 4px 0 16px;
+  }
+  .flow-row {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+  }
+  .flow-step {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 12.5px;
+    flex: 1;
+  }
+  .flow-step-label { font-weight: 700; margin-bottom: 2px; }
+  .flow-step-sub { font-size: 11.5px; color: var(--muted); }
+  .flow-arrow {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 4px 0;
+    color: var(--muted);
+    font-size: 16px;
+    line-height: 1;
+  }
+  .flow-arrow-line {
+    width: 1px;
+    flex: 1;
+    background: var(--border);
+    min-height: 8px;
+  }
+
+  /* Gap list */
+  .gap-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .gap-item {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 12px;
+    align-items: start;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .gap-item.err { border-color: var(--err-bg); background: var(--err-bg); }
+  .gap-item.warn { border-color: var(--warn-bg); background: var(--warn-bg); }
+  .gap-item.info { border-color: var(--accent-bg); background: var(--accent-bg); }
+  .gap-icon { font-size: 18px; line-height: 1.5; }
+  .gap-title { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .gap-desc { font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+  .gap-desc code {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    background: var(--code-bg);
+    padding: 1px 4px;
+    border-radius: 3px;
+    color: var(--text);
+  }
+
+  /* Option cards */
+  .option-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+  @media (max-width: 560px) { .option-grid { grid-template-columns: 1fr; } }
+  .option-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 18px;
+  }
+  .option-card.recommended { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .option-card-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .option-card h3 { font-size: 14px; margin-bottom: 8px; }
+  .option-pro, .option-con { font-size: 12.5px; padding: 3px 0; display: flex; gap: 6px; }
+  .option-pro::before { content: '+'; color: var(--ok); font-weight: 700; }
+  .option-con::before { content: '−'; color: var(--err); font-weight: 700; }
+
+  /* Schema diff */
+  .schema-diff {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 14px;
+  }
+  .schema-diff-header {
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+    padding: 8px 14px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-family: var(--mono);
+  }
+  .schema-diff pre {
+    border: none;
+    border-radius: 0;
+    margin: 0;
+    padding: 14px 18px;
+  }
+  .add { color: #16A34A; }
+  .remove { color: #DC2626; }
+  .neutral { color: var(--muted); }
+
+  /* Summary table at end */
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  @media (max-width: 560px) { .summary-grid { grid-template-columns: 1fr; } }
+  .summary-tile {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .summary-tile-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  .summary-tile-num {
+    font-size: 32px;
+    font-weight: 800;
+    line-height: 1;
+    margin-bottom: 4px;
+    font-variant-numeric: tabular-nums;
+  }
+  .summary-tile-sub { font-size: 12px; color: var(--muted); }
+
+  .inset {
+    border-left: 3px solid var(--accent);
+    background: var(--accent-bg);
+    border-radius: 0 8px 8px 0;
+    padding: 12px 16px;
+    margin-bottom: 14px;
+    font-size: 13px;
+    color: var(--text);
+  }
+  .inset-warn {
+    border-left-color: var(--warn);
+    background: var(--warn-bg);
+  }
+  .inset-err {
+    border-left-color: var(--err);
+    background: var(--err-bg);
+  }
+</style>
+
+<div class="page">
+
+  <div class="doc-header">
+    <div class="doc-eyebrow">Revio · Ist-Analyse</div>
+    <h1>Serienlogik für Behandlungsserien</h1>
+    <p class="doc-subtitle">Vollständige Analyse des Ist-Stands vor Implementierungsbeginn &mdash; Schema, API, Mobile, offene Lücken, Entscheidungen</p>
+  </div>
+
+  <!-- ZUSAMMENFASSUNG -->
+  <div class="section">
+    <div class="summary-grid">
+      <div class="summary-tile">
+        <div class="summary-tile-label">Im Schema vorhanden</div>
+        <div class="summary-tile-num" style="color: var(--ok)">4</div>
+        <div class="summary-tile-sub">Felder existieren bereits</div>
+      </div>
+      <div class="summary-tile">
+        <div class="summary-tile-label">Kritische Lücken</div>
+        <div class="summary-tile-num" style="color: var(--err)">4</div>
+        <div class="summary-tile-sub">Blockieren Serienlogik</div>
+      </div>
+      <div class="summary-tile">
+        <div class="summary-tile-label">Betroffene Schichten</div>
+        <div class="summary-tile-num" style="color: var(--accent)">3</div>
+        <div class="summary-tile-sub">Schema · API · Mobile</div>
+      </div>
+    </div>
+
+    <div class="inset">
+      <strong>Kernproblem:</strong> Das System kennt <em>Serienmetadaten</em> (frequenz, anzahlTermine) — aber der Confirm-Endpunkt erstellt immer genau <strong>einen</strong> ScheduledSlot. Serie vs. Einzeltermin ist aktuell nur ein Label ohne verhaltensändernden Effekt.
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- 1. WAS IM SCHEMA EXISTIERT -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-num">01</span>
+      <h2>Was bereits im Schema existiert</h2>
+    </div>
+
+    <p style="color: var(--muted); font-size: 13px; margin-bottom: 16px;">
+      Folgende Felder sind bereits in der DB vorhanden und müssen <em>nicht</em> neu angelegt werden:
+    </p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Modell</th>
+            <th>Feld</th>
+            <th>Aktueller Wert</th>
+            <th>Für Serie relevant</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>PatientRequest</code></td>
+            <td><code>frequenz</code></td>
+            <td><code>X1 | X2 | X3</code></td>
+            <td><span class="badge badge-ok">Ja &mdash; Rhythmus</span></td>
+          </tr>
+          <tr>
+            <td><code>PatientRequest</code></td>
+            <td><code>anzahlTermine</code></td>
+            <td><code>Int, default 6</code></td>
+            <td><span class="badge badge-ok">Ja &mdash; Anzahl Slots</span></td>
+          </tr>
+          <tr>
+            <td><code>PatientRequest</code></td>
+            <td><code>suchtyp</code></td>
+            <td><code>SERIE | EINZELTERMIN</code></td>
+            <td><span class="badge badge-ok">Ja &mdash; Branch-Bedingung</span></td>
+          </tr>
+          <tr>
+            <td><code>ScheduledSlot</code></td>
+            <td><code>seriesIndex</code></td>
+            <td><code>Int, default 1</code></td>
+            <td><span class="badge badge-ok">Ja &mdash; Reihenfolge</span></td>
+          </tr>
+          <tr>
+            <td><code>Inquiry</code></td>
+            <td><code>confirmedDatum</code></td>
+            <td>Erster Termin</td>
+            <td><span class="badge badge-info">Startdatum für Serie</span></td>
+          </tr>
+          <tr>
+            <td><code>Inquiry</code></td>
+            <td><code>frequenz / anzahlTermine</code></td>
+            <td>Snapshot von PatientRequest</td>
+            <td><span class="badge badge-info">Vorhanden als Snapshot</span></td>
+          </tr>
+          <tr>
+            <td><code>TherapistCapacityRule</code></td>
+            <td><code>maxNeueSerienProWoche</code></td>
+            <td><code>Int, default 2</code></td>
+            <td><span class="badge badge-ok">Ja &mdash; Kapazitätsgate</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- 2. CONFIRM-FLOW HEUTE -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-num">02</span>
+      <h2>Confirm-Flow heute (Ist-Zustand)</h2>
+    </div>
+
+    <div class="flow">
+      <div class="flow-row">
+        <div class="flow-step">
+          <div class="flow-step-label">Therapeut öffnet InquiryCard</div>
+          <div class="flow-step-sub">Sieht Patientenname, Heilmittel, Wunschzeiten</div>
+        </div>
+      </div>
+      <div class="flow-arrow"><div class="flow-arrow-line"></div>↓<div class="flow-arrow-line"></div></div>
+      <div class="flow-row">
+        <div class="flow-step">
+          <div class="flow-step-label">ConfirmModal öffnen</div>
+          <div class="flow-step-sub">Datum + Uhrzeit Von/Bis manuell eingeben</div>
+        </div>
+      </div>
+      <div class="flow-arrow"><div class="flow-arrow-line"></div>↓<div class="flow-arrow-line"></div></div>
+      <div class="flow-row">
+        <div class="flow-step">
+          <div class="flow-step-label"><code>POST /inquiry/:id/confirm</code></div>
+          <div class="flow-step-sub">datum, uhrzeitVon, uhrzeitBis</div>
+        </div>
+      </div>
+      <div class="flow-arrow"><div class="flow-arrow-line"></div>↓<div class="flow-arrow-line"></div></div>
+      <div class="flow-row">
+        <div class="flow-step">
+          <div class="flow-step-label">Transaktion: 3 Operationen</div>
+          <div class="flow-step-sub">Inquiry → CONFIRMED &nbsp;|&nbsp; 1× ScheduledSlot.create &nbsp;|&nbsp; CapacityRule.increment</div>
+        </div>
+      </div>
+      <div class="flow-arrow"><div class="flow-arrow-line"></div>↓<div class="flow-arrow-line"></div></div>
+      <div class="flow-row">
+        <div class="flow-step" style="border-color: var(--err); background: var(--err-bg);">
+          <div class="flow-step-label" style="color: var(--err)">Ergebnis: genau 1 Slot &mdash; unabhängig von frequenz/anzahlTermine</div>
+          <div class="flow-step-sub">seriesIndex ist immer 1. Felder werden ignoriert.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pre-label">inquiry.ts — confirm, Zeilen 281–312 (vereinfacht)</div>
+    <pre><span class="neutral">// Nur ein einziger Slot wird erzeugt:</span>
+fastify.prisma.scheduledSlot.upsert({
+  where: { id: <span class="add">`slot_inq_${id}`</span> },   <span class="neutral">// ← immer dieselbe ID</span>
+  create: {
+    id: <span class="add">`slot_inq_${id}`</span>,
+    bookingRequestId: <span class="remove">`inq_${id}`</span>,  <span class="neutral">// ← EXISTIERT NICHT in BookingRequest!</span>
+    seriesIndex: <span class="neutral">/* DEFAULT 1, nie gesetzt */</span>,
+    <span class="neutral">// frequenz / anzahlTermine werden hier nicht verwendet</span>
+  }
+})</pre>
+  </div>
+
+  <hr>
+
+  <!-- 3. KRITISCHE LÜCKEN -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-num">03</span>
+      <h2>Kritische Lücken</h2>
+    </div>
+
+    <div class="gap-list">
+
+      <div class="gap-item err">
+        <div class="gap-icon">⛓</div>
+        <div>
+          <div class="gap-title">FK-Verletzung: bookingRequestId zeigt ins Leere</div>
+          <div class="gap-desc">
+            Jeder via Inquiry erzeugte <code>ScheduledSlot</code> bekommt <code>bookingRequestId: "inq_${id}"</code>.
+            Diese ID existiert <strong>nicht</strong> in der <code>BookingRequest</code>-Tabelle.
+            In SQLite (Dev) wird das still akzeptiert, weil SQLite FK-Enforcement standardmäßig aus ist.
+            In PostgreSQL (Prod) wäre das ein Constraint-Fehler. Außerdem kann der Patient seine
+            Inquiry-Termine niemals im Terminbereich sehen, weil die App Termine über <code>BookingRequest</code> lädt.
+          </div>
+        </div>
+      </div>
+
+      <div class="gap-item err">
+        <div class="gap-icon">👁</div>
+        <div>
+          <div class="gap-title">Slot-Generator ignoriert Inquiry-Slots</div>
+          <div class="gap-desc">
+            <code>generateAvailableSlots()</code> prüft auf Overlap gegen <code>BookingRequest WHERE status IN (PENDING, CONFIRMED)</code>.
+            Via Inquiry bestätigte <code>ScheduledSlot</code>s (Status <code>SCHEDULED</code>) werden <strong>nicht</strong> berücksichtigt.
+            Folge: Patienten, die über das normale Buchungsformular buchen, können Slots belegen, die ein
+            Inquiry-Patient bereits bestätigt hat — echtes Doppelbuchungsrisiko.
+          </div>
+        </div>
+      </div>
+
+      <div class="gap-item err">
+        <div class="gap-icon">📅</div>
+        <div>
+          <div class="gap-title">Keine Seriengenerierung — 1 Slot statt N Slots</div>
+          <div class="gap-desc">
+            Der Confirm-Endpunkt nimmt <code>frequenz</code> und <code>anzahlTermine</code> aus dem Inquiry-Snapshot,
+            nutzt sie aber <strong>nicht</strong>. Es entsteht immer genau 1 <code>ScheduledSlot</code>.
+            Für eine Behandlungsserie (z.B. 6× KG, 1×/Woche) müssten 6 Slots auf aufeinanderfolgenden
+            Wochentagen im entsprechenden Rhythmus erzeugt werden.
+          </div>
+        </div>
+      </div>
+
+      <div class="gap-item warn">
+        <div class="gap-icon">👤</div>
+        <div>
+          <div class="gap-title">Patient sieht bestätigte Inquiry-Termine nicht</div>
+          <div class="gap-desc">
+            <code>TherapyTabPatient</code> lädt Termine über <code>myAppointments</code>, das aus dem
+            alten <code>BookingRequest</code>-System kommt. Inquiry-basierte <code>ScheduledSlot</code>s
+            haben keinen echten <code>BookingRequest</code> dahinter → der Patient sieht "Bestätigt" in der
+            Anfragenliste, aber keinen Eintrag im Terminbereich.
+          </div>
+        </div>
+      </div>
+
+      <div class="gap-item warn">
+        <div class="gap-icon">🔄</div>
+        <div>
+          <div class="gap-title">Kein Konflikt-Handling für zukünftige Serie-Slots</div>
+          <div class="gap-desc">
+            Wenn die Serie generiert wird (z.B. 6 Wochen), können einzelne Termine auf bereits belegte
+            Zeiten fallen (Urlaub, andere Buchung, Feiertag). Es gibt keine Logik, die Konflikte erkennt
+            und entweder überspringt oder dem Therapeuten zur Auflösung zeigt.
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- 4. ARCHITEKTUR-ENTSCHEIDUNG -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-num">04</span>
+      <h2>Architektur-Entscheidung: Wie wird die Serie generiert?</h2>
+    </div>
+
+    <div class="option-grid">
+      <div class="option-card recommended">
+        <div class="option-card-label">Option A &mdash; Empfohlen</div>
+        <h3>Automatisch beim Confirm</h3>
+        <div class="option-pro">Therapeut bestätigt Starttermin + Rhythmus einmalig</div>
+        <div class="option-pro">System generiert N Slots automatisch</div>
+        <div class="option-pro">Passt zu frequenz/anzahlTermine im Schema</div>
+        <div class="option-pro">Patient sieht sofort alle kommenden Termine</div>
+        <div class="option-con">Konflikte für spätere Slots möglich</div>
+        <div class="option-con">Mehr Logik im confirm-Endpunkt</div>
+      </div>
+
+      <div class="option-card">
+        <div class="option-card-label">Option B</div>
+        <h3>Manuell Termin für Termin</h3>
+        <div class="option-pro">Therapeut hat volle Kontrolle</div>
+        <div class="option-pro">Keine Konflikt-Komplexität</div>
+        <div class="option-con">Kein UX-Gewinn gegenüber Ist-Zustand</div>
+        <div class="option-con">6 manuelle Bestätigungen pro Serie</div>
+        <div class="option-con">Schema-Felder bleiben ungenutzt</div>
+      </div>
+    </div>
+
+    <div class="inset">
+      <strong>Entscheidung: Option A.</strong> Der Therapeut gibt beim Confirm zusätzlich den Wochentag und die Uhrzeit für den Wiederholungsrhythmus an. Das System berechnet daraus die folgenden N−1 Termine und prüft jeden einzeln gegen den Slot-Generator. Konflikte werden dem Therapeuten angezeigt, er kann sie überspringen lassen.
+    </div>
+
+    <h3>Wie der Rhythmus aus frequenz abgeleitet wird</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>frequenz</th><th>Abstand zwischen Terminen</th><th>Beispiel ab Mo 04.08.</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>X1</code></td><td>7 Tage</td><td>04.08 → 11.08 → 18.08 → …</td></tr>
+          <tr><td><code>X2</code></td><td>3–4 Tage (Mo+Do-Muster)</td><td>04.08 → 07.08 → 11.08 → …</td></tr>
+          <tr><td><code>X3</code></td><td>2–3 Tage (Mo+Mi+Fr)</td><td>04.08 → 06.08 → 08.08 → …</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="font-size: 13px; color: var(--muted);">
+      Für MVP: X2 = halbe Woche (3-4 Tage), X3 = alle 2 Tage. Exakter Abstand ist konfigurierbar ohne Schema-Änderung.
+    </p>
+  </div>
+
+  <hr>
+
+  <!-- 5. SCHEMA-ÄNDERUNGEN -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-num">05</span>
+      <h2>Notwendige Schema-Änderungen</h2>
+    </div>
+
+    <div class="schema-diff">
+      <div class="schema-diff-header">schema.prisma — ScheduledSlot</div>
+      <pre><span class="neutral">model ScheduledSlot {
+  id               String              @id @default(cuid())
+</span><span class="remove">  bookingRequestId String              // ← wird optional + nullable</span>
+<span class="add">  bookingRequestId String?             // nullable für Inquiry-basierte Slots</span>
+<span class="neutral">  bookingRequest   BookingRequest?     @relation(...)
+</span><span class="add">  inquiryId        String?             // NEU: direkte Verknüpfung zu Inquiry
+  inquiry          Inquiry?            @relation(fields: [inquiryId], references: [id], onDelete: Cascade)</span>
+<span class="neutral">  therapistId      String
+  startsAt         DateTime
+  endsAt           DateTime
+  seriesIndex      Int                 @default(1)
+  heilmittel       String              @default("")
+  patientName      String
+  patientPhone     String?
+  status           ScheduledSlotStatus @default(SCHEDULED)
+  notiz            String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+}</span></pre>
+    </div>
+
+    <div class="schema-diff">
+      <div class="schema-diff-header">schema.prisma — Inquiry (Relation ergänzen)</div>
+      <pre><span class="neutral">model Inquiry {
+  // ... alle bestehenden Felder bleiben
+</span><span class="add">  scheduledSlots   ScheduledSlot[]     // NEU: Relation zu generierten Slots</span>
+<span class="neutral">}</span></pre>
+    </div>
+
+    <div class="inset inset-warn">
+      <strong>Migration-Strategie:</strong> <code>bookingRequestId</code> auf <code>nullable</code> setzen via <code>prisma db push</code> (SQLite Dev). Bestehende Slots haben weiterhin <code>inq_${id}</code> als bookingRequestId — das ist historisch falsch, aber harmlos in Dev. In einer Prod-Migration müssen diese auf <code>inquiryId</code> umgestellt werden.
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- 6. API-ÄNDERUNGEN -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-num">06</span>
+      <h2>API-Änderungen</h2>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <span class="badge badge-warn">Ändern</span>
+        <code>POST /inquiry/:id/confirm</code>
+      </div>
+      <div class="card-body">
+        <strong>Neues Request-Schema:</strong> Zusätzlich zu <code>datum, uhrzeitVon, uhrzeitBis</code> kommt
+        <code>serieGenerieren: boolean</code> (default <code>true</code> wenn <code>suchtyp === 'SERIE'</code>).
+        <br><br>
+        <strong>Neue Logik für SERIE:</strong>
+        <ol style="margin: 8px 0 0; padding-left: 18px; line-height: 1.8;">
+          <li>Starttermin wie bisher validieren + Overlap-Check</li>
+          <li>Aus <code>frequenz</code> und <code>anzahlTermine</code> die folgenden N−1 Termine berechnen</li>
+          <li>Jeden Folgetermin gegen Slot-Generator prüfen → Konflikte markieren</li>
+          <li>Transaktion: Inquiry CONFIRMED + N ScheduledSlots (je mit <code>seriesIndex 1..N</code>) + CapacityRule</li>
+          <li>Response enthält <code>slots: [{startsAt, endsAt, seriesIndex, conflict: boolean}]</code></li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <span class="badge badge-err">Fix</span>
+        Slot-Generator: ScheduledSlots einbeziehen
+      </div>
+      <div class="card-body">
+        <code>generateAvailableSlots()</code> in <code>slot-generator.ts</code> prüft aktuell nur
+        <code>BookingRequest WHERE status IN (PENDING, CONFIRMED)</code> auf Overlap.
+        Inquiry-basierte <code>ScheduledSlot</code>s mit Status <code>SCHEDULED</code> werden <strong>ignoriert</strong>.
+        <br><br>
+        Fix: <code>TherapistBlockedTime</code>-ähnliche Overlap-Abfrage gegen <code>ScheduledSlot WHERE status = 'SCHEDULED'</code> hinzufügen, bevor Slots ausgegeben werden.
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <span class="badge badge-warn">Neu</span>
+        <code>GET /inquiry/:id/slots</code>
+      </div>
+      <div class="card-body">
+        Lädt alle <code>ScheduledSlot</code>s einer Inquiry (für Therapeuten-Detailansicht und Patienten-Terminübersicht).
+        Alternativ: in <code>GET /inquiry/my</code> und <code>GET /inquiry/incoming</code> die <code>scheduledSlots</code>-Relation einbinden.
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <span class="badge badge-warn">Ändern</span>
+        <code>POST /inquiry/:id/cancel</code>
+      </div>
+      <div class="card-body">
+        Aktuell: <code>scheduledSlot.updateMany WHERE id = "slot_inq_${id}"</code> → setzt genau einen Slot auf CANCELLED.
+        <br>
+        Neu: <code>scheduledSlot.updateMany WHERE inquiryId = id AND status = 'SCHEDULED'</code> → storniert alle offenen Serie-Slots.
+      </div>
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- 7. MOBILE-ÄNDERUNGEN -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-num">07</span>
+      <h2>Mobile-Änderungen</h2>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <span class="badge badge-warn">Erweitern</span>
+        InquiryCard — ConfirmModal (Therapeutenseite)
+      </div>
+      <div class="card-body">
+        Bei <code>suchtyp === 'SERIE'</code>: Modal zeigt zusätzlich einen Hinweis
+        "Es werden <strong>N Folgetermine</strong> automatisch im Wochentakt gebucht."
+        Nach dem Confirm: Anzeige aller erzeugten Slots mit Datum + Status (konfliktfrei / übersprungen).
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <span class="badge badge-warn">Erweitern</span>
+        InquiryCard — Confirmed-Ansicht
+      </div>
+      <div class="card-body">
+        Statt "Bestätigter Termin: 15.08." eine ausklappbare Liste aller Serie-Slots mit
+        <code>seriesIndex</code>, Datum, Uhrzeit und Status (<code>SCHEDULED / CANCELLED</code>).
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <span class="badge badge-err">Fix</span>
+        TherapyTabPatient — Inquiry-Termine sichtbar machen
+      </div>
+      <div class="card-body">
+        Aktuell werden Termine nur aus <code>myAppointments</code> (BookingRequest-System) geladen.
+        Inquiry-Termine erscheinen nie im Terminbereich.
+        <br><br>
+        Lösung: <code>GET /inquiry/my</code> gibt die Inquiries mit <code>scheduledSlots</code> zurück.
+        <code>TherapyTabPatient</code> rendert bestätigte Inquiry-Slots als eigene Karte unter "Deine Termine",
+        oder: <code>myAppointments</code> wird um Inquiry-Slots ergänzt (Adapter-Funktion).
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <span class="badge badge-warn">Neu</span>
+        PatientRequestCard — Serie-Fortschritt
+      </div>
+      <div class="card-body">
+        Zeigt "Termin 2 von 6 abgeschlossen" basierend auf <code>ScheduledSlot.status</code> und <code>seriesIndex</code>.
+        Optionaler Schritt — kann auch als Follow-up kommen.
+      </div>
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- 8. REIHENFOLGE / RISIKEN -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-num">08</span>
+      <h2>Empfohlene Implementierungsreihenfolge</h2>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>#</th><th>Schritt</th><th>Schicht</th><th>Abhängigkeit</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>1</td>
+            <td>Schema: <code>ScheduledSlot.bookingRequestId</code> nullable, <code>inquiryId</code> hinzufügen</td>
+            <td>DB</td>
+            <td>—</td>
+          </tr>
+          <tr>
+            <td>2</td>
+            <td>Slot-Generator: <code>ScheduledSlot SCHEDULED</code> in Overlap-Check einbeziehen</td>
+            <td>API</td>
+            <td>1</td>
+          </tr>
+          <tr>
+            <td>3</td>
+            <td>Hilfsfunktion: <code>buildSeriesDates(startDate, frequenz, anzahl)</code></td>
+            <td>API</td>
+            <td>—</td>
+          </tr>
+          <tr>
+            <td>4</td>
+            <td><code>POST /inquiry/:id/confirm</code>: N Slots generieren, Konflikte markieren</td>
+            <td>API</td>
+            <td>2, 3</td>
+          </tr>
+          <tr>
+            <td>5</td>
+            <td><code>POST /inquiry/:id/cancel</code>: alle Serie-Slots stornieren</td>
+            <td>API</td>
+            <td>4</td>
+          </tr>
+          <tr>
+            <td>6</td>
+            <td><code>GET /inquiry/my</code> + <code>incoming</code>: <code>scheduledSlots</code> in Response einbinden</td>
+            <td>API</td>
+            <td>4</td>
+          </tr>
+          <tr>
+            <td>7</td>
+            <td>InquiryCard: Confirmed-Ansicht mit Slot-Liste</td>
+            <td>Mobile</td>
+            <td>6</td>
+          </tr>
+          <tr>
+            <td>8</td>
+            <td>TherapyTabPatient: Inquiry-Slots in Terminbereich anzeigen</td>
+            <td>Mobile</td>
+            <td>6</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3 style="margin-top: 20px;">Bekannte Risiken</h3>
+    <div class="gap-list">
+      <div class="gap-item warn">
+        <div class="gap-icon">⚡</div>
+        <div>
+          <div class="gap-title">Race Condition bei Serien-Confirm</div>
+          <div class="gap-desc">
+            Wenn zwei Patienten gleichzeitig denselben Therapeuten bestätigen, kann der Overlap-Check
+            beide durchlassen. In SQLite (Dev) nicht kritisch. Für Prod: Advisory-Lock oder Serializable
+            Transaction pro therapistId. Bereits in <code>docs/dynamisches-buchungssystem.md §9</code> dokumentiert.
+          </div>
+        </div>
+      </div>
+      <div class="gap-item info">
+        <div class="gap-icon">📆</div>
+        <div>
+          <div class="gap-title">Feiertage / Ausnahmen</div>
+          <div class="gap-desc">
+            Die Seriengenerierung beachtet keine Feiertage. Wenn ein berechnetes Datum auf einen
+            Feiertag oder eine TherapistAbsence fällt, wird der Slot entweder übersprungen oder
+            auf den nächsten verfügbaren Tag verschoben. MVP-Entscheidung: überspringen + dem Therapeuten
+            melden, er bucht den Ersatztermin manuell nach.
+          </div>
+        </div>
+      </div>
+      <div class="gap-item info">
+        <div class="gap-icon">🔢</div>
+        <div>
+          <div class="gap-title">anzahlTermine vs. Rezept-Kontingent</div>
+          <div class="gap-desc">
+            <code>anzahlTermine</code> kommt vom Patienten (default 6). GKV-Rezepte haben feste Einheiten
+            (KG: 6–12 Einheiten). Für MVP: Wert wird ungeprüft übernommen. Follow-up: Validierung gegen
+            Rezept oder PrescriptionData.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <hr>
+
+  <div class="section">
+    <div class="section-header">
+      <span class="section-num">09</span>
+      <h2>Was explizit nicht in Scope ist</h2>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Feature</th><th>Begründung</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>Serienunterbrechung / Pausierung</td>
+            <td>Kein Schema-Support, Follow-up</td>
+          </tr>
+          <tr>
+            <td>Automatischer Ersatztermin bei Konflikt</td>
+            <td>MVP: überspringen + manuell nachbuchen</td>
+          </tr>
+          <tr>
+            <td>Feiertags-Kalender</td>
+            <td>Kein Bundesland-Mapping implementiert</td>
+          </tr>
+          <tr>
+            <td>COUNTER_PROPOSED für Serien</td>
+            <td>Route fehlt generell, unabhängiges Follow-up</td>
+          </tr>
+          <tr>
+            <td>Patienten-seitige Termin-Absage einzelner Slots</td>
+            <td>Derzeit nur Gesamtabsage der Inquiry möglich</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>

@@ -29,6 +29,73 @@ function formatUhrzeit(minutes: number) {
   return `${h}:${m}`;
 }
 
+function datumToStartsAt(datum: string, uhrzeitVon: number): Date {
+  const d = new Date(datum);
+  d.setHours(0, uhrzeitVon, 0, 0);
+  return d;
+}
+
+function datumToEndsAt(datum: string, uhrzeitBis: number): Date {
+  const d = new Date(datum);
+  d.setHours(0, uhrzeitBis, 0, 0);
+  return d;
+}
+
+async function checkSlotConflict(
+  fastify: FastifyInstance,
+  therapistId: string,
+  startsAt: Date,
+  endsAt: Date,
+  excludeId?: string,
+) {
+  return fastify.prisma.scheduledSlot.findFirst({
+    where: {
+      therapistId,
+      status: 'SCHEDULED',
+      startsAt: { lt: endsAt },
+      endsAt: { gt: startsAt },
+      ...(excludeId ? { id: { not: excludeId } } : {}),
+    },
+  });
+}
+
+// Nach individuellem Slot-Confirm oder -Decline: Inquiry-Status aktualisieren
+// wenn keine PENDING-Slots mehr übrig sind.
+async function maybeFinalizeInquiry(
+  tx: Parameters<Parameters<FastifyInstance['prisma']['$transaction']>[0]>[0],
+  inquiryId: string,
+  therapistId: string,
+  now: Date,
+) {
+  const slots = await tx.inquirySlot.findMany({ where: { inquiryId } });
+  const hasPending = slots.some((s) => s.status === 'PENDING');
+  if (hasPending) return;
+
+  const hasConfirmed = slots.some((s) => s.status === 'CONFIRMED');
+  await tx.inquiry.update({
+    where: { id: inquiryId },
+    data: {
+      status: hasConfirmed ? 'CONFIRMED' : 'DECLINED',
+      respondedAt: now,
+    },
+  });
+
+  if (hasConfirmed) {
+    // Parallel-Inquiries schließen
+    const inquiry = await tx.inquiry.findUnique({ where: { id: inquiryId }, select: { patientRequestId: true } });
+    if (inquiry) {
+      await tx.inquiry.updateMany({
+        where: {
+          patientRequestId: inquiry.patientRequestId,
+          id: { not: inquiryId },
+          status: { in: ['SENT', 'SEEN', 'COUNTER_PROPOSED'] },
+        },
+        data: { status: 'AUTO_CLOSED' },
+      });
+    }
+  }
+}
+
 const ACTIVE_STATUSES = ['SENT', 'SEEN', 'COUNTER_PROPOSED', 'CONFIRMED'];
 
 // ─── Route registration ───────────────────────────────────────────────────────
@@ -51,14 +118,18 @@ export async function inquiryRoutes(fastify: FastifyInstance) {
       anzahlTermine: z.number().int().min(1).max(40).default(6),
       suchtyp: z.enum(['SERIE', 'EINZELTERMIN']).default('SERIE'),
       message: z.string().max(500).optional(),
-      timeWindows: z.array(z.object({
-        weekday: z.number().int().min(0).max(6),
-        vonMinute: z.number().int().min(0).max(1439),
-        bisMinute: z.number().int().min(1).max(1440),
-      })).min(0).max(14).default([]),
+      // SERIE: konkrete Wunschtermine (bis zu 10 Slots)
+      wunschTermine: z.array(z.object({
+        datum: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        uhrzeitVon: z.number().int().min(0).max(1439),
+        uhrzeitBis: z.number().int().min(1).max(1440),
+      })).min(0).max(10).default([]),
+      // EINZELTERMIN: einzelner Wunschtermin
       wunschDatum: z.string().datetime().optional(),
       wunschUhrzeitVon: z.number().int().min(0).max(1439).optional(),
       wunschUhrzeitBis: z.number().int().min(1).max(1440).optional(),
+      // Legacy-Feld — wird für neue Anfragen ignoriert
+      timeWindows: z.array(z.any()).default([]),
       prescription: z.object({
         icdCode: z.string().optional(),
         heilmittelposNr: z.string().optional(),
@@ -73,11 +144,11 @@ export async function inquiryRoutes(fastify: FastifyInstance) {
     if (!parsed.success) return reply.status(400).send({ error: 'Ungültige Daten', details: parsed.error.flatten() });
 
     const { heilmittel, kassenart, frequenz, anzahlTermine, suchtyp, message,
-            timeWindows, wunschDatum, wunschUhrzeitVon, wunschUhrzeitBis,
+            wunschTermine, wunschDatum, wunschUhrzeitVon, wunschUhrzeitBis,
             prescription, therapistIds } = parsed.data;
 
-    if (suchtyp === 'SERIE' && timeWindows.length === 0) {
-      return reply.status(400).send({ error: 'Für eine Behandlungsserie sind Wunschzeiten erforderlich.' });
+    if (suchtyp === 'SERIE' && wunschTermine.length === 0) {
+      return reply.status(400).send({ error: 'Für eine Behandlungsserie sind konkrete Wunschtermine erforderlich.' });
     }
     if (suchtyp === 'EINZELTERMIN' && !wunschDatum) {
       return reply.status(400).send({ error: 'Für einen Einzeltermin muss ein Wunschtermin angegeben werden.' });
@@ -106,13 +177,6 @@ export async function inquiryRoutes(fastify: FastifyInstance) {
         data: {
           patientUserId: patient.id,
           heilmittel, kassenart, frequenz, anzahlTermine, suchtyp, message,
-          timeWindows: {
-            create: timeWindows.map((tw) => ({
-              weekday: tw.weekday,
-              vonMinute: tw.vonMinute,
-              bisMinute: tw.bisMinute,
-            })),
-          },
           ...(prescription ? {
             prescription: {
               create: {
@@ -125,16 +189,16 @@ export async function inquiryRoutes(fastify: FastifyInstance) {
             },
           } : {}),
         },
-        include: { timeWindows: true, prescription: true },
+        include: { prescription: true },
       });
 
-      const inquiries = await Promise.all(therapists.map((t) =>
-        tx.inquiry.create({
+      const inquiries = await Promise.all(therapists.map(async (t) => {
+        const inq = await tx.inquiry.create({
           data: {
             patientRequestId: pr.id,
             therapistId: t.id,
             status: 'SENT',
-            heilmittel, kassenart, frequenz, anzahlTermine,
+            heilmittel, kassenart, frequenz, anzahlTermine, suchtyp,
             patientFreitext: message,
             patientName,
             patientEmail: patient.email,
@@ -147,8 +211,22 @@ export async function inquiryRoutes(fastify: FastifyInstance) {
               wunschUhrzeitBis: wunschUhrzeitBis ?? null,
             } : {}),
           },
-        })
-      ));
+        });
+
+        if (suchtyp === 'SERIE' && wunschTermine.length > 0) {
+          await tx.inquirySlot.createMany({
+            data: wunschTermine.map((wt) => ({
+              inquiryId: inq.id,
+              datum: wt.datum,
+              uhrzeitVon: wt.uhrzeitVon,
+              uhrzeitBis: wt.uhrzeitBis,
+              status: 'PENDING' as const,
+            })),
+          });
+        }
+
+        return inq;
+      }));
 
       return { ...pr, inquiries };
     });
@@ -170,6 +248,7 @@ export async function inquiryRoutes(fastify: FastifyInstance) {
         inquiries: {
           include: {
             therapist: { select: { id: true, fullName: true, professionalTitle: true, city: true, photo: true } },
+            inquirySlots: { orderBy: { datum: 'asc' } },
           },
           orderBy: { createdAt: 'asc' },
         },
@@ -198,6 +277,7 @@ export async function inquiryRoutes(fastify: FastifyInstance) {
       },
       include: {
         patientRequest: { include: { timeWindows: true } },
+        inquirySlots: { orderBy: { datum: 'asc' } },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -222,11 +302,12 @@ export async function inquiryRoutes(fastify: FastifyInstance) {
     const updated = await fastify.prisma.inquiry.update({
       where: { id },
       data: { status: 'SEEN' },
+      include: { inquirySlots: { orderBy: { datum: 'asc' } } },
     });
     return reply.send(updated);
   });
 
-  // POST /inquiry/:id/confirm — Therapeut bestätigt mit Datum+Uhrzeit
+  // POST /inquiry/:id/confirm — Therapeut bestätigt EINZELTERMIN mit Datum+Uhrzeit
   fastify.post('/inquiry/:id/confirm', async (request, reply) => {
     const token = request.headers.authorization?.replace('Bearer ', '');
     if (!token) return reply.status(401).send({ error: 'Unauthorized' });
@@ -241,6 +322,9 @@ export async function inquiryRoutes(fastify: FastifyInstance) {
     if (!inquiry || inquiry.therapistId !== therapist.id) return reply.status(404).send({ error: 'Nicht gefunden' });
     if (!['SENT', 'SEEN', 'COUNTER_PROPOSED'].includes(inquiry.status)) {
       return reply.status(409).send({ error: `Ungültiger Übergang: ${inquiry.status} → CONFIRMED` });
+    }
+    if (inquiry.suchtyp === 'SERIE') {
+      return reply.status(400).send({ error: 'Für Serien-Anfragen bitte /confirm-all oder /slots/:slotId/confirm verwenden.' });
     }
 
     const schema = z.object({
@@ -261,15 +345,7 @@ export async function inquiryRoutes(fastify: FastifyInstance) {
     const endsAt = new Date(datum);
     endsAt.setHours(0, parsed.data.uhrzeitBis, 0, 0);
 
-    // Überschneidungs-Check gegen bestehende ScheduledSlots
-    const conflict = await fastify.prisma.scheduledSlot.findFirst({
-      where: {
-        therapistId: therapist.id,
-        status: 'SCHEDULED',
-        startsAt: { lt: endsAt },
-        endsAt: { gt: startsAt },
-      },
-    });
+    const conflict = await checkSlotConflict(fastify, therapist.id, startsAt, endsAt, `slot_inq_${id}`);
     if (conflict) {
       return reply.status(409).send({
         error: 'Zeitkonflikt: ein anderer Termin überschneidet sich',
@@ -293,7 +369,7 @@ export async function inquiryRoutes(fastify: FastifyInstance) {
         where: { id: `slot_inq_${id}` },
         create: {
           id: `slot_inq_${id}`,
-          bookingRequestId: `inq_${id}`,
+          inquiryId: id,
           therapistId: therapist.id,
           startsAt,
           endsAt,
@@ -327,7 +403,186 @@ export async function inquiryRoutes(fastify: FastifyInstance) {
     });
   });
 
-  // POST /inquiry/:id/decline — Therapeut lehnt ab
+  // POST /inquiry/:id/confirm-all — Therapeut bestätigt alle PENDING Slots einer SERIE
+  fastify.post('/inquiry/:id/confirm-all', async (request, reply) => {
+    const token = request.headers.authorization?.replace('Bearer ', '');
+    if (!token) return reply.status(401).send({ error: 'Unauthorized' });
+    const therapist = await resolveTherapist(fastify, token);
+    if (!therapist) return reply.status(403).send({ error: 'Nur Therapeut:innen' });
+
+    const { id } = request.params as { id: string };
+    const inquiry = await fastify.prisma.inquiry.findUnique({
+      where: { id },
+      include: { inquirySlots: { where: { status: 'PENDING' }, orderBy: { datum: 'asc' } } },
+    });
+    if (!inquiry || inquiry.therapistId !== therapist.id) return reply.status(404).send({ error: 'Nicht gefunden' });
+    if (!['SENT', 'SEEN', 'COUNTER_PROPOSED'].includes(inquiry.status)) {
+      return reply.status(409).send({ error: `Ungültiger Übergang: ${inquiry.status} → CONFIRMED` });
+    }
+    if (inquiry.suchtyp !== 'SERIE') {
+      return reply.status(400).send({ error: 'Nur für Serien-Anfragen verfügbar. Einzeltermin: /confirm verwenden.' });
+    }
+    if (inquiry.inquirySlots.length === 0) {
+      return reply.status(400).send({ error: 'Keine offenen Slots vorhanden.' });
+    }
+
+    // Konflikt-Check für alle Slots auf einmal
+    const conflicts: { datum: string; von: string }[] = [];
+    for (const slot of inquiry.inquirySlots) {
+      const startsAt = datumToStartsAt(slot.datum, slot.uhrzeitVon);
+      const endsAt = datumToEndsAt(slot.datum, slot.uhrzeitBis);
+      const conflict = await checkSlotConflict(fastify, therapist.id, startsAt, endsAt);
+      if (conflict) conflicts.push({ datum: slot.datum, von: formatUhrzeit(slot.uhrzeitVon) });
+    }
+    if (conflicts.length > 0) {
+      return reply.status(409).send({
+        error: 'Zeitkonflikte bei einzelnen Terminen',
+        conflicts,
+      });
+    }
+
+    const now = new Date();
+    const updatedInquiry = await fastify.prisma.$transaction(async (tx) => {
+      // ScheduledSlots für alle Slots anlegen
+      for (const slot of inquiry.inquirySlots) {
+        const startsAt = datumToStartsAt(slot.datum, slot.uhrzeitVon);
+        const endsAt = datumToEndsAt(slot.datum, slot.uhrzeitBis);
+        const scheduledSlot = await tx.scheduledSlot.create({
+          data: {
+            inquiryId: id,
+            inquirySlotId: slot.id,
+            therapistId: therapist.id,
+            startsAt,
+            endsAt,
+            heilmittel: inquiry.heilmittel,
+            patientName: inquiry.patientName,
+            patientPhone: inquiry.patientPhone ?? undefined,
+            status: 'SCHEDULED',
+          },
+        });
+        await tx.inquirySlot.update({
+          where: { id: slot.id },
+          data: { status: 'CONFIRMED' },
+        });
+        void scheduledSlot; // suppress unused warning
+      }
+
+      const inq = await tx.inquiry.update({
+        where: { id },
+        data: { status: 'CONFIRMED', respondedAt: now },
+        include: { inquirySlots: { orderBy: { datum: 'asc' } } },
+      });
+
+      await tx.therapistCapacityRule.upsert({
+        where: { therapistId: therapist.id },
+        create: { therapistId: therapist.id, laufendeNeuaufnahmenDieseWoche: 1, weekResetAt: now, abgeschlosseneInquiriesCount: 1 },
+        update: { laufendeNeuaufnahmenDieseWoche: { increment: 1 }, abgeschlosseneInquiriesCount: { increment: 1 } },
+      });
+
+      // Parallel-Inquiries schließen
+      await tx.inquiry.updateMany({
+        where: {
+          patientRequestId: inquiry.patientRequestId,
+          id: { not: id },
+          status: { in: ['SENT', 'SEEN', 'COUNTER_PROPOSED'] },
+        },
+        data: { status: 'AUTO_CLOSED' },
+      });
+
+      return inq;
+    });
+
+    return reply.send(updatedInquiry);
+  });
+
+  // POST /inquiry/:id/slots/:slotId/confirm — einzelnen InquirySlot bestätigen
+  fastify.post('/inquiry/:id/slots/:slotId/confirm', async (request, reply) => {
+    const token = request.headers.authorization?.replace('Bearer ', '');
+    if (!token) return reply.status(401).send({ error: 'Unauthorized' });
+    const therapist = await resolveTherapist(fastify, token);
+    if (!therapist) return reply.status(403).send({ error: 'Nur Therapeut:innen' });
+
+    const { id, slotId } = request.params as { id: string; slotId: string };
+    const inquiry = await fastify.prisma.inquiry.findUnique({ where: { id } });
+    if (!inquiry || inquiry.therapistId !== therapist.id) return reply.status(404).send({ error: 'Nicht gefunden' });
+    if (!['SENT', 'SEEN', 'COUNTER_PROPOSED', 'CONFIRMED'].includes(inquiry.status)) {
+      return reply.status(409).send({ error: `Inquiry-Status erlaubt keine Slot-Bestätigung: ${inquiry.status}` });
+    }
+
+    const slot = await fastify.prisma.inquirySlot.findUnique({ where: { id: slotId } });
+    if (!slot || slot.inquiryId !== id) return reply.status(404).send({ error: 'Slot nicht gefunden' });
+    if (slot.status !== 'PENDING') {
+      return reply.status(409).send({ error: `Slot ist bereits ${slot.status}` });
+    }
+
+    const startsAt = datumToStartsAt(slot.datum, slot.uhrzeitVon);
+    const endsAt = datumToEndsAt(slot.datum, slot.uhrzeitBis);
+
+    const conflict = await checkSlotConflict(fastify, therapist.id, startsAt, endsAt);
+    if (conflict) {
+      return reply.status(409).send({
+        error: 'Zeitkonflikt: ein anderer Termin überschneidet sich',
+        conflictingSlot: { startsAt: conflict.startsAt, endsAt: conflict.endsAt },
+      });
+    }
+
+    const now = new Date();
+    const updatedInquiry = await fastify.prisma.$transaction(async (tx) => {
+      await tx.scheduledSlot.create({
+        data: {
+          inquiryId: id,
+          inquirySlotId: slotId,
+          therapistId: therapist.id,
+          startsAt,
+          endsAt,
+          heilmittel: inquiry.heilmittel,
+          patientName: inquiry.patientName,
+          patientPhone: inquiry.patientPhone ?? undefined,
+          status: 'SCHEDULED',
+        },
+      });
+      await tx.inquirySlot.update({ where: { id: slotId }, data: { status: 'CONFIRMED' } });
+      await maybeFinalizeInquiry(tx, id, therapist.id, now);
+      return tx.inquiry.findUnique({
+        where: { id },
+        include: { inquirySlots: { orderBy: { datum: 'asc' } } },
+      });
+    });
+
+    return reply.send(updatedInquiry);
+  });
+
+  // POST /inquiry/:id/slots/:slotId/decline — einzelnen InquirySlot ablehnen
+  fastify.post('/inquiry/:id/slots/:slotId/decline', async (request, reply) => {
+    const token = request.headers.authorization?.replace('Bearer ', '');
+    if (!token) return reply.status(401).send({ error: 'Unauthorized' });
+    const therapist = await resolveTherapist(fastify, token);
+    if (!therapist) return reply.status(403).send({ error: 'Nur Therapeut:innen' });
+
+    const { id, slotId } = request.params as { id: string; slotId: string };
+    const inquiry = await fastify.prisma.inquiry.findUnique({ where: { id } });
+    if (!inquiry || inquiry.therapistId !== therapist.id) return reply.status(404).send({ error: 'Nicht gefunden' });
+
+    const slot = await fastify.prisma.inquirySlot.findUnique({ where: { id: slotId } });
+    if (!slot || slot.inquiryId !== id) return reply.status(404).send({ error: 'Slot nicht gefunden' });
+    if (slot.status !== 'PENDING') {
+      return reply.status(409).send({ error: `Slot ist bereits ${slot.status}` });
+    }
+
+    const now = new Date();
+    const updatedInquiry = await fastify.prisma.$transaction(async (tx) => {
+      await tx.inquirySlot.update({ where: { id: slotId }, data: { status: 'DECLINED' } });
+      await maybeFinalizeInquiry(tx, id, therapist.id, now);
+      return tx.inquiry.findUnique({
+        where: { id },
+        include: { inquirySlots: { orderBy: { datum: 'asc' } } },
+      });
+    });
+
+    return reply.send(updatedInquiry);
+  });
+
+  // POST /inquiry/:id/decline — Therapeut lehnt gesamte Anfrage ab
   fastify.post('/inquiry/:id/decline', async (request, reply) => {
     const token = request.headers.authorization?.replace('Bearer ', '');
     if (!token) return reply.status(401).send({ error: 'Unauthorized' });
@@ -377,7 +632,6 @@ export async function inquiryRoutes(fastify: FastifyInstance) {
     if (therapist && inquiry.therapistId === therapist.id) {
       actor = 'PRAXIS';
     } else if (patient) {
-      // Prüfen ob Patient zu dieser Inquiry gehört
       const pr = await fastify.prisma.patientRequest.findFirst({
         where: { id: inquiry.patientRequestId, patientUserId: patient.id },
       });
@@ -400,8 +654,8 @@ export async function inquiryRoutes(fastify: FastifyInstance) {
     }
 
     const now = new Date();
-    const [updatedInquiry] = await fastify.prisma.$transaction([
-      fastify.prisma.inquiry.update({
+    const updatedInquiry = await fastify.prisma.$transaction(async (tx) => {
+      const inq = await tx.inquiry.update({
         where: { id },
         data: {
           status: 'CANCELLED',
@@ -409,13 +663,28 @@ export async function inquiryRoutes(fastify: FastifyInstance) {
           cancelActor: actor,
           cancelledAt: now,
         },
-      }),
-      // ScheduledSlot auf CANCELLED setzen
-      fastify.prisma.scheduledSlot.updateMany({
-        where: { id: `slot_inq_${id}` },
+      });
+
+      // Alle ScheduledSlots dieser Inquiry canceln (via inquiryId)
+      await tx.scheduledSlot.updateMany({
+        where: { inquiryId: id, status: 'SCHEDULED' },
         data: { status: 'CANCELLED' },
-      }),
-    ]);
+      });
+
+      // Legacy: auch slot_inq_${id} canceln (falls von altem Confirm erstellt)
+      await tx.scheduledSlot.updateMany({
+        where: { id: `slot_inq_${id}`, status: 'SCHEDULED' },
+        data: { status: 'CANCELLED' },
+      });
+
+      // InquirySlots die CONFIRMED sind, auf DECLINED setzen
+      await tx.inquirySlot.updateMany({
+        where: { inquiryId: id, status: 'CONFIRMED' },
+        data: { status: 'DECLINED' },
+      });
+
+      return inq;
+    });
 
     return reply.send(updatedInquiry);
   });
@@ -463,7 +732,6 @@ export async function inquiryRoutes(fastify: FastifyInstance) {
     let skipped = 0;
 
     for (const b of bookings) {
-      // Schon migriert?
       const exists = await fastify.prisma.inquiry.findFirst({
         where: { patientRequest: { migrated: true }, therapistId: b.therapistId, patientName: b.patientName, heilmittel: b.heilmittel ?? '' },
       });

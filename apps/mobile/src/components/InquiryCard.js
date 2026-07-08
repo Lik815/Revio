@@ -20,7 +20,11 @@ const STATUS_CONFIG = {
   EXPIRED:            { label: 'Abgelaufen',     color: '#9CA3AF', bg: '#F9FAFB' },
 };
 
-const FREQUENZ_LABELS = { X1: '1×/Woche', X2: '2×/Woche', X3: '3×/Woche' };
+const SLOT_STATUS_CONFIG = {
+  PENDING:   { label: 'Offen',      color: '#F59E0B', bg: '#FEF3C7' },
+  CONFIRMED: { label: 'Bestätigt',  color: '#10B981', bg: '#D1FAE5' },
+  DECLINED:  { label: 'Abgelehnt',  color: '#EF4444', bg: '#FEE2E2' },
+};
 
 const CANCEL_REASONS = [
   { key: 'PRAXIS_KRANKHEIT', label: 'Krankheit' },
@@ -35,25 +39,10 @@ function formatMinutes(min) {
   return `${h}:${m}`;
 }
 
-function TimeWindowChips({ timeWindows, c }) {
-  if (!timeWindows?.length) return null;
-  const grouped = {};
-  for (const tw of timeWindows) {
-    const day = WOCHENTAG_LABELS[tw.weekday] ?? `Tag ${tw.weekday}`;
-    if (!grouped[day]) grouped[day] = [];
-    grouped[day].push(`${formatMinutes(tw.vonMinute)}–${formatMinutes(tw.bisMinute)}`);
-  }
-  return (
-    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
-      {Object.entries(grouped).map(([day, times]) => (
-        <View key={day} style={{ backgroundColor: c.mutedBg, borderRadius: RADIUS.sm, paddingVertical: 3, paddingHorizontal: 8, borderWidth: 1, borderColor: c.border }}>
-          <Text style={{ fontSize: 11, color: c.text, fontWeight: '600' }}>
-            {day} {times.join(', ')}
-          </Text>
-        </View>
-      ))}
-    </View>
-  );
+function formatDatum(datum) {
+  // datum: YYYY-MM-DD
+  const d = new Date(datum + 'T00:00:00');
+  return d.toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short' });
 }
 
 function ConfirmModal({ visible, onClose, onConfirm, saving, initialDatum = '', initialUhrzeitVon = '', initialUhrzeitBis = '', c }) {
@@ -158,12 +147,141 @@ function CancelModal({ visible, onClose, onCancel, saving, c }) {
   );
 }
 
+// Slot-Liste für Serien-Inquiries (Therapeuten-Ansicht)
+function SerieSlotList({ inquiry, authToken, onUpdate, saving, setSaving, c }) {
+  const slots = inquiry.inquirySlots ?? [];
+  const pendingCount = slots.filter((s) => s.status === 'PENDING').length;
+  const canAct = ['SENT', 'SEEN', 'COUNTER_PROPOSED', 'CONFIRMED'].includes(inquiry.status);
+
+  async function doSlotAction(slotId, action) {
+    setSaving(true);
+    try {
+      const res = await fetch(`${getBaseUrl()}/inquiry/${inquiry.id}/slots/${slotId}/${action}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        onUpdate?.(updated);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        Alert.alert('Fehler', data.error ?? 'Aktion fehlgeschlagen');
+      }
+    } catch {
+      Alert.alert('Verbindungsfehler');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function doConfirmAll() {
+    setSaving(true);
+    try {
+      const res = await fetch(`${getBaseUrl()}/inquiry/${inquiry.id}/confirm-all`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        onUpdate?.(updated);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        Alert.alert('Fehler', data.error ?? 'Bestätigung fehlgeschlagen');
+      }
+    } catch {
+      Alert.alert('Verbindungsfehler');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (slots.length === 0) {
+    return (
+      <View style={{ padding: 12, backgroundColor: c.mutedBg, borderRadius: RADIUS.sm }}>
+        <Text style={{ fontSize: 13, color: c.muted }}>Keine Wunschtermine vorhanden.</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ gap: 8 }}>
+      {canAct && pendingCount > 0 && (
+        <Pressable
+          onPress={() => {
+            Alert.alert(
+              'Alle bestätigen',
+              `Alle ${pendingCount} offenen Termine bestätigen?`,
+              [
+                { text: 'Abbrechen', style: 'cancel' },
+                { text: 'Alle bestätigen', onPress: doConfirmAll },
+              ],
+            );
+          }}
+          disabled={saving}
+          style={{
+            backgroundColor: c.primary, borderRadius: RADIUS.sm,
+            paddingVertical: 11, alignItems: 'center',
+            opacity: saving ? 0.6 : 1,
+          }}
+        >
+          <Text style={{ fontSize: 13, fontWeight: '700', color: '#fff' }}>
+            Alle {pendingCount} Termine bestätigen
+          </Text>
+        </Pressable>
+      )}
+
+      {slots.map((slot) => {
+        const cfg = SLOT_STATUS_CONFIG[slot.status] ?? SLOT_STATUS_CONFIG.PENDING;
+        return (
+          <View
+            key={slot.id}
+            style={{
+              flexDirection: 'row', alignItems: 'center', gap: 10,
+              padding: 10, borderRadius: RADIUS.sm, borderWidth: 1,
+              borderColor: c.border, backgroundColor: c.card,
+            }}
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 14, fontWeight: '600', color: c.text }}>
+                {formatDatum(slot.datum)}
+              </Text>
+              <Text style={{ fontSize: 12, color: c.muted }}>
+                {formatMinutes(slot.uhrzeitVon)} – {formatMinutes(slot.uhrzeitBis)} Uhr
+              </Text>
+            </View>
+            <View style={{ backgroundColor: cfg.bg, borderRadius: 8, paddingVertical: 2, paddingHorizontal: 7 }}>
+              <Text style={{ fontSize: 10, fontWeight: '700', color: cfg.color }}>{cfg.label}</Text>
+            </View>
+            {canAct && slot.status === 'PENDING' && !saving && (
+              <View style={{ flexDirection: 'row', gap: 6 }}>
+                <Pressable
+                  onPress={() => doSlotAction(slot.id, 'confirm')}
+                  style={{ backgroundColor: c.primary, borderRadius: RADIUS.sm, paddingVertical: 6, paddingHorizontal: 10 }}
+                >
+                  <Ionicons name="checkmark" size={14} color="#fff" />
+                </Pressable>
+                <Pressable
+                  onPress={() => doSlotAction(slot.id, 'decline')}
+                  style={{ borderWidth: 1, borderColor: c.error ?? '#EF4444', borderRadius: RADIUS.sm, paddingVertical: 6, paddingHorizontal: 10 }}
+                >
+                  <Ionicons name="close" size={14} color={c.error ?? '#EF4444'} />
+                </Pressable>
+              </View>
+            )}
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
 export function InquiryCard({ inquiry, authToken, c, onUpdate }) {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
+  const isSerie = (inquiry.suchtyp ?? inquiry.patientRequest?.suchtyp) === 'SERIE';
   const statusCfg = STATUS_CONFIG[inquiry.status] ?? STATUS_CONFIG.SENT;
   const timeWindows = inquiry.patientRequest?.timeWindows ?? [];
   const isActive = ['SENT', 'SEEN', 'COUNTER_PROPOSED', 'CONFIRMED'].includes(inquiry.status);
@@ -211,6 +329,10 @@ export function InquiryCard({ inquiry, authToken, c, onUpdate }) {
     doAction('cancel', { cancelReason: reason });
   };
 
+  // Kopfzeilen-Vorschau für Serie: Anzahl Slots
+  const slotCount = inquiry.inquirySlots?.length ?? 0;
+  const pendingCount = (inquiry.inquirySlots ?? []).filter((s) => s.status === 'PENDING').length;
+
   return (
     <View style={{ backgroundColor: c.card, borderRadius: RADIUS.md, borderWidth: 1, borderColor: c.border, overflow: 'hidden', ...SHADOW.card }}>
       {/* Header */}
@@ -227,9 +349,9 @@ export function InquiryCard({ inquiry, authToken, c, onUpdate }) {
             <Text style={{ fontSize: 12, color: c.muted }}>
               {inquiry.heilmittel}
               {' · '}
-              {(inquiry.suchtyp ?? inquiry.patientRequest?.suchtyp) === 'EINZELTERMIN'
-                ? 'Einzeltermin'
-                : (FREQUENZ_LABELS[inquiry.frequenz] ?? inquiry.frequenz)}
+              {isSerie
+                ? `Serie · ${slotCount} Termine`
+                : 'Einzeltermin'}
               {inquiry.kassenart ? ` · ${inquiry.kassenart}` : ''}
             </Text>
           </View>
@@ -237,12 +359,17 @@ export function InquiryCard({ inquiry, authToken, c, onUpdate }) {
             <View style={{ backgroundColor: statusCfg.bg, borderRadius: 10, paddingVertical: 3, paddingHorizontal: 8 }}>
               <Text style={{ fontSize: 11, fontWeight: '700', color: statusCfg.color }}>{statusCfg.label}</Text>
             </View>
+            {isSerie && pendingCount > 0 && (
+              <View style={{ backgroundColor: '#FEF3C7', borderRadius: 10, paddingVertical: 3, paddingHorizontal: 7 }}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: '#92400E' }}>{pendingCount} offen</Text>
+              </View>
+            )}
             <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={c.muted} />
           </View>
         </View>
 
-        {/* Wunschtermin (Einzeltermin) oder Zeitfenster-Vorschau (Serie) */}
-        {inquiry.wunschDatum ? (
+        {/* Einzeltermin: Wunschtermin-Vorschau */}
+        {!isSerie && inquiry.wunschDatum && (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 }}>
             <Ionicons name="calendar-outline" size={13} color={c.primary} />
             <Text style={{ fontSize: 12, color: c.primary, fontWeight: '600' }}>
@@ -250,8 +377,6 @@ export function InquiryCard({ inquiry, authToken, c, onUpdate }) {
               {inquiry.wunschUhrzeitVon != null ? ` · ${formatMinutes(inquiry.wunschUhrzeitVon)}–${formatMinutes(inquiry.wunschUhrzeitBis)} Uhr` : ''}
             </Text>
           </View>
-        ) : (
-          timeWindows.length > 0 && <TimeWindowChips timeWindows={timeWindows} c={c} />
         )}
       </Pressable>
 
@@ -274,7 +399,23 @@ export function InquiryCard({ inquiry, authToken, c, onUpdate }) {
             </View>
           ) : null}
 
-          {inquiry.status === 'CONFIRMED' && inquiry.confirmedDatum && (
+          {/* SERIE: Slot-Liste */}
+          {isSerie && (
+            <View style={{ gap: 8 }}>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: c.muted, textTransform: 'uppercase', letterSpacing: 0.5 }}>Wunschtermine</Text>
+              <SerieSlotList
+                inquiry={inquiry}
+                authToken={authToken}
+                onUpdate={onUpdate}
+                saving={actionLoading}
+                setSaving={setActionLoading}
+                c={c}
+              />
+            </View>
+          )}
+
+          {/* EINZELTERMIN: bestätigter Termin */}
+          {!isSerie && inquiry.status === 'CONFIRMED' && inquiry.confirmedDatum && (
             <View style={{ backgroundColor: '#D1FAE5', borderRadius: RADIUS.sm, padding: 10 }}>
               <Text style={{ fontSize: 13, fontWeight: '700', color: '#065F46' }}>
                 Bestätigter Termin: {new Date(inquiry.confirmedDatum).toLocaleDateString('de-DE')}
@@ -286,7 +427,8 @@ export function InquiryCard({ inquiry, authToken, c, onUpdate }) {
           {/* Aktionen */}
           {isActive && !actionLoading && (
             <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
-              {['SENT', 'SEEN', 'COUNTER_PROPOSED'].includes(inquiry.status) && (
+              {/* EINZELTERMIN: Bestätigen-Button */}
+              {!isSerie && ['SENT', 'SEEN', 'COUNTER_PROPOSED'].includes(inquiry.status) && (
                 <Pressable
                   onPress={() => setShowConfirmModal(true)}
                   style={{ flex: 1, minWidth: 100, backgroundColor: c.primary, borderRadius: RADIUS.sm, paddingVertical: 10, alignItems: 'center' }}
@@ -294,6 +436,7 @@ export function InquiryCard({ inquiry, authToken, c, onUpdate }) {
                   <Text style={{ fontSize: 13, fontWeight: '700', color: '#fff' }}>Bestätigen</Text>
                 </Pressable>
               )}
+              {/* Ablehnen (beide Typen) */}
               {['SENT', 'SEEN'].includes(inquiry.status) && (
                 <Pressable
                   onPress={handleDecline}
@@ -302,6 +445,7 @@ export function InquiryCard({ inquiry, authToken, c, onUpdate }) {
                   <Text style={{ fontSize: 13, fontWeight: '600', color: c.muted }}>Ablehnen</Text>
                 </Pressable>
               )}
+              {/* Absagen (CONFIRMED) */}
               {inquiry.status === 'CONFIRMED' && (
                 <Pressable
                   onPress={() => setShowCancelModal(true)}
@@ -316,6 +460,7 @@ export function InquiryCard({ inquiry, authToken, c, onUpdate }) {
         </View>
       )}
 
+      {/* Modals */}
       <ConfirmModal
         visible={showConfirmModal}
         onClose={() => setShowConfirmModal(false)}

@@ -152,7 +152,7 @@ function minutesFromIso(isoString) {
   return d.getHours() * 60 + d.getMinutes();
 }
 
-function SlotPicker({ therapistId, heilmittel, selectedSlot, onSelectSlot, onPicked, c }) {
+function SlotPicker({ therapistId, heilmittel, selectedSlot, selectedTermine, multiSelect, maxSelect, onSelectSlot, onPicked, c }) {
   const [slots, setSlots] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -221,7 +221,9 @@ function SlotPicker({ therapistId, heilmittel, selectedSlot, onSelectSlot, onPic
         const showAll = showAllFor.has(group.dateKey);
         const visibleSlots = showAll ? group.slots : group.slots.slice(0, 6);
         const hasMore = group.slots.length > 6 && !showAll;
-        const groupHasSelected = group.slots.some((slot) => selectedSlot?.startsAt === slot.startsAt);
+        const groupHasSelected = multiSelect
+          ? group.slots.some((slot) => (selectedTermine ?? []).some((s) => s.startsAt === slot.startsAt))
+          : group.slots.some((slot) => selectedSlot?.startsAt === slot.startsAt);
 
         return (
           <View
@@ -249,20 +251,25 @@ function SlotPicker({ therapistId, heilmittel, selectedSlot, onSelectSlot, onPic
               <View style={{ padding: 12, borderTopWidth: 1, borderTopColor: c.border, backgroundColor: c.background }}>
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                   {visibleSlots.map((slot) => {
-                    const active = selectedSlot?.startsAt === slot.startsAt;
+                    const active = multiSelect
+                      ? (selectedTermine ?? []).some((s) => s.startsAt === slot.startsAt)
+                      : selectedSlot?.startsAt === slot.startsAt;
+                    const atMax = multiSelect && (selectedTermine ?? []).length >= (maxSelect ?? 10) && !active;
                     return (
                       <Pressable
                         key={slot.startsAt}
                         onPress={() => {
+                          if (atMax) return;
                           onSelectSlot(slot);
-                          onPicked?.(slot);
+                          if (!multiSelect) onPicked?.(slot);
                         }}
                         style={{
                           paddingVertical: 10, paddingHorizontal: 14,
                           borderRadius: RADIUS.sm, borderWidth: 1.5,
-                          borderColor: active ? c.primary : c.border,
-                          backgroundColor: active ? c.primaryBg : c.card,
+                          borderColor: active ? c.primary : atMax ? c.border : c.border,
+                          backgroundColor: active ? c.primaryBg : atMax ? c.mutedBg : c.card,
                           minWidth: 72, alignItems: 'center',
+                          opacity: atMax ? 0.4 : 1,
                         }}
                       >
                         <Text style={{ fontSize: 14, fontWeight: active ? '700' : '500', color: active ? c.primary : c.text }}>
@@ -303,10 +310,8 @@ export function InquiryRequestForm({ c, t, therapist, authToken, onSuccess, onCl
   const [suchtyp, setSuchtyp] = useState('SERIE');
   const [selectedKassenart, setSelectedKassenart] = useState(knownKassenart);
   const [selectedHeilmittel, setSelectedHeilmittel] = useState(null);
-  const [selectedDays, setSelectedDays] = useState([]);
-  const [selectedSlots, setSelectedSlots] = useState([]);
-  const [selectedSlot, setSelectedSlot] = useState(null); // für Einzeltermin
-  const [frequenz, setFrequenz] = useState('X1');
+  const [selectedSlot, setSelectedSlot] = useState(null);    // Einzeltermin: ein Slot
+  const [selectedTermine, setSelectedTermine] = useState([]); // Serie: bis zu 10 Slots
   const [message, setMessage] = useState('');
   const [consent, setConsent] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -325,23 +330,16 @@ export function InquiryRequestForm({ c, t, therapist, authToken, onSuccess, onCl
 
   const insuranceOptions = kassenartOptions.filter((opt) => opt.key != null);
 
-  const toggleDay = (key) => setSelectedDays((prev) =>
-    prev.includes(key) ? prev.filter((d) => d !== key) : [...prev, key],
-  );
-  const toggleSlot = (key) => setSelectedSlots((prev) =>
-    prev.includes(key) ? prev.filter((s) => s !== key) : [...prev, key],
-  );
+  const MAX_TERMINE = 10;
 
-  function buildTimeWindows() {
-    const windows = [];
-    for (const day of selectedDays) {
-      for (const slotKey of selectedSlots) {
-        const z = ZEITFENSTER.find((zf) => zf.key === slotKey);
-        if (z) windows.push({ weekday: day, vonMinute: z.vonMinute, bisMinute: z.bisMinute });
-      }
-    }
-    return windows;
-  }
+  const toggleTermin = (slot) => {
+    setSelectedTermine((prev) => {
+      const exists = prev.some((s) => s.startsAt === slot.startsAt);
+      if (exists) return prev.filter((s) => s.startsAt !== slot.startsAt);
+      if (prev.length >= MAX_TERMINE) return prev;
+      return [...prev, slot];
+    });
+  };
 
   function handleBack() {
     setError('');
@@ -370,9 +368,9 @@ export function InquiryRequestForm({ c, t, therapist, authToken, onSuccess, onCl
       setError('Bitte wähle einen Termin aus.');
       return;
     }
-    if (step === 3 && suchtyp === 'SERIE') {
-      if (selectedDays.length === 0) { setError('Bitte wähle mindestens einen Wochentag aus.'); return; }
-      if (selectedSlots.length === 0) { setError('Bitte wähle mindestens eine Tageszeit aus.'); return; }
+    if (step === 3 && suchtyp === 'SERIE' && selectedTermine.length === 0) {
+      setError('Bitte wähle mindestens einen Wunschtermin aus.');
+      return;
     }
     setStep((s) => s + 1);
   }
@@ -387,11 +385,15 @@ export function InquiryRequestForm({ c, t, therapist, authToken, onSuccess, onCl
         heilmittel: selectedHeilmittel,
         kassenart: selectedKassenart,
         suchtyp,
-        frequenz: isEinzel ? 'X1' : frequenz,
-        anzahlTermine: isEinzel ? 1 : 6,
+        frequenz: 'X1',
+        anzahlTermine: isEinzel ? 1 : selectedTermine.length,
         message: message.trim() || undefined,
         therapistIds: [therapist.id],
-        timeWindows: isEinzel ? [] : buildTimeWindows(),
+        wunschTermine: isEinzel ? [] : selectedTermine.map((slot) => ({
+          datum: slot.startsAt.slice(0, 10),
+          uhrzeitVon: minutesFromIso(slot.startsAt),
+          uhrzeitBis: minutesFromIso(slot.endsAt),
+        })),
         ...(isEinzel && selectedSlot ? {
           wunschDatum: selectedSlot.startsAt,
           wunschUhrzeitVon: minutesFromIso(selectedSlot.startsAt),
@@ -539,7 +541,7 @@ export function InquiryRequestForm({ c, t, therapist, authToken, onSuccess, onCl
           </View>
         )}
 
-        {/* Schritt 2: Heilmittel + (bei Serie) Frequenz */}
+        {/* Schritt 2: Heilmittel */}
         {step === 2 && (
           <View style={{ gap: 20 }}>
             <View>
@@ -548,16 +550,10 @@ export function InquiryRequestForm({ c, t, therapist, authToken, onSuccess, onCl
                 ? <Text style={{ ...TYPE.small, color: c.muted }}>Keine Leistungen verfügbar.</Text>
                 : <ChipRow options={availableHeilmittel} selected={selectedHeilmittel} onSelect={setSelectedHeilmittel} c={c} />}
             </View>
-            {suchtyp === 'SERIE' && (
-              <View>
-                <Text style={{ fontSize: 14, fontWeight: '600', color: c.text, marginBottom: 8 }}>Häufigkeit pro Woche</Text>
-                <ChipRow options={FREQUENZ_OPTIONS} selected={frequenz} onSelect={setFrequenz} c={c} />
-              </View>
-            )}
           </View>
         )}
 
-        {/* Schritt 3: Slot-Picker (Einzeltermin) oder Zeitfenster (Serie) */}
+        {/* Schritt 3: Slot-Picker (Einzeltermin) oder Multi-Slot-Picker (Serie) */}
         {step === 3 && suchtyp === 'EINZELTERMIN' && (
           <View>
             <Text style={{ ...TYPE.h2, color: c.text, marginBottom: SPACE.xs }}>Wann möchtest du kommen?</Text>
@@ -577,15 +573,28 @@ export function InquiryRequestForm({ c, t, therapist, authToken, onSuccess, onCl
 
         {step === 3 && suchtyp === 'SERIE' && (
           <View>
-            <Text style={{ ...TYPE.h2, color: c.text, marginBottom: SPACE.xs }}>Wann hast du Zeit?</Text>
-            <Text style={{ ...TYPE.caption, color: c.muted, marginBottom: SPACE.md }}>
-              Wähle Wochentage und Tageszeiten, die dir am besten passen. Der Therapeut schlägt dann einen konkreten Termin vor.
+            <Text style={{ ...TYPE.h2, color: c.text, marginBottom: SPACE.xs }}>Wunschtermine wählen</Text>
+            <Text style={{ ...TYPE.caption, color: c.muted, marginBottom: SPACE.sm }}>
+              Wähle bis zu {MAX_TERMINE} freie Termine aus, die dir passen.
             </Text>
-            <TimeWindowPicker
-              selectedDays={selectedDays}
-              selectedSlots={selectedSlots}
-              onToggleDay={toggleDay}
-              onToggleSlot={toggleSlot}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACE.md }}>
+              <Text style={{ fontSize: 13, color: selectedTermine.length > 0 ? c.primary : c.muted, fontWeight: '600' }}>
+                {selectedTermine.length} von {MAX_TERMINE} ausgewählt
+              </Text>
+              {selectedTermine.length > 0 && (
+                <Pressable onPress={() => setSelectedTermine([])}>
+                  <Text style={{ fontSize: 12, color: c.muted }}>Auswahl zurücksetzen</Text>
+                </Pressable>
+              )}
+            </View>
+            <SlotPicker
+              therapistId={therapist.id}
+              heilmittel={selectedHeilmittel}
+              selectedSlot={null}
+              selectedTermine={selectedTermine}
+              multiSelect
+              maxSelect={MAX_TERMINE}
+              onSelectSlot={toggleTermin}
               c={c}
             />
           </View>
@@ -617,7 +626,7 @@ export function InquiryRequestForm({ c, t, therapist, authToken, onSuccess, onCl
               )}
               <Text style={{ fontSize: 13, color: c.muted }}>
                 Art: <Text style={{ color: c.text, fontWeight: '600' }}>
-                  {suchtyp === 'EINZELTERMIN' ? 'Einzeltermin' : `Serie · ${FREQUENZ_OPTIONS.find((f) => f.key === frequenz)?.label}`}
+                  {suchtyp === 'EINZELTERMIN' ? 'Einzeltermin' : `Behandlungsserie · ${selectedTermine.length} Termine`}
                 </Text>
               </Text>
               {suchtyp === 'EINZELTERMIN' && selectedSlot && (
@@ -627,20 +636,14 @@ export function InquiryRequestForm({ c, t, therapist, authToken, onSuccess, onCl
                   </Text>
                 </Text>
               )}
-              {suchtyp === 'SERIE' && selectedDays.length > 0 && (
-                <Text style={{ fontSize: 13, color: c.muted }}>
-                  Tage: <Text style={{ color: c.text, fontWeight: '600' }}>
-                    {selectedDays.map((d) => WOCHENTAGE.find((w) => w.key === d)?.label).join(', ')}
+              {suchtyp === 'SERIE' && selectedTermine.map((slot, i) => (
+                <Text key={i} style={{ fontSize: 13, color: c.muted }}>
+                  {i === 0 ? 'Termine: ' : ''}
+                  <Text style={{ color: c.text, fontWeight: '600' }}>
+                    {dateGroupLabel(slot.startsAt)} · {formatTime(slot.startsAt)}
                   </Text>
                 </Text>
-              )}
-              {suchtyp === 'SERIE' && selectedSlots.length > 0 && (
-                <Text style={{ fontSize: 13, color: c.muted }}>
-                  Uhrzeiten: <Text style={{ color: c.text, fontWeight: '600' }}>
-                    {selectedSlots.map((s) => ZEITFENSTER.find((z) => z.key === s)?.label).join(', ')}
-                  </Text>
-                </Text>
-              )}
+              ))}
             </View>
 
             <View style={{ marginBottom: SPACE.md }}>
