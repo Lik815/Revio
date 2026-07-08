@@ -227,13 +227,13 @@ export function TherapyTabTherapist({
             >
               {incomingInquiriesLoading && (!incomingInquiries || incomingInquiries.length === 0) ? (
                 <ActivityIndicator color={c.primary} style={{ marginTop: 40 }} />
-              ) : !incomingInquiries || incomingInquiries.length === 0 ? (
+              ) : pendingInquiries.length === 0 ? (
                 <View style={{ alignItems: 'center', paddingTop: 60, gap: 10 }}>
                   <Ionicons name="mail-open-outline" size={40} color={c.muted} />
-                  <Text style={{ fontSize: 15, color: c.muted, textAlign: 'center' }}>Keine Anfragen vorhanden</Text>
+                  <Text style={{ fontSize: 15, color: c.muted, textAlign: 'center' }}>Keine offenen Anfragen</Text>
                 </View>
               ) : (
-                (incomingInquiries ?? []).map((inquiry) => (
+                pendingInquiries.map((inquiry) => (
                   <InquiryCard
                     key={inquiry.id}
                     inquiry={inquiry}
