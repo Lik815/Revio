@@ -152,148 +152,234 @@ function minutesFromIso(isoString) {
   return d.getHours() * 60 + d.getMinutes();
 }
 
+function getThisWeekMonday(date = new Date()) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  const day = d.getDay();
+  d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day));
+  return d;
+}
+
+function addWeeks(date, n) {
+  const d = new Date(date);
+  d.setDate(d.getDate() + n * 7);
+  return d;
+}
+
+function weekKey(monday) {
+  return monday.toISOString().slice(0, 10);
+}
+
+function getWeekEnd(monday) {
+  const d = new Date(monday);
+  d.setDate(d.getDate() + 7);
+  return d;
+}
+
+function formatWeekRange(monday) {
+  const end = new Date(monday);
+  end.setDate(end.getDate() + 6);
+  const opts = { day: 'numeric', month: 'short' };
+  return `${monday.toLocaleDateString('de-DE', opts)} – ${end.toLocaleDateString('de-DE', opts)}`;
+}
+
+function getWeekDays(monday) {
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(monday);
+    d.setDate(d.getDate() + i);
+    return d;
+  });
+}
+
+const WEEK_DAY_LABELS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+
 function SlotPicker({ therapistId, heilmittel, selectedSlot, selectedTermine, multiSelect, maxSelect, onSelectSlot, onPicked, c }) {
-  const [slots, setSlots] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const todayMonday = useMemo(() => getThisWeekMonday(), []);
+  const [weekStart, setWeekStart] = useState(() => getThisWeekMonday());
+  const [slotsByWeek, setSlotsByWeek] = useState({});
+  const [loadingWeek, setLoadingWeek] = useState(null);
+  const [errorWeek, setErrorWeek] = useState(null);
   const [expandedDate, setExpandedDate] = useState(null);
   const [showAllFor, setShowAllFor] = useState(() => new Set());
 
+  const currentKey = weekKey(weekStart);
+
   useEffect(() => {
-    setLoading(true);
-    setError('');
-    const now = new Date();
-    const to = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
+    if (slotsByWeek[currentKey] !== undefined) return;
+    setLoadingWeek(currentKey);
+    setErrorWeek(null);
     fetch(
-      `${getBaseUrl()}/therapists/${therapistId}/available-slots?heilmittel=${encodeURIComponent(heilmittel)}&from=${now.toISOString()}&to=${to.toISOString()}`,
+      `${getBaseUrl()}/therapists/${therapistId}/available-slots?heilmittel=${encodeURIComponent(heilmittel)}&from=${weekStart.toISOString()}&to=${getWeekEnd(weekStart).toISOString()}`,
       { headers: { ...TUNNEL_HEADERS } },
     )
       .then((r) => r.json())
       .then((data) => {
         const slotList = Array.isArray(data.slots) ? data.slots : [];
-        setSlots(slotList);
-        setExpandedDate(slotList[0]?.startsAt ? dateGroupKey(slotList[0].startsAt) : null);
-        setShowAllFor(new Set());
-        setLoading(false);
+        setSlotsByWeek((prev) => ({ ...prev, [currentKey]: slotList }));
+        setLoadingWeek(null);
+        const firstSlot = slotList[0];
+        setExpandedDate(firstSlot ? dateGroupKey(firstSlot.startsAt) : null);
       })
-      .catch(() => { setError('Termine konnten nicht geladen werden.'); setLoading(false); });
-  }, [therapistId, heilmittel]);
+      .catch(() => { setErrorWeek(currentKey); setLoadingWeek(null); });
+  }, [currentKey, therapistId, heilmittel]);
+
+  useEffect(() => { setShowAllFor(new Set()); }, [currentKey]);
+
+  const currentSlots = slotsByWeek[currentKey] ?? [];
+  const isLoading = loadingWeek === currentKey;
+  const hasError = errorWeek === currentKey;
 
   const byDate = useMemo(() => {
     const map = new Map();
-    for (const slot of slots) {
-      const key = dateGroupKey(slot.startsAt);
-      if (!map.has(key)) map.set(key, { dateKey: key, label: dateGroupLabel(slot.startsAt), slots: [] });
-      map.get(key).slots.push(slot);
+    for (const slot of currentSlots) {
+      const dk = dateGroupKey(slot.startsAt);
+      if (!map.has(dk)) map.set(dk, { dateKey: dk, label: dateGroupLabel(slot.startsAt), slots: [] });
+      map.get(dk).slots.push(slot);
     }
     return Array.from(map.values());
-  }, [slots]);
+  }, [currentSlots]);
 
-  if (loading) {
-    return <ActivityIndicator color={c.primary} style={{ marginTop: 32 }} />;
-  }
-
-  if (error) {
-    return (
-      <View style={{ alignItems: 'center', marginTop: 24 }}>
-        <Ionicons name="alert-circle-outline" size={28} color={c.error ?? '#EF4444'} style={{ marginBottom: 8 }} />
-        <Text style={{ fontSize: 13, color: c.muted, textAlign: 'center' }}>{error}</Text>
-      </View>
-    );
-  }
-
-  if (byDate.length === 0) {
-    return (
-      <View style={{ alignItems: 'center', marginTop: 32 }}>
-        <Ionicons name="calendar-outline" size={36} color={c.muted} style={{ marginBottom: 12 }} />
-        <Text style={{ fontSize: 15, fontWeight: '700', color: c.text, textAlign: 'center' }}>Keine freien Termine</Text>
-        <Text style={{ fontSize: 13, color: c.muted, textAlign: 'center', marginTop: 6, lineHeight: 20 }}>
-          In den nächsten 14 Tagen sind keine freien Termine verfügbar.
-        </Text>
-      </View>
-    );
-  }
+  const today = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; }, []);
+  const todayKey = today.toISOString().slice(0, 10);
+  const isFirstWeek = currentKey === weekKey(todayMonday);
+  const weekDays = getWeekDays(weekStart);
 
   return (
     <View style={{ gap: 8 }}>
-      {byDate.map((group) => {
-        const isOpen = expandedDate === group.dateKey;
-        const showAll = showAllFor.has(group.dateKey);
-        const visibleSlots = showAll ? group.slots : group.slots.slice(0, 6);
-        const hasMore = group.slots.length > 6 && !showAll;
-        const groupHasSelected = multiSelect
-          ? group.slots.some((slot) => (selectedTermine ?? []).some((s) => s.startsAt === slot.startsAt))
-          : group.slots.some((slot) => selectedSlot?.startsAt === slot.startsAt);
-
-        return (
-          <View
-            key={group.dateKey}
-            style={{ borderRadius: RADIUS.md, borderWidth: 1, borderColor: c.border, overflow: 'hidden' }}
+      {/* Wochen-Strip */}
+      <View style={{ borderRadius: RADIUS.md, borderWidth: 1, borderColor: c.border, backgroundColor: c.card, paddingVertical: 12, paddingHorizontal: 4 }}>
+        {/* Header: ← Woche → */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 6, marginBottom: 10 }}>
+          <Pressable
+            onPress={() => { if (!isFirstWeek) setWeekStart(addWeeks(weekStart, -1)); }}
+            disabled={isFirstWeek}
+            style={{ padding: 6, opacity: isFirstWeek ? 0.25 : 1 }}
           >
-            <Pressable
-              onPress={() => setExpandedDate(isOpen ? null : group.dateKey)}
-              style={{
-                flexDirection: 'row', alignItems: 'center',
-                padding: 14,
-                backgroundColor: c.card,
-              }}
-            >
-              <Text style={{ flex: 1, fontSize: 15, fontWeight: '700', color: c.text }}>
-                {group.label}
-              </Text>
-              {groupHasSelected && !isOpen && (
-                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: c.primary, marginRight: 8 }} />
-              )}
-              <Ionicons name={isOpen ? 'chevron-up' : 'chevron-down'} size={18} color={c.muted} />
-            </Pressable>
+            <Ionicons name="chevron-back" size={18} color={c.text} />
+          </Pressable>
+          <Text style={{ fontSize: 13, fontWeight: '600', color: c.text }}>{formatWeekRange(weekStart)}</Text>
+          <Pressable onPress={() => setWeekStart(addWeeks(weekStart, 1))} style={{ padding: 6 }}>
+            <Ionicons name="chevron-forward" size={18} color={c.text} />
+          </Pressable>
+        </View>
+        {/* Tages-Zellen */}
+        <View style={{ flexDirection: 'row', justifyContent: 'space-around' }}>
+          {weekDays.map((day, idx) => {
+            const dk = day.toISOString().slice(0, 10);
+            const isPast = day < today;
+            const isToday = dk === todayKey;
+            const hasSlotsForDay = byDate.some((g) => g.dateKey === dk);
+            const hasSelection = multiSelect
+              ? (selectedTermine ?? []).some((s) => s.startsAt?.slice(0, 10) === dk)
+              : selectedSlot?.startsAt?.slice(0, 10) === dk;
+            return (
+              <Pressable
+                key={dk}
+                onPress={() => {
+                  if (isPast || !hasSlotsForDay) return;
+                  setExpandedDate(expandedDate === dk ? null : dk);
+                }}
+                style={{ alignItems: 'center', gap: 2, paddingVertical: 2, paddingHorizontal: 4, opacity: isPast ? 0.3 : 1 }}
+              >
+                <Text style={{ fontSize: 11, color: c.muted, fontWeight: '500' }}>{WEEK_DAY_LABELS[idx]}</Text>
+                <Text style={{
+                  fontSize: 14,
+                  fontWeight: hasSelection || isToday ? '800' : '400',
+                  color: hasSelection ? c.primary : isToday ? c.primary : hasSlotsForDay ? c.text : c.muted,
+                }}>
+                  {day.getDate()}
+                </Text>
+                <View style={{
+                  width: 5, height: 5, borderRadius: 3,
+                  backgroundColor: hasSelection ? c.primary : (isToday && hasSlotsForDay ? `${c.primary}60` : 'transparent'),
+                }} />
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
 
-            {isOpen && (
-              <View style={{ padding: 12, borderTopWidth: 1, borderTopColor: c.border, backgroundColor: c.background }}>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                  {visibleSlots.map((slot) => {
-                    const active = multiSelect
-                      ? (selectedTermine ?? []).some((s) => s.startsAt === slot.startsAt)
-                      : selectedSlot?.startsAt === slot.startsAt;
-                    const atMax = multiSelect && (selectedTermine ?? []).length >= (maxSelect ?? 10) && !active;
-                    return (
-                      <Pressable
-                        key={slot.startsAt}
-                        onPress={() => {
-                          if (atMax) return;
-                          onSelectSlot(slot);
-                          if (!multiSelect) onPicked?.(slot);
-                        }}
-                        style={{
-                          paddingVertical: 10, paddingHorizontal: 14,
-                          borderRadius: RADIUS.sm, borderWidth: 1.5,
-                          borderColor: active ? c.primary : atMax ? c.border : c.border,
-                          backgroundColor: active ? c.primaryBg : atMax ? c.mutedBg : c.card,
-                          minWidth: 72, alignItems: 'center',
-                          opacity: atMax ? 0.4 : 1,
-                        }}
-                      >
-                        <Text style={{ fontSize: 14, fontWeight: active ? '700' : '500', color: active ? c.primary : c.text }}>
-                          {formatTime(slot.startsAt)}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-                {hasMore && (
-                  <Pressable
-                    onPress={() => setShowAllFor((prev) => new Set([...prev, group.dateKey]))}
-                    style={{ marginTop: 10, alignItems: 'center', paddingVertical: 8 }}
-                  >
-                    <Text style={{ fontSize: 13, fontWeight: '700', color: c.primary, letterSpacing: 0.4 }}>
-                      MEHR
-                    </Text>
-                  </Pressable>
+      {/* Slot-Liste */}
+      {isLoading ? (
+        <ActivityIndicator color={c.primary} style={{ marginTop: 20 }} />
+      ) : hasError ? (
+        <View style={{ alignItems: 'center', marginTop: 16 }}>
+          <Ionicons name="alert-circle-outline" size={24} color={c.error ?? '#EF4444'} style={{ marginBottom: 6 }} />
+          <Text style={{ fontSize: 13, color: c.muted, textAlign: 'center' }}>Termine konnten nicht geladen werden.</Text>
+        </View>
+      ) : byDate.length === 0 ? (
+        <View style={{ alignItems: 'center', paddingVertical: 20 }}>
+          <Text style={{ fontSize: 13, color: c.muted, textAlign: 'center' }}>Keine freien Termine in dieser Woche.</Text>
+        </View>
+      ) : (
+        byDate.map((group) => {
+          const isOpen = expandedDate === group.dateKey;
+          const showAll = showAllFor.has(group.dateKey);
+          const visibleSlots = showAll ? group.slots : group.slots.slice(0, 6);
+          const hasMore = group.slots.length > 6 && !showAll;
+          const groupHasSelected = multiSelect
+            ? group.slots.some((slot) => (selectedTermine ?? []).some((s) => s.startsAt === slot.startsAt))
+            : group.slots.some((slot) => selectedSlot?.startsAt === slot.startsAt);
+
+          return (
+            <View key={group.dateKey} style={{ borderRadius: RADIUS.md, borderWidth: 1, borderColor: c.border, overflow: 'hidden' }}>
+              <Pressable
+                onPress={() => setExpandedDate(isOpen ? null : group.dateKey)}
+                style={{ flexDirection: 'row', alignItems: 'center', padding: 14, backgroundColor: c.card }}
+              >
+                <Text style={{ flex: 1, fontSize: 15, fontWeight: '700', color: c.text }}>{group.label}</Text>
+                {groupHasSelected && !isOpen && (
+                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: c.primary, marginRight: 8 }} />
                 )}
-              </View>
-            )}
-          </View>
-        );
-      })}
+                <Ionicons name={isOpen ? 'chevron-up' : 'chevron-down'} size={18} color={c.muted} />
+              </Pressable>
+
+              {isOpen && (
+                <View style={{ padding: 12, borderTopWidth: 1, borderTopColor: c.border, backgroundColor: c.background }}>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                    {visibleSlots.map((slot) => {
+                      const active = multiSelect
+                        ? (selectedTermine ?? []).some((s) => s.startsAt === slot.startsAt)
+                        : selectedSlot?.startsAt === slot.startsAt;
+                      const atMax = multiSelect && (selectedTermine ?? []).length >= (maxSelect ?? 10) && !active;
+                      return (
+                        <Pressable
+                          key={slot.startsAt}
+                          onPress={() => {
+                            if (atMax) return;
+                            onSelectSlot(slot);
+                            if (!multiSelect) onPicked?.(slot);
+                          }}
+                          style={{
+                            paddingVertical: 10, paddingHorizontal: 14,
+                            borderRadius: RADIUS.sm, borderWidth: 1.5,
+                            borderColor: active ? c.primary : c.border,
+                            backgroundColor: active ? c.primaryBg : atMax ? c.mutedBg : c.card,
+                            minWidth: 72, alignItems: 'center',
+                            opacity: atMax ? 0.4 : 1,
+                          }}
+                        >
+                          <Text style={{ fontSize: 14, fontWeight: active ? '700' : '500', color: active ? c.primary : c.text }}>
+                            {formatTime(slot.startsAt)}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                  {hasMore && (
+                    <Pressable
+                      onPress={() => setShowAllFor((prev) => new Set([...prev, group.dateKey]))}
+                      style={{ marginTop: 10, alignItems: 'center', paddingVertical: 8 }}
+                    >
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: c.primary, letterSpacing: 0.4 }}>MEHR</Text>
+                    </Pressable>
+                  )}
+                </View>
+              )}
+            </View>
+          );
+        })
+      )}
     </View>
   );
 }
