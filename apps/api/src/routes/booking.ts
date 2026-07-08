@@ -442,7 +442,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // GET /bookings/my — Patient sieht eigene Buchungen
+  // GET /bookings/my — Patient sieht eigene Buchungen (BookingRequests + Inquiry-ScheduledSlots)
   fastify.get('/bookings/my', async (request, reply) => {
     const token = request.headers.authorization?.replace('Bearer ', '');
     if (!token) return reply.status(401).send({ error: 'Unauthorized' });
@@ -462,7 +462,40 @@ export async function bookingRoutes(fastify: FastifyInstance) {
       ...(take ? { take } : {}),
     });
 
-    return reply.send(bookings);
+    // Inquiry-basierte ScheduledSlots (Serien-Termine) dazuladen.
+    // ScheduledSlot hat kein direktes Prisma-Relation zu Inquiry, daher zwei Queries.
+    const patientInquiryIds = await fastify.prisma.inquiry.findMany({
+      where: { patientRequest: { patientUserId: patient.id } },
+      select: { id: true },
+    });
+    const inquiryScheduledSlots = patientInquiryIds.length > 0
+      ? await fastify.prisma.scheduledSlot.findMany({
+          where: { inquiryId: { in: patientInquiryIds.map((i) => i.id) } },
+          include: {
+            therapist: { select: { id: true, fullName: true, professionalTitle: true, city: true, photo: true, phone: true } },
+          },
+          orderBy: { startsAt: 'asc' },
+        })
+      : [];
+
+    // Auf BookingRequest-kompatibles Format normalisieren.
+    const normalizedSlots = inquiryScheduledSlots.map((slot) => ({
+      id: slot.id,
+      status: slot.status === 'SCHEDULED' ? 'CONFIRMED' : slot.status,
+      startsAt: slot.startsAt,
+      endsAt: slot.endsAt,
+      heilmittel: slot.heilmittel,
+      therapist: slot.therapist,
+      patientName: slot.patientName,
+      patientPhone: slot.patientPhone,
+      _source: 'inquiry' as const,
+    }));
+
+    const merged = [...bookings, ...normalizedSlots].sort(
+      (a, b) => new Date(a.startsAt ?? 0).getTime() - new Date(b.startsAt ?? 0).getTime(),
+    );
+
+    return reply.send(merged);
   });
 
   // GET /bookings/incoming — Therapeut sieht eingehende Buchungen
