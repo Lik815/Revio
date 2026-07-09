@@ -12,6 +12,8 @@ import { ProfileTabScreen } from '../screens/profile/ProfileScreen';
 import { TherapistProfileScreen } from '../screens/public/TherapistProfileScreen';
 import { PracticeProfileScreen } from '../screens/public/PracticeProfileScreen';
 import { TherapistDashboardScreen } from '../screens/dashboard/TherapistDashboardScreen';
+import { CourseListScreen } from '../screens/courses/CourseListScreen';
+import { CourseDetailScreen } from '../screens/courses/CourseDetailScreen';
 import { LoginScreen } from '../screens/auth/LoginScreen';
 import { translations } from '../i18n/translations';
 import { CustomTabBar } from './CustomTabBar';
@@ -41,7 +43,19 @@ function withProfileScreens(HomeComponent, homeName) {
   };
 }
 
-const DiscoverStack = withProfileScreens(DiscoverTabScreen, 'DiscoverHome');
+const DiscoverCourseStack = createNativeStackNavigator();
+function DiscoverStack() {
+  return (
+    <DiscoverCourseStack.Navigator screenOptions={{ headerShown: false }}>
+      <DiscoverCourseStack.Screen component={DiscoverTabScreen} name="DiscoverHome" />
+      <DiscoverCourseStack.Screen component={ProfileTabScreen} name={ROOT_ROUTES.PROFILE} />
+      <DiscoverCourseStack.Screen component={TherapistProfileScreen} name={ROOT_ROUTES.THERAPIST_PROFILE} />
+      <DiscoverCourseStack.Screen component={PracticeProfileScreen} name={ROOT_ROUTES.PRACTICE_PROFILE} />
+      <DiscoverCourseStack.Screen component={CourseListScreen} name={ROOT_ROUTES.COURSE_LIST} />
+      <DiscoverCourseStack.Screen component={CourseDetailScreen} name={ROOT_ROUTES.COURSE_DETAIL} />
+    </DiscoverCourseStack.Navigator>
+  );
+}
 const FavoritesStack = withProfileScreens(FavoritesTabScreen, 'FavoritesHome');
 const TherapyStack = withProfileScreens(TherapyTabScreen, 'TherapyHome');
 const NotificationsStack = withProfileScreens(NotificationsTabScreen, 'NotificationsHome');

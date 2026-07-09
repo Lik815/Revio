@@ -83,6 +83,10 @@ export function DiscoverTabScreen() {
     navigation.navigate(ROOT_ROUTES.THERAPIST_PROFILE, { therapistId: id, therapist: fallback });
   };
 
+  const openCourses = () => {
+    navigation.navigate(ROOT_ROUTES.COURSE_LIST);
+  };
+
   const handleBannerPress = () => {
     navigation.navigate(ROOT_ROUTES.MAIN_TABS, {
       screen: TAB_ROUTES.THERAPY,
@@ -146,6 +150,7 @@ export function DiscoverTabScreen() {
         userCoords={search.userCoords}
         viewMode={search.viewMode}
         bannerExtraPadding={nextAppointment ? NEXT_APPOINTMENT_BANNER_HEIGHT + 16 : 0}
+        onOpenCourses={openCourses}
       />
 
       <NextAppointmentBanner

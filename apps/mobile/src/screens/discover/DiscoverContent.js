@@ -116,6 +116,7 @@ export function DiscoverContent(props) {
     requestableOnly,
     setRequestableOnly,
     bannerExtraPadding = 0,
+    onOpenCourses,
   } = props;
 
   const insets = useSafeAreaInsets();
@@ -668,6 +669,29 @@ export function DiscoverContent(props) {
           <View style={styles.hero}>
             <Text style={[styles.heroTitle, { color: c.text }]}>{t('heroTitle')}</Text>
             <Text style={[styles.heroSub, { color: c.muted }]}>{t('heroSub')}</Text>
+            {onOpenCourses && (
+              <Pressable
+                onPress={onOpenCourses}
+                style={({ pressed }) => ({
+                  marginTop: SPACE.sm,
+                  borderRadius: RADIUS.md,
+                  borderWidth: 1,
+                  borderColor: c.border,
+                  backgroundColor: pressed ? c.primaryBg : c.card,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  paddingHorizontal: SPACE.lg,
+                  paddingVertical: SPACE.md,
+                })}
+              >
+                <View style={{ gap: 2 }}>
+                  <Text style={[TYPE.heading, { color: c.text }]}>Gesundheitskurse</Text>
+                  <Text style={[TYPE.meta, { color: c.textMuted }]}>Bewegung, Ernährung, Entspannung und mehr</Text>
+                </View>
+                <Text style={[{ fontSize: 18, color: c.primary }]}>›</Text>
+              </Pressable>
+            )}
           </View>
         )}
 
