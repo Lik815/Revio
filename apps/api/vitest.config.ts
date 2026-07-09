@@ -5,6 +5,7 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     globalSetup: './test/setup.ts',
+    fileParallelism: false,
     poolOptions: {
       threads: {
         singleThread: true,

@@ -6,6 +6,7 @@ const TEST_DB = './prisma/test.db';
 export async function setup() {
   process.env.DATABASE_URL = `file:${TEST_DB}`;
   process.env.REVIO_ADMIN_TOKEN = 'test-token';
+  process.env.RESEND_API_KEY = 'test-key'; // Verhindert throw in mailer.ts; Resend selbst wird nicht aufgerufen da kein echter Key
 
   // Remove stale test DB so migration starts fresh
   if (existsSync(TEST_DB)) rmSync(TEST_DB);
