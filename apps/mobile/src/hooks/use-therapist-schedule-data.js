@@ -4,6 +4,7 @@ import { getBaseUrl, TUNNEL_HEADERS } from '../utils/app-utils';
 export function useTherapistScheduleData({ authToken }) {
   const [workingHoursRules, setWorkingHoursRules] = useState([]);
   const [blockedTimes, setBlockedTimes] = useState([]);
+  const [courseSessions, setCourseSessions] = useState([]);
   const [loading, setLoading] = useState(false);
   const cancelledRef = useRef(false);
 
@@ -17,12 +18,16 @@ export function useTherapistScheduleData({ authToken }) {
       const to = new Date();
       to.setDate(to.getDate() + 90);
 
-      const [hoursRes, blockedRes] = await Promise.all([
+      const [hoursRes, blockedRes, courseSessionsRes] = await Promise.all([
         fetch(`${getBaseUrl()}/therapist/working-hours`, {
           headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
         }).catch(() => null),
         fetch(
           `${getBaseUrl()}/therapist/blocked-times?from=${from.toISOString()}&to=${to.toISOString()}`,
+          { headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` } },
+        ).catch(() => null),
+        fetch(
+          `${getBaseUrl()}/courses/my/sessions?from=${from.toISOString()}&to=${to.toISOString()}`,
           { headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` } },
         ).catch(() => null),
       ]);
@@ -37,6 +42,10 @@ export function useTherapistScheduleData({ authToken }) {
         const d = await blockedRes.json().catch(() => ({}));
         if (!cancelledRef.current) setBlockedTimes(d.blockedTimes ?? []);
       }
+      if (courseSessionsRes?.ok) {
+        const d = await courseSessionsRes.json().catch(() => ({}));
+        if (!cancelledRef.current) setCourseSessions(d.sessions ?? []);
+      }
     } finally {
       if (!cancelledRef.current) setLoading(false);
     }
@@ -47,5 +56,5 @@ export function useTherapistScheduleData({ authToken }) {
     return () => { cancelledRef.current = true; };
   }, [load]);
 
-  return { workingHoursRules, blockedTimes, loading, refreshScheduleData: load };
+  return { workingHoursRules, blockedTimes, courseSessions, loading, refreshScheduleData: load };
 }

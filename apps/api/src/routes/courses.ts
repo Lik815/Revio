@@ -397,4 +397,53 @@ export async function courseRoutes(fastify: FastifyInstance) {
     await fastify.prisma.courseSession.delete({ where: { id: sessionId } });
     return reply.status(204).send();
   });
+
+  // ── Kalender-Sessions des Therapeuten ────────────────────────────────────────
+  // GET /courses/my/sessions?from=ISO&to=ISO
+  // Gibt alle CourseSession-Einträge der eigenen Kurse in einem Zeitraum zurück,
+  // damit sie im Therapeuten-Kalender wie Terminslots angezeigt werden können.
+
+  fastify.get('/courses/my/sessions', async (request, reply) => {
+    const therapist = await resolveTherapist(fastify, request);
+    if (!therapist) return reply.status(401).send({ error: 'Unauthorized' });
+
+    const q = request.query as Record<string, string | undefined>;
+    const from = q.from ? new Date(q.from) : new Date();
+    const to = q.to ? new Date(q.to) : new Date(from.getTime() + 90 * 24 * 60 * 60 * 1000);
+
+    const sessions = await fastify.prisma.courseSession.findMany({
+      where: {
+        startsAt: { gte: from, lte: to },
+        courseRun: {
+          status: { notIn: [CourseRunStatus.CANCELLED] },
+          course: { therapistId: therapist.id },
+        },
+      },
+      include: {
+        courseRun: {
+          select: {
+            id: true,
+            label: true,
+            status: true,
+            course: { select: { id: true, title: true } },
+          },
+        },
+      },
+      orderBy: { startsAt: 'asc' },
+    });
+
+    return reply.send({
+      sessions: sessions.map(s => ({
+        id: s.id,
+        startsAt: s.startsAt,
+        endsAt: s.endsAt,
+        location: s.location,
+        courseId: s.courseRun.course.id,
+        courseTitle: s.courseRun.course.title,
+        runId: s.courseRun.id,
+        runLabel: s.courseRun.label,
+        runStatus: s.courseRun.status,
+      })),
+    });
+  });
 }

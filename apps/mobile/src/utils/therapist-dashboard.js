@@ -140,15 +140,22 @@ export function computeTherapistDashboardStats({
 
 /**
  * Wandelt computeDayPeriods-Ergebnis in typisierte Agenda-Items um.
- * kind=blocked wird nicht angezeigt (kein eintrag im Mockup).
+ * kind=blocked wird nicht angezeigt.
+ * courseSessions werden als type='course' Items eingefügt und chronologisch einsortiert.
  */
-export function getDayAgendaItems({ bookings, workingHoursRules, blockedTimes, date }) {
+export function getDayAgendaItems({ bookings, workingHoursRules, blockedTimes, courseSessions = [], date }) {
   const periods = computeDayPeriods(
     Array.isArray(workingHoursRules) ? workingHoursRules : [],
     Array.isArray(blockedTimes) ? blockedTimes : [],
     Array.isArray(bookings) ? bookings : [],
     date,
   );
+
+  const dayStart = new Date(date);
+  dayStart.setHours(0, 0, 0, 0);
+  const dayEnd = new Date(date);
+  dayEnd.setHours(23, 59, 59, 999);
+
   const items = [];
   for (const p of periods) {
     if (p.kind === 'booked') {
@@ -158,9 +165,22 @@ export function getDayAgendaItems({ bookings, workingHoursRules, blockedTimes, d
     } else if (p.kind === 'free') {
       items.push({ type: 'free', startsAt: p.startsAt, endsAt: p.endsAt });
     }
-    // 'blocked' wird nicht in Agenda angezeigt
   }
-  return items; // bereits sortiert durch computeDayPeriods
+
+  // Kurs-Sessions des Tages einfügen
+  if (Array.isArray(courseSessions)) {
+    for (const s of courseSessions) {
+      const start = new Date(s.startsAt);
+      const end = new Date(s.endsAt);
+      if (start >= dayStart && start <= dayEnd) {
+        items.push({ type: 'course', session: s, startsAt: start, endsAt: end });
+      }
+    }
+  }
+
+  // Chronologisch sortieren
+  items.sort((a, b) => a.startsAt - b.startsAt);
+  return items;
 }
 
 /**

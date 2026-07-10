@@ -10,7 +10,7 @@ export function OptionsContent({
   onShowLogin, onShowRegister,
   onShowFeedback, onShowChangePassword, onShowPhoneEdit, onShowKassenartEdit, onLogout,
   onShowDebug,
-  onShowWorkingHours, onShowServices, onShowBlockedTimes, onShowCapacityRule, onShowAbsences,
+  onShowWorkingHours, onShowServices, onShowBlockedTimes, onShowCapacityRule, onShowAbsences, onShowMyCourses,
   c, t, styles,
 }) {
   const [debugTapCount, setDebugTapCount] = React.useState(0);
@@ -104,6 +104,23 @@ const renderOptions = () => {
                 subtitle="Urlaub und Fortbildungen"
                 icon="airplane-outline"
                 onPress={onShowAbsences}
+                valueColor={c.primary}
+                last
+              />
+            </OptionGroup>
+          </>
+        )}
+
+        {/* ── Kurse (alle eingeloggten Therapeuten) ── */}
+        {loggedInTherapist && (
+          <>
+            <SectionHeader title="Gesundheitskurse" />
+            <OptionGroup>
+              <OptionRow
+                label="Meine Kurse"
+                subtitle="Kurse anlegen, planen und einreichen"
+                icon="school-outline"
+                onPress={onShowMyCourses}
                 valueColor={c.primary}
                 last
               />
