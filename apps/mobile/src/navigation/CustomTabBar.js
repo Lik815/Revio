@@ -119,6 +119,7 @@ export function CustomTabBar({ state, descriptors, navigation, badgeCounts = {} 
             paddingVertical: SPACE.sm,
             paddingHorizontal: SPACE.sm,
             gap: 4,
+            alignSelf: 'stretch',
             ...SHADOW.modal,
           }}
         >
@@ -138,8 +139,10 @@ export function CustomTabBar({ state, descriptors, navigation, badgeCounts = {} 
                 key={route.key}
                 onPress={onPress}
                 style={{
+                  flex: 1,
                   flexDirection: 'row',
                   alignItems: 'center',
+                  justifyContent: 'center',
                   gap: 7,
                   paddingVertical: 10,
                   paddingHorizontal: 18,
