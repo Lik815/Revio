@@ -335,6 +335,7 @@ export async function courseRoutes(fastify: FastifyInstance) {
     const { courseId, runId } = request.params as { courseId: string; runId: string };
     const run = await fastify.prisma.courseRun.findFirst({
       where: { id: runId, courseId, course: { therapistId: therapist.id } },
+      include: { course: { select: { reviewStatus: true } } },
     });
     if (!run) return reply.status(404).send({ error: 'Durchlauf nicht gefunden' });
     assertRunNotTerminal(run.status);
@@ -355,6 +356,29 @@ export async function courseRoutes(fastify: FastifyInstance) {
         }),
       ),
     );
+
+    // Auto-Publish: Durchlauf zu einem bereits freigegebenen Kurs hinzugefügt
+    // (z. B. über "Durchlauf hinzufügen" im Wizard). Das Auto-Publish bei der
+    // Kurs-Freigabe selbst greift hier nicht, weil der Kurs schon APPROVED
+    // war, bevor dieser Durchlauf/die Termine existierten – ohne diesen
+    // zweiten Auto-Publish-Pfad bliebe der Durchlauf für immer im DRAFT-Limbo.
+    if (run.status === CourseRunStatus.DRAFT && run.course.reviewStatus === ReviewStatus.APPROVED) {
+      try {
+        assertRunPublishable({
+          courseReviewStatus: run.course.reviewStatus,
+          sessionCount: sessions.length,
+          maxParticipants: run.maxParticipants,
+        });
+        await fastify.prisma.courseRun.update({
+          where: { id: runId },
+          data: { status: CourseRunStatus.PUBLISHED },
+        });
+      } catch {
+        // Voraussetzungen (noch) nicht erfüllt – bleibt DRAFT, Therapeut kann
+        // später weitere Termine ergänzen.
+      }
+    }
+
     return reply.status(201).send(sessions);
   });
 
