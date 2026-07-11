@@ -165,6 +165,9 @@ model Therapist {
   sessionTokenExpiresAt DateTime?
   photo                 String?
   expoPushToken         String?
+  autoAcceptEnabled     Boolean      @default(false)
+  autoAcceptSingle      Boolean      @default(false)
+  autoAcceptSeries      Boolean      @default(false)
   taxRegistrationStatus String?
   healthAuthorityStatus String?
   complianceUpdatedAt   DateTime?
