@@ -16,37 +16,52 @@ import { BackButton } from '../../components/BackButton';
 import { TherapistCourseCreateScreen } from './TherapistCourseCreateScreen';
 
 const STATUS_META = {
-  DRAFT:            { label: 'Entwurf',       bg: 'mutedBg',   fg: 'muted'   },
-  PENDING_REVIEW:   { label: 'In Prüfung',    bg: 'warningBg', fg: 'warning' },
-  APPROVED:         { label: 'Genehmigt',     bg: 'successBg', fg: 'success' },
-  REJECTED:         { label: 'Abgelehnt',     bg: 'errorBg',   fg: 'error'   },
-  CHANGES_REQUESTED:{ label: 'Änderungen nötig', bg: 'warningBg', fg: 'warning' },
-  SUSPENDED:        { label: 'Gesperrt',      bg: 'errorBg',   fg: 'error'   },
+  DRAFT:            { label: 'Entwurf',          bg: 'mutedBg',   fg: 'muted',   icon: 'create-outline' },
+  PENDING_REVIEW:   { label: 'In Prüfung',        bg: 'warningBg', fg: 'warning', icon: 'time-outline' },
+  APPROVED:         { label: 'Genehmigt',         bg: 'successBg', fg: 'success', icon: 'checkmark-circle-outline' },
+  REJECTED:         { label: 'Abgelehnt',         bg: 'errorBg',   fg: 'error',   icon: 'close-circle-outline' },
+  CHANGES_REQUESTED:{ label: 'Änderungen nötig',  bg: 'warningBg', fg: 'warning', icon: 'alert-circle-outline' },
+  SUSPENDED:        { label: 'Gesperrt',          bg: 'errorBg',   fg: 'error',   icon: 'ban-outline' },
 };
 
 function StatusBadge({ status, c }) {
-  const meta = STATUS_META[status] ?? { label: status, bg: 'mutedBg', fg: 'muted' };
+  const meta = STATUS_META[status] ?? { label: status, bg: 'mutedBg', fg: 'muted', icon: 'ellipse-outline' };
   return (
-    <View style={{ backgroundColor: c[meta.bg], borderRadius: RADIUS.full, paddingHorizontal: 8, paddingVertical: 3 }}>
-      <Text style={[TYPE.label, { color: c[meta.fg] }]}>{meta.label}</Text>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: c[meta.bg], borderRadius: RADIUS.full, paddingHorizontal: 12, paddingVertical: 6 }}>
+      <Ionicons name={meta.icon} size={14} color={c[meta.fg]} />
+      <Text style={[TYPE.meta, { color: c[meta.fg], fontWeight: '700' }]}>{meta.label}</Text>
     </View>
   );
 }
 
 function CourseRow({ course, c, onPress }) {
   const runCount = course.runs?.length ?? 0;
+  const meta = STATUS_META[course.reviewStatus];
+  const accentColor = meta ? c[meta.fg] : c.border;
+  const highlight = course.reviewStatus === 'PENDING_REVIEW' || course.reviewStatus === 'CHANGES_REQUESTED';
+
   return (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => [
-        { backgroundColor: c.card, borderRadius: RADIUS.md, borderWidth: 1, borderColor: c.border, padding: SPACE.lg, gap: SPACE.sm, opacity: pressed ? 0.85 : 1 },
+        {
+          backgroundColor: highlight ? c.warningBg : c.card,
+          borderRadius: RADIUS.md,
+          borderWidth: 1,
+          borderLeftWidth: 4,
+          borderColor: highlight ? accentColor : c.border,
+          borderLeftColor: accentColor,
+          padding: SPACE.lg,
+          gap: SPACE.sm,
+          opacity: pressed ? 0.85 : 1,
+        },
         SHADOW.card,
       ]}
     >
       <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: SPACE.sm }}>
         <Text style={[TYPE.heading, { color: c.text, flex: 1 }]} numberOfLines={2}>{course.title}</Text>
-        <StatusBadge status={course.reviewStatus} c={c} />
       </View>
+      <StatusBadge status={course.reviewStatus} c={c} />
       <Text style={[TYPE.meta, { color: c.textMuted }]}>
         {course.category?.label ?? course.categoryKey}
         {runCount > 0 ? `  ·  ${runCount} ${runCount === 1 ? 'Durchlauf' : 'Durchläufe'}` : '  ·  Noch kein Durchlauf'}
@@ -54,8 +69,11 @@ function CourseRow({ course, c, onPress }) {
       {course.reviewStatus === 'DRAFT' && (
         <Text style={[TYPE.meta, { color: c.primary }]}>Noch nicht eingereicht – tippe zum Bearbeiten</Text>
       )}
+      {course.reviewStatus === 'PENDING_REVIEW' && (
+        <Text style={[TYPE.meta, { color: c.warning, fontWeight: '600' }]}>Das Revio-Team prüft diesen Kurs gerade</Text>
+      )}
       {course.reviewStatus === 'CHANGES_REQUESTED' && (
-        <Text style={[TYPE.meta, { color: c.warning }]}>Admin hat Änderungen angefragt</Text>
+        <Text style={[TYPE.meta, { color: c.warning, fontWeight: '600' }]}>Admin hat Änderungen angefragt</Text>
       )}
     </Pressable>
   );
