@@ -73,6 +73,16 @@ export function computeAvailableSlots(
           continue;
         }
 
+        // dayEnd rundet auf den ganzen Kalendertag (Server-Zeitzone) auf und
+        // kann dadurch bis zu einen Tag über range.to hinausreichen (siehe
+        // dayEnd-Berechnung oben) — hier hart gegen die angefragte Obergrenze
+        // filtern, damit z. B. "Woche 6.–12. Juli" nicht noch Montag 13. Juli
+        // mit ausliefert.
+        if (slotStartDate >= range.to) {
+          slotStart += stepMs;
+          continue;
+        }
+
         // Prüfen ob eine Blockzeit oder Buchung diesen Kandidaten überlappt
         const allBlocks = [...blockedTimes, ...existingBookings];
         const overlap = allBlocks.find(

@@ -217,3 +217,25 @@ describe('Mehrere Wochentage', () => {
     expect(days.has(2)).toBe(true); // Dienstag
   });
 });
+
+// Regression: Mobile SlotPicker fragt eine Woche als
+// [Montag 00:00, folgender Montag 00:00) an (exklusive Obergrenze).
+// dayEnd im Generator rundete diese Grenze bisher auf den vollen
+// Kalendertag auf (Server-Zeitzone) und lieferte dadurch Slots des
+// bereits nicht mehr angefragten Folge-Montags mit aus.
+describe('Wochengrenze: to = folgender Montag 00:00 (exklusiv)', () => {
+  test('liefert keine Slots am Tag nach der angefragten Woche', () => {
+    const slots = computeAvailableSlots(
+      [rule({ weekday: 1 })], // Mo 08:00–12:00
+      [], [],
+      20, 20,
+      // Woche Mo 6.7. – So 12.7., exklusive Obergrenze = Mo 13.7. 00:00
+      { from: new Date(2026, 6, 6, 0, 0), to: new Date(2026, 6, 13, 0, 0) },
+      new Date(2026, 6, 5, 0, 0), // So davor
+    );
+    const leaksIntoNextWeek = slots.some((s) => s.startsAt >= new Date(2026, 6, 13, 0, 0));
+    expect(leaksIntoNextWeek).toBe(false);
+    // Der reguläre Montag der angefragten Woche muss weiterhin da sein.
+    expect(slots.some((s) => s.startsAt.getTime() === new Date(2026, 6, 6, 8, 0).getTime())).toBe(true);
+  });
+});
