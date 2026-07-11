@@ -147,8 +147,37 @@ function CancelModal({ visible, onClose, onCancel, saving, c }) {
   );
 }
 
+function ConfirmAllModal({ visible, onClose, onConfirm, saving, pendingCount, c }) {
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', paddingHorizontal: 20 }} onPress={onClose}>
+        <Pressable onPress={() => {}} style={[{ backgroundColor: c.card, borderRadius: RADIUS.lg, padding: 20, gap: 14 }, SHADOW.card]}>
+          <View style={{ alignItems: 'center', gap: 10 }}>
+            <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: c.primaryBg ?? '#DBEAFE', alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="checkmark-done-outline" size={22} color={c.primary} />
+            </View>
+            <Text style={{ fontSize: 17, fontWeight: '700', color: c.text, textAlign: 'center' }}>Alle bestätigen</Text>
+            <Text style={{ fontSize: 14, color: c.muted, textAlign: 'center' }}>
+              Alle {pendingCount} offenen {pendingCount === 1 ? 'Termin' : 'Termine'} bestätigen?
+            </Text>
+          </View>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <Pressable onPress={onClose} disabled={saving} style={{ flex: 1, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: c.border, paddingVertical: 12, alignItems: 'center' }}>
+              <Text style={{ fontSize: 14, fontWeight: '600', color: c.muted }}>Abbrechen</Text>
+            </Pressable>
+            <Pressable onPress={onConfirm} disabled={saving} style={{ flex: 1, borderRadius: RADIUS.sm, backgroundColor: saving ? c.border : c.primary, paddingVertical: 12, alignItems: 'center' }}>
+              {saving ? <ActivityIndicator size="small" color="#fff" /> : <Text style={{ fontSize: 14, fontWeight: '700', color: '#fff' }}>Alle bestätigen</Text>}
+            </Pressable>
+          </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
 // Slot-Liste für Serien-Inquiries (Therapeuten-Ansicht)
 function SerieSlotList({ inquiry, authToken, onUpdate, saving, setSaving, c }) {
+  const [showConfirmAllModal, setShowConfirmAllModal] = useState(false);
   const slots = inquiry.inquirySlots ?? [];
   const pendingCount = slots.filter((s) => s.status === 'PENDING').length;
   const canAct = ['SENT', 'SEEN', 'COUNTER_PROPOSED', 'CONFIRMED'].includes(inquiry.status);
@@ -176,6 +205,7 @@ function SerieSlotList({ inquiry, authToken, onUpdate, saving, setSaving, c }) {
   }
 
   async function doConfirmAll() {
+    setShowConfirmAllModal(false);
     setSaving(true);
     try {
       const res = await fetch(`${getBaseUrl()}/inquiry/${inquiry.id}/confirm-all`, {
@@ -214,16 +244,7 @@ function SerieSlotList({ inquiry, authToken, onUpdate, saving, setSaving, c }) {
     <View style={{ gap: 8 }}>
       {canAct && pendingCount > 0 && (
         <Pressable
-          onPress={() => {
-            Alert.alert(
-              'Alle bestätigen',
-              `Alle ${pendingCount} offenen Termine bestätigen?`,
-              [
-                { text: 'Abbrechen', style: 'cancel' },
-                { text: 'Alle bestätigen', onPress: doConfirmAll },
-              ],
-            );
-          }}
+          onPress={() => setShowConfirmAllModal(true)}
           disabled={saving}
           style={{
             backgroundColor: c.primary, borderRadius: RADIUS.sm,
@@ -278,6 +299,15 @@ function SerieSlotList({ inquiry, authToken, onUpdate, saving, setSaving, c }) {
           </View>
         );
       })}
+
+      <ConfirmAllModal
+        visible={showConfirmAllModal}
+        onClose={() => setShowConfirmAllModal(false)}
+        onConfirm={doConfirmAll}
+        saving={saving}
+        pendingCount={pendingCount}
+        c={c}
+      />
     </View>
   );
 }
