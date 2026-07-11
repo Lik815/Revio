@@ -73,6 +73,7 @@ module.exports = {
           sounds: [],
         },
       ],
+      '@react-native-community/datetimepicker',
     ],
     extra: {
       eas: {

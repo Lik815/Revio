@@ -212,9 +212,11 @@ export async function courseRoutes(fastify: FastifyInstance) {
     const course = await fastify.prisma.course.findFirst({ where: { id: courseId, therapistId: therapist.id } });
     if (!course) return reply.status(404).send({ error: 'Kurs nicht gefunden' });
 
-    if (course.reviewStatus !== ReviewStatus.APPROVED) {
-      return reply.status(409).send({ error: 'Kursdurchläufe können nur für freigegebene Kurse erstellt werden.' });
-    }
+    // Durchläufe/Termine dürfen bereits für unfreigegebene Kurse angelegt werden
+    // (Therapeut baut das komplette Kurspaket vor der Einreichung auf). Die
+    // eigentliche Freigabe-Schranke sitzt am Veröffentlichungszeitpunkt in
+    // assertRunPublishable – vor Freigabe bleibt der Run im Status DRAFT und
+    // taucht dadurch nirgends öffentlich auf.
 
     const parsed = runCreateSchema.safeParse(request.body);
     if (!parsed.success) return reply.status(400).send({ error: 'Ungültige Daten', details: parsed.error.flatten() });

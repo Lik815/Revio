@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { ReviewStatus } from '@prisma/client';
-import { assertEligibleConsistency } from '../utils/course-assertions.js';
+import { CourseRunStatus, ReviewStatus } from '@prisma/client';
+import { assertEligibleConsistency, assertRunPublishable } from '../utils/course-assertions.js';
 
 const reviewSchema = z.object({
   status: z.enum([
@@ -92,6 +92,33 @@ export async function adminCourseRoutes(fastify: FastifyInstance) {
       where: { id },
       data: { reviewStatus: status, adminNote: adminNote ?? null },
     });
+
+    // Bei Freigabe: bereits vom Therapeuten angelegte Durchläufe (Status DRAFT,
+    // im Wizard vor der Einreichung erstellt) automatisch veröffentlichen, damit
+    // der Kurs ohne zusätzlichen manuellen Schritt öffentlich sichtbar wird.
+    if (status === ReviewStatus.APPROVED) {
+      const draftRuns = await fastify.prisma.courseRun.findMany({
+        where: { courseId: id, status: CourseRunStatus.DRAFT },
+        include: { _count: { select: { sessions: true } } },
+      });
+      for (const run of draftRuns) {
+        try {
+          assertRunPublishable({
+            courseReviewStatus: updated.reviewStatus,
+            sessionCount: run._count.sessions,
+            maxParticipants: run.maxParticipants,
+          });
+          await fastify.prisma.courseRun.update({
+            where: { id: run.id },
+            data: { status: CourseRunStatus.PUBLISHED },
+          });
+        } catch {
+          // Durchlauf erfüllt Veröffentlichungsvoraussetzungen (noch) nicht
+          // (z. B. keine Termine) – bleibt DRAFT, Therapeut kann später selbst veröffentlichen.
+        }
+      }
+    }
+
     return reply.send(updated);
   });
 

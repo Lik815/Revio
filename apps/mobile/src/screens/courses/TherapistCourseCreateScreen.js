@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/use-theme';
 import { getBaseUrl, RADIUS, SHADOW, SPACE, TUNNEL_HEADERS, TYPE } from '../../utils/app-utils';
@@ -114,9 +115,67 @@ function StepHeader({ step, total, c }) {
   );
 }
 
-// ── Datums-/Zeitpicker (einfache Texteingabe) ────────────────────────────────
+// ── Datums-/Zeitpicker (nativ) ────────────────────────────────────────────────
 
-function DateTimeRow({ session, index, onChange, onRemove, c }) {
+function formatDatePart(value) {
+  return value ? value.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'Datum wählen';
+}
+
+function formatTimePart(value) {
+  return value ? value.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : 'Uhrzeit wählen';
+}
+
+// iOS: kompakter, immer sichtbarer Picker (öffnet natives Popover beim Tippen).
+// Android: Pressable-Feld, das per Tap den nativen Dialog öffnet (kein Inline-Widget möglich).
+function PickerField({ label, value, onChange, mode, c, themeMode }) {
+  const [showAndroidPicker, setShowAndroidPicker] = useState(false);
+
+  const handleChange = (event, selected) => {
+    if (Platform.OS === 'android') setShowAndroidPicker(false);
+    if (event.type === 'dismissed') return;
+    if (selected) onChange(selected);
+  };
+
+  return (
+    <View style={{ flex: 1 }}>
+      <Text style={[TYPE.label, { color: c.textMuted, marginBottom: 3 }]}>{label}</Text>
+      {Platform.OS === 'ios' ? (
+        <DateTimePicker
+          value={value ?? new Date()}
+          mode={mode}
+          display="compact"
+          onChange={handleChange}
+          locale="de-DE"
+          themeVariant={themeMode === 'dark' ? 'dark' : 'light'}
+          style={{ alignSelf: 'flex-start' }}
+        />
+      ) : (
+        <>
+          <Pressable
+            onPress={() => setShowAndroidPicker(true)}
+            style={{
+              backgroundColor: c.card,
+              borderWidth: 1,
+              borderColor: c.border,
+              borderRadius: RADIUS.sm,
+              paddingHorizontal: SPACE.md,
+              paddingVertical: 11,
+            }}
+          >
+            <Text style={[TYPE.body, { color: value ? c.text : c.muted }]}>
+              {mode === 'date' ? formatDatePart(value) : formatTimePart(value)}
+            </Text>
+          </Pressable>
+          {showAndroidPicker && (
+            <DateTimePicker value={value ?? new Date()} mode={mode} display="default" onChange={handleChange} />
+          )}
+        </>
+      )}
+    </View>
+  );
+}
+
+function DateTimeRow({ session, index, onChange, onRemove, c, themeMode }) {
   return (
     <View style={[{ backgroundColor: c.card, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: c.border, padding: SPACE.md, gap: SPACE.sm }, SHADOW.card]}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -128,39 +187,31 @@ function DateTimeRow({ session, index, onChange, onRemove, c }) {
         )}
       </View>
       <View style={{ gap: SPACE.sm }}>
+        <PickerField
+          label="Datum"
+          value={session.date}
+          onChange={(v) => onChange({ ...session, date: v })}
+          mode="date"
+          c={c}
+          themeMode={themeMode}
+        />
         <View style={{ flexDirection: 'row', gap: SPACE.sm }}>
-          <View style={{ flex: 1 }}>
-            <Text style={[TYPE.label, { color: c.textMuted, marginBottom: 3 }]}>Datum (TT.MM.JJJJ)</Text>
-            <Input
-              value={session.date}
-              onChangeText={(v) => onChange({ ...session, date: v })}
-              placeholder="10.09.2026"
-              c={c}
-              keyboardType="numbers-and-punctuation"
-            />
-          </View>
-        </View>
-        <View style={{ flexDirection: 'row', gap: SPACE.sm }}>
-          <View style={{ flex: 1 }}>
-            <Text style={[TYPE.label, { color: c.textMuted, marginBottom: 3 }]}>Von (HH:MM)</Text>
-            <Input
-              value={session.startTime}
-              onChangeText={(v) => onChange({ ...session, startTime: v })}
-              placeholder="09:00"
-              c={c}
-              keyboardType="numbers-and-punctuation"
-            />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={[TYPE.label, { color: c.textMuted, marginBottom: 3 }]}>Bis (HH:MM)</Text>
-            <Input
-              value={session.endTime}
-              onChangeText={(v) => onChange({ ...session, endTime: v })}
-              placeholder="10:30"
-              c={c}
-              keyboardType="numbers-and-punctuation"
-            />
-          </View>
+          <PickerField
+            label="Von"
+            value={session.startTime}
+            onChange={(v) => onChange({ ...session, startTime: v })}
+            mode="time"
+            c={c}
+            themeMode={themeMode}
+          />
+          <PickerField
+            label="Bis"
+            value={session.endTime}
+            onChange={(v) => onChange({ ...session, endTime: v })}
+            mode="time"
+            c={c}
+            themeMode={themeMode}
+          />
         </View>
         <View>
           <Text style={[TYPE.label, { color: c.textMuted, marginBottom: 3 }]}>Ort (optional)</Text>
@@ -176,26 +227,17 @@ function DateTimeRow({ session, index, onChange, onRemove, c }) {
   );
 }
 
-// ── Datum parsen ─────────────────────────────────────────────────────────────
+// ── Datum + Uhrzeit zusammenführen ────────────────────────────────────────────
 
-function parseLocalDateTime(date, time) {
-  const [day, month, year] = date.split('.');
-  const [hour, minute] = time.split(':');
-  if (!day || !month || !year || !hour || !minute) return null;
-  const d = new Date(
-    parseInt(year, 10),
-    parseInt(month, 10) - 1,
-    parseInt(day, 10),
-    parseInt(hour, 10),
-    parseInt(minute, 10),
-  );
-  return isNaN(d.getTime()) ? null : d;
+function combineDateAndTime(date, time) {
+  if (!date || !time) return null;
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate(), time.getHours(), time.getMinutes());
 }
 
 // ── Haupt-Screen ─────────────────────────────────────────────────────────────
 
 export function TherapistCourseCreateScreen({ authToken, c: cProp, existingCourse, onBack, onSaved }) {
-  const { c: themeC } = useTheme();
+  const { c: themeC, themeMode } = useTheme();
   const c = cProp ?? themeC;
   const insets = useSafeAreaInsets();
 
@@ -221,11 +263,11 @@ export function TherapistCourseCreateScreen({ authToken, c: cProp, existingCours
 
   // Step 2 – Termine
   const [sessions, setSessions] = useState([
-    { date: '', startTime: '', endTime: '', location: '' },
+    { date: null, startTime: null, endTime: null, location: '' },
   ]);
 
   const updateSession = (idx, val) => setSessions((prev) => prev.map((s, i) => i === idx ? val : s));
-  const addSession = () => setSessions((prev) => [...prev, { date: '', startTime: '', endTime: '', location: '' }]);
+  const addSession = () => setSessions((prev) => [...prev, { date: null, startTime: null, endTime: null, location: '' }]);
   const removeSession = (idx) => setSessions((prev) => prev.filter((_, i) => i !== idx));
 
   const validateStep0 = () => {
@@ -244,11 +286,9 @@ export function TherapistCourseCreateScreen({ authToken, c: cProp, existingCours
   const validateStep2 = () => {
     for (let i = 0; i < sessions.length; i++) {
       const s = sessions[i];
-      if (!s.date.trim() || !s.startTime.trim() || !s.endTime.trim()) return `Termin ${i + 1}: Datum und Uhrzeiten ausfüllen.`;
-      const start = parseLocalDateTime(s.date, s.startTime);
-      const end = parseLocalDateTime(s.date, s.endTime);
-      if (!start) return `Termin ${i + 1}: Datum oder Startzeit ungültig.`;
-      if (!end) return `Termin ${i + 1}: Datum oder Endzeit ungültig.`;
+      if (!s.date || !s.startTime || !s.endTime) return `Termin ${i + 1}: Datum und Uhrzeiten ausfüllen.`;
+      const start = combineDateAndTime(s.date, s.startTime);
+      const end = combineDateAndTime(s.date, s.endTime);
       if (end <= start) return `Termin ${i + 1}: Endzeit muss nach Startzeit liegen.`;
     }
     return null;
@@ -318,8 +358,8 @@ export function TherapistCourseCreateScreen({ authToken, c: cProp, existingCours
 
       // 3. Sessions anlegen
       const sessionPayloads = sessions.map((s) => ({
-        startsAt: parseLocalDateTime(s.date, s.startTime).toISOString(),
-        endsAt: parseLocalDateTime(s.date, s.endTime).toISOString(),
+        startsAt: combineDateAndTime(s.date, s.startTime).toISOString(),
+        endsAt: combineDateAndTime(s.date, s.endTime).toISOString(),
         location: s.location.trim() || undefined,
       }));
       const sessRes = await fetch(`${getBaseUrl()}/courses/my/${courseId}/runs/${runId}/sessions`, {
@@ -443,6 +483,7 @@ export function TherapistCourseCreateScreen({ authToken, c: cProp, existingCours
                 onChange={(val) => updateSession(idx, val)}
                 onRemove={() => removeSession(idx)}
                 c={c}
+                themeMode={themeMode}
               />
             ))}
             <Pressable
