@@ -17,7 +17,8 @@ import {
   getDefaultSpecializationOptions,
   isSpecializationOptionStorageError,
 } from '../utils/specialization-options.js';
-import { getPublicSiteSettings, setBooleanAppSetting, SITE_UNDER_CONSTRUCTION_KEY } from '../utils/app-settings.js';
+import { getPublicSiteSettings, setBooleanAppSetting, SITE_UNDER_CONSTRUCTION_KEY, COURSES_ENABLED_KEY } from '../utils/app-settings.js';
+import { invalidateCoursesEnabledCache } from '../utils/course-feature-gate.js';
 
 
 const splitList = (value: string) =>
@@ -123,7 +124,8 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
     label: z.string().trim().min(2).max(100),
   });
   const siteSettingsSchema = z.object({
-    underConstruction: z.boolean(),
+    underConstruction: z.boolean().optional(),
+    coursesEnabled: z.boolean().optional(),
   });
   const blogPostSchema = z.object({
     slug: z.string().trim().min(2).max(120).regex(/^[a-z0-9-]+$/, 'Ungültiger Slug'),
@@ -195,6 +197,19 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
     };
   });
 
+  // TEMP-DEBUG: Zeitkonflikt-Diagnose, wird nach Analyse wieder entfernt.
+  fastify.get('/debug/scheduled-slots', async (request, reply) => {
+    const { therapistEmail } = request.query as { therapistEmail?: string };
+    if (!therapistEmail) return reply.status(400).send({ error: 'therapistEmail fehlt' });
+    const therapist = await fastify.prisma.therapist.findFirst({ where: { email: therapistEmail } });
+    if (!therapist) return reply.status(404).send({ error: 'Therapeut nicht gefunden' });
+    const [slots, inquiries] = await Promise.all([
+      fastify.prisma.scheduledSlot.findMany({ where: { therapistId: therapist.id }, orderBy: { startsAt: 'asc' } }),
+      fastify.prisma.inquiry.findMany({ where: { therapistId: therapist.id }, include: { inquirySlots: true }, orderBy: { createdAt: 'desc' } }),
+    ]);
+    return reply.send({ slots, inquiries });
+  });
+
   fastify.get('/site-settings', async () => {
     return getPublicSiteSettings(fastify.prisma);
   });
@@ -228,15 +243,28 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
     const parsed = siteSettingsSchema.safeParse(request.body);
     if (!parsed.success) return reply.badRequest('Ungültige Eingabedaten');
 
-    await setBooleanAppSetting(
-      fastify.prisma,
-      SITE_UNDER_CONSTRUCTION_KEY,
-      parsed.data.underConstruction,
-    );
+    // Beide Schalter sind unabhängig — nur das jeweils mitgeschickte Feld wird gesetzt.
+    if (parsed.data.underConstruction !== undefined) {
+      await setBooleanAppSetting(
+        fastify.prisma,
+        SITE_UNDER_CONSTRUCTION_KEY,
+        parsed.data.underConstruction,
+      );
+    }
+
+    if (parsed.data.coursesEnabled !== undefined) {
+      await setBooleanAppSetting(
+        fastify.prisma,
+        COURSES_ENABLED_KEY,
+        parsed.data.coursesEnabled,
+      );
+      // Gate-Cache leeren, damit das Abschalten sofort greift.
+      invalidateCoursesEnabledCache();
+    }
 
     return {
       success: true,
-      underConstruction: parsed.data.underConstruction,
+      ...(await getPublicSiteSettings(fastify.prisma)),
     };
   });
 
