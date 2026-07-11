@@ -9,6 +9,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../hooks/use-theme';
+import { useToast } from '../../hooks/use-toast';
+import { ToastOverlay } from '../../components/ToastOverlay';
 import { getBaseUrl, RADIUS, SHADOW, SPACE, TUNNEL_HEADERS, TYPE } from '../../utils/app-utils';
 import { BackButton } from '../../components/BackButton';
 import { TherapistCourseCreateScreen } from './TherapistCourseCreateScreen';
@@ -68,6 +70,7 @@ export function TherapistCoursesScreen({ authToken, c: cProp, onBack }) {
   const [refreshing, setRefreshing] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [editCourse, setEditCourse] = useState(null);
+  const { toastMsg, toastAnim, showToast } = useToast();
 
   const load = useCallback(async (refresh = false) => {
     if (refresh) setRefreshing(true); else setLoading(true);
@@ -92,7 +95,7 @@ export function TherapistCoursesScreen({ authToken, c: cProp, onBack }) {
         c={c}
         existingCourse={editCourse}
         onBack={() => { setShowCreate(false); setEditCourse(null); }}
-        onSaved={() => { setShowCreate(false); setEditCourse(null); load(); }}
+        onSaved={(message) => { setShowCreate(false); setEditCourse(null); load(); if (message) showToast(message); }}
       />
     );
   }
@@ -139,6 +142,8 @@ export function TherapistCoursesScreen({ authToken, c: cProp, onBack }) {
           }
         />
       )}
+
+      <ToastOverlay message={toastMsg} anim={toastAnim} c={c} />
     </View>
   );
 }

@@ -373,14 +373,15 @@ export function TherapistCourseCreateScreen({ authToken, c: cProp, existingCours
       }
 
       // 4. Zur Prüfung einreichen (nur wenn DRAFT oder CHANGES_REQUESTED)
-      if (!existingCourse || existingCourse.reviewStatus === 'DRAFT' || existingCourse.reviewStatus === 'CHANGES_REQUESTED') {
+      const willSubmit = !existingCourse || existingCourse.reviewStatus === 'DRAFT' || existingCourse.reviewStatus === 'CHANGES_REQUESTED';
+      if (willSubmit) {
         await fetch(`${getBaseUrl()}/courses/my/${courseId}/submit`, {
           method: 'POST',
           headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
         });
       }
 
-      onSaved();
+      onSaved(willSubmit ? 'Kurs eingereicht – wird jetzt geprüft.' : 'Änderungen gespeichert.');
     } catch (e) {
       setError(e.message ?? 'Unbekannter Fehler.');
     } finally {
