@@ -60,6 +60,14 @@ module.exports = {
     },
     plugins: [
       [
+        'expo-build-properties',
+        {
+          ios: {
+            clangCXXLanguageStandard: 'c++20',
+          },
+        },
+      ],
+      [
         'expo-location',
         {
           locationWhenInUsePermission: 'Revio benötigt deinen Standort, um Therapeuten in deiner Nähe zu finden.',
