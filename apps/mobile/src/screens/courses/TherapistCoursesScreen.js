@@ -14,8 +14,9 @@ import { ToastOverlay } from '../../components/ToastOverlay';
 import { getBaseUrl, RADIUS, SHADOW, SPACE, TUNNEL_HEADERS, TYPE } from '../../utils/app-utils';
 import { BackButton } from '../../components/BackButton';
 import { TherapistCourseCreateScreen } from './TherapistCourseCreateScreen';
+import { CourseOverviewScreen } from './CourseOverviewScreen';
 
-const STATUS_META = {
+export const STATUS_META = {
   DRAFT:            { label: 'Entwurf',          bg: 'mutedBg',   fg: 'muted',   icon: 'create-outline' },
   PENDING_REVIEW:   { label: 'In Prüfung',        bg: 'warningBg', fg: 'warning', icon: 'time-outline' },
   APPROVED:         { label: 'Genehmigt',         bg: 'successBg', fg: 'success', icon: 'checkmark-circle-outline' },
@@ -24,7 +25,7 @@ const STATUS_META = {
   SUSPENDED:        { label: 'Gesperrt',          bg: 'errorBg',   fg: 'error',   icon: 'ban-outline' },
 };
 
-function StatusBadge({ status, c }) {
+export function StatusBadge({ status, c }) {
   const meta = STATUS_META[status] ?? { label: status, bg: 'mutedBg', fg: 'muted', icon: 'ellipse-outline' };
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: c[meta.bg], borderRadius: RADIUS.full, paddingHorizontal: 12, paddingVertical: 6 }}>
@@ -88,6 +89,7 @@ export function TherapistCoursesScreen({ authToken, c: cProp, onBack }) {
   const [refreshing, setRefreshing] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [editCourse, setEditCourse] = useState(null);
+  const [viewCourseId, setViewCourseId] = useState(null);
   const { toastMsg, toastAnim, showToast } = useToast();
 
   const load = useCallback(async (refresh = false) => {
@@ -119,6 +121,18 @@ export function TherapistCoursesScreen({ authToken, c: cProp, onBack }) {
     );
   }
 
+  if (viewCourseId) {
+    return (
+      <CourseOverviewScreen
+        authToken={authToken}
+        c={c}
+        courseId={viewCourseId}
+        onBack={() => setViewCourseId(null)}
+        onEdit={(course) => { setViewCourseId(null); setEditCourse(course); }}
+      />
+    );
+  }
+
   return (
     <View style={{ flex: 1, backgroundColor: c.background }}>
       <View style={{ paddingHorizontal: SPACE.lg, backgroundColor: c.background }}>
@@ -145,7 +159,7 @@ export function TherapistCoursesScreen({ authToken, c: cProp, onBack }) {
           contentContainerStyle={{ padding: SPACE.lg, gap: SPACE.md, paddingTop: 0 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={c.primary} />}
           renderItem={({ item }) => (
-            <CourseRow course={item} c={c} onPress={() => setEditCourse(item)} />
+            <CourseRow course={item} c={c} onPress={() => setViewCourseId(item.id)} />
           )}
           ListEmptyComponent={
             <View style={{ alignItems: 'center', paddingTop: 60, gap: SPACE.lg }}>
