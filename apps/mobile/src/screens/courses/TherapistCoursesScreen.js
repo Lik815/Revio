@@ -98,7 +98,8 @@ export function TherapistCoursesScreen({ authToken, c: cProp, onBack }) {
       });
       if (res.ok) {
         const data = await res.json();
-        setCourses(data.courses ?? []);
+        // GET /courses/my liefert das Array direkt (kein { courses } Wrapper wie /courses).
+        setCourses(Array.isArray(data) ? data : []);
       }
     } catch (_) {}
     finally { setLoading(false); setRefreshing(false); }
