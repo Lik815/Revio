@@ -24,6 +24,7 @@ import {
   TYPE,
 } from '../../utils/app-utils';
 import { AccountHeader } from '../../components/AccountHeader';
+import { CourseCard } from '../../components/CourseCard';
 
 // ── Map platform split ──────────────────────────────────────────────────────
 // Native (iOS / Android): real react-native-maps
@@ -116,10 +117,19 @@ export function DiscoverContent(props) {
     requestableOnly,
     setRequestableOnly,
     bannerExtraPadding = 0,
-    onOpenCourses,
+    courseResults,
+    courseLoading,
+    courseCategoryKey,
+    selectCourseCategory,
+    courseCategoryChips,
+    openCourseById,
   } = props;
 
   const insets = useSafeAreaInsets();
+
+  const isCourseMode = activeChip?.type === 'courses';
+  const safeCourseResults = Array.isArray(courseResults) ? courseResults : [];
+  const safeCourseCategoryChips = Array.isArray(courseCategoryChips) ? courseCategoryChips : [];
 
   const safeResults = Array.isArray(results) ? results : [];
   const matchedResultsCount = safeResults.filter(
@@ -148,7 +158,7 @@ export function DiscoverContent(props) {
   const visibleSuggestions = safeAcSuggestions.filter((group) => group.type !== 'PRACTICE_NAME');
   const mutedText = c.textMuted ?? c.muted;
   const iconHitSlop = { top: 10, bottom: 10, left: 10, right: 10 };
-  const showHeaderToggle = viewMode === 'map' || searched || safeResults.length > 0;
+  const showHeaderToggle = !isCourseMode && (viewMode === 'map' || searched || safeResults.length > 0);
   const [fortbildungQuery, setFortbildungQuery] = React.useState('');
   const [showRadiusPicker, setShowRadiusPicker] = React.useState(false);
 
@@ -665,33 +675,10 @@ export function DiscoverContent(props) {
           </View>
         )}
 
-        {!searched && (
+        {!searched && !isCourseMode && (
           <View style={styles.hero}>
             <Text style={[styles.heroTitle, { color: c.text }]}>{t('heroTitle')}</Text>
             <Text style={[styles.heroSub, { color: c.muted }]}>{t('heroSub')}</Text>
-            {onOpenCourses && (
-              <Pressable
-                onPress={onOpenCourses}
-                style={({ pressed }) => ({
-                  marginTop: SPACE.sm,
-                  borderRadius: RADIUS.md,
-                  borderWidth: 1,
-                  borderColor: c.border,
-                  backgroundColor: pressed ? c.primaryBg : c.card,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  paddingHorizontal: SPACE.lg,
-                  paddingVertical: SPACE.md,
-                })}
-              >
-                <View style={{ gap: 2 }}>
-                  <Text style={[TYPE.heading, { color: c.text }]}>Gesundheitskurse</Text>
-                  <Text style={[TYPE.meta, { color: c.textMuted }]}>Bewegung, Ernährung, Entspannung und mehr</Text>
-                </View>
-                <Text style={[{ fontSize: 18, color: c.primary }]}>›</Text>
-              </Pressable>
-            )}
           </View>
         )}
 
@@ -708,14 +695,17 @@ export function DiscoverContent(props) {
               value={query}
               onChangeText={(text) => {
                 setQuery(text);
+                // Im Kursmodus den Kurs-Chip NICHT nullen – sonst fällt die
+                // Suche zurück in die Therapeutensuche und die Titelsuche bricht.
+                if (isCourseMode) return;
                 setShowAutocomplete(true);
                 setActiveChip(null);
               }}
-              onSubmitEditing={() => runSearch()}
-              onFocus={() => setShowAutocomplete(true)}
+              onSubmitEditing={() => { if (!isCourseMode) runSearch(); }}
+              onFocus={() => { if (!isCourseMode) setShowAutocomplete(true); }}
               onBlur={() => setTimeout(() => setShowAutocomplete(false), 150)}
               returnKeyType="search"
-              placeholder={t('searchPlaceholder')}
+              placeholder={isCourseMode ? 'Kurse suchen' : t('searchPlaceholder')}
               placeholderTextColor={c.muted}
               style={[styles.searchInput, { color: c.text }]}
             />
@@ -724,26 +714,30 @@ export function DiscoverContent(props) {
                 <Ionicons name="close-circle" size={16} color={c.muted} />
               </Pressable>
             )}
-            <View style={[styles.searchDivider, { backgroundColor: c.border }]} />
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Pressable onPress={() => { setLocationSheetCity(locationLabel || city); setShowLocationSheet(true); }} style={[styles.searchFilterArea, { paddingRight: 6 }]} hitSlop={iconHitSlop}>
-                <View>
-                  <Ionicons name="location-outline" size={20} color={city ? c.primary : c.muted} />
-                  {city && <View style={{ position: 'absolute', top: -1, right: -1, width: 7, height: 7, borderRadius: 4, backgroundColor: c.success, borderWidth: 1.5, borderColor: c.card }} />}
+            {!isCourseMode && (
+              <>
+                <View style={[styles.searchDivider, { backgroundColor: c.border }]} />
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Pressable onPress={() => { setLocationSheetCity(locationLabel || city); setShowLocationSheet(true); }} style={[styles.searchFilterArea, { paddingRight: 6 }]} hitSlop={iconHitSlop}>
+                    <View>
+                      <Ionicons name="location-outline" size={20} color={city ? c.primary : c.muted} />
+                      {city && <View style={{ position: 'absolute', top: -1, right: -1, width: 7, height: 7, borderRadius: 4, backgroundColor: c.success, borderWidth: 1.5, borderColor: c.card }} />}
+                    </View>
+                  </Pressable>
+                  <Pressable onPress={() => setShowFilters(!showFilters)} style={[styles.searchFilterArea, { paddingLeft: 6 }]} hitSlop={iconHitSlop}>
+                    <Ionicons name="options-outline" size={20} color={showFilters || activeFilterCount > 0 ? c.primary : c.muted} />
+                    {activeFilterCount > 0 && (
+                      <View style={[styles.filterBadge, { backgroundColor: c.primary }]}>
+                        <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
+                      </View>
+                    )}
+                  </Pressable>
                 </View>
-              </Pressable>
-              <Pressable onPress={() => setShowFilters(!showFilters)} style={[styles.searchFilterArea, { paddingLeft: 6 }]} hitSlop={iconHitSlop}>
-                <Ionicons name="options-outline" size={20} color={showFilters || activeFilterCount > 0 ? c.primary : c.muted} />
-                {activeFilterCount > 0 && (
-                  <View style={[styles.filterBadge, { backgroundColor: c.primary }]}>
-                    <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
-                  </View>
-                )}
-              </Pressable>
-            </View>
+              </>
+            )}
           </View>
 
-          {showAutocomplete && visibleSuggestions.length > 0 && (
+          {!isCourseMode && showAutocomplete && visibleSuggestions.length > 0 && (
             <View style={[styles.autocompleteBox, { backgroundColor: c.card, borderColor: c.primary }]}>
               {visibleSuggestions.map((group) => {
                 const typeLabel = group.type === 'SPECIALTY' ? 'Spezialisierung'
@@ -811,6 +805,33 @@ export function DiscoverContent(props) {
           </View>
         )}
 
+        {/* Kategorie-Chips – nur im Kursmodus */}
+        {isCourseMode && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.chipsRow}
+          >
+            {safeCourseCategoryChips.map((chip) => {
+              const active = (courseCategoryKey ?? null) === chip.key;
+              return (
+                <Pressable
+                  key={String(chip.key)}
+                  onPress={() => selectCourseCategory(chip.key)}
+                  style={[
+                    styles.chip,
+                    active
+                      ? { backgroundColor: c.accent, borderColor: c.accent }
+                      : { backgroundColor: c.card, borderColor: c.border },
+                  ]}
+                >
+                  <Text style={[styles.chipText, { color: active ? '#FFFFFF' : c.text }]}>{chip.label}</Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        )}
+
         {filtersPanel}
       </View>
 
@@ -822,6 +843,28 @@ export function DiscoverContent(props) {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
+      {isCourseMode ? (
+        <>
+          {courseLoading && [1, 2, 3].map((item) => <SkeletonCard key={item} C={c} />)}
+
+          {!courseLoading && safeCourseResults.map((course) => (
+            <View key={course.id} style={{ marginBottom: 14 }}>
+              <CourseCard course={course} c={c} onPress={() => openCourseById(course.id, course.title)} />
+            </View>
+          ))}
+
+          {!courseLoading && safeCourseResults.length === 0 && (
+            <View style={[styles.emptyState, { backgroundColor: c.card, borderColor: c.border }]}>
+              <Ionicons name="school-outline" size={32} color={c.muted} />
+              <Text style={[styles.emptyTitle, { color: c.text }]}>Keine Kurse gefunden</Text>
+              <Text style={[styles.emptyBody, { color: c.muted }]}>
+                Versuche eine andere Kategorie oder einen anderen Suchbegriff.
+              </Text>
+            </View>
+          )}
+        </>
+      ) : (
+      <>
       {(searched || safeResults.length > 0) ? (
         <View style={styles.sectionRow}>
           <View style={{ flex: 1, gap: 4 }}>
@@ -1012,6 +1055,8 @@ export function DiscoverContent(props) {
             </Pressable>
           </View>
         </View>
+      )}
+      </>
       )}
       </ScrollView>
 

@@ -4,7 +4,7 @@ import { ReviewStatus, CourseRunStatus, CourseLocationType } from '@prisma/clien
 export async function publicCourseRoutes(fastify: FastifyInstance) {
 
   // ── Kurssuche ──────────────────────────────────────────────────────────────
-  // GET /courses?categoryKey=bewegung&city=Berlin&locationType=ONSITE&page=1&limit=20
+  // GET /courses?q=yoga&categoryKey=bewegung&city=Berlin&locationType=ONSITE&page=1&limit=20
 
   fastify.get('/courses', async (request, reply) => {
     const q = request.query as Record<string, string | undefined>;
@@ -15,6 +15,7 @@ export async function publicCourseRoutes(fastify: FastifyInstance) {
       reviewStatus: ReviewStatus.APPROVED,
       ...(q.categoryKey ? { categoryKey: q.categoryKey } : {}),
       ...(q.locationType ? { locationType: q.locationType as CourseLocationType } : {}),
+      ...(q.q ? { title: { contains: q.q } } : {}),
       runs: {
         some: {
           status: CourseRunStatus.PUBLISHED,

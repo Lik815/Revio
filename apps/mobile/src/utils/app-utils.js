@@ -14,7 +14,20 @@ const quickChips = [
   { label: 'Kniereha', keywords: ['knie', 'kniereha', 'knieschmerzen'] },
   { label: 'Sportphysiotherapie', keywords: ['sport', 'sportphysiotherapie', 'sportverletzung', 'sportreha'] },
   { label: 'Neurologische Rehabilitation', keywords: ['neurologie', 'neurologisch', 'neurologische rehabilitation', 'bobath', 'vojta', 'bobath-therapie', 'vojta-therapie'] },
-  { label: 'Schulterrehabilitation', keywords: ['schulter', 'schulterrehabilitation', 'nackenschmerzen', 'nacken'] }
+  { label: 'Schulterrehabilitation', keywords: ['schulter', 'schulterrehabilitation', 'nackenschmerzen', 'nacken'] },
+  // Sondermodus: schaltet die Ergebnisliste auf Gesundheitskurse um (siehe use-search.js)
+  { label: 'Gesundheitskurse', type: 'courses' },
+];
+
+// Kategorie-Chips für die Kurssuche (Sondermodus des Gesundheitskurse-Chips)
+const courseCategoryChips = [
+  { key: null, label: 'Alle' },
+  { key: 'bewegung', label: 'Bewegung' },
+  { key: 'ernaehrung', label: 'Ernährung' },
+  { key: 'stress', label: 'Stressbewältigung' },
+  { key: 'entspannung', label: 'Entspannung' },
+  { key: 'sucht', label: 'Suchtmittelkonsum' },
+  { key: 'sonstiges', label: 'Sonstiges' },
 ];
 
 const COLORS = {
@@ -502,6 +515,7 @@ export {
   normalizeLanguageCodes,
   normalizeTherapistProfile,
   quickChips,
+  courseCategoryChips,
   regSpecOptions,
   resolveKassenartFilterValues,
   resolveMediaUrl,

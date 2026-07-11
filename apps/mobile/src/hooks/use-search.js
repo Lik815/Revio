@@ -96,6 +96,14 @@ export function useSearch({ t }) {
   const [viewMode, setViewMode] = useState('list');
   const [mapScrollEnabled, setMapScrollEnabled] = useState(true);
 
+  // ── Kurssuche (eigener Pfad, unabhängig von Therapeuten-Ergebnissen) ───────
+  // Läuft NICHT durch runSearchWith – Kurse brauchen keinen Ort und dürfen die
+  // Therapeuten-Ergebnisse (results/mapTherapists) nicht überschreiben.
+  const [courseResults, setCourseResults] = useState([]);
+  const [courseLoading, setCourseLoading] = useState(false);
+  const [courseCategoryKey, setCourseCategoryKey] = useState(null);
+  const courseDebounceRef = useRef(null);
+
   // ── Autocomplete ──────────────────────────────────────────────────────────
   const [acSuggestions, setAcSuggestions] = useState([]);
   const acDebounceRef = useRef(null);
@@ -171,6 +179,44 @@ export function useSearch({ t }) {
     return () => { if (acDebounceRef.current) clearTimeout(acDebounceRef.current); };
   }, [query]);
 
+  // ── Kurssuche: Fetch + debounced Effekt ───────────────────────────────────
+  const runCourseSearch = async (text, categoryKey) => {
+    setCourseLoading(true);
+    try {
+      const params = new URLSearchParams({ limit: '20' });
+      const trimmed = typeof text === 'string' ? text.trim() : '';
+      if (trimmed.length >= 2) params.set('q', trimmed);
+      if (categoryKey) params.set('categoryKey', categoryKey);
+      const res = await fetch(`${getBaseUrl()}/courses?${params}`, { headers: { ...TUNNEL_HEADERS } });
+      if (res.ok) {
+        const data = await res.json();
+        setCourseResults(data.courses ?? []);
+      } else {
+        setCourseResults([]);
+      }
+    } catch {
+      setCourseResults([]);
+    } finally {
+      setCourseLoading(false);
+    }
+  };
+
+  // Ein Effekt deckt alle drei Auslöser im Kursmodus ab: Chip-Aktivierung,
+  // Kategorie-Wechsel und Titel-Textsuche (query). 350 ms Debounce.
+  useEffect(() => {
+    if (activeChip?.type !== 'courses') return;
+    if (courseDebounceRef.current) clearTimeout(courseDebounceRef.current);
+    courseDebounceRef.current = setTimeout(() => {
+      runCourseSearch(query, courseCategoryKey);
+    }, 350);
+    return () => { if (courseDebounceRef.current) clearTimeout(courseDebounceRef.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeChip, query, courseCategoryKey]);
+
+  const selectCourseCategory = (key) => {
+    setCourseCategoryKey(key);
+  };
+
   // ── Filter helpers ────────────────────────────────────────────────────────
   const activeFilterCount =
     (homeVisit ? 1 : 0) +
@@ -200,6 +246,8 @@ export function useSearch({ t }) {
     setViewMode('list');
     setShowFilters(false);
     setMapScrollEnabled(true);
+    setCourseResults([]);
+    setCourseCategoryKey(null);
   };
 
   // ── Core search logic ─────────────────────────────────────────────────────
@@ -310,6 +358,15 @@ export function useSearch({ t }) {
   const runSearch = () => runSearchWith(query, userCoords);
 
   const selectChip = (chip) => {
+    // Kurs-Chip zweigt VOR runSearchWith ab: kein Ort-Guard, kein LocationSheet.
+    if (chip.type === 'courses') {
+      setActiveChip(chip);
+      setQuery('');
+      setShowAutocomplete(false);
+      setCourseCategoryKey(null);
+      // Fetch übernimmt der debounced Effekt (reagiert auf activeChip-Wechsel).
+      return;
+    }
     setActiveChip(chip);
     setQuery(chip.label);
     runSearchWith(chip.label, userCoords);
@@ -599,6 +656,11 @@ export function useSearch({ t }) {
     searched, setSearched,
     viewMode, setViewMode,
     mapScrollEnabled, setMapScrollEnabled,
+    // Course search
+    courseResults,
+    courseLoading,
+    courseCategoryKey,
+    selectCourseCategory,
     // Autocomplete
     acSuggestions,
     // Search actions
