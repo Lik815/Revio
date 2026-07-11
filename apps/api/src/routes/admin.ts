@@ -197,19 +197,6 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
     };
   });
 
-  // TEMP-DEBUG: Zeitkonflikt-Diagnose, wird nach Analyse wieder entfernt.
-  fastify.get('/debug/scheduled-slots', async (request, reply) => {
-    const { therapistEmail } = request.query as { therapistEmail?: string };
-    if (!therapistEmail) return reply.status(400).send({ error: 'therapistEmail fehlt' });
-    const therapist = await fastify.prisma.therapist.findFirst({ where: { email: therapistEmail } });
-    if (!therapist) return reply.status(404).send({ error: 'Therapeut nicht gefunden' });
-    const [slots, inquiries] = await Promise.all([
-      fastify.prisma.scheduledSlot.findMany({ where: { therapistId: therapist.id }, orderBy: { startsAt: 'asc' } }),
-      fastify.prisma.inquiry.findMany({ where: { therapistId: therapist.id }, include: { inquirySlots: true }, orderBy: { createdAt: 'desc' } }),
-    ]);
-    return reply.send({ slots, inquiries });
-  });
-
   fastify.get('/site-settings', async () => {
     return getPublicSiteSettings(fastify.prisma);
   });
