@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Image, Pressable, RefreshControl, ScrollView, Text, View,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,7 +11,8 @@ import { useTherapyData } from '../../context/TherapyContext';
 import { useTherapistScheduleData } from '../../hooks/use-therapist-schedule-data';
 import { useTherapistServices } from '../../hooks/use-therapist-services';
 import { useTheme } from '../../hooks/use-theme';
-import { TAB_ROUTES } from '../../navigation/route-names';
+import { NewsAnnouncementModal } from '../../modals/NewsAnnouncementModal';
+import { ROOT_ROUTES, TAB_ROUTES } from '../../navigation/route-names';
 import { getBaseUrl, RADIUS } from '../../utils/app-utils';
 import {
   getDayAgendaItems,
@@ -444,18 +446,31 @@ function AgendaCard({ items, agendaState, onPressBooking, onPressAll, servicesBy
 
 // ─── Placeholder-Cards ───────────────────────────────────────────────────────
 
-function IconLinkCard({ iconName, title, subtitle, c }) {
+// Announcement id — bump this when a new announcement should reset the "gesehen" flag.
+const NEWS_ANNOUNCEMENT_ID = 'revio-oktober-2026';
+const NEWS_SEEN_STORAGE_KEY = `news_seen_${NEWS_ANNOUNCEMENT_ID}`;
+
+function IconLinkCard({ iconName, title, subtitle, c, onPress, showBadge }) {
   return (
-    <View style={[cardStyle(c), { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 14 }]}>
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        cardStyle(c),
+        { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 14, opacity: onPress && pressed ? 0.7 : 1 },
+      ]}
+    >
       <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: c.mutedBg ?? c.border, alignItems: 'center', justifyContent: 'center' }}>
         <Ionicons name={iconName} size={20} color={c.text} />
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={{ fontSize: 14, fontWeight: '700', color: c.text }}>{title}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Text style={{ fontSize: 14, fontWeight: '700', color: c.text }}>{title}</Text>
+          {showBadge && <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: c.primary }} />}
+        </View>
         <Text style={{ fontSize: 12, color: c.muted, marginTop: 2 }} numberOfLines={2}>{subtitle}</Text>
       </View>
       <Ionicons name="chevron-forward" size={16} color={c.muted} />
-    </View>
+    </Pressable>
   );
 }
 
@@ -545,6 +560,22 @@ export function TherapistDashboardScreen() {
 
   const noWorkingHours = agendaItems.length === 0;
 
+  const [newsSeen, setNewsSeen] = useState(true);
+  const [newsModalVisible, setNewsModalVisible] = useState(false);
+  useEffect(() => {
+    AsyncStorage.getItem(NEWS_SEEN_STORAGE_KEY).then((value) => setNewsSeen(value === 'true'));
+  }, []);
+  const openNewsModal = useCallback(() => {
+    setNewsModalVisible(true);
+    setNewsSeen(true);
+    AsyncStorage.setItem(NEWS_SEEN_STORAGE_KEY, 'true');
+  }, []);
+
+  const profileCompletion = loggedInTherapist?.profileCompletion;
+  const profileTasksSubtitle = profileCompletion && profileCompletion.percentage < 100
+    ? `2 Dokumentationen · 1 Bestätigung · Profil zu ${profileCompletion.percentage}% vervollständigt`
+    : '2 Dokumentationen · 1 Bestätigung ausstehend';
+
   const name = loggedInTherapist?.fullName ?? 'Mein Konto';
   const photo = resolvePhotoUri(loggedInTherapist?.photo);
 
@@ -608,7 +639,8 @@ export function TherapistDashboardScreen() {
         <IconLinkCard
           iconName="clipboard-outline"
           title="Offene Aufgaben"
-          subtitle="2 Dokumentationen · 1 Bestätigung ausstehend"
+          subtitle={profileTasksSubtitle}
+          onPress={() => navigation.navigate(ROOT_ROUTES.PROFILE)}
           c={c}
         />
 
@@ -616,9 +648,17 @@ export function TherapistDashboardScreen() {
           iconName="megaphone-outline"
           title="Neuigkeiten"
           subtitle="Neue Funktionen für Therapeuten verfügbar"
+          onPress={openNewsModal}
+          showBadge={!newsSeen}
           c={c}
         />
       </ScrollView>
+
+      <NewsAnnouncementModal
+        visible={newsModalVisible}
+        onClose={() => setNewsModalVisible(false)}
+        c={c}
+      />
     </View>
   );
 }
