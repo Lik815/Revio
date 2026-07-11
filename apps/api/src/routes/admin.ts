@@ -197,6 +197,32 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
     };
   });
 
+  // TEMP-DEBUG: löst einen bekannten Support-Fall auf (echter Zeitkonflikt
+  // zwischen zwei überschneidenden Serien-Anfragen desselben Testpatienten),
+  // wird nach Ausführung sofort wieder entfernt.
+  fastify.post('/debug/decline-inquiry-slot', async (request, reply) => {
+    const { therapistEmail, datum, uhrzeitVon } = request.query as { therapistEmail?: string; datum?: string; uhrzeitVon?: string };
+    if (!therapistEmail || !datum || !uhrzeitVon) return reply.status(400).send({ error: 'therapistEmail, datum, uhrzeitVon erforderlich' });
+    const therapist = await fastify.prisma.therapist.findFirst({ where: { email: therapistEmail } });
+    if (!therapist) return reply.status(404).send({ error: 'Therapeut nicht gefunden' });
+
+    const slots = await fastify.prisma.inquirySlot.findMany({
+      where: {
+        datum,
+        uhrzeitVon: Number(uhrzeitVon),
+        status: 'PENDING',
+        inquiry: { therapistId: therapist.id },
+      },
+    });
+
+    const declined = [];
+    for (const slot of slots) {
+      await fastify.prisma.inquirySlot.update({ where: { id: slot.id }, data: { status: 'DECLINED' } });
+      declined.push({ id: slot.id, inquiryId: slot.inquiryId });
+    }
+    return reply.send({ declined });
+  });
+
   fastify.get('/site-settings', async () => {
     return getPublicSiteSettings(fastify.prisma);
   });
