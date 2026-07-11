@@ -36,6 +36,9 @@ const defaultState = {
   certificationOptions: certificationFallback,
   specializationOptions: specializationFallback,
   heilmittelOptions: heilmittelFallback,
+  // Plattformweiter Kurs-Schalter (aus /config/options → site.coursesEnabled).
+  // Default true = rückwärtskompatibel, bis der Admin ihn abschaltet.
+  coursesEnabled: true,
 };
 
 // Module-level cache shared by every useConfigOptions() call site, so /config/options
@@ -57,6 +60,8 @@ function fetchConfigOptions() {
         certificationOptions: normalizeOptions(data.certifications, certificationFallback),
         specializationOptions: normalizeOptions(data.specializations, specializationFallback),
         heilmittelOptions: normalizeOptions(data.heilmittel, heilmittelFallback),
+        // Nur explizit false schaltet ab; alles andere lässt Kurse an.
+        coursesEnabled: data.site?.coursesEnabled !== false,
       };
       cachedState = next;
       listeners.forEach((listener) => listener(next));

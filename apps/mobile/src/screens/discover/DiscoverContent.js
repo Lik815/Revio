@@ -25,6 +25,7 @@ import {
 } from '../../utils/app-utils';
 import { AccountHeader } from '../../components/AccountHeader';
 import { CourseCard } from '../../components/CourseCard';
+import { useConfigOptions } from '../../hooks/use-config-options';
 
 // ── Map platform split ──────────────────────────────────────────────────────
 // Native (iOS / Android): real react-native-maps
@@ -127,7 +128,14 @@ export function DiscoverContent(props) {
 
   const insets = useSafeAreaInsets();
 
-  const isCourseMode = activeChip?.type === 'courses';
+  // Plattformweiter Kurs-Schalter: bei "aus" verschwindet der Kurs-Chip und der
+  // Kursmodus ist nicht mehr erreichbar (auch wenn activeChip noch gesetzt wäre).
+  const { coursesEnabled } = useConfigOptions();
+  const visibleQuickChips = coursesEnabled
+    ? quickChips
+    : quickChips.filter((chip) => chip.type !== 'courses');
+
+  const isCourseMode = coursesEnabled && activeChip?.type === 'courses';
   const safeCourseResults = Array.isArray(courseResults) ? courseResults : [];
   const safeCourseCategoryChips = Array.isArray(courseCategoryChips) ? courseCategoryChips : [];
 
@@ -784,7 +792,7 @@ export function DiscoverContent(props) {
               style={{ flex: 1 }}
               contentContainerStyle={styles.chipsRow}
             >
-              {quickChips.map((chip) => {
+              {visibleQuickChips.map((chip) => {
                 const active = activeChip?.label === chip.label;
                 return (
                   <Pressable

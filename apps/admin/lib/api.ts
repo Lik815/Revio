@@ -125,6 +125,7 @@ export type HeilmittelOption = {
 
 export type SiteSettings = {
   underConstruction: boolean;
+  coursesEnabled: boolean;
 };
 
 export type BlogPost = {

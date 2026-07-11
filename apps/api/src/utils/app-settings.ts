@@ -10,6 +10,7 @@ type AppSettingStore = {
 };
 
 export const SITE_UNDER_CONSTRUCTION_KEY = 'site_under_construction';
+export const COURSES_ENABLED_KEY = 'courses_enabled';
 
 export async function getBooleanAppSetting(
   prisma: AppSettingStore,
@@ -37,5 +38,8 @@ export async function setBooleanAppSetting(
 export async function getPublicSiteSettings(prisma: AppSettingStore) {
   return {
     underConstruction: await getBooleanAppSetting(prisma, SITE_UNDER_CONSTRUCTION_KEY, false),
+    // Plattformweiter Kurs-Schalter. Fallback true = rückwärtskompatibel
+    // (ohne gesetztes Setting bleiben Kurse an, bis der Admin sie abschaltet).
+    coursesEnabled: await getBooleanAppSetting(prisma, COURSES_ENABLED_KEY, true),
   };
 }

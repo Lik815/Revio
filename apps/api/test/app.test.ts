@@ -106,7 +106,7 @@ describe('Site settings', () => {
   it('returns public site config and can toggle under construction via admin', async () => {
     const initialRes = await app.inject({ method: 'GET', url: '/config/site' });
     expect(initialRes.statusCode).toBe(200);
-    expect(initialRes.json()).toEqual({ underConstruction: false });
+    expect(initialRes.json()).toEqual({ underConstruction: false, coursesEnabled: true });
 
     const updateRes = await app.inject({
       method: 'POST',
@@ -116,11 +116,11 @@ describe('Site settings', () => {
     });
 
     expect(updateRes.statusCode).toBe(200);
-    expect(updateRes.json()).toEqual({ success: true, underConstruction: true });
+    expect(updateRes.json()).toEqual({ success: true, underConstruction: true, coursesEnabled: true });
 
     const nextRes = await app.inject({ method: 'GET', url: '/config/site' });
     expect(nextRes.statusCode).toBe(200);
-    expect(nextRes.json()).toEqual({ underConstruction: true });
+    expect(nextRes.json()).toEqual({ underConstruction: true, coursesEnabled: true });
   });
 });
 

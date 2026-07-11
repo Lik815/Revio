@@ -287,6 +287,17 @@ export async function updateSiteUnderConstruction(formData: FormData) {
   revalidatePath('/settings');
 }
 
+export async function updateCoursesEnabled(formData: FormData) {
+  const value = String(formData.get('coursesEnabled') ?? '').trim();
+  const coursesEnabled = value === 'true';
+
+  await adminRequest('/admin/site-settings/update', {
+    body: { coursesEnabled },
+  });
+
+  revalidatePath('/settings');
+}
+
 export async function updateAppFeedbackStatus(id: string, formData: FormData) {
   const status = String(formData.get('status') ?? '').trim();
   if (status !== 'NEW' && status !== 'RESOLVED') return;

@@ -3,6 +3,7 @@ import { Pressable, ScrollView, Switch, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SPACE } from '../../utils/app-utils';
 import { AccountHeader } from '../../components/AccountHeader';
+import { useConfigOptions } from '../../hooks/use-config-options';
 
 export function OptionsContent({
   loggedInTherapist, loggedInPatient,
@@ -14,6 +15,7 @@ export function OptionsContent({
   c, t, styles,
 }) {
   const [debugTapCount, setDebugTapCount] = React.useState(0);
+  const { coursesEnabled } = useConfigOptions();
 const renderOptions = () => {
   const isLoggedIn = Boolean(loggedInTherapist || loggedInPatient);
 
@@ -111,8 +113,8 @@ const renderOptions = () => {
           </>
         )}
 
-        {/* ── Kurse (alle eingeloggten Therapeuten) ── */}
-        {loggedInTherapist && (
+        {/* ── Kurse (alle eingeloggten Therapeuten) — nur wenn plattformweit aktiv ── */}
+        {loggedInTherapist && coursesEnabled && (
           <>
             <SectionHeader title="Gesundheitskurse" />
             <OptionGroup>
