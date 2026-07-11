@@ -102,6 +102,34 @@ export function QualifikationActions({ id, currentStatus, action }: {
   );
 }
 
+export function CourseActions({ id, status, actions }: {
+  id: string;
+  status: string;
+  actions: {
+    approve: (id: string) => Promise<void>;
+    reject: (id: string) => Promise<void>;
+    requestChanges: (id: string) => Promise<void>;
+    suspend: (id: string) => Promise<void>;
+  };
+}) {
+  return (
+    <div className="action-row">
+      {status !== 'APPROVED' && (
+        <ActionButton label="Freigeben" variant="approve" action={() => actions.approve(id)} />
+      )}
+      {status !== 'REJECTED' && (
+        <ActionButton label="Ablehnen" variant="reject" action={() => actions.reject(id)} />
+      )}
+      {status !== 'CHANGES_REQUESTED' && (
+        <ActionButton label="Änderungen" variant="warn" action={() => actions.requestChanges(id)} />
+      )}
+      {status === 'APPROVED' && (
+        <ActionButton label="Sperren" variant="reject" action={() => actions.suspend(id)} />
+      )}
+    </div>
+  );
+}
+
 export function LinkActions({ id, status, actions }: {
   id: string;
   status: string;

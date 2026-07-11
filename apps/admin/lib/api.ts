@@ -179,6 +179,45 @@ export type AdminLink = {
   };
 };
 
+export type AdminCourseRun = {
+  id: string;
+  label: string | null;
+  status: string;
+  city?: string | null;
+  address?: string | null;
+  onlineUrl?: string | null;
+  maxParticipants: number;
+  priceAmount: number | null;
+  priceCurrency: string;
+  bookingDeadline?: string | null;
+  sessions?: Array<{ id: string; startsAt: string; endsAt: string; location: string | null }>;
+  _count?: { enrollments: number };
+};
+
+export type AdminCourse = {
+  id: string;
+  title: string;
+  description: string;
+  targetAudience: string | null;
+  prerequisites: string | null;
+  instructorName: string;
+  instructorBio: string | null;
+  contactInfo: string | null;
+  cancellationPolicy: string | null;
+  locationType: string;
+  healthInsuranceEligible: boolean;
+  zppVerified: boolean;
+  zppDocUrl: string | null;
+  reviewStatus: string;
+  adminNote: string | null;
+  createdAt: string;
+  updatedAt: string;
+  category: { key: string; label: string } | null;
+  therapist: { id: string; fullName: string; email: string; city: string } | null;
+  practice: { id: string; name: string; city: string } | null;
+  runs: AdminCourseRun[];
+};
+
 export const api = {
   getAppFeedback: () => adminFetch<AppFeedback[]>('/admin/feedback'),
   getStats: () => adminFetch<AdminStats>('/admin/stats'),
@@ -193,4 +232,6 @@ export const api = {
   getCertificationOptions: () => adminFetch<{ certifications: CertificationOption[] }>('/admin/certifications'),
   getSpecializationOptions: () => adminFetch<{ specializations: SpecializationOption[] }>('/admin/specializations'),
   getHeilmittelOptions: () => adminFetch<{ heilmittel: HeilmittelOption[] }>('/admin/heilmittel'),
+  getAdminCourses: () => adminFetch<{ courses: AdminCourse[]; total: number }>('/admin/courses?limit=50'),
+  getAdminCourse: (id: string) => adminFetch<AdminCourse>(`/admin/courses/${id}`),
 };

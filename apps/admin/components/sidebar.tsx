@@ -24,6 +24,7 @@ const navGroups = [
       { href: '/therapists', label: 'Therapeuten', icon: 'M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2M12 3a4 4 0 100 8 4 4 0 000-8z' },
       { href: '/practices', label: 'Praxen', icon: 'M4 21V9l8-6 8 6v12M9 21v-6h6v6M4 11h16' },
       { href: '/links', label: 'Verknüpfungen', icon: 'M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71' },
+      { href: '/courses', label: 'Kurse', icon: 'M4 19.5A2.5 2.5 0 016.5 17H20M4 19.5A2.5 2.5 0 014 17V4h16v13M4 19.5V21' },
       { href: '/feedback', label: 'Feedback', icon: 'M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z' },
     ],
   },
