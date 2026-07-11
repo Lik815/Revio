@@ -99,50 +99,66 @@ export function CustomTabBar({ state, descriptors, navigation, badgeCounts = {} 
     }
   }, [targetNavWidth, isGuestTabBar]);
 
-  // Gast-Ansicht: einzelner breiter Button
-  // Auf dem Auth-Tab selbst → "Suche" anzeigen (Anmelden wäre doppelt)
-  // Auf allen anderen Tabs → "Anmelden" anzeigen
+  // Gast-Ansicht: beide Tabs (Suche + Anmelden) immer sichtbar als kompakte Pill-Nav
   if (isGuestTabBar) {
-    const currentRoute = state.routes[state.index];
-    const onAuthTab = currentRoute?.name === TAB_ROUTES.AUTH;
-
-    const authRoute = state.routes.find((r) => r.name === TAB_ROUTES.AUTH) ?? state.routes[state.routes.length - 1];
-    const discoverRoute = state.routes.find((r) => r.name === TAB_ROUTES.DISCOVER) ?? state.routes[0];
-
-    const onPress = () => {
-      if (onAuthTab) {
-        navigation.navigate(discoverRoute.name);
-      } else {
-        navigation.navigate(authRoute.name);
-      }
-    };
-
     return (
       <View
         style={{
+          alignItems: 'center',
           backgroundColor: c.background,
           paddingHorizontal: SPACE.lg,
           paddingTop: SPACE.sm,
           paddingBottom: insets.bottom + SPACE.sm,
         }}
       >
-        <Pressable
-          onPress={onPress}
-          style={({ pressed }) => ({
-            backgroundColor: pressed ? c.primaryDark ?? c.primary : c.primary,
-            borderRadius: RADIUS.full,
+        <View
+          style={{
             flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 10,
-            paddingVertical: 16,
-          })}
+            backgroundColor: c.nav,
+            borderRadius: RADIUS.lg,
+            paddingVertical: SPACE.sm,
+            paddingHorizontal: SPACE.sm,
+            gap: 4,
+            ...SHADOW.modal,
+          }}
         >
-          <Ionicons name={onAuthTab ? 'search-outline' : 'log-in-outline'} size={22} color="#fff" />
-          <Text style={{ fontSize: 16, fontWeight: '700', color: '#fff', letterSpacing: 0.2 }}>
-            {onAuthTab ? 'Suche' : 'Anmelden'}
-          </Text>
-        </Pressable>
+          {state.routes.map((route, index) => {
+            const focused = state.index === index;
+            const isAuth = route.name === TAB_ROUTES.AUTH;
+            const icon = isAuth ? 'log-in' : 'search';
+            const label = isAuth ? 'Anmelden' : 'Suche';
+
+            const onPress = () => {
+              const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+              if (!event.defaultPrevented) navigation.navigate(route.name);
+            };
+
+            return (
+              <Pressable
+                key={route.key}
+                onPress={onPress}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 7,
+                  paddingVertical: 10,
+                  paddingHorizontal: 18,
+                  borderRadius: RADIUS.md,
+                  backgroundColor: focused ? c.primary : 'transparent',
+                }}
+              >
+                <Ionicons
+                  name={focused ? icon : `${icon}-outline`}
+                  size={18}
+                  color={focused ? '#fff' : (c.textMuted ?? c.muted)}
+                />
+                <Text style={{ fontSize: 14, fontWeight: '700', color: focused ? '#fff' : (c.textMuted ?? c.muted) }}>
+                  {label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
       </View>
     );
   }
