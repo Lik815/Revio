@@ -178,8 +178,15 @@ export async function generateAvailableSlots(
   const { disabled, durationMin, stepMin } = await resolveServiceConfig(fastify, therapistId, heilmittelKey);
   if (disabled) return [];
 
-  // 2. Arbeitszeiten, Blockzeiten, bestehende Buchungen laden
-  const [rules, blockedTimes, bookings] = await Promise.all([
+  // 2. Arbeitszeiten, Blockzeiten, bestehende Buchungen laden.
+  // Zwei getrennte Buchungsursprünge müssen beide ausgeschlossen werden:
+  //  - BookingRequest (Direktbuchungs-Flow): PENDING blockiert die Sichtbarkeit
+  //    schon vor der Bestätigung, um Doppel-Anfragen auf denselben Slot zu
+  //    vermeiden (dafür gibt's zu diesem Zeitpunkt noch keinen ScheduledSlot).
+  //  - ScheduledSlot (u.a. über den Inquiry/Serien-Flow bestätigte Termine):
+  //    ohne diesen zweiten Check tauchen über Inquiry bestätigte Zeiten
+  //    weiterhin als "frei" auf, obwohl der Therapeut dafür schon fest gebucht ist.
+  const [rules, blockedTimes, bookingRequests, scheduledSlots] = await Promise.all([
     fastify.prisma.therapistWorkingHoursRule.findMany({
       where: { therapistId, isActive: true },
     }),
@@ -195,9 +202,18 @@ export async function generateAvailableSlots(
       },
       select: { startsAt: true, endsAt: true },
     }),
+    fastify.prisma.scheduledSlot.findMany({
+      where: {
+        therapistId,
+        status: 'SCHEDULED',
+        startsAt: { lt: to },
+        endsAt: { gt: from },
+      },
+      select: { startsAt: true, endsAt: true },
+    }),
   ]);
 
-  const existingBookings = bookings
+  const existingBookings = [...bookingRequests, ...scheduledSlots]
     .filter((b): b is { startsAt: Date; endsAt: Date } => b.startsAt !== null && b.endsAt !== null);
 
   return computeAvailableSlots(rules, blockedTimes, existingBookings, durationMin, stepMin, { from, to }, now);

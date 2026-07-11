@@ -2937,6 +2937,53 @@ describe('Dynamic Booking', () => {
     expect(res.statusCode).toBe(400);
   });
 
+  it('GET /therapists/:id/available-slots — schließt über Inquiry bestätigte ScheduledSlots aus', async () => {
+    const day = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+    day.setHours(0, 0, 0, 0);
+    await prisma.therapistWorkingHoursRule.create({
+      data: { therapistId, weekday: day.getDay(), startMinute: 8 * 60, endMinute: 10 * 60 },
+    });
+    await prisma.heilmittelOption.upsert({
+      where: { key: 'KG' },
+      create: { key: 'KG', label: 'KG', defaultDurationMin: 20 },
+      update: { defaultDurationMin: 20 },
+    });
+
+    const from = day.toISOString();
+    const to = new Date(day.getTime() + 24 * 60 * 60 * 1000).toISOString();
+
+    // Vorher: 08:00 ist frei
+    const before = await app.inject({
+      method: 'GET', url: `/therapists/${therapistId}/available-slots?heilmittel=KG&from=${from}&to=${to}`,
+    });
+    const beforeTimes = before.json().slots.map((s: any) => s.startsAt);
+    expect(beforeTimes).toContain(new Date(day.getTime() + 8 * 60 * 60 * 1000).toISOString());
+
+    // Direkt einen ScheduledSlot anlegen, wie ihn eine bestätigte Inquiry erzeugen würde
+    // (bookingRequestId null, inquiryId gesetzt — die für diesen Bug relevante Origin).
+    const slotStart = new Date(day.getTime() + 8 * 60 * 60 * 1000);
+    const slotEnd = new Date(slotStart.getTime() + 20 * 60 * 1000);
+    await prisma.scheduledSlot.create({
+      data: {
+        therapistId,
+        startsAt: slotStart,
+        endsAt: slotEnd,
+        heilmittel: 'KG',
+        patientName: 'Test Patient',
+        status: 'SCHEDULED',
+      },
+    });
+
+    // Nachher: 08:00 darf NICHT mehr als frei angeboten werden
+    const after = await app.inject({
+      method: 'GET', url: `/therapists/${therapistId}/available-slots?heilmittel=KG&from=${from}&to=${to}`,
+    });
+    const afterTimes = after.json().slots.map((s: any) => s.startsAt);
+    expect(afterTimes).not.toContain(slotStart.toISOString());
+
+    await prisma.scheduledSlot.deleteMany({ where: { therapistId, startsAt: slotStart } });
+  });
+
   // ── POST /bookings (dynamisch) ────────────────────────────────────────────
 
   it('POST /bookings — bucht Zeitfenster atomisch (startsAt)', async () => {
