@@ -189,6 +189,10 @@ model Therapist {
   // Phase 1 — Zertifikats-Verifikation
   qualifikationenStatus QualifikationStatus @default(UNGEPRÜFT)
   qualifikationenVerifiziertAt DateTime?
+  // Auto-Accept (added via migration 20260712000000)
+  autoAcceptEnabled     Boolean      @default(false)
+  autoAcceptSingle      Boolean      @default(false)
+  autoAcceptSeries      Boolean      @default(false)
   createdAt             DateTime     @default(now())
   updatedAt             DateTime     @updatedAt
   links                 TherapistPracticeLink[]

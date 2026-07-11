@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator, LayoutAnimation, Modal, Pressable, RefreshControl, ScrollView, Text, View,
+  ActivityIndicator, LayoutAnimation, Modal, Pressable, RefreshControl, ScrollView, Switch, Text, View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { RADIUS, isSameDay, startOfDay, SPACE } from '../../utils/app-utils';
+import { RADIUS, isSameDay, startOfDay, SPACE, getBaseUrl, TUNNEL_HEADERS } from '../../utils/app-utils';
 import { InquiryCard } from '../../components/InquiryCard';
 import { computeTherapistDashboardStats } from '../../utils/therapist-dashboard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -46,6 +46,27 @@ export function TherapyTabTherapist({
 
   const pendingInquiries = useMemo(() => (incomingInquiries ?? []).filter((q) => ['SENT', 'SEEN', 'COUNTER_PROPOSED'].includes(q.status)), [incomingInquiries]);
   const pendingInquiryCount = pendingInquiries.length;
+
+  const [autoAcceptEnabled, setAutoAcceptEnabled] = useState(loggedInTherapist?.autoAcceptEnabled ?? false);
+  const [autoAcceptSingle, setAutoAcceptSingle] = useState(loggedInTherapist?.autoAcceptSingle ?? false);
+  const [autoAcceptSeries, setAutoAcceptSeries] = useState(loggedInTherapist?.autoAcceptSeries ?? false);
+
+  useEffect(() => {
+    setAutoAcceptEnabled(loggedInTherapist?.autoAcceptEnabled ?? false);
+    setAutoAcceptSingle(loggedInTherapist?.autoAcceptSingle ?? false);
+    setAutoAcceptSeries(loggedInTherapist?.autoAcceptSeries ?? false);
+  }, [loggedInTherapist?.autoAcceptEnabled, loggedInTherapist?.autoAcceptSingle, loggedInTherapist?.autoAcceptSeries]);
+
+  const patchAutoAccept = useCallback(async (patch) => {
+    if (!authToken) return;
+    try {
+      await fetch(`${getBaseUrl()}/auth/me/auto-accept`, {
+        method: 'PATCH',
+        headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      });
+    } catch (_) {}
+  }, [authToken]);
 
   const activation = useBookingActivation({ onActivateBookingRequests });
   const calendarView = useTherapistCalendarView();
@@ -225,6 +246,62 @@ export function TherapyTabTherapist({
               showsVerticalScrollIndicator={false}
               refreshControl={<RefreshControl refreshing={therapyRefreshing} onRefresh={onRefresh} tintColor={c.primary} />}
             >
+              {/* Auto-Accept Toggle */}
+              <View style={{ backgroundColor: c.card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: autoAcceptEnabled ? `${c.primary}40` : c.border, overflow: 'hidden' }}>
+                <Pressable
+                  onPress={() => {
+                    const next = !autoAcceptEnabled;
+                    setAutoAcceptEnabled(next);
+                    patchAutoAccept({ autoAcceptEnabled: next });
+                  }}
+                  style={{ flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 }}
+                >
+                  <View style={{ width: 36, height: 36, borderRadius: RADIUS.md, backgroundColor: autoAcceptEnabled ? c.primary : c.mutedBg, alignItems: 'center', justifyContent: 'center' }}>
+                    <Ionicons name="flash" size={18} color={autoAcceptEnabled ? '#fff' : c.muted} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: c.text }}>Automatisch bestaetigen</Text>
+                    <Text style={{ fontSize: 12, color: c.muted, marginTop: 1 }}>Neue Anfragen direkt bestaetigen</Text>
+                  </View>
+                  <Switch
+                    value={autoAcceptEnabled}
+                    onValueChange={(val) => { setAutoAcceptEnabled(val); patchAutoAccept({ autoAcceptEnabled: val }); }}
+                    trackColor={{ false: c.border, true: c.primary }}
+                    thumbColor="#fff"
+                  />
+                </Pressable>
+                {autoAcceptEnabled && (
+                  <View style={{ borderTopWidth: 1, borderTopColor: c.border, paddingHorizontal: 14, paddingBottom: 10 }}>
+                    <Pressable
+                      onPress={() => { const v = !autoAcceptSingle; setAutoAcceptSingle(v); patchAutoAccept({ autoAcceptSingle: v }); }}
+                      style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, gap: 10 }}
+                    >
+                      <Ionicons name="calendar-outline" size={16} color={c.primary} />
+                      <Text style={{ flex: 1, fontSize: 13, color: c.text }}>Einzeltermine</Text>
+                      <Switch
+                        value={autoAcceptSingle}
+                        onValueChange={(v) => { setAutoAcceptSingle(v); patchAutoAccept({ autoAcceptSingle: v }); }}
+                        trackColor={{ false: c.border, true: c.primary }}
+                        thumbColor="#fff"
+                      />
+                    </Pressable>
+                    <Pressable
+                      onPress={() => { const v = !autoAcceptSeries; setAutoAcceptSeries(v); patchAutoAccept({ autoAcceptSeries: v }); }}
+                      style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, gap: 10 }}
+                    >
+                      <Ionicons name="layers-outline" size={16} color={c.primary} />
+                      <Text style={{ flex: 1, fontSize: 13, color: c.text }}>Serientermine</Text>
+                      <Switch
+                        value={autoAcceptSeries}
+                        onValueChange={(v) => { setAutoAcceptSeries(v); patchAutoAccept({ autoAcceptSeries: v }); }}
+                        trackColor={{ false: c.border, true: c.primary }}
+                        thumbColor="#fff"
+                      />
+                    </Pressable>
+                  </View>
+                )}
+              </View>
+
               {incomingInquiriesLoading && (!incomingInquiries || incomingInquiries.length === 0) ? (
                 <ActivityIndicator color={c.primary} style={{ marginTop: 40 }} />
               ) : pendingInquiries.length === 0 ? (
@@ -342,14 +419,24 @@ export function TherapyTabTherapist({
                 {/* Anfragen */}
                 <Pressable
                   onPress={() => { setShowStatsModal(false); setTherapistTab('anfragen'); }}
-                  style={{ flex: 1, backgroundColor: pendingInquiryCount > 0 ? `${c.warning ?? '#B78700'}12` : c.card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: pendingInquiryCount > 0 ? `${c.warning ?? '#B78700'}40` : c.border, padding: 16 }}
+                  style={{ flex: 1, backgroundColor: autoAcceptEnabled ? `${c.primary}10` : pendingInquiryCount > 0 ? `${c.warning ?? '#B78700'}12` : c.card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: autoAcceptEnabled ? `${c.primary}40` : pendingInquiryCount > 0 ? `${c.warning ?? '#B78700'}40` : c.border, padding: 16 }}
                 >
-                  <View style={{ width: 40, height: 40, borderRadius: RADIUS.md, backgroundColor: `${c.warning ?? '#B78700'}18`, alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
-                    <Ionicons name="person-outline" size={20} color={c.warning ?? '#B78700'} />
+                  <View style={{ width: 40, height: 40, borderRadius: RADIUS.md, backgroundColor: autoAcceptEnabled ? `${c.primary}20` : `${c.warning ?? '#B78700'}18`, alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
+                    <Ionicons name={autoAcceptEnabled ? 'flash' : 'person-outline'} size={20} color={autoAcceptEnabled ? c.primary : c.warning ?? '#B78700'} />
                   </View>
-                  <Text style={{ fontSize: 26, fontWeight: '800', color: pendingInquiryCount > 0 ? (c.warning ?? '#B78700') : c.text }}>{pendingInquiryCount}</Text>
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: c.text, marginTop: 2 }}>Anfragen</Text>
-                  <Text style={{ fontSize: 12, color: c.muted, marginTop: 2 }}>{pendingInquiryCount === 0 ? 'keine offen' : `${pendingInquiryCount} offen`}</Text>
+                  {autoAcceptEnabled ? (
+                    <>
+                      <Text style={{ fontSize: 13, fontWeight: '800', color: c.primary, marginBottom: 2 }}>Auto-Bestaetigung</Text>
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: c.text }}>Anfragen</Text>
+                      <Text style={{ fontSize: 12, color: c.muted, marginTop: 2 }}>aktiv</Text>
+                    </>
+                  ) : (
+                    <>
+                      <Text style={{ fontSize: 26, fontWeight: '800', color: pendingInquiryCount > 0 ? (c.warning ?? '#B78700') : c.text }}>{pendingInquiryCount}</Text>
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: c.text, marginTop: 2 }}>Anfragen</Text>
+                      <Text style={{ fontSize: 12, color: c.muted, marginTop: 2 }}>{pendingInquiryCount === 0 ? 'keine offen' : `${pendingInquiryCount} offen`}</Text>
+                    </>
+                  )}
                 </Pressable>
 
                 {/* Auslastung */}

@@ -364,6 +364,9 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
         updatedAt: therapist.complianceUpdatedAt ?? null,
       },
       bookingMode: therapist.bookingMode ?? 'DIRECTORY_ONLY',
+      autoAcceptEnabled: (therapist as any).autoAcceptEnabled ?? false,
+      autoAcceptSingle: (therapist as any).autoAcceptSingle ?? false,
+      autoAcceptSeries: (therapist as any).autoAcceptSeries ?? false,
       profileStatus: getProfileStatus({
         ...(therapist as any),
         kassenart: serializedKassenarten,
@@ -655,6 +658,41 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
         documentCount,
       }),
     };
+  });
+
+  fastify.patch('/auth/me/auto-accept', async (request, reply) => {
+    const token = getToken(request);
+    if (!token) return reply.unauthorized('Kein Token');
+
+    const schema = z.object({
+      autoAcceptEnabled: z.boolean().optional(),
+      autoAcceptSingle: z.boolean().optional(),
+      autoAcceptSeries: z.boolean().optional(),
+    });
+    const parsed = schema.safeParse(request.body);
+    if (!parsed.success) return reply.badRequest(parsed.error.flatten().toString());
+
+    const user = await fastify.prisma.user.findUnique({ where: { sessionToken: token } });
+    const therapist = (user
+      ? (await fastify.prisma.therapist.findFirst({ where: { userId: user.id } }))
+        ?? (await fastify.prisma.therapist.findUnique({ where: { sessionToken: token } }))
+      : await fastify.prisma.therapist.findUnique({ where: { sessionToken: token } }));
+    if (!therapist) return reply.unauthorized('Ungültiger Token');
+
+    const updated = await fastify.prisma.therapist.update({
+      where: { id: therapist.id },
+      data: {
+        ...(parsed.data.autoAcceptEnabled !== undefined ? { autoAcceptEnabled: parsed.data.autoAcceptEnabled } : {}),
+        ...(parsed.data.autoAcceptSingle !== undefined ? { autoAcceptSingle: parsed.data.autoAcceptSingle } : {}),
+        ...(parsed.data.autoAcceptSeries !== undefined ? { autoAcceptSeries: parsed.data.autoAcceptSeries } : {}),
+      },
+    });
+
+    return reply.send({
+      autoAcceptEnabled: (updated as any).autoAcceptEnabled,
+      autoAcceptSingle: (updated as any).autoAcceptSingle,
+      autoAcceptSeries: (updated as any).autoAcceptSeries,
+    });
   });
 
   fastify.patch('/auth/me/compliance', async (request, reply) => {

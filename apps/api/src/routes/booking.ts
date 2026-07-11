@@ -413,10 +413,20 @@ export async function bookingRoutes(fastify: FastifyInstance) {
         });
       });
 
+      // Auto-Accept: Einzeltermin direkt bestätigen wenn aktiviert
+      let finalStatus = result.status;
+      if ((therapist as any).autoAcceptEnabled && (therapist as any).autoAcceptSingle) {
+        await fastify.prisma.bookingRequest.update({
+          where: { id: result.id },
+          data: { status: 'CONFIRMED', confirmedSlotAt: startsAt },
+        });
+        finalStatus = 'CONFIRMED';
+      }
+
       if (therapist.expoPushToken) {
         sendPushNotification(
           therapist.expoPushToken,
-          'Neue Terminanfrage',
+          finalStatus === 'CONFIRMED' ? 'Termin automatisch bestätigt' : 'Neue Terminanfrage',
           `${patientName} hat einen Termin am ${startsAt.toLocaleDateString('de-DE')} gebucht.`,
           { bookingId: result.id, screen: 'bookings' },
         );
@@ -424,7 +434,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
 
       return reply.status(201).send({
         id: result.id,
-        status: result.status,
+        status: finalStatus,
         startsAt: result.startsAt?.toISOString(),
         endsAt: result.endsAt?.toISOString(),
         expiresAt: result.responseDueAt,
