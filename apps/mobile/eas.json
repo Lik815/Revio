@@ -23,6 +23,9 @@
     "production": {
       "autoIncrement": true,
       "channel": "main",
+      "ios": {
+        "image": "latest"
+      },
       "android": {
         "buildType": "apk"
       }
