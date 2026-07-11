@@ -23,5 +23,12 @@ if ! npx prisma db push --schema prisma/schema.production.prisma --accept-data-l
   exit 1
 fi
 
+# "db push" führt keine Migrations-SQL aus (nur Schema-Sync), deshalb muss
+# Seed-Daten wie CourseCategory hier explizit und idempotent nachgezogen werden.
+echo "Seeding course categories..."
+if ! npx prisma db execute --schema prisma/schema.production.prisma --file prisma/seed-course-categories.sql; then
+  echo "WARN: Seeding der Kurskategorien fehlgeschlagen (Server startet trotzdem)."
+fi
+
 echo "Starting node server..."
 exec node dist/server.js

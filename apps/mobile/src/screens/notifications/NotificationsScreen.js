@@ -1,7 +1,7 @@
-import React, { useMemo } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { SectionList, Text, View, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useTheme } from '../../hooks/use-theme';
 import { useNotifications } from '../../context/NotificationContext';
 import { appStyles } from '../../styles/app-styles';
@@ -38,6 +38,10 @@ export function NotificationsTabScreen() {
   } = useNotifications();
 
   const unreadCount = notifications.filter((n) => !readNotifIds.has(n.id)).length;
+
+  useFocusEffect(useCallback(() => {
+    if (notifications.length > 0) markAllNotificationsRead();
+  }, [notifications, markAllNotificationsRead]));
 
   // Server already caps notifications to the last 7 days, so no per-item
   // dismiss is needed here — items just move from unread to read.
