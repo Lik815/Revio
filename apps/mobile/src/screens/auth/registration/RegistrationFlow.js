@@ -96,7 +96,7 @@ export function RegistrationFlow({ onClose, onShowLogin, onComplete, c, t, style
     // Name → firstName / lastName splitten
     const parts = name.trim().split(/\s+/);
     setFirstName(parts[0] ?? '');
-    setLastName(parts.slice(1).join(' ') || parts[0] ?? '');
+    setLastName(parts.slice(1).join(' ') || (parts[0] ?? ''));
     setAccountLoading(true);
     try {
       const res = await fetch(`${getBaseUrl()}/register/send-otp`, {
