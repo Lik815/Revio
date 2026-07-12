@@ -416,10 +416,33 @@ export async function bookingRoutes(fastify: FastifyInstance) {
       // Auto-Accept: Einzeltermin direkt bestätigen wenn aktiviert
       let finalStatus = result.status;
       if ((therapist as any).autoAcceptEnabled && (therapist as any).autoAcceptSingle) {
-        await fastify.prisma.bookingRequest.update({
-          where: { id: result.id },
-          data: { status: 'CONFIRMED', confirmedSlotAt: startsAt },
-        });
+        const autoNow = new Date();
+        await fastify.prisma.$transaction([
+          fastify.prisma.bookingRequest.update({
+            where: { id: result.id },
+            data: { status: 'CONFIRMED', confirmedSlotAt: startsAt, respondedAt: autoNow },
+          }),
+          fastify.prisma.scheduledSlot.upsert({
+            where: { id: `slot_${result.id}` },
+            create: {
+              id: `slot_${result.id}`,
+              bookingRequestId: result.id,
+              therapistId,
+              startsAt,
+              endsAt,
+              heilmittel,
+              patientName,
+              patientPhone: (patient as any).phone ?? null,
+              status: 'SCHEDULED',
+            },
+            update: { startsAt, endsAt, status: 'SCHEDULED' },
+          }),
+          fastify.prisma.therapistCapacityRule.upsert({
+            where: { therapistId },
+            create: { therapistId, laufendeNeuaufnahmenDieseWoche: 1, weekResetAt: autoNow, abgeschlosseneInquiriesCount: 1 },
+            update: { laufendeNeuaufnahmenDieseWoche: { increment: 1 }, abgeschlosseneInquiriesCount: { increment: 1 } },
+          }),
+        ]);
         finalStatus = 'CONFIRMED';
       }
 

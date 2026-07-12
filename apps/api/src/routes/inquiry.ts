@@ -290,6 +290,64 @@ export async function inquiryRoutes(fastify: FastifyInstance) {
       }
     }
 
+    // Auto-Accept: EINZELTERMIN-Inquiry direkt bestätigen wenn aktiviert
+    if (suchtyp === 'EINZELTERMIN' && wunschDatum && wunschUhrzeitVon != null && wunschUhrzeitBis != null) {
+      for (const inq of patientRequest.inquiries) {
+        const therapistSettings = await fastify.prisma.therapist.findUnique({
+          where: { id: inq.therapistId },
+          select: { autoAcceptEnabled: true, autoAcceptSingle: true } as any,
+        });
+        if (!(therapistSettings as any)?.autoAcceptEnabled || !(therapistSettings as any)?.autoAcceptSingle) continue;
+
+        const datum = new Date(wunschDatum);
+        const startsAt = new Date(datum);
+        startsAt.setHours(0, wunschUhrzeitVon, 0, 0);
+        const endsAt = new Date(datum);
+        endsAt.setHours(0, wunschUhrzeitBis, 0, 0);
+
+        const conflict = await checkSlotConflict(fastify, inq.therapistId, startsAt, endsAt);
+        if (conflict) continue;
+
+        const now = new Date();
+        await fastify.prisma.$transaction(async (tx) => {
+          await tx.scheduledSlot.upsert({
+            where: { id: `slot_inq_${inq.id}` },
+            create: {
+              id: `slot_inq_${inq.id}`,
+              inquiryId: inq.id,
+              therapistId: inq.therapistId,
+              startsAt,
+              endsAt,
+              heilmittel,
+              patientName: inq.patientName,
+              patientPhone: inq.patientPhone ?? undefined,
+              status: 'SCHEDULED',
+            },
+            update: { startsAt, endsAt, status: 'SCHEDULED' },
+          });
+          await tx.inquiry.update({
+            where: { id: inq.id },
+            data: {
+              status: 'CONFIRMED',
+              confirmedDatum: datum,
+              confirmedUhrzeitVon: wunschUhrzeitVon,
+              confirmedUhrzeitBis: wunschUhrzeitBis,
+              respondedAt: now,
+            },
+          });
+          await tx.therapistCapacityRule.upsert({
+            where: { therapistId: inq.therapistId },
+            create: { therapistId: inq.therapistId, laufendeNeuaufnahmenDieseWoche: 1, weekResetAt: now, abgeschlosseneInquiriesCount: 1 },
+            update: { laufendeNeuaufnahmenDieseWoche: { increment: 1 }, abgeschlosseneInquiriesCount: { increment: 1 } },
+          });
+          await tx.inquiry.updateMany({
+            where: { patientRequestId: inq.patientRequestId, id: { not: inq.id }, status: { in: ['SENT', 'SEEN', 'COUNTER_PROPOSED'] } },
+            data: { status: 'AUTO_CLOSED' },
+          });
+        });
+      }
+    }
+
     return reply.status(201).send(patientRequest);
   });
 

@@ -251,8 +251,14 @@ export function TherapyTabTherapist({
                 <Pressable
                   onPress={() => {
                     const next = !autoAcceptEnabled;
+                    let patch = { autoAcceptEnabled: next };
+                    if (next && !autoAcceptSingle && !autoAcceptSeries) {
+                      setAutoAcceptSingle(true);
+                      setAutoAcceptSeries(true);
+                      patch = { ...patch, autoAcceptSingle: true, autoAcceptSeries: true };
+                    }
                     setAutoAcceptEnabled(next);
-                    patchAutoAccept({ autoAcceptEnabled: next });
+                    patchAutoAccept(patch);
                   }}
                   style={{ flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 }}
                 >
@@ -265,7 +271,16 @@ export function TherapyTabTherapist({
                   </View>
                   <Switch
                     value={autoAcceptEnabled}
-                    onValueChange={(val) => { setAutoAcceptEnabled(val); patchAutoAccept({ autoAcceptEnabled: val }); }}
+                    onValueChange={(val) => {
+                      let patch = { autoAcceptEnabled: val };
+                      if (val && !autoAcceptSingle && !autoAcceptSeries) {
+                        setAutoAcceptSingle(true);
+                        setAutoAcceptSeries(true);
+                        patch = { ...patch, autoAcceptSingle: true, autoAcceptSeries: true };
+                      }
+                      setAutoAcceptEnabled(val);
+                      patchAutoAccept(patch);
+                    }}
                     trackColor={{ false: c.border, true: c.primary }}
                     thumbColor="#fff"
                   />
@@ -273,27 +288,49 @@ export function TherapyTabTherapist({
                 {autoAcceptEnabled && (
                   <View style={{ borderTopWidth: 1, borderTopColor: c.border, paddingHorizontal: 14, paddingBottom: 10 }}>
                     <Pressable
-                      onPress={() => { const v = !autoAcceptSingle; setAutoAcceptSingle(v); patchAutoAccept({ autoAcceptSingle: v }); }}
+                      onPress={() => {
+                        const v = !autoAcceptSingle;
+                        let patch = { autoAcceptSingle: v };
+                        if (!v && !autoAcceptSeries) { setAutoAcceptEnabled(false); patch = { ...patch, autoAcceptEnabled: false }; }
+                        setAutoAcceptSingle(v);
+                        patchAutoAccept(patch);
+                      }}
                       style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, gap: 10 }}
                     >
                       <Ionicons name="calendar-outline" size={16} color={c.primary} />
                       <Text style={{ flex: 1, fontSize: 13, color: c.text }}>Einzeltermine</Text>
                       <Switch
                         value={autoAcceptSingle}
-                        onValueChange={(v) => { setAutoAcceptSingle(v); patchAutoAccept({ autoAcceptSingle: v }); }}
+                        onValueChange={(v) => {
+                          let patch = { autoAcceptSingle: v };
+                          if (!v && !autoAcceptSeries) { setAutoAcceptEnabled(false); patch = { ...patch, autoAcceptEnabled: false }; }
+                          setAutoAcceptSingle(v);
+                          patchAutoAccept(patch);
+                        }}
                         trackColor={{ false: c.border, true: c.primary }}
                         thumbColor="#fff"
                       />
                     </Pressable>
                     <Pressable
-                      onPress={() => { const v = !autoAcceptSeries; setAutoAcceptSeries(v); patchAutoAccept({ autoAcceptSeries: v }); }}
+                      onPress={() => {
+                        const v = !autoAcceptSeries;
+                        let patch = { autoAcceptSeries: v };
+                        if (!v && !autoAcceptSingle) { setAutoAcceptEnabled(false); patch = { ...patch, autoAcceptEnabled: false }; }
+                        setAutoAcceptSeries(v);
+                        patchAutoAccept(patch);
+                      }}
                       style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, gap: 10 }}
                     >
                       <Ionicons name="layers-outline" size={16} color={c.primary} />
                       <Text style={{ flex: 1, fontSize: 13, color: c.text }}>Serientermine</Text>
                       <Switch
                         value={autoAcceptSeries}
-                        onValueChange={(v) => { setAutoAcceptSeries(v); patchAutoAccept({ autoAcceptSeries: v }); }}
+                        onValueChange={(v) => {
+                          let patch = { autoAcceptSeries: v };
+                          if (!v && !autoAcceptSingle) { setAutoAcceptEnabled(false); patch = { ...patch, autoAcceptEnabled: false }; }
+                          setAutoAcceptSeries(v);
+                          patchAutoAccept(patch);
+                        }}
                         trackColor={{ false: c.border, true: c.primary }}
                         thumbColor="#fff"
                       />
