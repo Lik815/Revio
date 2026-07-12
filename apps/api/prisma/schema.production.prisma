@@ -191,7 +191,6 @@ model Therapist {
   workingHoursRules     TherapistWorkingHoursRule[]
   services              TherapistService[]
   blockedTimes          TherapistBlockedTime[]
-  capacityRule          TherapistCapacityRule?
   absences              TherapistAbsence[]
   scheduledSlots        ScheduledSlot[]
   inquiries             Inquiry[]               @relation("TherapistInquiries")
@@ -510,25 +509,6 @@ model UserFavoriteTherapist {
 }
 
 // ─── Phase 1: Angebotsseite + Kalender-Fundament ─────────────────────────────
-
-// Kapazitäts-Drossel: wie viele neue Serien nimmt ein:e Therapeut:in pro Woche an.
-// Schützt vor Überbuchung durch das grobe Verfügbarkeitsmodell.
-model TherapistCapacityRule {
-  id                             String    @id @default(cuid())
-  therapistId                    String    @unique
-  therapist                      Therapist @relation(fields: [therapistId], references: [id], onDelete: Cascade)
-  maxNeueSerienProWoche          Int       @default(2)
-  laufendeNeuaufnahmenDieseWoche Int       @default(0)
-  weekResetAt                    DateTime?
-  maxAnfragenOffen               Int       @default(5)
-  autoPauseBeiFullCapacity       Boolean   @default(true)
-  // belegungsfaktor 0.0–1.0: welcher Anteil der Zeitfenster gilt als bereits belegt.
-  // Default 0.4 (Cold Start < 5 Anfragen), steigt auf 0.5 nach Kalibrierung.
-  belegungsfaktor                Float     @default(0.4)
-  abgeschlosseneInquiriesCount   Int       @default(0)
-  createdAt                      DateTime  @default(now())
-  updatedAt                      DateTime  @updatedAt
-}
 
 // Mehrtägige Abwesenheiten (Urlaub, Fortbildung, Krankheit).
 // Ergänzt TherapistBlockedTime (tagesinnere Blöcke) — beide Modelle bleiben

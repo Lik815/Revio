@@ -11,7 +11,7 @@ export function OptionsContent({
   onShowLogin, onShowRegister,
   onShowFeedback, onShowChangePassword, onShowPhoneEdit, onShowKassenartEdit, onLogout,
   onShowDebug,
-  onShowWorkingHours, onShowServices, onShowBlockedTimes, onShowCapacityRule, onShowAbsences, onShowMyCourses,
+  onShowWorkingHours, onShowServices, onShowBlockedTimes, onShowAbsences, onShowMyCourses,
   c, t, styles,
 }) {
   const [debugTapCount, setDebugTapCount] = React.useState(0);
@@ -92,13 +92,6 @@ const renderOptions = () => {
                 subtitle="Pausen, Urlaub, Hausbesuche blockieren"
                 icon="ban-outline"
                 onPress={onShowBlockedTimes}
-                valueColor={c.primary}
-              />
-              <OptionRow
-                label="Kapazitaet"
-                subtitle="Max. neue Patienten pro Woche"
-                icon="speedometer-outline"
-                onPress={onShowCapacityRule}
                 valueColor={c.primary}
               />
               <OptionRow

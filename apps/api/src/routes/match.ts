@@ -8,9 +8,6 @@ const W = {
   KASSENART_MATCH: 15,
   KASSENART_MISMATCH: -10,
   ZEITFENSTER_OVERLAP_PER_MIN: 0.1, // max ~20 Punkte bei 200 Min Overlap
-  KAPAZITAET_VERFUEGBAR: 10,
-  KAPAZITAET_VOLL: -20,
-  BELEGUNGSFAKTOR_PER_POINT: 10, // (1 - belegungsfaktor) * 10
   QUALIFIKATION_NICHT_VERIFIZIERT: -25,
   SPRACHE_MATCH: 5,
   REVIEW_RATING_PER_STAR: 3, // (avgRating - 3) * 3, nur wenn >= 3 Reviews
@@ -59,7 +56,7 @@ export async function matchRoutes(fastify: FastifyInstance) {
 
       const { heilmittel, kassenart, timeWindows } = patientRequest;
 
-      // Alle APPROVED+sichtbaren Therapeuten laden (mit Sprachen, Kapazität, Reviews)
+      // Alle APPROVED+sichtbaren Therapeuten laden (mit Arbeitszeiten und Reviews)
       const therapists = await fastify.prisma.therapist.findMany({
         where: {
           reviewStatus: 'APPROVED',
@@ -67,7 +64,6 @@ export async function matchRoutes(fastify: FastifyInstance) {
           isPublished: true,
         },
         include: {
-          capacityRule: true,
           workingHoursRules: { where: { isActive: true } },
           reviews: { select: { rating: true } },
         },
@@ -85,8 +81,6 @@ export async function matchRoutes(fastify: FastifyInstance) {
         scoreNormalized: number;
         explanations: Explanation[];
         zeitfensterOverlapMinutes: number;
-        kapazitaetVerfuegbar: boolean;
-        belegungsfaktor: number;
         existingInquiryId: string | null;
       }> = [];
 
@@ -141,32 +135,7 @@ export async function matchRoutes(fastify: FastifyInstance) {
           explanations.push({ signal: 'ZEITFENSTER_OVERLAP', delta, detail: `${totalOverlap} Min Überlappung` });
         }
 
-        // 5. Kapazität
-        const cap = (th as any).capacityRule;
-        let kapazitaetVerfuegbar = true;
-        let belegungsfaktor = cap?.belegungsfaktor ?? 0.4;
-        if (cap) {
-          const openInquiries = await fastify.prisma.inquiry.count({
-            where: { therapistId: th.id, status: { in: ['SENT', 'SEEN', 'COUNTER_PROPOSED'] } },
-          });
-          kapazitaetVerfuegbar = openInquiries < cap.maxAnfragenOffen
-            && cap.laufendeNeuaufnahmenDieseWoche < cap.maxNeueSerienProWoche;
-
-          if (kapazitaetVerfuegbar) {
-            score += W.KAPAZITAET_VERFUEGBAR;
-            explanations.push({ signal: 'KAPAZITAET_VERFUEGBAR', delta: W.KAPAZITAET_VERFUEGBAR });
-          } else {
-            score += W.KAPAZITAET_VOLL;
-            explanations.push({ signal: 'KAPAZITAET_VOLL', delta: W.KAPAZITAET_VOLL });
-          }
-
-          // Belegungsfaktor: je freier, desto besser
-          const belegunsgDelta = Math.round((1 - belegungsfaktor) * W.BELEGUNGSFAKTOR_PER_POINT);
-          score += belegunsgDelta;
-          explanations.push({ signal: 'BELEGUNGSFAKTOR', delta: belegunsgDelta, detail: `${Math.round(belegungsfaktor * 100)}% belegt` });
-        }
-
-        // 6. Review-Rating
+        // 5. Review-Rating
         const reviews = (th as any).reviews ?? [];
         if (reviews.length >= 3) {
           const avg = reviews.reduce((s: number, r: any) => s + r.rating, 0) / reviews.length;
@@ -177,7 +146,7 @@ export async function matchRoutes(fastify: FastifyInstance) {
           }
         }
 
-        // 7. Bestehende Inquiry (falls Patient bereits angefragt hat)
+        // 6. Bestehende Inquiry (falls Patient bereits angefragt hat)
         const existingInquiry = patientRequest.inquiries.find(
           (q) => q.therapistId === th.id && !['WITHDRAWN', 'EXPIRED', 'DECLINED', 'DECLINED_BY_PATIENT', 'AUTO_CLOSED', 'CANCELLED'].includes(q.status)
         );
@@ -192,8 +161,6 @@ export async function matchRoutes(fastify: FastifyInstance) {
           scoreNormalized: 0, // wird unten gesetzt
           explanations,
           zeitfensterOverlapMinutes: totalOverlap,
-          kapazitaetVerfuegbar,
-          belegungsfaktor,
           existingInquiryId: existingInquiry?.id ?? null,
         });
       }

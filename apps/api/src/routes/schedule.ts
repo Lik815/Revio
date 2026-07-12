@@ -7,63 +7,6 @@ async function resolveTherapist(fastify: FastifyInstance, token: string) {
 
 export async function scheduleRoutes(fastify: FastifyInstance) {
 
-  // ─── CapacityRule ────────────────────────────────────────────────────────────
-
-  // GET /schedule/capacity-rule — eigene Regel laden (oder Defaults zurückgeben)
-  fastify.get('/schedule/capacity-rule', async (request, reply) => {
-    const token = request.headers.authorization?.replace('Bearer ', '');
-    if (!token) return reply.status(401).send({ error: 'Unauthorized' });
-    const therapist = await resolveTherapist(fastify, token);
-    if (!therapist) return reply.status(403).send({ error: 'Therapeut nicht gefunden' });
-
-    let rule = await fastify.prisma.therapistCapacityRule.findUnique({
-      where: { therapistId: therapist.id },
-    });
-
-    if (!rule) {
-      rule = await fastify.prisma.therapistCapacityRule.create({
-        data: { therapistId: therapist.id },
-      });
-    }
-
-    // Wochenzähler montags zurücksetzen
-    const now = new Date();
-    const monday = new Date(now);
-    monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
-    monday.setHours(0, 0, 0, 0);
-    if (!rule.weekResetAt || rule.weekResetAt < monday) {
-      rule = await fastify.prisma.therapistCapacityRule.update({
-        where: { therapistId: therapist.id },
-        data: { laufendeNeuaufnahmenDieseWoche: 0, weekResetAt: monday },
-      });
-    }
-
-    return reply.send(rule);
-  });
-
-  // PATCH /schedule/capacity-rule — Einstellungen aktualisieren
-  fastify.patch('/schedule/capacity-rule', async (request, reply) => {
-    const token = request.headers.authorization?.replace('Bearer ', '');
-    if (!token) return reply.status(401).send({ error: 'Unauthorized' });
-    const therapist = await resolveTherapist(fastify, token);
-    if (!therapist) return reply.status(403).send({ error: 'Therapeut nicht gefunden' });
-
-    const schema = z.object({
-      maxNeueSerienProWoche: z.number().int().min(1).max(10).optional(),
-      maxAnfragenOffen: z.number().int().min(1).max(20).optional(),
-      autoPauseBeiFullCapacity: z.boolean().optional(),
-    });
-    const parsed = schema.safeParse(request.body);
-    if (!parsed.success) return reply.status(400).send({ error: 'Ungültige Daten', details: parsed.error.flatten() });
-
-    const rule = await fastify.prisma.therapistCapacityRule.upsert({
-      where: { therapistId: therapist.id },
-      create: { therapistId: therapist.id, ...parsed.data },
-      update: parsed.data,
-    });
-    return reply.send(rule);
-  });
-
   // ─── Absences ────────────────────────────────────────────────────────────────
 
   // GET /schedule/absences — alle Abwesenheiten der eigenen Therapeutin

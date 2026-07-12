@@ -276,11 +276,6 @@ export async function inquiryRoutes(fastify: FastifyInstance) {
             await tx.inquirySlot.update({ where: { id: slot.id }, data: { status: 'CONFIRMED' } });
           }
           await tx.inquiry.update({ where: { id: inq.id }, data: { status: 'CONFIRMED', respondedAt: now } });
-          await tx.therapistCapacityRule.upsert({
-            where: { therapistId: inq.therapistId },
-            create: { therapistId: inq.therapistId, laufendeNeuaufnahmenDieseWoche: 1, weekResetAt: now, abgeschlosseneInquiriesCount: 1 },
-            update: { laufendeNeuaufnahmenDieseWoche: { increment: 1 }, abgeschlosseneInquiriesCount: { increment: 1 } },
-          });
           // Parallel-Inquiries schließen
           await tx.inquiry.updateMany({
             where: { patientRequestId: inq.patientRequestId, id: { not: inq.id }, status: { in: ['SENT', 'SEEN', 'COUNTER_PROPOSED'] } },
@@ -334,11 +329,6 @@ export async function inquiryRoutes(fastify: FastifyInstance) {
               confirmedUhrzeitBis: wunschUhrzeitBis,
               respondedAt: now,
             },
-          });
-          await tx.therapistCapacityRule.upsert({
-            where: { therapistId: inq.therapistId },
-            create: { therapistId: inq.therapistId, laufendeNeuaufnahmenDieseWoche: 1, weekResetAt: now, abgeschlosseneInquiriesCount: 1 },
-            update: { laufendeNeuaufnahmenDieseWoche: { increment: 1 }, abgeschlosseneInquiriesCount: { increment: 1 } },
           });
           await tx.inquiry.updateMany({
             where: { patientRequestId: inq.patientRequestId, id: { not: inq.id }, status: { in: ['SENT', 'SEEN', 'COUNTER_PROPOSED'] } },
@@ -508,11 +498,6 @@ export async function inquiryRoutes(fastify: FastifyInstance) {
         },
         update: { startsAt, endsAt, status: 'SCHEDULED' },
       }),
-      fastify.prisma.therapistCapacityRule.upsert({
-        where: { therapistId: therapist.id },
-        create: { therapistId: therapist.id, laufendeNeuaufnahmenDieseWoche: 1, weekResetAt: now, abgeschlosseneInquiriesCount: 1 },
-        update: { laufendeNeuaufnahmenDieseWoche: { increment: 1 }, abgeschlosseneInquiriesCount: { increment: 1 } },
-      }),
     ]);
 
     // Parallel-Anfragen an andere Therapeuten automatisch schließen
@@ -599,12 +584,6 @@ export async function inquiryRoutes(fastify: FastifyInstance) {
         where: { id },
         data: { status: 'CONFIRMED', respondedAt: now },
         include: { inquirySlots: { orderBy: { datum: 'asc' } } },
-      });
-
-      await tx.therapistCapacityRule.upsert({
-        where: { therapistId: therapist.id },
-        create: { therapistId: therapist.id, laufendeNeuaufnahmenDieseWoche: 1, weekResetAt: now, abgeschlosseneInquiriesCount: 1 },
-        update: { laufendeNeuaufnahmenDieseWoche: { increment: 1 }, abgeschlosseneInquiriesCount: { increment: 1 } },
       });
 
       // Parallel-Inquiries schließen
