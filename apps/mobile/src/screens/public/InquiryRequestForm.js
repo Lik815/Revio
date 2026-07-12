@@ -403,6 +403,7 @@ export function InquiryRequestForm({ c, t, therapist, authToken, onSuccess, onCl
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [autoConfirmed, setAutoConfirmed] = useState(false);
   const [saveKassenart, setSaveKassenart] = useState(false);
 
   const availableHeilmittel = (Array.isArray(therapist?.heilmittel) ? therapist.heilmittel : [])
@@ -498,6 +499,8 @@ export function InquiryRequestForm({ c, t, therapist, authToken, onSuccess, onCl
           : 'Anfrage fehlgeschlagen.';
         setError(data.error ?? fallback);
       } else {
+        const confirmed = Array.isArray(data?.inquiries) && data.inquiries.some((i) => i.status === 'CONFIRMED');
+        setAutoConfirmed(confirmed);
         setSuccess(true);
       }
     } catch {
@@ -512,16 +515,20 @@ export function InquiryRequestForm({ c, t, therapist, authToken, onSuccess, onCl
     return (
       <View style={{ flex: 1, padding: SPACE.lg, alignItems: 'center', justifyContent: 'center', backgroundColor: c.background }}>
         <Ionicons name="checkmark-circle" size={64} color={c.success ?? '#1A7A40'} />
-        <Text style={{ ...TYPE.h2, color: c.text, marginTop: SPACE.md, textAlign: 'center' }}>Anfrage gesendet</Text>
+        <Text style={{ ...TYPE.h2, color: c.text, marginTop: SPACE.md, textAlign: 'center' }}>
+          {autoConfirmed ? 'Termin bestaetigt' : 'Anfrage gesendet'}
+        </Text>
         {therapist?.fullName ? (
           <Text style={{ ...TYPE.body, color: c.text, marginTop: SPACE.sm, textAlign: 'center', fontWeight: '600' }}>
             {therapist.fullName}
           </Text>
         ) : null}
         <Text style={{ ...TYPE.body, color: c.muted, marginTop: SPACE.sm, textAlign: 'center' }}>
-          {isEinzel
-            ? 'Der Therapeut prüft deine Anfrage und bestätigt den Termin.'
-            : 'Der Therapeut prüft deine Wunschzeiten und bestätigt einen konkreten Termin.'}
+          {autoConfirmed
+            ? 'Dein Termin wurde automatisch bestaetigt.'
+            : isEinzel
+              ? 'Der Therapeut prueft deine Anfrage und bestaetigt den Termin.'
+              : 'Der Therapeut prueft deine Wunschzeiten und bestaetigt einen konkreten Termin.'}
         </Text>
         <Pressable
           onPress={onSuccess}

@@ -348,7 +348,18 @@ export async function inquiryRoutes(fastify: FastifyInstance) {
       }
     }
 
-    return reply.status(201).send(patientRequest);
+    // Aktualisierte Inquiry-Statuses nach Auto-Accept neu laden und zurückgeben
+    const updatedInquiries = await fastify.prisma.inquiry.findMany({
+      where: { id: { in: patientRequest.inquiries.map((i: any) => i.id) } },
+      select: { id: true, status: true },
+    });
+    const statusById = new Map(updatedInquiries.map((i) => [i.id, i.status]));
+    const responseInquiries = patientRequest.inquiries.map((i: any) => ({
+      ...i,
+      status: statusById.get(i.id) ?? i.status,
+    }));
+
+    return reply.status(201).send({ ...patientRequest, inquiries: responseInquiries });
   });
 
   // GET /inquiry/my — eigene PatientRequests mit Inquiries (Patient)
