@@ -58,14 +58,15 @@ export function TherapyTabScreen() {
   const [repeatBookingTherapist, setRepeatBookingTherapist] = useState(null);
   const [showRepeatBookingForm, setShowRepeatBookingForm] = useState(false);
 
-  // Force-refreshes every list each time this tab gains focus (tab switch, back
-  // navigation after booking, etc.), not just on first mount. Loaders only show a
-  // blocking spinner the very first time (lastLoadedAt === 0), so refocusing never
-  // flickers — existing data stays on screen while the background fetch resolves.
+  // Refreshes every list when this tab gains focus, but only when the data is
+  // actually stale (older than STALE_MS in TherapyContext). Switching away and
+  // straight back no longer fires a request salvo. Loaders only show a blocking
+  // spinner the very first time (lastLoadedAt === 0); a background refresh keeps
+  // existing data on screen while the fetch resolves. Pull-to-refresh forces.
   useFocusEffect(
     useCallback(() => {
       if (!authToken) return;
-      refreshTherapyTab(authToken, accountType, loggedInTherapist, { force: true });
+      refreshTherapyTab(authToken, accountType, loggedInTherapist);
     }, [authToken, accountType, loggedInTherapist, refreshTherapyTab]),
   );
 

@@ -255,13 +255,8 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     if (!token) return reply.unauthorized('Kein Token');
 
     let therapist = null as any;
-    const user = await fastify.prisma.user.findUnique({
-      where: { sessionToken: token },
-    });
-    if (user?.sessionTokenExpiresAt && user.sessionTokenExpiresAt < new Date()) {
-      await fastify.prisma.user.update({ where: { id: user.id }, data: { sessionToken: null, sessionTokenExpiresAt: null } });
-      return reply.unauthorized('Sitzung abgelaufen. Bitte erneut anmelden.');
-    }
+    // Single lookup with the therapist profile included — the expiry check reads
+    // the same row, so there's no need for a second findUnique.
     const userWithProfile = await fastify.prisma.user.findUnique({
       where: { sessionToken: token },
       include: {
@@ -278,6 +273,10 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
         },
       },
     });
+    if (userWithProfile?.sessionTokenExpiresAt && userWithProfile.sessionTokenExpiresAt < new Date()) {
+      await fastify.prisma.user.update({ where: { id: userWithProfile.id }, data: { sessionToken: null, sessionTokenExpiresAt: null } });
+      return reply.unauthorized('Sitzung abgelaufen. Bitte erneut anmelden.');
+    }
 
     // Patient profile — return directly without therapist lookup
     if (userWithProfile?.role === 'patient') {

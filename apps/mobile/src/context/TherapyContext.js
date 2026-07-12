@@ -6,9 +6,11 @@ import { useAuth } from './AuthContext';
 
 const TherapyContext = createContext(null);
 
-// Background-refresh window: a focus/foreground refresh always forces a refetch,
-// this only governs how "fresh" data must be for a non-forced background call.
-const STALE_MS = 20 * 1000;
+// Freshness window for tab-focus refetches. A focus refresh no longer forces a
+// refetch: if the data is younger than this it stays as-is (no request), so
+// rapid tab switching doesn't fire a salvo of requests. Pull-to-refresh and
+// app-foregrounding still force. AppState foregrounding also forces (see below).
+const STALE_MS = 30 * 1000;
 const isStale = (lastLoadedAt) => Date.now() - lastLoadedAt > STALE_MS;
 
 export function TherapyProvider({ children }) {
@@ -23,9 +25,6 @@ export function TherapyProvider({ children }) {
   const [myInquiries, setMyInquiries] = useState([]);
   const [myInquiriesLoading, setMyInquiriesLoading] = useState(false);
   const [myInquiriesLastLoadedAt, setMyInquiriesLastLoadedAt] = useState(0);
-  const [mySlots, setMySlots] = useState([]);
-  const [slotsLoading, setSlotsLoading] = useState(false);
-  const [deletingSlotIds, setDeletingSlotIds] = useState([]);
   const [patients, setPatients] = useState([]);
   const [patientsLoading, setPatientsLoading] = useState(false);
   const [patientsLastLoadedAt, setPatientsLastLoadedAt] = useState(0);
@@ -40,7 +39,6 @@ export function TherapyProvider({ children }) {
   const [favoritesLastLoadedAt, setFavoritesLastLoadedAt] = useState(0);
   const [appointmentsLastLoadedAt, setAppointmentsLastLoadedAt] = useState(0);
   const [incomingBookingsLastLoadedAt, setIncomingBookingsLastLoadedAt] = useState(0);
-  const [slotsLastLoadedAt, setSlotsLastLoadedAt] = useState(0);
 
   const loadFavorites = useCallback(async (token, { background = false } = {}) => {
     if (!token) return;
@@ -117,36 +115,6 @@ export function TherapyProvider({ children }) {
     } catch {} finally { setMyInquiriesLoading(false); }
   }, [myInquiriesLastLoadedAt]);
 
-  const loadMySlots = useCallback(async (token, { background = false } = {}) => {
-    if (!token) return;
-    if (!background || slotsLastLoadedAt === 0) setSlotsLoading(true);
-    try {
-      const pastFrom = new Date();
-      pastFrom.setFullYear(pastFrom.getFullYear() - 1);
-      const now = new Date();
-      const headers = { ...TUNNEL_HEADERS, Authorization: `Bearer ${token}` };
-      const [futureRes, pastBookedRes] = await Promise.all([
-        timedFetch('therapist/slots', `${getBaseUrl()}/therapist/slots`, { headers }),
-        timedFetch(
-          'therapist/slots past booked',
-          `${getBaseUrl()}/therapist/slots?status=BOOKED&from=${encodeURIComponent(pastFrom.toISOString())}&to=${encodeURIComponent(now.toISOString())}`,
-          { headers },
-        ),
-      ]);
-      if (futureRes.ok || pastBookedRes.ok) {
-        const futureData = futureRes.ok ? await futureRes.json().catch(() => ({})) : {};
-        const pastBookedData = pastBookedRes.ok ? await pastBookedRes.json().catch(() => ({})) : {};
-        const merged = new Map();
-        [...(Array.isArray(futureData.slots) ? futureData.slots : []), ...(Array.isArray(pastBookedData.slots) ? pastBookedData.slots : [])]
-          .forEach((slot) => {
-            if (slot?.id) merged.set(slot.id, slot);
-          });
-        setMySlots([...merged.values()].sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt)));
-        setSlotsLastLoadedAt(Date.now());
-      }
-    } catch {} finally { setSlotsLoading(false); }
-  }, [slotsLastLoadedAt]);
-
   const loadPatients = useCallback(async (token, { background = false } = {}) => {
     if (!token) return;
     if (!background || patientsLastLoadedAt === 0) setPatientsLoading(true);
@@ -204,19 +172,15 @@ export function TherapyProvider({ children }) {
     setMyInquiries([]);
     setMyInquiriesLastLoadedAt(0);
     setMyInquiriesLoading(false);
-    setMySlots([]);
-    setDeletingSlotIds([]);
     setPatients([]);
     setPatientDetails({});
     setFavoritesLastLoadedAt(0);
     setAppointmentsLastLoadedAt(0);
     setIncomingBookingsLastLoadedAt(0);
-    setSlotsLastLoadedAt(0);
     setPatientsLastLoadedAt(0);
     setFavoritesLoading(false);
     setMyAppointmentsLoading(false);
     setIncomingBookingsLoading(false);
-    setSlotsLoading(false);
     setPatientsLoading(false);
     setTherapyRefreshing(false);
   }, []);
@@ -277,7 +241,6 @@ export function TherapyProvider({ children }) {
       incomingInquiries, incomingInquiriesLoading, setIncomingInquiries,
       incomingInquiriesLastLoadedAt, loadIncomingInquiries,
       myInquiries, myInquiriesLoading, setMyInquiries, loadMyInquiries,
-      mySlots, slotsLoading, deletingSlotIds, setMySlots, setDeletingSlotIds,
       patients, patientsLoading, patientsLastLoadedAt, setPatients,
       patientDetails, loadPatientDetail, setPatientDetails,
       favorites, favoritesLoading, favoritePractices,
@@ -286,9 +249,9 @@ export function TherapyProvider({ children }) {
       setAvailableSlots, setAvailableSlotsTherapistId,
       therapyRefreshing, setTherapyRefreshing,
       favoritesLastLoadedAt, appointmentsLastLoadedAt,
-      incomingBookingsLastLoadedAt, slotsLastLoadedAt,
+      incomingBookingsLastLoadedAt,
       loadFavorites, loadMyAppointments, loadIncomingBookings,
-      loadMySlots, loadAvailableSlots, loadPatients,
+      loadAvailableSlots, loadPatients,
       resetTherapyData, refreshTherapyTab, handleTherapyRefresh,
     }}>
       {children}

@@ -7,6 +7,7 @@ import { getEnv } from '../env.js';
 import { THERAPIST_VERIFICATIONS_DIR } from '../utils/storage-paths.js';
 import { geocodeAddress } from '../utils/geocode.js';
 import { getTherapistPublicationState, getTherapistRequestabilityState } from '../utils/profile-completeness.js';
+import { resetSearchCache } from './search.js';
 import { sendProfileApprovedEmail, sendProfileRejectedEmail, sendProfileChangesRequestedEmail } from '../utils/mailer.js';
 import { sendPushNotification } from '../utils/push.js';
 import { ensureDefaultCertificationOptions } from '../utils/certification-options.js';
@@ -853,6 +854,10 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
       }),
     ]);
 
+    // Therapist just became publicly visible — drop the cached search list so
+    // they appear immediately instead of after the cache TTL.
+    resetSearchCache();
+
     sendProfileApprovedEmail({ to: t.email, name: t.fullName }).catch((err) =>
       fastify.log.error({ err }, 'Failed to send profile approved email'),
     );
@@ -880,6 +885,8 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
     const t = await fastify.prisma.therapist.update({ where: { id }, data: { reviewStatus: 'REJECTED' } }).catch(() => null);
     if (!t) return reply.notFound('Therapist not found');
 
+    resetSearchCache();
+
     sendProfileRejectedEmail({ to: t.email, name: t.fullName }).catch((err) =>
       fastify.log.error({ err }, 'Failed to send profile rejected email'),
     );
@@ -892,6 +899,8 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
     const t = await fastify.prisma.therapist.update({ where: { id }, data: { reviewStatus: 'CHANGES_REQUESTED' } }).catch(() => null);
     if (!t) return reply.notFound('Therapist not found');
 
+    resetSearchCache();
+
     sendProfileChangesRequestedEmail({ to: t.email, name: t.fullName }).catch((err) =>
       fastify.log.error({ err }, 'Failed to send profile changes-requested email'),
     );
@@ -903,6 +912,7 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
     const { id } = request.params as { id: string };
     const t = await fastify.prisma.therapist.update({ where: { id }, data: { reviewStatus: 'SUSPENDED' } }).catch(() => null);
     if (!t) return reply.notFound('Therapist not found');
+    resetSearchCache();
 
     return { message: 'Therapist suspended.' };
   });
@@ -948,6 +958,7 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
     const { id } = request.params as { id: string };
     const p = await fastify.prisma.practice.update({ where: { id }, data: { reviewStatus: 'APPROVED' } }).catch(() => null);
     if (!p) return reply.notFound('Practice not found');
+    resetSearchCache();
     return { message: 'Practice approved.' };
   });
 
@@ -955,6 +966,7 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
     const { id } = request.params as { id: string };
     const p = await fastify.prisma.practice.update({ where: { id }, data: { reviewStatus: 'REJECTED' } }).catch(() => null);
     if (!p) return reply.notFound('Practice not found');
+    resetSearchCache();
     return { message: 'Practice rejected.' };
   });
 
@@ -962,6 +974,7 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
     const { id } = request.params as { id: string };
     const p = await fastify.prisma.practice.update({ where: { id }, data: { reviewStatus: 'SUSPENDED' } }).catch(() => null);
     if (!p) return reply.notFound('Practice not found');
+    resetSearchCache();
     return { message: 'Practice suspended.' };
   });
 
@@ -987,6 +1000,7 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
     const { id } = request.params as { id: string };
     const l = await fastify.prisma.therapistPracticeLink.update({ where: { id }, data: { status: 'CONFIRMED' } }).catch(() => null);
     if (!l) return reply.notFound('Link not found');
+    resetSearchCache();
     return { message: 'Link confirmed.' };
   });
 
@@ -994,6 +1008,7 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
     const { id } = request.params as { id: string };
     const l = await fastify.prisma.therapistPracticeLink.update({ where: { id }, data: { status: 'REJECTED' } }).catch(() => null);
     if (!l) return reply.notFound('Link not found');
+    resetSearchCache();
     return { message: 'Link rejected.' };
   });
 
@@ -1001,6 +1016,7 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
     const { id } = request.params as { id: string };
     const l = await fastify.prisma.therapistPracticeLink.update({ where: { id }, data: { status: 'DISPUTED' } }).catch(() => null);
     if (!l) return reply.notFound('Link not found');
+    resetSearchCache();
     return { message: 'Link disputed.' };
   });
 

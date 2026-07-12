@@ -1,4 +1,5 @@
-import { FastifyPluginAsync } from 'fastify';
+import { FastifyPluginAsync, FastifyInstance } from 'fastify';
+import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import type { SearchInput, SearchTherapist, SearchPractice } from '@revio/shared';
 import { normalizeText, scoreMatch, levenshtein } from '../utils/search-utils.js';
@@ -170,6 +171,55 @@ function scoreTherapist(
   return 0;
 }
 
+// ── Searchable therapist list (cached) ──────────────────────────────────────
+// The public search scores and filters in JS over every approved, visible,
+// self-employed therapist. That base set changes rarely (admin approval, profile
+// edits), so caching it for a short window avoids a DB roundtrip on every
+// keystroke-driven search. Staleness is bounded by SEARCH_CACHE_TTL_MS; an admin
+// approval or profile edit becomes searchable within that window.
+const SEARCH_CACHE_TTL_MS = 60_000;
+// Safety cap on the response size so a very dense city (or, at scale, a huge
+// directory) can never ship an unbounded list to the client. Sits well above
+// typical per-city result counts, so today's UX is unaffected.
+const SEARCH_RESULT_LIMIT = 200;
+
+const searchTherapistInclude = {
+  links: {
+    where: {
+      status: 'CONFIRMED',
+      practice: { reviewStatus: 'APPROVED' },
+    },
+    include: { practice: true },
+  },
+} satisfies Prisma.TherapistInclude;
+
+type SearchableTherapist = Prisma.TherapistGetPayload<{ include: typeof searchTherapistInclude }>;
+
+let searchTherapistCache: { data: SearchableTherapist[]; loadedAt: number } | null = null;
+
+// Drops the cached list so the next search reloads from the DB. Used by tests to
+// keep search isolated between cases; could also be called after admin approval
+// to make a therapist searchable immediately instead of within the TTL window.
+export function resetSearchCache(): void {
+  searchTherapistCache = null;
+}
+
+async function loadSearchableTherapists(fastify: FastifyInstance): Promise<SearchableTherapist[]> {
+  if (searchTherapistCache && Date.now() - searchTherapistCache.loadedAt < SEARCH_CACHE_TTL_MS) {
+    return searchTherapistCache.data;
+  }
+  const therapists = await fastify.prisma.therapist.findMany({
+    where: {
+      reviewStatus: 'APPROVED',
+      isVisible: true,
+      employmentStatus: 'SELF_EMPLOYED',
+    },
+    include: searchTherapistInclude,
+  });
+  searchTherapistCache = { data: therapists, loadedAt: Date.now() };
+  return therapists;
+}
+
 // ── Routes ─────────────────────────────────────────────────────────────────
 
 const searchBodySchema = z.object({
@@ -202,25 +252,10 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
     const input: SearchInput = parsed.data;
     fastify.log.info({ searchInput: input }, 'mobile search input');
 
-    // Load all approved therapists that are publicly visible.
-    // Invited profiles and manager-onboarding profiles require an explicit publication
-    // confirmation before they may appear in search.
-    const therapists = await fastify.prisma.therapist.findMany({
-      where: {
-        reviewStatus: 'APPROVED',
-        isVisible: true,
-        employmentStatus: 'SELF_EMPLOYED',
-      },
-      include: {
-        links: {
-          where: {
-            status: 'CONFIRMED',
-            practice: { reviewStatus: 'APPROVED' },
-          },
-          include: { practice: true },
-        },
-      },
-    });
+    // Load all approved, publicly-visible therapists (cached ~60s — see
+    // loadSearchableTherapists). Invited/manager-onboarding profiles still need an
+    // explicit publication confirmation before appearing, enforced below.
+    const therapists = await loadSearchableTherapists(fastify);
 
     const normalizedCity = input.city ? normalizeText(input.city) : null;
     const passesFilters = (t: typeof therapists[number]) => {
@@ -372,14 +407,18 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
       return b.relevance - a.relevance;
     });
 
+    // Cap the response after ranking, so the client receives the best matches
+    // first and never an unbounded list (see SEARCH_RESULT_LIMIT).
+    const limitedResults = results.slice(0, SEARCH_RESULT_LIMIT);
+
     const practiceMap = new Map<string, SearchPractice>();
-    results.forEach((t) => t.practices.forEach((p) => {
+    limitedResults.forEach((t) => t.practices.forEach((p) => {
       if (input.origin && input.radiusKm != null && p.distKm != null && p.distKm > input.radiusKm) return;
       practiceMap.set(p.id, p);
     }));
 
     return {
-      therapists: results,
+      therapists: limitedResults,
       practices: Array.from(practiceMap.values()),
     };
   });

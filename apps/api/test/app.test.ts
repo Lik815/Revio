@@ -1,5 +1,6 @@
 import { beforeAll, afterAll, beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { buildApp } from '../src/app.js';
+import { resetSearchCache } from '../src/routes/search.js';
 import { prisma } from '../src/plugins/prisma.js';
 import { hashPassword } from '../src/routes/auth-utils.js';
 import { getProfileStatus } from '../src/utils/profile-completeness.js';
@@ -78,6 +79,8 @@ afterEach(async () => {
   await prisma.practice.deleteMany();
   await prisma.specializationOption.deleteMany();
   await prisma.emailOtp.deleteMany();
+  // Search caches the therapist list; drop it so each test sees a fresh DB.
+  resetSearchCache();
 });
 
 // Seed a confirmed (verified) EmailOtp so /register/therapist accepts the email

@@ -301,6 +301,11 @@ export function useSearch({ t }) {
   };
 
   const fetchSearchResults = async (q, effectiveCity, origin) => {
+    // homeVisit/kassenart/gender/fortbildungen werden bewusst NICHT mehr an den
+    // Server geschickt: sie werden lokal über applyFilters angewendet, damit ein
+    // Filter-Toggle sofort wirkt (kein Server-Roundtrip). Der Server liefert die
+    // nach Suchbegriff + Ort + requestable gefilterte Obermenge; die feineren
+    // Filter grenzen diese im Client ein.
     const response = await fetch(`${getBaseUrl()}/search`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...TUNNEL_HEADERS },
@@ -309,9 +314,6 @@ export function useSearch({ t }) {
         city: effectiveCity,
         origin: origin ? { lat: origin.lat, lng: origin.lng } : undefined,
         radiusKm: origin ? searchRadius : undefined,
-        homeVisit: homeVisit || undefined,
-        kassenart: kassenart || undefined,
-        gender: gender || undefined,
         requestable: requestableOnly || undefined,
       }),
     });
@@ -381,10 +383,15 @@ export function useSearch({ t }) {
     runSearchWith(text, userCoords);
   };
 
-  // ── Auto-refresh search when filters change ───────────────────────────────
+  // ── Re-filter locally when filters change ─────────────────────────────────
+  // Diese Filter grenzen nur die bereits geladene Obermenge ein — kein neuer
+  // Server-Request. Im Kursmodus (activeChip.type === 'courses') dürfen die
+  // Therapeuten-Ergebnisse nicht angefasst werden.
   useEffect(() => {
     if (!searchedRef.current) return;
-    runSearchWith(query, userCoords);
+    if (activeChip?.type === 'courses') return;
+    setResults(applyFilters(allApiTherapists, userCoords));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [homeVisit, kassenart, gender, fortbildungen]);
 
   useEffect(() => {

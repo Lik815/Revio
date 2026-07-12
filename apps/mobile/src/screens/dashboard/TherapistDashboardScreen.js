@@ -532,10 +532,12 @@ export function TherapistDashboardScreen() {
     return () => clearInterval(id);
   }, []);
 
+  // On focus, refresh only when the data is stale (see STALE_MS / SCHEDULE_STALE_MS).
+  // Rapid tab switching no longer re-fires every request; pull-to-refresh forces.
   useFocusEffect(
     useCallback(() => {
       if (authToken) {
-        refreshTherapyTab(authToken, accountType, loggedInTherapist, { force: true });
+        refreshTherapyTab(authToken, accountType, loggedInTherapist);
         refreshScheduleData();
       }
     }, [authToken, accountType, loggedInTherapist, refreshTherapyTab, refreshScheduleData]),
@@ -615,7 +617,7 @@ export function TherapistDashboardScreen() {
             refreshing={isRefreshing}
             onRefresh={() => {
               handleTherapyRefresh(authToken, accountType, loggedInTherapist);
-              refreshScheduleData();
+              refreshScheduleData({ force: true });
             }}
             tintColor={c.primary}
           />
