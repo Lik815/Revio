@@ -3232,6 +3232,33 @@ describe('Dynamic Booking', () => {
     expect(found.cancelReason).toBe('Krankheitsbedingt');
   });
 
+  it('GET /bookings/incoming — enthält über Inquiry bestätigte ScheduledSlots', async () => {
+    const startsAt = futureStartsAt();
+    const endsAt = new Date(startsAt.getTime() + 60 * 60_000);
+    const slot = await prisma.scheduledSlot.create({
+      data: {
+        therapistId,
+        startsAt,
+        endsAt,
+        heilmittel: 'MLD60',
+        patientName: 'Inquiry Testpatient',
+        status: 'SCHEDULED',
+      },
+    });
+
+    const incoming = await app.inject({
+      method: 'GET', url: '/bookings/incoming',
+      headers: { authorization: `Bearer ${therapistToken}` },
+    });
+    expect(incoming.statusCode).toBe(200);
+    const found = incoming.json().find((b: { id: string }) => b.id === slot.id);
+    expect(found).toBeTruthy();
+    expect(found.status).toBe('CONFIRMED');
+    expect(found.patientName).toBe('Inquiry Testpatient');
+
+    await prisma.scheduledSlot.delete({ where: { id: slot.id } });
+  });
+
   it('Expiry — abgelaufene PENDING-Buchung wird auf EXPIRED gesetzt', async () => {
     const startsAt = futureStartsAt();
     const booking = await prisma.bookingRequest.create({

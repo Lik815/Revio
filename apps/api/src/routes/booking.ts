@@ -437,11 +437,6 @@ export async function bookingRoutes(fastify: FastifyInstance) {
             },
             update: { startsAt, endsAt, status: 'SCHEDULED' },
           }),
-          fastify.prisma.therapistCapacityRule.upsert({
-            where: { therapistId },
-            create: { therapistId, laufendeNeuaufnahmenDieseWoche: 1, weekResetAt: autoNow, abgeschlosseneInquiriesCount: 1 },
-            update: { laufendeNeuaufnahmenDieseWoche: { increment: 1 }, abgeschlosseneInquiriesCount: { increment: 1 } },
-          }),
         ]);
         finalStatus = 'CONFIRMED';
       }
@@ -548,7 +543,33 @@ export async function bookingRoutes(fastify: FastifyInstance) {
       ...(take ? { take } : {}),
     });
 
-    return reply.send(bookings);
+    // Inquiry-basierte ScheduledSlots (Serien-Termine) dazuladen — Gegenstück
+    // zur selben Ergänzung in GET /bookings/my. Ohne das sind über den
+    // Serien-Flow bestätigte Termine im Therapeuten-Kalender unsichtbar,
+    // obwohl der Patient sie in seiner eigenen Terminliste bereits sieht.
+    const inquiryScheduledSlots = await fastify.prisma.scheduledSlot.findMany({
+      where: { therapistId: therapist.id },
+      orderBy: { startsAt: 'asc' },
+    });
+
+    // Auf BookingRequest-kompatibles Format normalisieren.
+    const normalizedSlots = inquiryScheduledSlots.map((slot) => ({
+      id: slot.id,
+      status: slot.status === 'SCHEDULED' ? 'CONFIRMED' : slot.status,
+      startsAt: slot.startsAt,
+      endsAt: slot.endsAt,
+      heilmittel: slot.heilmittel,
+      patientName: slot.patientName,
+      patientPhone: slot.patientPhone,
+      createdAt: slot.createdAt,
+      _source: 'inquiry' as const,
+    }));
+
+    const merged = [...bookings, ...normalizedSlots].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
+
+    return reply.send(merged);
   });
 
   // PATCH /bookings/:id/respond — Therapeut bestätigt oder lehnt ab
@@ -598,20 +619,6 @@ export async function bookingRoutes(fastify: FastifyInstance) {
             status: 'SCHEDULED',
           },
           update: { startsAt: confirmedAt, endsAt, status: 'SCHEDULED' },
-        }),
-        // CapacityRule-Zähler inkrementieren (upsert falls noch keine Regel)
-        fastify.prisma.therapistCapacityRule.upsert({
-          where: { therapistId: booking.therapistId },
-          create: {
-            therapistId: booking.therapistId,
-            laufendeNeuaufnahmenDieseWoche: 1,
-            weekResetAt: now,
-            abgeschlosseneInquiriesCount: 1,
-          },
-          update: {
-            laufendeNeuaufnahmenDieseWoche: { increment: 1 },
-            abgeschlosseneInquiriesCount: { increment: 1 },
-          },
         }),
       ]);
 
