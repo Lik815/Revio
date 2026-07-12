@@ -24,12 +24,12 @@ export const TAB_TRANSLATION_KEYS = {
 
 // Home screen name within each tab's nested stack (see withProfileScreens
 // in AppTabs.js). Pressing a tab navigates back to this screen, even if a
-// profile screen is currently open on top of it. Tabs without a nested
-// stack (e.g. Options) are omitted.
+// profile screen is currently open on top of it.
 export const TAB_HOME_ROUTES = {
   [TAB_ROUTES.DASHBOARD]:  'DashboardHome',
   [TAB_ROUTES.DISCOVER]:   'DiscoverHome',
   [TAB_ROUTES.THERAPY]:    'TherapyHome',
   [TAB_ROUTES.FAVORITES]:  'FavoritesHome',
   [TAB_ROUTES.NOTIFICATIONS]: 'NotificationsHome',
+  [TAB_ROUTES.OPTIONS]:    'OptionsHome',
 };
