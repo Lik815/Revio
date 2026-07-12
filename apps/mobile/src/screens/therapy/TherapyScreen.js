@@ -117,6 +117,13 @@ export function TherapyTabScreen() {
     }
   }, [route.params?.openBookingId, incomingBookings]);
 
+  // Dashboard-Tap ("Offene Aufgaben") — direkt im Anfragen-Unterreiter landen.
+  const openTab = route.params?.openTab;
+  useEffect(() => {
+    if (!openTab) return;
+    navigation.setParams({ openTab: undefined });
+  }, [openTab]);
+
   const openTherapistById = (id, fallback = null) => {
     navigation.navigate(ROOT_ROUTES.THERAPIST_PROFILE, { therapistId: id, therapist: fallback });
   };
@@ -353,6 +360,7 @@ export function TherapyTabScreen() {
           loggedInTherapist={loggedInTherapist}
           onActivateBookingRequests={handleActivateBookingRequests}
           heilmittelOptions={heilmittelOptions}
+          initialSubTab={openTab}
           c={c} t={t} styles={appStyles}
         />
         <TherapistCancelModal

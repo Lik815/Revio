@@ -512,6 +512,7 @@ export function TherapistDashboardScreen() {
   const {
     incomingBookings,
     incomingBookingsLoading,
+    incomingInquiries,
     therapyRefreshing,
     handleTherapyRefresh,
     refreshTherapyTab,
@@ -574,9 +575,32 @@ export function TherapistDashboardScreen() {
   }, []);
 
   const profileCompletion = loggedInTherapist?.profileCompletion;
-  const profileTasksSubtitle = profileCompletion && profileCompletion.percentage < 100
-    ? `2 Dokumentationen · 1 Bestätigung · Profil zu ${profileCompletion.percentage}% vervollständigt`
-    : '2 Dokumentationen · 1 Bestätigung ausstehend';
+  const pendingConfirmations = useMemo(() => {
+    const pendingInquiries = (incomingInquiries ?? []).filter((i) =>
+      ['SENT', 'SEEN', 'COUNTER_PROPOSED'].includes(i.status),
+    ).length;
+    const pendingBookings = (incomingBookings ?? []).filter((b) => b.status === 'PENDING').length;
+    return pendingInquiries + pendingBookings;
+  }, [incomingInquiries, incomingBookings]);
+
+  const openTasks = useMemo(() => {
+    const tasks = [];
+    if (pendingConfirmations > 0) {
+      tasks.push({
+        key: 'confirmations',
+        label: `${pendingConfirmations} ${pendingConfirmations === 1 ? 'Bestätigung' : 'Bestätigungen'} ausstehend`,
+        target: { screen: TAB_ROUTES.THERAPY, params: { openTab: 'anfragen' } },
+      });
+    }
+    if (profileCompletion && profileCompletion.percentage < 100) {
+      tasks.push({
+        key: 'profile',
+        label: `Profil zu ${profileCompletion.percentage}% vervollständigt`,
+        target: { screen: ROOT_ROUTES.PROFILE },
+      });
+    }
+    return tasks;
+  }, [pendingConfirmations, profileCompletion]);
 
   const name = loggedInTherapist?.fullName ?? 'Mein Konto';
   const photo = resolvePhotoUri(loggedInTherapist?.photo);
@@ -638,13 +662,18 @@ export function TherapistDashboardScreen() {
           c={c}
         />
 
-        <IconLinkCard
-          iconName="clipboard-outline"
-          title="Offene Aufgaben"
-          subtitle={profileTasksSubtitle}
-          onPress={() => navigation.navigate(ROOT_ROUTES.PROFILE)}
-          c={c}
-        />
+        {openTasks.length > 0 && (
+          <IconLinkCard
+            iconName="clipboard-outline"
+            title="Offene Aufgaben"
+            subtitle={openTasks.map((task) => task.label).join(' · ')}
+            onPress={() => {
+              const { screen, params } = openTasks[0].target;
+              navigation.navigate(screen, params);
+            }}
+            c={c}
+          />
+        )}
 
         <IconLinkCard
           iconName="megaphone-outline"

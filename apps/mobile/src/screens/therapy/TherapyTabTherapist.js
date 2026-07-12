@@ -29,13 +29,20 @@ export function TherapyTabTherapist({
   loggedInTherapist,
   onActivateBookingRequests,
   heilmittelOptions,
+  initialSubTab,
   c, t, styles,
 }) {
   const bookingEnabled = loggedInTherapist?.bookingMode === 'FIRST_APPOINTMENT_REQUEST';
   const reviewApproved = loggedInTherapist?.reviewStatus === 'APPROVED';
   const [filterListKind, setFilterListKind] = useState(null);
   const [showStatsModal, setShowStatsModal] = useState(false);
-  const [therapistTab, setTherapistTab] = useState('termine');
+  const [therapistTab, setTherapistTab] = useState(initialSubTab === 'anfragen' ? 'anfragen' : 'termine');
+
+  // Dashboard-Tap ("Offene Aufgaben") — Anfragen-Tab direkt öffnen, auch wenn
+  // der Screen schon gemountet war (initialSubTab allein reicht dann nicht).
+  useEffect(() => {
+    if (initialSubTab === 'anfragen') setTherapistTab('anfragen');
+  }, [initialSubTab]);
 
   // Eingehende Anfragen beim ersten Öffnen des Tabs nachladen wenn noch nicht geladen.
   useEffect(() => {
