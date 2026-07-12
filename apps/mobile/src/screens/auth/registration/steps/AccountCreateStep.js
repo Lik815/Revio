@@ -7,10 +7,9 @@ import { ICON_HIT_SLOP, RADIUS } from '../../../../utils/app-utils';
 
 const LABEL_STYLE = { fontSize: 11, fontWeight: '700', letterSpacing: 0.8, textTransform: 'uppercase' };
 
-// Step 1 — role toggle + name + email + password. On submit sends the OTP.
+// Step 1 — role toggle + email + password. On submit sends the OTP.
 export function AccountCreateStep({
   role, onSelectRole,
-  name, onChangeName,
   email, onChangeEmail,
   password, onChangePassword,
   showPassword, onToggleShowPassword,
@@ -48,21 +47,6 @@ export function AccountCreateStep({
             </Pressable>
           ))}
         </View>
-      </View>
-
-      {/* Name */}
-      <View style={{ marginBottom: 14 }}>
-        <Text style={[LABEL_STYLE, { color: c.muted, marginBottom: 7 }]}>NAME</Text>
-        <TextInput
-          value={name}
-          onChangeText={onChangeName}
-          placeholder="Vor- und Nachname"
-          placeholderTextColor={c.muted}
-          autoCapitalize="words"
-          textContentType="name"
-          autoComplete="name"
-          style={[styles.regInput, { backgroundColor: c.card, borderColor: name ? c.primary : c.border, color: c.text }]}
-        />
       </View>
 
       {/* E-Mail */}

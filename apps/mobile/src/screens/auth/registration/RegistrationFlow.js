@@ -26,7 +26,6 @@ export function RegistrationFlow({ onClose, onShowLogin, onComplete, c, t, style
   const [step, setStep] = useState('account');
 
   // Account
-  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -90,13 +89,8 @@ export function RegistrationFlow({ onClose, onShowLogin, onComplete, c, t, style
   // ── Step 1 → send OTP ──────────────────────────────────────────────────────
   const handleSendOtp = async () => {
     setAccountError('');
-    if (!name.trim()) { setAccountError('Bitte gib deinen Namen ein.'); return; }
     if (!EMAIL_RE.test(email)) { setAccountError('Bitte gib eine gültige E-Mail ein.'); return; }
     if (password.length < 8) { setAccountError('Passwort muss mindestens 8 Zeichen haben.'); return; }
-    // Name → firstName / lastName splitten
-    const parts = name.trim().split(/\s+/);
-    setFirstName(parts[0] ?? '');
-    setLastName(parts.slice(1).join(' ') || (parts[0] ?? ''));
     setAccountLoading(true);
     try {
       const res = await fetch(`${getBaseUrl()}/register/send-otp`, {
@@ -280,7 +274,6 @@ export function RegistrationFlow({ onClose, onShowLogin, onComplete, c, t, style
     content = (
       <AccountCreateStep
         role={role} onSelectRole={handleSelectRole}
-        name={name} onChangeName={(v) => { setName(v); setAccountError(''); }}
         email={email} onChangeEmail={(v) => { setEmail(v); setAccountError(''); }}
         password={password} onChangePassword={setPassword}
         showPassword={showPassword} onToggleShowPassword={() => setShowPassword((v) => !v)}
