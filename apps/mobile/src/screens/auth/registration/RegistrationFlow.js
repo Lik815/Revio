@@ -4,7 +4,6 @@ import { getBaseUrl, normalizeTherapistProfile, TUNNEL_HEADERS } from '../../../
 import { useAuth } from '../../../context/AuthContext';
 import { useTherapyData } from '../../../context/TherapyContext';
 import { useConfigOptions } from '../../../hooks/use-config-options';
-import { RoleSelectStep } from './steps/RoleSelectStep';
 import { AccountCreateStep } from './steps/AccountCreateStep';
 import { OtpVerifyStep } from './steps/OtpVerifyStep';
 import { BasicProfileStep } from './steps/BasicProfileStep';
@@ -23,16 +22,14 @@ export function RegistrationFlow({ onClose, onShowLogin, onComplete, c, t, style
   const { loadFavorites, loadMyAppointments, loadIncomingBookings } = useTherapyData();
   const { specializationOptions } = useConfigOptions();
 
-  const [role, setRole] = useState(null);
-  const [step, setStep] = useState('role');
+  const [role, setRole] = useState('patient');
+  const [step, setStep] = useState('account');
 
   // Account
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [passwordConfirm, setPasswordConfirm] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
-  const [terms, setTerms] = useState(false);
   const [accountError, setAccountError] = useState('');
   const [accountLoading, setAccountLoading] = useState(false);
 
@@ -87,16 +84,19 @@ export function RegistrationFlow({ onClose, onShowLogin, onComplete, c, t, style
     return () => { cancelled = true; clearTimeout(timer); };
   }, [postalCode, cityTouched, role]);
 
-  // ── Step 1: role ───────────────────────────────────────────────────────────
-  const handleSelectRole = (r) => { setRole(r); setAccountError(''); setStep('account'); };
+  // ── Step 1 (inline im AccountCreateStep): Rolle wählen ────────────────────
+  const handleSelectRole = (r) => { setRole(r); setAccountError(''); };
 
-  // ── Step 2: account → send OTP ──────────────────────────────────────────────
+  // ── Step 1 → send OTP ──────────────────────────────────────────────────────
   const handleSendOtp = async () => {
     setAccountError('');
+    if (!name.trim()) { setAccountError('Bitte gib deinen Namen ein.'); return; }
     if (!EMAIL_RE.test(email)) { setAccountError('Bitte gib eine gültige E-Mail ein.'); return; }
     if (password.length < 8) { setAccountError('Passwort muss mindestens 8 Zeichen haben.'); return; }
-    if (password !== passwordConfirm) { setAccountError(t('passwordsMismatch')); return; }
-    if (!terms) { setAccountError(t('termsRequired')); return; }
+    // Name → firstName / lastName splitten
+    const parts = name.trim().split(/\s+/);
+    setFirstName(parts[0] ?? '');
+    setLastName(parts.slice(1).join(' ') || parts[0] ?? '');
     setAccountLoading(true);
     try {
       const res = await fetch(`${getBaseUrl()}/register/send-otp`, {
@@ -279,15 +279,14 @@ export function RegistrationFlow({ onClose, onShowLogin, onComplete, c, t, style
   if (step === 'account') {
     content = (
       <AccountCreateStep
+        role={role} onSelectRole={handleSelectRole}
+        name={name} onChangeName={(v) => { setName(v); setAccountError(''); }}
         email={email} onChangeEmail={(v) => { setEmail(v); setAccountError(''); }}
         password={password} onChangePassword={setPassword}
-        passwordConfirm={passwordConfirm} onChangePasswordConfirm={setPasswordConfirm}
         showPassword={showPassword} onToggleShowPassword={() => setShowPassword((v) => !v)}
-        showPasswordConfirm={showPasswordConfirm} onToggleShowPasswordConfirm={() => setShowPasswordConfirm((v) => !v)}
-        terms={terms} onToggleTerms={() => setTerms((v) => !v)}
         error={accountError} loading={accountLoading}
         onSubmit={handleSendOtp}
-        onBack={() => setStep('role')}
+        onBack={onClose}
         onShowLogin={onShowLogin}
         c={c} t={t} styles={styles}
       />
@@ -302,7 +301,7 @@ export function RegistrationFlow({ onClose, onShowLogin, onComplete, c, t, style
         onConfirm={handleConfirmOtp}
         onResend={handleResendOtp}
         onChangeEmail={() => { setOtpCode(''); setOtpError(''); setStep('account'); }}
-        onBack={() => setStep('account')}
+        onBack={() => { setOtpCode(''); setOtpError(''); setStep('account'); }}
         c={c} t={t} styles={styles}
       />
     );
@@ -348,14 +347,6 @@ export function RegistrationFlow({ onClose, onShowLogin, onComplete, c, t, style
         onSkip={() => submitTherapist([])}
         onBack={() => setStep('employment')}
         c={c} t={t} styles={styles}
-      />
-    );
-  } else {
-    content = (
-      <RoleSelectStep
-        onSelectRole={handleSelectRole}
-        onBack={onClose}
-        c={c} t={t}
       />
     );
   }

@@ -1,20 +1,13 @@
 import React, { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { AuthHero } from '../../components/auth/AuthHero';
-import { AuthPrimaryButton } from '../../components/auth/AuthPrimaryButton';
-import { AuthScreenShell } from '../../components/auth/AuthScreenShell';
-import {
-  Pressable,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   getBaseUrl,
   normalizeTherapistProfile,
+  RADIUS,
   SPACE,
   softenErrorMessage,
   TUNNEL_HEADERS,
@@ -22,20 +15,23 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { useTherapyData } from '../../context/TherapyContext';
 import { ROOT_ROUTES } from '../../navigation/route-names';
+import { SocialAuthButtons } from '../../components/auth/SocialAuthButtons';
+
+const LABEL_STYLE = { fontSize: 11, fontWeight: '700', letterSpacing: 0.8, textTransform: 'uppercase' };
 
 export function LoginScreen({ c, styles, t, onClose, bookingTargetTherapist, onBookingReady, showBackButton = true }) {
   const navigation = useNavigation();
   const { loginAsTherapist, loginAsPatient } = useAuth();
   const { loadFavorites, loadMyAppointments, loadIncomingBookings } = useTherapyData();
   const insets = useSafeAreaInsets();
-  const shellTopPadding = showBackButton ? 0 : insets.top + SPACE.md;
 
+  const [mode, setMode] = useState('login'); // 'login' | 'forgotPassword'
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [loginError, setLoginError] = useState('');
   const [loginNotice, setLoginNotice] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
-  const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false);
+  const [forgotLoading, setForgotLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
   const registerPushToken = async (token) => {
@@ -68,16 +64,11 @@ export function LoginScreen({ c, styles, t, onClose, bookingTargetTherapist, onB
       }
       const data = await res.json();
       const token = data.accessToken || data.token;
-
       const profileRes = await fetch(`${getBaseUrl()}/auth/me`, {
         headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${token}` },
       });
-      if (!profileRes.ok) {
-        setLoginError(t('alertInvalidCredentials'));
-        return;
-      }
+      if (!profileRes.ok) { setLoginError(t('alertInvalidCredentials')); return; }
       const profile = await profileRes.json();
-
       loadFavorites(token);
       if (profile.role === 'patient') {
         await loginAsPatient(token, profile);
@@ -99,15 +90,13 @@ export function LoginScreen({ c, styles, t, onClose, bookingTargetTherapist, onB
     }
   };
 
-  const handleLogin = () => loginWithCredentials(loginEmail, loginPassword);
-
   const handleForgotPassword = async () => {
     const email = loginEmail.trim();
     setLoginError('');
     setLoginNotice('');
     if (!email) { setLoginError(t('forgotPasswordEmailMissing')); return; }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setLoginError(t('forgotPasswordEmailInvalid')); return; }
-    setForgotPasswordLoading(true);
+    setForgotLoading(true);
     try {
       const res = await fetch(`${getBaseUrl()}/auth/forgot-password`, {
         method: 'POST',
@@ -123,23 +112,85 @@ export function LoginScreen({ c, styles, t, onClose, bookingTargetTherapist, onB
     } catch {
       setLoginError(t('alertConnectionError') + '. ' + t('alertConnectionErrorBody'));
     } finally {
-      setForgotPasswordLoading(false);
+      setForgotLoading(false);
     }
   };
 
-  return (
-    <AuthScreenShell c={c} t={t} onBack={showBackButton ? onClose : undefined} paddingHorizontal={20} paddingTop={shellTopPadding} grow>
-      <AuthHero
-        align="center"
-        title="Willkommen zurück"
-        expandable={{ label: 'Mehr erfahren', body: t('loginInfoBody') }}
-        c={c}
-      />
+  // ── Shared shell ────────────────────────────────────────────────────────────
+  const topPad = insets.top + SPACE.lg;
 
-      {/* Inputs */}
-      <View style={{ gap: 14 }}>
+  const Logo = () => (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: SPACE.xl }}>
+      <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: c.primary, alignItems: 'center', justifyContent: 'center' }}>
+        <Text style={{ fontSize: 18, fontWeight: '800', color: '#fff' }}>R</Text>
+      </View>
+      <Text style={{ fontSize: 20, fontWeight: '800', color: c.text }}>Revio</Text>
+    </View>
+  );
+
+  // ── Forgot Password View ─────────────────────────────────────────────────────
+  if (mode === 'forgotPassword') {
+    return (
+      <View style={{ flex: 1, backgroundColor: c.background, paddingTop: topPad, paddingHorizontal: SPACE.lg }}>
+        <Pressable onPress={() => { setLoginError(''); setLoginNotice(''); setMode('login'); }} hitSlop={12} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: SPACE.lg }}>
+          <Ionicons name="chevron-back" size={20} color={c.text} />
+          <Text style={{ fontSize: 15, fontWeight: '600', color: c.text }}>Zurueck</Text>
+        </Pressable>
+
+        <Text style={{ fontSize: 30, fontWeight: '800', color: c.text, marginBottom: 8 }}>Passwort zuruecksetzen</Text>
+        <Text style={{ fontSize: 15, color: c.muted, marginBottom: SPACE.xl, lineHeight: 22 }}>
+          Gib deine E-Mail-Adresse ein — wir senden dir einen Link zum Zuruecksetzen.
+        </Text>
+
+        <Text style={[LABEL_STYLE, { color: c.muted, marginBottom: 7 }]}>E-MAIL</Text>
+        <TextInput
+          style={[styles.regInput, { color: c.text, borderColor: loginEmail.length > 0 ? c.primary : c.border, backgroundColor: c.card }]}
+          value={loginEmail}
+          onChangeText={setLoginEmail}
+          placeholder="deine@email.de"
+          placeholderTextColor={c.muted}
+          autoCapitalize="none"
+          keyboardType="email-address"
+          textContentType="emailAddress"
+          autoComplete="email"
+        />
+
+        {loginNotice ? (
+          <View style={[styles.noticeBox, { backgroundColor: c.successBg, borderColor: c.success, marginTop: 16 }]}>
+            <Text style={{ color: c.success, flex: 1 }}>{loginNotice}</Text>
+          </View>
+        ) : null}
+        {loginError ? (
+          <View style={[styles.noticeBox, { backgroundColor: c.errorBg, borderColor: c.error, marginTop: 16 }]}>
+            <Text style={{ color: c.error, flex: 1 }}>{softenErrorMessage(loginError)}</Text>
+          </View>
+        ) : null}
+
+        <Pressable
+          onPress={handleForgotPassword}
+          disabled={forgotLoading}
+          style={{ backgroundColor: c.primary, borderRadius: RADIUS.md, paddingVertical: 16, alignItems: 'center', marginTop: SPACE.lg }}
+        >
+          {forgotLoading
+            ? <ActivityIndicator color="#fff" />
+            : <Text style={{ fontSize: 16, fontWeight: '700', color: '#fff' }}>Link senden</Text>}
+        </Pressable>
+      </View>
+    );
+  }
+
+  // ── Login View ───────────────────────────────────────────────────────────────
+  return (
+    <View style={{ flex: 1, backgroundColor: c.background, paddingTop: topPad, paddingHorizontal: SPACE.lg }}>
+      <Logo />
+
+      <Text style={{ fontSize: 30, fontWeight: '800', color: c.text, marginBottom: 6 }}>Willkommen zurueck</Text>
+      <Text style={{ fontSize: 15, color: c.muted, marginBottom: SPACE.xl }}>Melde dich an, um fortzufahren.</Text>
+
+      {/* Fields */}
+      <View style={{ gap: 14, marginBottom: SPACE.lg }}>
         <View>
-          <Text style={{ fontSize: 11, fontWeight: '700', color: c.muted, marginBottom: 7, letterSpacing: 0.8, textTransform: 'uppercase' }}>{t('emailLabel')}</Text>
+          <Text style={[LABEL_STYLE, { color: c.muted, marginBottom: 7 }]}>E-MAIL</Text>
           <TextInput
             style={[styles.regInput, { color: c.text, borderColor: loginEmail.length > 0 ? c.primary : c.border, backgroundColor: c.card }]}
             value={loginEmail}
@@ -153,7 +204,12 @@ export function LoginScreen({ c, styles, t, onClose, bookingTargetTherapist, onB
           />
         </View>
         <View>
-          <Text style={{ fontSize: 11, fontWeight: '700', color: c.muted, marginBottom: 7, letterSpacing: 0.8, textTransform: 'uppercase' }}>{t('passwordLabel')}</Text>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 7 }}>
+            <Text style={[LABEL_STYLE, { color: c.muted }]}>PASSWORT</Text>
+            <Pressable onPress={() => { setLoginError(''); setLoginNotice(''); setMode('forgotPassword'); }} hitSlop={8}>
+              <Text style={{ fontSize: 13, fontWeight: '600', color: c.primary }}>Passwort vergessen?</Text>
+            </Pressable>
+          </View>
           <View style={{ position: 'relative' }}>
             <TextInput
               style={[styles.regInput, { color: c.text, borderColor: loginPassword.length > 0 ? c.primary : c.border, backgroundColor: c.card, paddingRight: 44 }]}
@@ -170,75 +226,57 @@ export function LoginScreen({ c, styles, t, onClose, bookingTargetTherapist, onB
             </Pressable>
           </View>
         </View>
-        <Pressable
-          onPress={handleForgotPassword}
-          disabled={forgotPasswordLoading}
-          style={{ alignSelf: 'flex-end', paddingVertical: 4 }}
-        >
-          <Text style={{ fontSize: 13, fontWeight: '600', color: forgotPasswordLoading ? c.muted : c.primary }}>
-            {forgotPasswordLoading ? t('forgotPasswordLoading') : t('forgotPasswordLink')}
-          </Text>
-        </Pressable>
       </View>
 
       {loginNotice ? (
-        <View style={[styles.noticeBox, { backgroundColor: c.successBg, borderColor: c.success, marginTop: 12 }]}>
+        <View style={[styles.noticeBox, { backgroundColor: c.successBg, borderColor: c.success, marginBottom: 12 }]}>
           <Text style={{ color: c.success, flex: 1 }}>{loginNotice}</Text>
         </View>
       ) : null}
-
       {loginError ? (
-        <View style={[styles.noticeBox, { backgroundColor: c.errorBg, borderColor: c.error, marginTop: 12 }]}>
+        <View style={[styles.noticeBox, { backgroundColor: c.errorBg, borderColor: c.error, marginBottom: 12 }]}>
           <Text style={{ color: c.error, flex: 1 }}>{softenErrorMessage(loginError)}</Text>
         </View>
       ) : null}
 
-      <AuthPrimaryButton
-        label={loginLoading ? t('loginLoading') : t('loginAction')}
-        onPress={handleLogin}
+      {/* Anmelden */}
+      <Pressable
+        onPress={() => loginWithCredentials(loginEmail, loginPassword)}
         disabled={loginLoading}
-        c={c}
-        styles={styles}
-        style={{ marginTop: 24 }}
-      />
+        style={{ backgroundColor: c.primary, borderRadius: RADIUS.md, paddingVertical: 16, alignItems: 'center', marginBottom: SPACE.lg }}
+      >
+        {loginLoading
+          ? <ActivityIndicator color="#fff" />
+          : <Text style={{ fontSize: 16, fontWeight: '700', color: '#fff' }}>Anmelden</Text>}
+      </Pressable>
 
-      <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 18 }}>
+      {/* Social */}
+      <SocialAuthButtons c={c} />
+
+      {/* Register link */}
+      <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 4, marginTop: SPACE.lg }}>
         <Text style={{ fontSize: 14, color: c.muted }}>Noch kein Konto?</Text>
         <Pressable onPress={() => navigation.navigate(ROOT_ROUTES.REGISTRATION)} hitSlop={8}>
-          <Text style={{ fontSize: 14, fontWeight: '700', color: c.primary }}>{t('registerBtn')}</Text>
+          <Text style={{ fontSize: 14, fontWeight: '700', color: c.primary }}>Jetzt registrieren</Text>
         </Pressable>
       </View>
 
-      {/* Demo logins */}
-      <View style={{ marginTop: 28 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-          <View style={{ flex: 1, height: 1, backgroundColor: c.border }} />
-          <Text style={{ fontSize: 12, color: c.muted, fontWeight: '600' }}>DEMO</Text>
-          <View style={{ flex: 1, height: 1, backgroundColor: c.border }} />
-        </View>
-        <View style={{ flexDirection: 'row', gap: 10 }}>
-          <Pressable
-            onPress={() => loginWithCredentials('demo.patient@revio.de', 'Demo1234!')}
-            style={{ flex: 1, borderWidth: 1.5, borderColor: c.border, borderRadius: 12, paddingVertical: 12, alignItems: 'center', backgroundColor: c.card }}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-              <Ionicons name="person-outline" size={14} color={c.text} />
-              <Text style={{ fontSize: 13, fontWeight: '700', color: c.text }}>Patient</Text>
-            </View>
-            <Text style={{ fontSize: 11, color: c.muted, marginTop: 2 }}>Demo-Konto</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => loginWithCredentials('demo.physio@revio.de', 'Demo1234!')}
-            style={{ flex: 1, borderWidth: 1.5, borderColor: c.border, borderRadius: 12, paddingVertical: 12, alignItems: 'center', backgroundColor: c.card }}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-              <Ionicons name="medical-outline" size={14} color={c.text} />
-              <Text style={{ fontSize: 13, fontWeight: '700', color: c.text }}>Physiotherapeut</Text>
-            </View>
-            <Text style={{ fontSize: 11, color: c.muted, marginTop: 2 }}>Demo-Konto</Text>
-          </Pressable>
-        </View>
+      {/* Demo */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: SPACE.xl }}>
+        <Text style={{ fontSize: 13, color: c.muted }}>Demo ausprobieren:</Text>
+        <Pressable
+          onPress={() => loginWithCredentials('demo.patient@revio.de', 'Demo1234!')}
+          style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1.5, borderColor: c.border, backgroundColor: c.card }}
+        >
+          <Text style={{ fontSize: 13, fontWeight: '600', color: c.text }}>Patient</Text>
+        </Pressable>
+        <Pressable
+          onPress={() => loginWithCredentials('demo.physio@revio.de', 'Demo1234!')}
+          style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1.5, borderColor: c.border, backgroundColor: c.card }}
+        >
+          <Text style={{ fontSize: 13, fontWeight: '600', color: c.text }}>Physiotherapeut</Text>
+        </Pressable>
       </View>
-    </AuthScreenShell>
+    </View>
   );
 }
