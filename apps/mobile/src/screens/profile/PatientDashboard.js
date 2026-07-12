@@ -13,9 +13,12 @@ import { deleteAccountRequest, getBaseUrl, RADIUS, SHADOW, SPACE, TUNNEL_HEADERS
 import { DeleteAccountModal } from '../../modals/DeleteAccountModal';
 import { useAuth } from '../../context/AuthContext';
 
+const KASSENART_LABELS = { gesetzlich: 'Gesetzlich', privat: 'Privat', selbstzahler: 'Selbstzahler' };
+
 export function PatientDashboardScreen({
   c, loggedInPatient, styles, t, authToken, onProfileSaved, onAccountDeleted,
   favorites = [], myAppointments = [], onOpenTherapist,
+  onShowPhoneEdit, onShowKassenartEdit, onShowChangePassword,
 }) {
   const { setLoggedInPatient } = useAuth();
 
@@ -23,6 +26,7 @@ export function PatientDashboardScreen({
   const lastName = loggedInPatient?.lastName ?? '';
   const email = loggedInPatient?.email ?? '';
   const phone = loggedInPatient?.phone ?? null;
+  const kassenart = loggedInPatient?.kassenart ?? null;
   const createdAt = loggedInPatient?.createdAt ?? null;
   const initials = ((firstName[0] ?? '') + (lastName[0] ?? '')).toUpperCase() || '?';
 
@@ -213,12 +217,13 @@ export function PatientDashboardScreen({
       <View style={{ backgroundColor: c.card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: c.border, padding: SPACE.lg, marginBottom: SPACE.md }}>
         <Text style={{ fontSize: 15, fontWeight: '700', color: c.text, marginBottom: SPACE.md }}>Kontakt</Text>
 
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACE.md }}>
+        <Pressable onPress={onShowPhoneEdit} style={{ flexDirection: 'row', alignItems: 'center', gap: SPACE.md }}>
           <Ionicons name="call-outline" size={18} color={c.muted} />
           <Text style={{ flex: 1, fontSize: 15, color: phone ? c.text : c.muted }}>
             {phone ?? (t('phonePlaceholder') ?? '+49 …')}
           </Text>
-        </View>
+          <Ionicons name="chevron-forward" size={16} color={c.muted} />
+        </Pressable>
 
         <View style={{ height: 1, backgroundColor: c.border, marginVertical: SPACE.md }} />
 
@@ -226,6 +231,27 @@ export function PatientDashboardScreen({
           <Ionicons name="mail-outline" size={18} color={c.muted} />
           <Text style={{ flex: 1, fontSize: 15, color: c.text }}>{email}</Text>
         </View>
+
+        <View style={{ height: 1, backgroundColor: c.border, marginVertical: SPACE.md }} />
+
+        <Pressable onPress={onShowKassenartEdit} style={{ flexDirection: 'row', alignItems: 'center', gap: SPACE.md }}>
+          <Ionicons name="card-outline" size={18} color={c.muted} />
+          <Text style={{ flex: 1, fontSize: 15, color: kassenart ? c.text : c.muted }}>
+            {kassenart ? (KASSENART_LABELS[kassenart] ?? kassenart) : 'Versicherungsart noch nicht hinterlegt'}
+          </Text>
+          <Ionicons name="chevron-forward" size={16} color={c.muted} />
+        </Pressable>
+      </View>
+
+      {/* ── Konto ───────────────────────────────────────────────────── */}
+      <View style={{ backgroundColor: c.card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: c.border, padding: SPACE.lg, marginBottom: SPACE.md }}>
+        <Text style={{ fontSize: 15, fontWeight: '700', color: c.text, marginBottom: SPACE.md }}>Konto</Text>
+
+        <Pressable onPress={onShowChangePassword} style={{ flexDirection: 'row', alignItems: 'center', gap: SPACE.md }}>
+          <Ionicons name="key-outline" size={18} color={c.muted} />
+          <Text style={{ flex: 1, fontSize: 15, color: c.text }}>{t('changePassword')}</Text>
+          <Ionicons name="chevron-forward" size={16} color={c.muted} />
+        </Pressable>
       </View>
 
       {/* ── Therapie-Übersicht ───────────────────────────────────────── */}

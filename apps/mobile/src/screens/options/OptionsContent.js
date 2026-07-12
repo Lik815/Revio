@@ -9,7 +9,7 @@ export function OptionsContent({
   loggedInTherapist, loggedInPatient,
   themeMode, setThemeMode,
   onShowLogin, onShowRegister,
-  onShowFeedback, onShowChangePassword, onShowPhoneEdit, onShowKassenartEdit, onLogout,
+  onShowFeedback, onLogout,
   onShowDebug,
   onShowWorkingHours, onShowServices, onShowBlockedTimes, onShowAbsences, onShowMyCourses,
   c, t, styles,
@@ -192,33 +192,6 @@ const renderOptions = () => {
           <>
             <SectionHeader title={t('accountSection')} />
             <OptionGroup>
-              {loggedInPatient && (
-                <OptionRow
-                  label="Telefonnummer"
-                  subtitle={loggedInPatient.phone ? loggedInPatient.phone : 'Noch nicht hinterlegt'}
-                  icon="call-outline"
-                  onPress={onShowPhoneEdit}
-                  valueColor={c.primary}
-                />
-              )}
-              {loggedInPatient && (
-                <OptionRow
-                  label="Versicherungsart"
-                  subtitle={loggedInPatient.kassenart
-                    ? ({ gesetzlich: 'Gesetzlich', privat: 'Privat', selbstzahler: 'Selbstzahler' }[loggedInPatient.kassenart] ?? loggedInPatient.kassenart)
-                    : 'Noch nicht hinterlegt'}
-                  icon="card-outline"
-                  onPress={onShowKassenartEdit}
-                  valueColor={c.primary}
-                />
-              )}
-              <OptionRow
-                label={t('changePassword')}
-                subtitle={t('changePasswordHint')}
-                icon="key-outline"
-                onPress={onShowChangePassword}
-                valueColor={c.primary}
-              />
               <OptionRow
                 label={t('logoutBtn')}
                 subtitle={t('logoutHint')}

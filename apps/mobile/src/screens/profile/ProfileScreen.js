@@ -17,6 +17,9 @@ import { ToastOverlay } from '../../components/ToastOverlay';
 import { ProfileSavedModal } from '../../modals/ProfileSavedModal';
 import { ReviewNotificationModal } from '../../modals/ReviewNotificationModal';
 import { PhotoPromptModal } from '../../modals/PhotoPromptModal';
+import { ChangePasswordModal } from '../../modals/ChangePasswordModal';
+import { PatientPhoneModal } from '../../modals/PatientPhoneModal';
+import { PatientKassenartModal } from '../../modals/PatientKassenartModal';
 import { TherapistDashboardScreen } from './TherapistDashboard';
 import { PatientDashboardScreen } from './PatientDashboard';
 import { useTherapyData } from '../../context/TherapyContext';
@@ -33,7 +36,12 @@ export function ProfileTabScreen() {
   const loggedInPatient = useAppStore(appStoreSelectors.loggedInPatient);
   const loggedInTherapist = useAppStore(appStoreSelectors.loggedInTherapist);
   const signOut = useAppStore((s) => s.signOut);
+  const updatePatientProfile = useAppStore((s) => s.updatePatientProfile);
   const { logout, setLoggedInPatient, setLoggedInTherapist } = useAuth();
+
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [showPhoneEdit, setShowPhoneEdit] = useState(false);
+  const [showKassenartEdit, setShowKassenartEdit] = useState(false);
 
   const { c } = useTheme();
   const { certificationOptions, specializationOptions, heilmittelOptions } = useConfigOptions();
@@ -121,6 +129,9 @@ export function ProfileTabScreen() {
             onOpenTherapist={(id, th) => navigation.navigate(ROOT_ROUTES.THERAPIST_PROFILE, { therapistId: id, therapist: th })}
             onProfileSaved={handlePatientProfileSaved}
             onAccountDeleted={handleAccountDeleted}
+            onShowPhoneEdit={() => setShowPhoneEdit(true)}
+            onShowKassenartEdit={() => setShowKassenartEdit(true)}
+            onShowChangePassword={() => setShowChangePassword(true)}
           />
         </View>
         <ProfileSavedModal
@@ -135,6 +146,28 @@ export function ProfileTabScreen() {
           notification={reviewNotification}
           onDone={markReviewNotificationSeen}
           c={c} t={t}
+        />
+        <ChangePasswordModal
+          visible={showChangePassword}
+          onClose={() => setShowChangePassword(false)}
+          authToken={authToken}
+          c={c} t={t}
+        />
+        <PatientPhoneModal
+          visible={showPhoneEdit}
+          onClose={() => setShowPhoneEdit(false)}
+          authToken={authToken}
+          currentPhone={loggedInPatient?.phone ?? ''}
+          onSaved={(phone) => { updatePatientProfile({ phone }); setShowPhoneEdit(false); }}
+          c={c}
+        />
+        <PatientKassenartModal
+          visible={showKassenartEdit}
+          onClose={() => setShowKassenartEdit(false)}
+          authToken={authToken}
+          currentKassenart={loggedInPatient?.kassenart ?? null}
+          onSaved={(kassenart) => { updatePatientProfile({ kassenart }); setShowKassenartEdit(false); }}
+          c={c}
         />
         <ToastOverlay message={toastMsg} anim={toastAnim} c={c} />
       </>
