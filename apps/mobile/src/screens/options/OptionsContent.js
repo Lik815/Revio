@@ -11,7 +11,7 @@ export function OptionsContent({
   onShowLogin, onShowRegister,
   onShowFeedback, onLogout,
   onShowDebug,
-  onShowWorkingHours, onShowServices, onShowBlockedTimes, onShowAbsences, onShowMyCourses,
+  onShowWorkingHours, onShowServices, onShowBlockedTimes, onShowMyCourses,
   c, t, styles,
 }) {
   const [debugTapCount, setDebugTapCount] = React.useState(0);
@@ -88,17 +88,10 @@ const renderOptions = () => {
                 valueColor={c.primary}
               />
               <OptionRow
-                label="Blockzeiten"
-                subtitle="Pausen, Urlaub, Hausbesuche blockieren"
+                label="Abwesenheit & Blockzeiten"
+                subtitle="Pausen, Hausbesuche, Urlaub, Fortbildungen blockieren"
                 icon="ban-outline"
                 onPress={onShowBlockedTimes}
-                valueColor={c.primary}
-              />
-              <OptionRow
-                label="Abwesenheiten"
-                subtitle="Urlaub und Fortbildungen"
-                icon="airplane-outline"
-                onPress={onShowAbsences}
                 valueColor={c.primary}
                 last
               />

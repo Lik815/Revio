@@ -12,7 +12,6 @@ import { useAuth } from '../../context/AuthContext';
 import { WorkingHoursScreen } from '../therapy/WorkingHoursScreen';
 import { TherapistServicesScreen } from '../therapy/TherapistServicesScreen';
 import { BlockedTimesScreen } from '../therapy/BlockedTimesScreen';
-import { AbsenceScreen } from './AbsenceScreen';
 import { TherapistCoursesScreen } from '../courses/TherapistCoursesScreen';
 
 const t = (key) => translations.de[key] ?? key;
@@ -38,7 +37,6 @@ export function OptionsTabScreen() {
   const [showWorkingHours, setShowWorkingHours] = useState(false);
   const [showServices, setShowServices] = useState(false);
   const [showBlockedTimes, setShowBlockedTimes] = useState(false);
-  const [showAbsences, setShowAbsences] = useState(false);
   const [showMyCourses, setShowMyCourses] = useState(false);
 
   const handleLogout = async () => {
@@ -55,9 +53,6 @@ export function OptionsTabScreen() {
   }
   if (showBlockedTimes) {
     return <BlockedTimesScreen c={c} authToken={authToken} onBack={() => setShowBlockedTimes(false)} />;
-  }
-  if (showAbsences) {
-    return <AbsenceScreen c={c} authToken={authToken} onBack={() => setShowAbsences(false)} />;
   }
   if (showMyCourses) {
     return <TherapistCoursesScreen c={c} authToken={authToken} onBack={() => setShowMyCourses(false)} />;
@@ -78,7 +73,6 @@ export function OptionsTabScreen() {
         onShowWorkingHours={() => setShowWorkingHours(true)}
         onShowServices={() => setShowServices(true)}
         onShowBlockedTimes={() => setShowBlockedTimes(true)}
-        onShowAbsences={() => setShowAbsences(true)}
         onShowMyCourses={() => setShowMyCourses(true)}
         c={c}
         t={t}

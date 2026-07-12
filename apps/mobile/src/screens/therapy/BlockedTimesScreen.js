@@ -9,38 +9,128 @@ import { useToast } from '../../hooks/use-toast';
 import { ToastOverlay } from '../../components/ToastOverlay';
 import { BackButton } from '../../components/BackButton';
 
-function formatRange(startsAt, endsAt) {
-  if (!startsAt) return '—';
-  const start = new Date(startsAt);
-  const end = endsAt ? new Date(endsAt) : null;
+const GRUND_LABELS = {
+  URLAUB: 'Urlaub',
+  FORTBILDUNG: 'Fortbildung',
+  KRANKHEIT: 'Krankheit',
+  SONSTIGES: 'Sonstiges',
+};
+
+const GRUND_ICONS = {
+  URLAUB: 'airplane-outline',
+  FORTBILDUNG: 'school-outline',
+  KRANKHEIT: 'medkit-outline',
+  SONSTIGES: 'calendar-outline',
+};
+
+// Blockzeit (grund=null) → Datum+Uhrzeit-Bereich. Abwesenheit (grund gesetzt) →
+// Tages-Bereich, da sie stets auf volle Tage gerundet gespeichert wird.
+function formatRange(entry) {
+  if (!entry.startsAt) return '—';
+  const start = new Date(entry.startsAt);
+  const end = entry.endsAt ? new Date(entry.endsAt) : null;
+
+  if (entry.grund) {
+    const fmt = (d) => d.toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' });
+    if (!end || start.toDateString() === end.toDateString()) return fmt(start);
+    return `${fmt(start)} – ${fmt(end)}`;
+  }
+
   const date = start.toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
   const startTime = start.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
   const endTime = end ? end.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : '';
   return `${date} · ${startTime}${endTime ? `–${endTime}` : ''} Uhr`;
 }
 
-// Einfache ISO-Eingabe für MVP: Therapeut gibt Datum+Uhrzeit als Text ein.
-// Für Production wäre hier ein DateTimePicker-Modal sinnvoll.
-function AddBlockedTimeModal({ c, visible, onClose, onSave, saving }) {
+function GrundPicker({ value, onChange, c }) {
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+      {Object.entries(GRUND_LABELS).map(([key, label]) => {
+        const active = value === key;
+        return (
+          <Pressable
+            key={key}
+            onPress={() => onChange(key)}
+            style={{
+              flexDirection: 'row', alignItems: 'center', gap: 5,
+              paddingVertical: 7, paddingHorizontal: 12,
+              borderRadius: RADIUS.sm,
+              borderWidth: 1.5,
+              borderColor: active ? c.primary : c.border,
+              backgroundColor: active ? `${c.primary}14` : c.card,
+            }}
+          >
+            <Ionicons name={GRUND_ICONS[key]} size={14} color={active ? c.primary : c.muted} />
+            <Text style={{ fontSize: 13, fontWeight: active ? '700' : '500', color: active ? c.primary : c.text }}>{label}</Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+function ModeToggle({ mode, onChange, c }) {
+  return (
+    <View style={{ flexDirection: 'row', borderRadius: RADIUS.sm, borderWidth: 1, borderColor: c.border, overflow: 'hidden' }}>
+      {[{ key: 'block', label: 'Blockzeit' }, { key: 'absence', label: 'Abwesenheit' }].map((option, index) => (
+        <Pressable
+          key={option.key}
+          onPress={() => onChange(option.key)}
+          style={{
+            flex: 1, paddingVertical: 10, alignItems: 'center',
+            backgroundColor: mode === option.key ? c.primaryBg : c.card,
+            borderLeftWidth: index > 0 ? 1 : 0, borderLeftColor: c.border,
+          }}
+        >
+          <Text style={{ fontSize: 13, fontWeight: '700', color: mode === option.key ? c.primary : c.muted }}>{option.label}</Text>
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
+function AddEntryModal({ c, visible, onClose, onSave, saving }) {
+  const [mode, setMode] = useState('block');
   const [startsAt, setStartsAt] = useState('');
   const [endsAt, setEndsAt] = useState('');
   const [title, setTitle] = useState('');
+  const [von, setVon] = useState('');
+  const [bis, setBis] = useState('');
+  const [grund, setGrund] = useState('URLAUB');
+
+  const resetFields = () => {
+    setStartsAt(''); setEndsAt(''); setTitle('');
+    setVon(''); setBis(''); setGrund('URLAUB');
+  };
 
   const handleSave = () => {
-    const s = new Date(startsAt);
-    const e = new Date(endsAt);
-    if (isNaN(s.getTime()) || isNaN(e.getTime())) {
-      Alert.alert('Ungültiges Datum', 'Bitte Datum und Uhrzeit im Format "2026-07-01T09:00" eingeben.');
-      return;
+    if (mode === 'block') {
+      const s = new Date(startsAt);
+      const e = new Date(endsAt);
+      if (isNaN(s.getTime()) || isNaN(e.getTime())) {
+        Alert.alert('Ungültiges Datum', 'Bitte Datum und Uhrzeit im Format "2026-07-01T09:00" eingeben.');
+        return;
+      }
+      if (e <= s) {
+        Alert.alert('Ungültig', 'Das Enddatum muss nach dem Startdatum liegen.');
+        return;
+      }
+      onSave({ startsAt: s.toISOString(), endsAt: e.toISOString(), title: title.trim() || undefined });
+    } else {
+      const vonDate = new Date(von);
+      const bisDate = new Date(bis);
+      if (isNaN(vonDate.getTime()) || isNaN(bisDate.getTime())) {
+        Alert.alert('Ungültiges Datum', 'Bitte Datum im Format "2026-07-01" eingeben.');
+        return;
+      }
+      if (bisDate < vonDate) {
+        Alert.alert('Ungültig', 'Das Enddatum muss nach dem Startdatum liegen.');
+        return;
+      }
+      bisDate.setHours(23, 59, 59, 999);
+      onSave({ startsAt: vonDate.toISOString(), endsAt: bisDate.toISOString(), grund });
     }
-    if (e <= s) {
-      Alert.alert('Ungültig', 'Das Enddatum muss nach dem Startdatum liegen.');
-      return;
-    }
-    onSave({ startsAt: s.toISOString(), endsAt: e.toISOString(), title: title.trim() || 'Blockiert' });
-    setStartsAt('');
-    setEndsAt('');
-    setTitle('');
+    resetFields();
   };
 
   return (
@@ -49,39 +139,76 @@ function AddBlockedTimeModal({ c, visible, onClose, onSave, saving }) {
         style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', paddingHorizontal: 20 }}
         onPress={onClose}
       >
-        <Pressable onPress={() => {}} style={{ backgroundColor: c.card, borderRadius: RADIUS.lg, padding: 20, gap: 12 }}>
-          <Text style={{ fontSize: 17, fontWeight: '700', color: c.text }}>Blockzeit hinzufügen</Text>
+        <Pressable onPress={() => {}} style={{ backgroundColor: c.card, borderRadius: RADIUS.lg, padding: 20, gap: 14 }}>
+          <Text style={{ fontSize: 17, fontWeight: '700', color: c.text }}>Eintrag hinzufügen</Text>
 
-          <Text style={{ fontSize: 13, color: c.muted }}>Beginn (z.B. 2026-07-01T09:00)</Text>
-          <TextInput
-            value={startsAt}
-            onChangeText={setStartsAt}
-            placeholder="2026-07-01T09:00"
-            placeholderTextColor={c.muted}
-            style={{ borderWidth: 1, borderColor: c.border, borderRadius: RADIUS.sm, backgroundColor: c.mutedBg, color: c.text, fontSize: 14, padding: 10 }}
-          />
+          <ModeToggle mode={mode} onChange={setMode} c={c} />
 
-          <Text style={{ fontSize: 13, color: c.muted }}>Ende (z.B. 2026-07-01T12:00)</Text>
-          <TextInput
-            value={endsAt}
-            onChangeText={setEndsAt}
-            placeholder="2026-07-01T12:00"
-            placeholderTextColor={c.muted}
-            style={{ borderWidth: 1, borderColor: c.border, borderRadius: RADIUS.sm, backgroundColor: c.mutedBg, color: c.text, fontSize: 14, padding: 10 }}
-          />
-
-          <Text style={{ fontSize: 13, color: c.muted }}>Titel (optional)</Text>
-          <TextInput
-            value={title}
-            onChangeText={setTitle}
-            placeholder="z.B. Pause, Urlaub, Fortbildung"
-            placeholderTextColor={c.muted}
-            style={{ borderWidth: 1, borderColor: c.border, borderRadius: RADIUS.sm, backgroundColor: c.mutedBg, color: c.text, fontSize: 14, padding: 10 }}
-          />
+          {mode === 'block' ? (
+            <>
+              <View style={{ gap: 4 }}>
+                <Text style={{ fontSize: 13, color: c.muted }}>Beginn (z.B. 2026-07-01T09:00)</Text>
+                <TextInput
+                  value={startsAt}
+                  onChangeText={setStartsAt}
+                  placeholder="2026-07-01T09:00"
+                  placeholderTextColor={c.muted}
+                  style={{ borderWidth: 1, borderColor: c.border, borderRadius: RADIUS.sm, backgroundColor: c.mutedBg, color: c.text, fontSize: 14, padding: 10 }}
+                />
+              </View>
+              <View style={{ gap: 4 }}>
+                <Text style={{ fontSize: 13, color: c.muted }}>Ende (z.B. 2026-07-01T12:00)</Text>
+                <TextInput
+                  value={endsAt}
+                  onChangeText={setEndsAt}
+                  placeholder="2026-07-01T12:00"
+                  placeholderTextColor={c.muted}
+                  style={{ borderWidth: 1, borderColor: c.border, borderRadius: RADIUS.sm, backgroundColor: c.mutedBg, color: c.text, fontSize: 14, padding: 10 }}
+                />
+              </View>
+              <View style={{ gap: 4 }}>
+                <Text style={{ fontSize: 13, color: c.muted }}>Titel (optional)</Text>
+                <TextInput
+                  value={title}
+                  onChangeText={setTitle}
+                  placeholder="z.B. Pause, Hausbesuch"
+                  placeholderTextColor={c.muted}
+                  style={{ borderWidth: 1, borderColor: c.border, borderRadius: RADIUS.sm, backgroundColor: c.mutedBg, color: c.text, fontSize: 14, padding: 10 }}
+                />
+              </View>
+            </>
+          ) : (
+            <>
+              <View style={{ gap: 4 }}>
+                <Text style={{ fontSize: 13, color: c.muted }}>Von (z.B. 2026-08-01)</Text>
+                <TextInput
+                  value={von}
+                  onChangeText={setVon}
+                  placeholder="2026-08-01"
+                  placeholderTextColor={c.muted}
+                  style={{ borderWidth: 1, borderColor: c.border, borderRadius: RADIUS.sm, backgroundColor: c.mutedBg, color: c.text, fontSize: 14, padding: 10 }}
+                />
+              </View>
+              <View style={{ gap: 4 }}>
+                <Text style={{ fontSize: 13, color: c.muted }}>Bis (inkl., z.B. 2026-08-15)</Text>
+                <TextInput
+                  value={bis}
+                  onChangeText={setBis}
+                  placeholder="2026-08-15"
+                  placeholderTextColor={c.muted}
+                  style={{ borderWidth: 1, borderColor: c.border, borderRadius: RADIUS.sm, backgroundColor: c.mutedBg, color: c.text, fontSize: 14, padding: 10 }}
+                />
+              </View>
+              <View style={{ gap: 8 }}>
+                <Text style={{ fontSize: 13, color: c.muted }}>Grund</Text>
+                <GrundPicker value={grund} onChange={setGrund} c={c} />
+              </View>
+            </>
+          )}
 
           <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
             <Pressable
-              onPress={onClose}
+              onPress={() => { resetFields(); onClose(); }}
               style={{ flex: 1, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: c.border, paddingVertical: 12, alignItems: 'center' }}
             >
               <Text style={{ fontSize: 14, fontWeight: '600', color: c.muted }}>Abbrechen</Text>
@@ -106,7 +233,7 @@ export function BlockedTimesScreen({ c, authToken, onBack }) {
   const insets = useSafeAreaInsets();
   const { toastMsg, toastAnim, showToast } = useToast();
 
-  const [blockedTimes, setBlockedTimes] = useState([]);
+  const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -114,12 +241,20 @@ export function BlockedTimesScreen({ c, authToken, onBack }) {
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch(`${getBaseUrl()}/therapist/blocked-times`, {
-        headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
-      });
+      // GET /therapist/blocked-times defaults to "jetzt bis +90 Tage" — hier
+      // explizit weiter gefasst, damit auch vergangene Abwesenheiten (Historie,
+      // wie zuvor bei /schedule/absences) sichtbar bleiben.
+      const from = new Date();
+      from.setFullYear(from.getFullYear() - 1);
+      const to = new Date();
+      to.setFullYear(to.getFullYear() + 1);
+      const res = await fetch(
+        `${getBaseUrl()}/therapist/blocked-times?from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(to.toISOString())}`,
+        { headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` } },
+      );
       if (res.ok) {
         const data = await res.json();
-        setBlockedTimes(data.blockedTimes ?? []);
+        setEntries(data.blockedTimes ?? []);
       }
     } catch {}
     finally { setLoading(false); }
@@ -127,19 +262,27 @@ export function BlockedTimesScreen({ c, authToken, onBack }) {
 
   useEffect(() => { load(); }, [load]);
 
-  const handleAdd = async ({ startsAt, endsAt, title }) => {
+  const handleAdd = async (payload) => {
     setSaving(true);
     try {
       const res = await fetch(`${getBaseUrl()}/therapist/blocked-times`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
-        body: JSON.stringify({ startsAt, endsAt, title }),
+        body: JSON.stringify(payload),
       });
       if (res.ok) {
         const created = await res.json();
-        setBlockedTimes((prev) => [created, ...prev]);
+        setEntries((prev) => [...prev, created].sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt)));
         setShowAddModal(false);
-        showToast('Blockzeit gespeichert');
+        if (created.conflicts && created.conflicts.length > 0) {
+          const names = created.conflicts.slice(0, 3).map((s) => `• ${s.patientName}`).join('\n');
+          Alert.alert(
+            'Eintrag gespeichert',
+            `Es gibt ${created.conflicts.length} bestehende${created.conflicts.length === 1 ? 'n Termin' : ' Termine'} in diesem Zeitraum:\n\n${names}${created.conflicts.length > 3 ? `\n...und ${created.conflicts.length - 3} weitere` : ''}\n\nBitte informiere deine Patienten.`,
+          );
+        } else {
+          showToast('Gespeichert');
+        }
       } else {
         const data = await res.json().catch(() => ({}));
         Alert.alert('Fehler', data.error ?? 'Speichern fehlgeschlagen');
@@ -159,8 +302,8 @@ export function BlockedTimesScreen({ c, authToken, onBack }) {
         headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
       });
       if (res.ok) {
-        setBlockedTimes((prev) => prev.filter((b) => b.id !== id));
-        showToast('Blockzeit gelöscht');
+        setEntries((prev) => prev.filter((e) => e.id !== id));
+        showToast('Gelöscht');
       }
     } catch {
       showToast('Löschen fehlgeschlagen');
@@ -171,7 +314,7 @@ export function BlockedTimesScreen({ c, authToken, onBack }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: c.background }}>
-      <BackButton onPress={onBack} c={c} label="Blockzeiten" />
+      <BackButton onPress={onBack} c={c} label="Abwesenheit & Blockzeiten" />
 
       {loading ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
@@ -183,8 +326,9 @@ export function BlockedTimesScreen({ c, authToken, onBack }) {
           showsVerticalScrollIndicator={false}
         >
           <Text style={{ fontSize: 13, color: c.muted, lineHeight: 18, marginBottom: 4 }}>
-            Blockzeiten schließen Zeitfenster für alle Buchungen aus — egal welches Heilmittel.
-            Geeignet für Pausen, Urlaub, Hausbesuche oder nicht buchbare Reservierungen.
+            Blockzeiten und Abwesenheiten schließen Zeitfenster für alle Buchungen aus.
+            Nutze „Blockzeit" für Pausen, Hausbesuche oder kurze Reservierungen, und
+            „Abwesenheit" für Urlaub, Fortbildung oder Krankheit über mehrere Tage.
           </Text>
 
           <Pressable
@@ -192,41 +336,57 @@ export function BlockedTimesScreen({ c, authToken, onBack }) {
             style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, borderRadius: RADIUS.sm, borderWidth: 1.5, borderColor: c.primary, borderStyle: 'dashed' }}
           >
             <Ionicons name="add" size={16} color={c.primary} />
-            <Text style={{ fontSize: 13, fontWeight: '600', color: c.primary }}>Blockzeit hinzufügen</Text>
+            <Text style={{ fontSize: 13, fontWeight: '600', color: c.primary }}>Eintrag hinzufügen</Text>
           </Pressable>
 
-          {blockedTimes.length === 0 ? (
+          {entries.length === 0 ? (
             <View style={{ alignItems: 'center', paddingVertical: 32 }}>
               <Ionicons name="calendar-outline" size={32} color={c.muted} />
-              <Text style={{ fontSize: 14, color: c.muted, marginTop: 8 }}>Keine Blockzeiten vorhanden</Text>
+              <Text style={{ fontSize: 14, color: c.muted, marginTop: 8 }}>Keine Einträge vorhanden</Text>
             </View>
           ) : (
-            blockedTimes.map((b) => (
-              <View
-                key={b.id}
-                style={{ backgroundColor: c.card, borderRadius: RADIUS.md, borderWidth: 1, borderColor: c.border, padding: SPACE.md, flexDirection: 'row', alignItems: 'center', gap: 12, ...SHADOW.card }}
-              >
-                <View style={{ flex: 1, gap: 2 }}>
-                  <Text style={{ fontSize: 14, fontWeight: '700', color: c.text }}>{b.title}</Text>
-                  <Text style={{ fontSize: 12, color: c.muted }}>{formatRange(b.startsAt, b.endsAt)}</Text>
-                </View>
-                <Pressable
-                  onPress={() => handleDelete(b.id)}
-                  disabled={deletingId === b.id}
-                  style={{ padding: 6 }}
-                  hitSlop={8}
+            entries.map((entry) => {
+              const isPast = new Date(entry.endsAt) < new Date();
+              return (
+                <View
+                  key={entry.id}
+                  style={{
+                    backgroundColor: c.card, borderRadius: RADIUS.md, borderWidth: 1,
+                    borderColor: c.border, padding: SPACE.md,
+                    flexDirection: 'row', alignItems: 'center', gap: 12,
+                    opacity: isPast ? 0.55 : 1,
+                    ...SHADOW.card,
+                  }}
                 >
-                  {deletingId === b.id
-                    ? <ActivityIndicator size="small" color={c.error} />
-                    : <Ionicons name="trash-outline" size={18} color={c.error} />}
-                </Pressable>
-              </View>
-            ))
+                  {entry.grund ? (
+                    <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: `${c.primary}15`, alignItems: 'center', justifyContent: 'center' }}>
+                      <Ionicons name={GRUND_ICONS[entry.grund] ?? 'calendar-outline'} size={18} color={c.primary} />
+                    </View>
+                  ) : null}
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: c.text }}>
+                      {entry.grund ? (GRUND_LABELS[entry.grund] ?? entry.grund) : entry.title}
+                    </Text>
+                    <Text style={{ fontSize: 12, color: c.muted }}>{formatRange(entry)}</Text>
+                  </View>
+                  <Pressable
+                    onPress={() => handleDelete(entry.id)}
+                    disabled={deletingId === entry.id}
+                    style={{ padding: 6 }}
+                    hitSlop={8}
+                  >
+                    {deletingId === entry.id
+                      ? <ActivityIndicator size="small" color={c.error} />
+                      : <Ionicons name="trash-outline" size={18} color={c.error} />}
+                  </Pressable>
+                </View>
+              );
+            })
           )}
         </ScrollView>
       )}
 
-      <AddBlockedTimeModal
+      <AddEntryModal
         c={c}
         visible={showAddModal}
         onClose={() => setShowAddModal(false)}

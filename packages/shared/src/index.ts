@@ -365,13 +365,17 @@ export interface TherapistService {
   updatedAt: string;
 }
 
-// Neutrale Blockzeit (Pause, Hausbesuch, Urlaub, …).
+export type AbsenceGrund = 'URLAUB' | 'FORTBILDUNG' | 'KRANKHEIT' | 'SONSTIGES';
+
+// Neutrale Blockzeit. grund=null = Ad-hoc-Block (Pause, Hausbesuch, …);
+// grund gesetzt = mehrtägige Abwesenheit (Urlaub, Fortbildung, Krankheit, Sonstiges).
 export interface TherapistBlockedTime {
   id: string;
   therapistId: string;
   startsAt: string;
   endsAt: string;
   title: string;
+  grund: AbsenceGrund | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -411,6 +415,7 @@ export interface CreateBlockedTimeInput {
   startsAt: string;
   endsAt: string;
   title?: string;
+  grund?: AbsenceGrund;
 }
 
 export interface GetAvailableSlotsResponse {

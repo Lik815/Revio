@@ -2875,6 +2875,36 @@ describe('Dynamic Booking', () => {
     expect(res.json().title).toBe('Pause');
   });
 
+  it('POST /therapist/blocked-times — grund gesetzt: title wird automatisch aus dem Grund abgeleitet', async () => {
+    const start = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+
+    const res = await app.inject({
+      method: 'POST', url: '/therapist/blocked-times',
+      headers: { authorization: `Bearer ${therapistToken}`, 'content-type': 'application/json' },
+      payload: { startsAt: start.toISOString(), endsAt: end.toISOString(), grund: 'URLAUB' },
+    });
+    expect(res.statusCode).toBe(201);
+    expect(res.json().title).toBe('Urlaub');
+    expect(res.json().grund).toBe('URLAUB');
+  });
+
+  it('GET /therapist/blocked-times — gibt grund mit zurück', async () => {
+    const start = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const end = new Date(start.getTime() + 60 * 60 * 1000);
+    await prisma.therapistBlockedTime.create({
+      data: { therapistId, startsAt: start, endsAt: end, title: 'Fortbildung', grund: 'FORTBILDUNG' },
+    });
+
+    const res = await app.inject({
+      method: 'GET', url: '/therapist/blocked-times',
+      headers: { authorization: `Bearer ${therapistToken}` },
+    });
+    expect(res.statusCode).toBe(200);
+    const entry = res.json().blockedTimes.find((b: { title: string }) => b.title === 'Fortbildung');
+    expect(entry?.grund).toBe('FORTBILDUNG');
+  });
+
   it('POST /therapist/blocked-times — lehnt endsAt <= startsAt ab', async () => {
     const t = new Date(Date.now() + 24 * 60 * 60 * 1000);
     const res = await app.inject({
@@ -2931,6 +2961,38 @@ describe('Dynamic Booking', () => {
     expect(res.json().slots.length).toBeGreaterThanOrEqual(6);
     expect(res.json().slots[0].startsAt).toBeTruthy();
     expect(res.json().slots[0].endsAt).toBeTruthy();
+  });
+
+  it('GET /therapists/:id/available-slots — schließt Zeitfenster innerhalb einer Abwesenheit aus', async () => {
+    const day = new Date(Date.now() + 4 * 24 * 60 * 60 * 1000);
+    day.setHours(0, 0, 0, 0);
+    await prisma.therapistWorkingHoursRule.create({
+      data: { therapistId, weekday: day.getDay(), startMinute: 8 * 60, endMinute: 10 * 60 },
+    });
+    await prisma.heilmittelOption.upsert({
+      where: { key: 'KG' },
+      create: { key: 'KG', label: 'KG', defaultDurationMin: 20 },
+      update: { defaultDurationMin: 20 },
+    });
+    // Ganztägige "Abwesenheit" (grund gesetzt statt null) über den kompletten Tag
+    await prisma.therapistBlockedTime.create({
+      data: {
+        therapistId,
+        startsAt: day,
+        endsAt: new Date(day.getTime() + 24 * 60 * 60 * 1000),
+        title: 'Urlaub',
+        grund: 'URLAUB',
+      },
+    });
+
+    const from = day.toISOString();
+    const to = new Date(day.getTime() + 24 * 60 * 60 * 1000).toISOString();
+    const res = await app.inject({
+      method: 'GET',
+      url: `/therapists/${therapistId}/available-slots?heilmittel=KG&from=${from}&to=${to}`,
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().slots).toHaveLength(0);
   });
 
   it('GET /therapists/:id/available-slots — erfordert heilmittel-Parameter', async () => {
@@ -3062,6 +3124,25 @@ describe('Dynamic Booking', () => {
     const endsAt = new Date(startsAt.getTime() + 2 * 60 * 60 * 1000);
     await prisma.therapistBlockedTime.create({
       data: { therapistId, startsAt, endsAt },
+    });
+
+    const res = await app.inject({
+      method: 'POST', url: '/bookings',
+      headers: { authorization: `Bearer ${patientToken}`, 'content-type': 'application/json' },
+      payload: { therapistId, startsAt: startsAt.toISOString(), heilmittel: 'KG', consentAccepted: true },
+    });
+    expect(res.statusCode).toBe(409);
+  });
+
+  it('POST /bookings — lehnt Zeitfenster innerhalb einer Abwesenheit ab (grund gesetzt)', async () => {
+    // Abwesenheiten (Urlaub/Fortbildung/…) leben in derselben Tabelle wie
+    // Ad-hoc-Blockzeiten (grund gesetzt statt null) und müssen genauso Buchungen
+    // verhindern — das war vor der Vereinheitlichung von TherapistAbsence nicht
+    // der Fall.
+    const startsAt = futureStartsAt();
+    const endsAt = new Date(startsAt.getTime() + 2 * 60 * 60 * 1000);
+    await prisma.therapistBlockedTime.create({
+      data: { therapistId, startsAt, endsAt, title: 'Urlaub', grund: 'URLAUB' },
     });
 
     const res = await app.inject({

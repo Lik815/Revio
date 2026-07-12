@@ -49,6 +49,15 @@ function canUseBookingMode(therapist: { reviewStatus?: string | null; bookingMod
 const splitList = (value: string) =>
   value.split(',').map((s) => s.trim()).filter(Boolean);
 
+// Deckt sowohl Ad-hoc-Blockzeiten (grund=null) als auch mehrtägige Abwesenheiten
+// (grund gesetzt) ab — beide leben in TherapistBlockedTime (siehe schema.prisma).
+const ABSENCE_GRUND_LABELS: Record<string, string> = {
+  URLAUB: 'Urlaub',
+  FORTBILDUNG: 'Fortbildung',
+  KRANKHEIT: 'Krankheit',
+  SONSTIGES: 'Sonstiges',
+};
+
 // Optional, additive filters for /bookings/my and /bookings/incoming.
 function parseBookingListQuery(query: Record<string, unknown>) {
   const { from, to, status, limit } = query as { from?: string; to?: string; status?: string; limit?: string };
@@ -908,13 +917,17 @@ export async function bookingRoutes(fastify: FastifyInstance) {
         startsAt: b.startsAt.toISOString(),
         endsAt: b.endsAt.toISOString(),
         title: b.title,
+        grund: b.grund,
         createdAt: b.createdAt.toISOString(),
         updatedAt: b.updatedAt.toISOString(),
       })),
     };
   });
 
-  // POST /therapist/blocked-times — Neue Blockzeit anlegen
+  // POST /therapist/blocked-times — Neue Blockzeit oder Abwesenheit anlegen.
+  // grund gesetzt = Abwesenheit (Urlaub/Fortbildung/Krankheit/Sonstiges), sonst
+  // Ad-hoc-Blockzeit. Beide teilen sich Speicherung, Slot-Ausschluss und die
+  // Buchungs-Konfliktprüfung — siehe TherapistBlockedTime in schema.prisma.
   fastify.post('/therapist/blocked-times', async (request, reply) => {
     const token = request.headers.authorization?.replace('Bearer ', '');
     if (!token) return reply.status(401).send({ error: 'Unauthorized' });
@@ -925,6 +938,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
       startsAt: z.string().datetime(),
       endsAt: z.string().datetime(),
       title: z.string().trim().min(1).max(100).optional(),
+      grund: z.enum(['URLAUB', 'FORTBILDUNG', 'KRANKHEIT', 'SONSTIGES']).optional(),
     }).refine((d) => new Date(d.endsAt) > new Date(d.startsAt), {
       message: 'endsAt must be after startsAt',
     });
@@ -932,13 +946,25 @@ export async function bookingRoutes(fastify: FastifyInstance) {
     const parsed = schema.safeParse(request.body);
     if (!parsed.success) return reply.status(400).send({ error: 'Invalid request', details: parsed.error.flatten() });
 
+    const startsAt = new Date(parsed.data.startsAt);
+    const endsAt = new Date(parsed.data.endsAt);
+    const defaultTitle = parsed.data.grund ? ABSENCE_GRUND_LABELS[parsed.data.grund] : 'Blockiert';
+
     const blocked = await fastify.prisma.therapistBlockedTime.create({
       data: {
         therapistId: therapist.id,
-        startsAt: new Date(parsed.data.startsAt),
-        endsAt: new Date(parsed.data.endsAt),
-        title: parsed.data.title ?? 'Blockiert',
+        startsAt,
+        endsAt,
+        title: parsed.data.title ?? defaultTitle,
+        grund: parsed.data.grund ?? null,
       },
+    });
+
+    // Informativ (nicht blockierend): bereits bestätigte Termine im gewählten
+    // Zeitraum, damit der Therapeut betroffene Patient:innen benachrichtigen kann.
+    const conflicts = await fastify.prisma.scheduledSlot.findMany({
+      where: { therapistId: therapist.id, startsAt: { gte: startsAt, lte: endsAt }, status: 'SCHEDULED' },
+      select: { id: true, startsAt: true, patientName: true },
     });
 
     return reply.status(201).send({
@@ -946,8 +972,10 @@ export async function bookingRoutes(fastify: FastifyInstance) {
       startsAt: blocked.startsAt.toISOString(),
       endsAt: blocked.endsAt.toISOString(),
       title: blocked.title,
+      grund: blocked.grund,
       createdAt: blocked.createdAt.toISOString(),
       updatedAt: blocked.updatedAt.toISOString(),
+      conflicts: conflicts.map((s) => ({ ...s, startsAt: s.startsAt.toISOString() })),
     });
   });
 
