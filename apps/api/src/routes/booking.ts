@@ -434,8 +434,9 @@ export async function bookingRoutes(fastify: FastifyInstance) {
               patientName,
               patientPhone: (patient as any).phone ?? null,
               status: 'SCHEDULED',
+              autoConfirmed: true,
             },
-            update: { startsAt, endsAt, status: 'SCHEDULED' },
+            update: { startsAt, endsAt, status: 'SCHEDULED', autoConfirmed: true },
           }),
         ]);
         finalStatus = 'CONFIRMED';
@@ -570,6 +571,41 @@ export async function bookingRoutes(fastify: FastifyInstance) {
     );
 
     return reply.send(merged);
+  });
+
+  // GET /bookings/auto-confirmed-unseen — automatisch bestätigte Termine, die
+  // der Therapeut im Anfragen-Tab noch nicht gesehen hat (Auto-Accept-Flow).
+  fastify.get('/bookings/auto-confirmed-unseen', async (request, reply) => {
+    const token = request.headers.authorization?.replace('Bearer ', '');
+    if (!token) return reply.status(401).send({ error: 'Unauthorized' });
+    const therapist = await resolveTherapist(fastify, token);
+    if (!therapist) return reply.status(403).send({ error: 'Only therapists can view this' });
+
+    const slots = await fastify.prisma.scheduledSlot.findMany({
+      where: { therapistId: therapist.id, autoConfirmed: true, seenByTherapistAt: null },
+      orderBy: { startsAt: 'asc' },
+    });
+
+    return reply.send(slots);
+  });
+
+  // POST /bookings/auto-confirmed-unseen/mark-seen — markiert alle aktuell
+  // ungesehenen auto-bestätigten Termine des Therapeuten als gesehen. Wird
+  // beim Öffnen/Aufklappen des entsprechenden Abschnitts im Anfragen-Tab
+  // aufgerufen, danach verschwinden die Einträge dauerhaft aus der Liste.
+  fastify.post('/bookings/auto-confirmed-unseen/mark-seen', async (request, reply) => {
+    const token = request.headers.authorization?.replace('Bearer ', '');
+    if (!token) return reply.status(401).send({ error: 'Unauthorized' });
+    const therapist = await resolveTherapist(fastify, token);
+    if (!therapist) return reply.status(403).send({ error: 'Only therapists can do this' });
+
+    const now = new Date();
+    const result = await fastify.prisma.scheduledSlot.updateMany({
+      where: { therapistId: therapist.id, autoConfirmed: true, seenByTherapistAt: null },
+      data: { seenByTherapistAt: now },
+    });
+
+    return reply.send({ markedCount: result.count });
   });
 
   // PATCH /bookings/:id/respond — Therapeut bestätigt oder lehnt ab

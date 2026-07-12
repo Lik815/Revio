@@ -549,12 +549,18 @@ model ScheduledSlot {
   status           ScheduledSlotStatus @default(SCHEDULED)
   // Therapeuten-interne Kurz-Notiz (max. 200 Zeichen, nicht für Patienten sichtbar)
   notiz            String?
+  // Auto-Accept-Tracking: true wenn dieser Slot ohne manuelle Bestätigung
+  // durch den Therapeuten entstanden ist (autoAcceptEnabled). Steuert die
+  // "Neu automatisch bestätigt"-Anzeige im Anfragen-Tab und die Mitteilung.
+  autoConfirmed        Boolean   @default(false)
+  seenByTherapistAt    DateTime?
   createdAt        DateTime            @default(now())
   updatedAt        DateTime            @updatedAt
 
   @@index([therapistId, startsAt, status])
   @@index([bookingRequestId])
   @@index([inquiryId])
+  @@index([therapistId, autoConfirmed, seenByTherapistAt])
 }
 
 // ─── Phase 2: Nachfrageseite + State Machine ──────────────────────────────────

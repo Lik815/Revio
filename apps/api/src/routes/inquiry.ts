@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { sendPushNotification } from '../utils/push.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -271,6 +272,7 @@ export async function inquiryRoutes(fastify: FastifyInstance) {
                 patientName: inq.patientName,
                 patientPhone: inq.patientPhone ?? undefined,
                 status: 'SCHEDULED',
+                autoConfirmed: true,
               },
             });
             await tx.inquirySlot.update({ where: { id: slot.id }, data: { status: 'CONFIRMED' } });
@@ -282,6 +284,16 @@ export async function inquiryRoutes(fastify: FastifyInstance) {
             data: { status: 'AUTO_CLOSED' },
           });
         });
+
+        if ((therapistSettings as any)?.expoPushToken) {
+          const count = confirmedSlots.length;
+          sendPushNotification(
+            (therapistSettings as any).expoPushToken,
+            'Termine automatisch bestätigt',
+            `${inq.patientName} · ${count} ${count === 1 ? 'Termin wurde' : 'Termine wurden'} automatisch bestätigt.`,
+            { inquiryId: inq.id, screen: 'anfragen' },
+          );
+        }
       }
     }
 
@@ -290,7 +302,7 @@ export async function inquiryRoutes(fastify: FastifyInstance) {
       for (const inq of patientRequest.inquiries) {
         const therapistSettings = await fastify.prisma.therapist.findUnique({
           where: { id: inq.therapistId },
-          select: { autoAcceptEnabled: true, autoAcceptSingle: true } as any,
+          select: { autoAcceptEnabled: true, autoAcceptSingle: true, expoPushToken: true } as any,
         });
         if (!(therapistSettings as any)?.autoAcceptEnabled || !(therapistSettings as any)?.autoAcceptSingle) continue;
 
@@ -317,8 +329,9 @@ export async function inquiryRoutes(fastify: FastifyInstance) {
               patientName: inq.patientName,
               patientPhone: inq.patientPhone ?? undefined,
               status: 'SCHEDULED',
+              autoConfirmed: true,
             },
-            update: { startsAt, endsAt, status: 'SCHEDULED' },
+            update: { startsAt, endsAt, status: 'SCHEDULED', autoConfirmed: true },
           });
           await tx.inquiry.update({
             where: { id: inq.id },
@@ -335,6 +348,15 @@ export async function inquiryRoutes(fastify: FastifyInstance) {
             data: { status: 'AUTO_CLOSED' },
           });
         });
+
+        if ((therapistSettings as any)?.expoPushToken) {
+          sendPushNotification(
+            (therapistSettings as any).expoPushToken,
+            'Termin automatisch bestätigt',
+            `${inq.patientName} hat einen Termin am ${startsAt.toLocaleDateString('de-DE')} automatisch bestätigt bekommen.`,
+            { inquiryId: inq.id, screen: 'anfragen' },
+          );
+        }
       }
     }
 

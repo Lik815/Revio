@@ -15,6 +15,7 @@ export const notificationRoutes: FastifyPluginAsync = async (fastify) => {
       reviewStatus?: string;
       therapistId?: string;
       bookingId?: string;
+      inquiryId?: string;
       linkId?: string;
       practiceId?: string;
       actionLabel?: string;
@@ -97,6 +98,44 @@ export const notificationRoutes: FastifyPluginAsync = async (fastify) => {
           message: `Neue Buchungsanfrage von ${name} (${date}).`,
           createdAt: b.createdAt,
           bookingId: b.id,
+          actionLabel: 'Anfrage öffnen',
+        });
+      }
+
+      // Auto-Accept: automatisch bestätigte Termine der letzten 7 Tage.
+      // Serien-Termine (gemeinsame inquiryId) werden zu einer Mitteilung
+      // gebündelt, Einzeltermine (bookingRequestId) bleiben 1:1.
+      const recentAutoConfirmed = await fastify.prisma.scheduledSlot.findMany({
+        where: { therapistId: therapist.id, autoConfirmed: true, createdAt: { gte: sevenDaysAgo } },
+        orderBy: { createdAt: 'desc' },
+      });
+      const seriesGroups = new Map<string, typeof recentAutoConfirmed>();
+      for (const slot of recentAutoConfirmed) {
+        if (slot.inquiryId) {
+          const group = seriesGroups.get(slot.inquiryId) ?? [];
+          group.push(slot);
+          seriesGroups.set(slot.inquiryId, group);
+        } else {
+          const date = slot.createdAt.toLocaleDateString('de-DE');
+          notifications.push({
+            id: `auto-confirmed-${slot.id}`,
+            type: 'AUTO_CONFIRMED_APPOINTMENT',
+            message: `${slot.patientName} hat automatisch einen Termin am ${date} erhalten.`,
+            createdAt: slot.createdAt,
+            bookingId: slot.bookingRequestId ?? undefined,
+            actionLabel: 'Termin öffnen',
+          });
+        }
+      }
+      for (const [inquiryId, slots] of seriesGroups) {
+        const newest = slots[0];
+        const count = slots.length;
+        notifications.push({
+          id: `auto-confirmed-inquiry-${inquiryId}`,
+          type: 'AUTO_CONFIRMED_APPOINTMENT',
+          message: `${newest.patientName} · ${count} ${count === 1 ? 'Termin wurde' : 'Termine wurden'} automatisch bestätigt.`,
+          createdAt: newest.createdAt,
+          inquiryId,
           actionLabel: 'Anfrage öffnen',
         });
       }

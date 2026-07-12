@@ -3607,6 +3607,75 @@ describe('GET /notifications — routing metadata', () => {
     expect(notif.bookingId).toBe(booking.id);
   });
 
+  it('bündelt auto-bestätigte Serien-Termine zu einer Mitteilung, zeigt Einzeltermine separat', async () => {
+    const therapistToken = 'notif-auto-therapist-token';
+    const therapist = await prisma.therapist.create({
+      data: {
+        email: 'notif-auto@test.de', fullName: 'Auto Test', professionalTitle: 'PT',
+        city: 'Berlin', specializations: '', languages: 'de', certifications: '',
+        sessionToken: therapistToken, reviewStatus: 'APPROVED',
+      } as any,
+    });
+
+    const now = new Date();
+    const inquiryId = 'fake-inquiry-id-for-grouping-test';
+    // Zwei Serien-Slots derselben Inquiry
+    await prisma.scheduledSlot.create({
+      data: {
+        therapistId: therapist.id, inquiryId, startsAt: new Date(now.getTime() + 86400000),
+        endsAt: new Date(now.getTime() + 86400000 + 1200000), patientName: 'Serie Patient',
+        status: 'SCHEDULED', autoConfirmed: true,
+      },
+    });
+    await prisma.scheduledSlot.create({
+      data: {
+        therapistId: therapist.id, inquiryId, startsAt: new Date(now.getTime() + 2 * 86400000),
+        endsAt: new Date(now.getTime() + 2 * 86400000 + 1200000), patientName: 'Serie Patient',
+        status: 'SCHEDULED', autoConfirmed: true,
+      },
+    });
+    // Ein Einzeltermin-Slot (eigener Booking-Ursprung)
+    const singleSlot = await prisma.scheduledSlot.create({
+      data: {
+        therapistId: therapist.id, startsAt: new Date(now.getTime() + 3 * 86400000),
+        endsAt: new Date(now.getTime() + 3 * 86400000 + 1200000), patientName: 'Einzel Patient',
+        status: 'SCHEDULED', autoConfirmed: true,
+      },
+    });
+
+    const notifRes = await app.inject({
+      method: 'GET', url: '/notifications',
+      headers: { authorization: `Bearer ${therapistToken}` },
+    });
+    const autoNotifs = notifRes.json().notifications.filter((n: any) => n.type === 'AUTO_CONFIRMED_APPOINTMENT');
+    expect(autoNotifs).toHaveLength(2); // 1 gebündelt (Serie) + 1 einzeln
+    const seriesNotif = autoNotifs.find((n: any) => n.inquiryId === inquiryId);
+    expect(seriesNotif.message).toContain('2 Termine');
+    const singleNotif = autoNotifs.find((n: any) => n.id === `auto-confirmed-${singleSlot.id}`);
+    expect(singleNotif).toBeDefined();
+
+    // Unseen-Liste enthält alle 3 Slots
+    const unseenRes = await app.inject({
+      method: 'GET', url: '/bookings/auto-confirmed-unseen',
+      headers: { authorization: `Bearer ${therapistToken}` },
+    });
+    expect(unseenRes.json()).toHaveLength(3);
+
+    // Als gesehen markieren
+    const markRes = await app.inject({
+      method: 'POST', url: '/bookings/auto-confirmed-unseen/mark-seen',
+      headers: { authorization: `Bearer ${therapistToken}` },
+    });
+    expect(markRes.json().markedCount).toBe(3);
+
+    // Danach leer
+    const afterRes = await app.inject({
+      method: 'GET', url: '/bookings/auto-confirmed-unseen',
+      headers: { authorization: `Bearer ${therapistToken}` },
+    });
+    expect(afterRes.json()).toHaveLength(0);
+  });
+
 });
 
 describe('Session token expiry', () => {

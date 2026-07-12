@@ -18,6 +18,43 @@ import { useTherapistCalendarView } from '../../hooks/use-therapist-calendar-vie
 import { useTherapistScheduleData } from '../../hooks/use-therapist-schedule-data';
 import { useTherapistServices } from '../../hooks/use-therapist-services';
 
+function formatAutoConfirmedDate(iso) {
+  const d = new Date(iso);
+  return d.toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short' });
+}
+
+function formatAutoConfirmedTime(startIso, endIso) {
+  const opts = { hour: '2-digit', minute: '2-digit' };
+  const start = new Date(startIso).toLocaleTimeString('de-DE', opts);
+  const end = new Date(endIso).toLocaleTimeString('de-DE', opts);
+  return `${start}–${end}`;
+}
+
+function AutoConfirmedCard({ slot, c }) {
+  return (
+    <View
+      style={{
+        flexDirection: 'row', alignItems: 'center', gap: 10,
+        padding: 12, borderRadius: RADIUS.sm, borderWidth: 1,
+        borderColor: c.border, backgroundColor: c.card,
+      }}
+    >
+      <View style={{ width: 34, height: 34, borderRadius: RADIUS.sm, backgroundColor: c.primaryBg ?? '#DBEAFE', alignItems: 'center', justifyContent: 'center' }}>
+        <Ionicons name="flash" size={16} color={c.primary} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={{ fontSize: 14, fontWeight: '600', color: c.text }}>{slot.patientName}</Text>
+        <Text style={{ fontSize: 12, color: c.muted, marginTop: 1 }}>
+          {formatAutoConfirmedDate(slot.startsAt)} · {formatAutoConfirmedTime(slot.startsAt, slot.endsAt)}
+        </Text>
+      </View>
+      <View style={{ backgroundColor: c.successBg ?? '#D1FAE5', borderRadius: RADIUS.full, paddingVertical: 3, paddingHorizontal: 8 }}>
+        <Text style={{ fontSize: 10, fontWeight: '700', color: c.success ?? '#10B981' }}>AUTO BESTÄTIGT</Text>
+      </View>
+    </View>
+  );
+}
+
 export function TherapyTabTherapist({
   authToken,
   incomingBookings, incomingBookingsLoading,
@@ -74,6 +111,33 @@ export function TherapyTabTherapist({
       });
     } catch (_) {}
   }, [authToken]);
+
+  // Automatisch bestätigte Termine, die der Therapeut noch nicht gesehen hat.
+  // Werden beim Öffnen des Anfragen-Tabs geladen, für den Rest dieses Besuchs
+  // angezeigt und sofort serverseitig als gesehen markiert — beim nächsten
+  // Öffnen sind sie dann weg ("einmal gesehen, verschwinden sie").
+  const [autoConfirmedUnseen, setAutoConfirmedUnseen] = useState([]);
+
+  useEffect(() => {
+    if (therapistTab !== 'anfragen' || !authToken) return;
+    let cancelled = false;
+    fetch(`${getBaseUrl()}/bookings/auto-confirmed-unseen`, {
+      headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
+    })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((slots) => {
+        if (cancelled) return;
+        setAutoConfirmedUnseen(Array.isArray(slots) ? slots : []);
+        if (Array.isArray(slots) && slots.length > 0) {
+          fetch(`${getBaseUrl()}/bookings/auto-confirmed-unseen/mark-seen`, {
+            method: 'POST',
+            headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
+          }).catch(() => {});
+        }
+      })
+      .catch(() => { if (!cancelled) setAutoConfirmedUnseen([]); });
+    return () => { cancelled = true; };
+  }, [therapistTab, authToken]);
 
   const activation = useBookingActivation({ onActivateBookingRequests });
   const calendarView = useTherapistCalendarView();
@@ -345,6 +409,17 @@ export function TherapyTabTherapist({
                   </View>
                 )}
               </View>
+
+              {autoConfirmedUnseen.length > 0 && (
+                <View style={{ gap: 8 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: c.muted, textTransform: 'uppercase', letterSpacing: 0.4 }}>
+                    Neu automatisch bestätigt
+                  </Text>
+                  {autoConfirmedUnseen.map((slot) => (
+                    <AutoConfirmedCard key={slot.id} slot={slot} c={c} />
+                  ))}
+                </View>
+              )}
 
               {incomingInquiriesLoading && (!incomingInquiries || incomingInquiries.length === 0) ? (
                 <ActivityIndicator color={c.primary} style={{ marginTop: 40 }} />
