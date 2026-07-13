@@ -1,13 +1,13 @@
-// Wochenbasierter Slot-Picker mit Kalender-Strip (← Woche →) und
-// aufklappbaren Tageskarten. Genutzt vom InquiryRequestForm für Einzeltermin
+// Wochenbasierter Slot-Picker: Wochen-Navigation (← Woche →) und aufklappbare
+// Tageskarten. Genutzt vom InquiryRequestForm für Einzeltermin
 // (Single-Select mit Auto-Weiter) und Serie (Multi-Select bis maxSelect).
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { getBaseUrl, RADIUS, TUNNEL_HEADERS } from '../../../utils/app-utils';
 import {
-  addWeeks, dateGroupKey, formatWeekRange, getThisWeekMonday, getWeekDays,
-  getWeekEnd, groupSlotsByDate, WEEK_DAY_LABELS, weekKey,
+  addWeeks, dateGroupKey, formatWeekRange, getThisWeekMonday,
+  getWeekEnd, groupSlotsByDate, weekKey,
 } from './booking-form-utils';
 import { SlotDayGroup } from './BookingFormShared';
 
@@ -49,10 +49,7 @@ export function SlotPicker({ therapistId, heilmittel, selectedSlot, selectedTerm
 
   const byDate = useMemo(() => groupSlotsByDate(currentSlots), [currentSlots]);
 
-  const today = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; }, []);
-  const todayKey = today.toISOString().slice(0, 10);
   const isFirstWeek = currentKey === weekKey(todayMonday);
-  const weekDays = getWeekDays(weekStart);
 
   const isSlotActive = (slot) => (multiSelect
     ? (selectedTermine ?? []).some((s) => s.startsAt === slot.startsAt)
@@ -63,10 +60,9 @@ export function SlotPicker({ therapistId, heilmittel, selectedSlot, selectedTerm
 
   return (
     <View style={{ gap: 8 }}>
-      {/* Wochen-Strip */}
-      <View style={{ borderRadius: RADIUS.md, borderWidth: 1, borderColor: c.border, backgroundColor: c.card, paddingVertical: 12, paddingHorizontal: 4 }}>
-        {/* Header: ← Woche → */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 6, marginBottom: 10 }}>
+      {/* Wochen-Navigation: ← Woche → */}
+      <View style={{ borderRadius: RADIUS.md, borderWidth: 1, borderColor: c.border, backgroundColor: c.card, paddingVertical: 8, paddingHorizontal: 4 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 6 }}>
           <Pressable
             onPress={() => { if (!isFirstWeek) setWeekStart(addWeeks(weekStart, -1)); }}
             disabled={isFirstWeek}
@@ -78,41 +74,6 @@ export function SlotPicker({ therapistId, heilmittel, selectedSlot, selectedTerm
           <Pressable onPress={() => setWeekStart(addWeeks(weekStart, 1))} style={{ padding: 6 }}>
             <Ionicons name="chevron-forward" size={18} color={c.text} />
           </Pressable>
-        </View>
-        {/* Tages-Zellen */}
-        <View style={{ flexDirection: 'row', justifyContent: 'space-around' }}>
-          {weekDays.map((day, idx) => {
-            const dk = day.toISOString().slice(0, 10);
-            const isPast = day < today;
-            const isToday = dk === todayKey;
-            const hasSlotsForDay = byDate.some((g) => g.dateKey === dk);
-            const hasSelection = multiSelect
-              ? (selectedTermine ?? []).some((s) => s.startsAt?.slice(0, 10) === dk)
-              : selectedSlot?.startsAt?.slice(0, 10) === dk;
-            return (
-              <Pressable
-                key={dk}
-                onPress={() => {
-                  if (isPast || !hasSlotsForDay) return;
-                  setExpandedDate(expandedDate === dk ? null : dk);
-                }}
-                style={{ alignItems: 'center', gap: 2, paddingVertical: 2, paddingHorizontal: 4, opacity: isPast ? 0.3 : 1 }}
-              >
-                <Text style={{ fontSize: 11, color: c.muted, fontWeight: '500' }}>{WEEK_DAY_LABELS[idx]}</Text>
-                <Text style={{
-                  fontSize: 14,
-                  fontWeight: hasSelection || isToday ? '800' : '400',
-                  color: hasSelection ? c.primary : isToday ? c.primary : hasSlotsForDay ? c.text : c.muted,
-                }}>
-                  {day.getDate()}
-                </Text>
-                <View style={{
-                  width: 5, height: 5, borderRadius: 3,
-                  backgroundColor: hasSelection ? c.primary : (isToday && hasSlotsForDay ? `${c.primary}60` : 'transparent'),
-                }} />
-              </Pressable>
-            );
-          })}
         </View>
       </View>
 

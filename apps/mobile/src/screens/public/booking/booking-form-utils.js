@@ -49,8 +49,6 @@ export function getDateRange(days = 14) {
 
 // ── Wochen-Navigation (SlotPicker) ──────────────────────────────────────────
 
-export const WEEK_DAY_LABELS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-
 export function getThisWeekMonday(date = new Date()) {
   const d = new Date(date);
   d.setHours(0, 0, 0, 0);
@@ -80,14 +78,6 @@ export function formatWeekRange(monday) {
   end.setDate(end.getDate() + 6);
   const opts = { day: 'numeric', month: 'short' };
   return `${monday.toLocaleDateString('de-DE', opts)} – ${end.toLocaleDateString('de-DE', opts)}`;
-}
-
-export function getWeekDays(monday) {
-  return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(monday);
-    d.setDate(d.getDate() + i);
-    return d;
-  });
 }
 
 // ── Formular-Daten ──────────────────────────────────────────────────────────
