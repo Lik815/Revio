@@ -33,7 +33,10 @@ export function InquiryRequestForm({ c, t, therapist, authToken, onSuccess, onCl
   const knownKassenart = loggedInPatient?.kassenart ?? null;
 
   const [step, setStep] = useState(1);
-  const [suchtyp, setSuchtyp] = useState('SERIE');
+  // Einzeltermin (Erstgespräch, ohne Rezept) als Standard, da das für die meisten
+  // neuen Patient:innen der naheliegendere Einstieg ist. Behandlungsserie bleibt
+  // als bewusst wählbare zweite Option sichtbar.
+  const [suchtyp, setSuchtyp] = useState('EINZELTERMIN');
   const [selectedKassenart, setSelectedKassenart] = useState(knownKassenart);
   const [selectedHeilmittel, setSelectedHeilmittel] = useState(null);
   const [selectedSlot, setSelectedSlot] = useState(null);    // Einzeltermin: ein Slot
