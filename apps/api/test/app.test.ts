@@ -3319,6 +3319,10 @@ describe('Dynamic Booking', () => {
     const slot = await prisma.scheduledSlot.create({
       data: {
         therapistId,
+        // Echte Inquiry-Slots haben immer inquiryId gesetzt (siehe inquiry.ts) —
+        // das ist genau das Kriterium, das /bookings/incoming zur Abgrenzung von
+        // Einzelbuchungs-Slots (bookingRequestId statt inquiryId) nutzt.
+        inquiryId: 'test-inquiry-id',
         startsAt,
         endsAt,
         heilmittel: 'MLD60',
@@ -3338,6 +3342,42 @@ describe('Dynamic Booking', () => {
     expect(found.patientName).toBe('Inquiry Testpatient');
 
     await prisma.scheduledSlot.delete({ where: { id: slot.id } });
+  });
+
+  it('GET /bookings/incoming — automatisch bestätigte Einzelbuchung erscheint nur einmal (nicht dupliziert über den intern erzeugten ScheduledSlot)', async () => {
+    await prisma.therapist.update({
+      where: { id: therapistId },
+      data: { autoAcceptEnabled: true, autoAcceptSingle: true },
+    });
+
+    const startsAt = futureStartsAt();
+    const bookRes = await app.inject({
+      method: 'POST', url: '/bookings',
+      headers: { authorization: `Bearer ${patientToken}`, 'content-type': 'application/json' },
+      payload: { therapistId, startsAt: startsAt.toISOString(), heilmittel: 'KG', consentAccepted: true },
+    });
+    expect(bookRes.statusCode).toBe(201);
+    expect(bookRes.json().status).toBe('CONFIRMED');
+    const bookingId = bookRes.json().id;
+
+    const incoming = await app.inject({
+      method: 'GET', url: '/bookings/incoming',
+      headers: { authorization: `Bearer ${therapistToken}` },
+    });
+    expect(incoming.statusCode).toBe(200);
+    // Weder als eigene BookingRequest-Zeile noch als zusätzlicher
+    // (fälschlich `_source: 'inquiry'`) ScheduledSlot-Duplikat darf der
+    // Termin doppelt auftauchen.
+    const matches = incoming.json().filter(
+      (b: { id: string }) => b.id === bookingId || b.id === `slot_${bookingId}`,
+    );
+    expect(matches).toHaveLength(1);
+    expect(matches[0].id).toBe(bookingId);
+
+    await prisma.therapist.update({
+      where: { id: therapistId },
+      data: { autoAcceptEnabled: false, autoAcceptSingle: false },
+    });
   });
 
   it('Expiry — abgelaufene PENDING-Buchung wird auf EXPIRED gesetzt', async () => {

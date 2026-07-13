@@ -568,8 +568,15 @@ export async function bookingRoutes(fastify: FastifyInstance) {
     // zur selben Ergänzung in GET /bookings/my. Ohne das sind über den
     // Serien-Flow bestätigte Termine im Therapeuten-Kalender unsichtbar,
     // obwohl der Patient sie in seiner eigenen Terminliste bereits sieht.
+    // WICHTIG: inquiryId muss gesetzt sein — sonst werden auch die
+    // ScheduledSlots aus dem Einzelbuchungs-Flow (POST /bookings Auto-Accept
+    // und PATCH /bookings/:id/respond CONFIRM, beide mit bookingRequestId
+    // statt inquiryId) hier zusätzlich geladen und erscheinen doppelt neben
+    // ihrer eigenen BookingRequest-Zeile aus `bookings` oben (führte im
+    // Kalender zu zwei sich überlappenden, halbbreiten Karten für denselben
+    // Termin statt einer normalen).
     const inquiryScheduledSlots = await fastify.prisma.scheduledSlot.findMany({
-      where: { therapistId: therapist.id },
+      where: { therapistId: therapist.id, inquiryId: { not: null } },
       orderBy: { startsAt: 'asc' },
     });
 
