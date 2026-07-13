@@ -1,9 +1,9 @@
 import React from 'react';
 import { Linking, Modal, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { RADIUS } from '../utils/app-utils';
+import { PUBLIC_WEB_URL, RADIUS } from '../utils/app-utils';
 
-const LEARN_MORE_URL = 'https://revio.app';
+const LEARN_MORE_URL = PUBLIC_WEB_URL;
 
 export function NewsAnnouncementModal({ visible, onClose, c }) {
   return (

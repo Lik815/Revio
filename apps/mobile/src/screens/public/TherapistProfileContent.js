@@ -75,7 +75,6 @@ export function TherapistProfileContent(props) {
   const thWithSlots = availableSlots !== undefined ? { ...th, availableSlots } : th;
   const insets = useSafeAreaInsets();
 
-  const [showLoginHint, setShowLoginHint] = useState(false);
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedSlotId, setSelectedSlotId] = useState(null);
@@ -315,13 +314,9 @@ export function TherapistProfileContent(props) {
                     style={[styles.ctaBtn, { backgroundColor: selectedSlotId ? c.primary : c.border, marginTop: 18, opacity: selectedSlotId ? 1 : 0.85 }]}
                     onPress={() => {
                       if (!selectedSlotId) return;
-                      if (authToken && accountType === 'patient') {
-                        setShowBookingModal(false);
-                        onBookingRequest({ ...th, selectedSlotId });
-                      } else {
-                        setShowBookingModal(false);
-                        setShowLoginHint(true);
-                      }
+                      // Guest-/Login-Prüfung passiert zentral in onBookingRequest (Parent).
+                      setShowBookingModal(false);
+                      onBookingRequest({ ...th, selectedSlotId });
                     }}
                     disabled={!selectedSlotId}
                   >
@@ -333,37 +328,6 @@ export function TherapistProfileContent(props) {
                   Aktuell keine freien Termine verfügbar. Kontaktiere den Therapeuten direkt.
                 </Text>
               )}
-            </Pressable>
-          </Pressable>
-        </Modal>
-
-        {/* ── Login-Hinweis Modal ─────────────────────────────────────────────── */}
-        <Modal visible={showLoginHint} transparent animationType="fade" onRequestClose={() => setShowLoginHint(false)}>
-          <Pressable
-            style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center', padding: 24 }}
-            onPress={() => setShowLoginHint(false)}
-          >
-            <Pressable onPress={() => {}} style={{ backgroundColor: c.card, borderRadius: 16, padding: 24, width: '100%', maxWidth: 360 }}>
-              <View style={{ alignItems: 'center', marginBottom: 16 }}>
-                <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: c.primaryBg, alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
-                  <Ionicons name="calendar-outline" size={26} color={c.primary} />
-                </View>
-                <Text style={{ fontSize: 17, fontWeight: '700', color: c.text, textAlign: 'center', marginBottom: 8 }}>
-                  Anmeldung erforderlich
-                </Text>
-                <Text style={{ fontSize: 14, color: c.muted, textAlign: 'center', lineHeight: 20 }}>
-                  Um einen Termin zu buchen, melde dich mit deinem Patienten-Konto an oder erstelle ein kostenloses Konto.
-                </Text>
-              </View>
-              <Pressable
-                onPress={() => { setShowLoginHint(false); onBookingRequest({ ...th, selectedSlotId }); }}
-                style={{ backgroundColor: c.primary, borderRadius: 10, paddingVertical: 13, alignItems: 'center', marginBottom: 10 }}
-              >
-                <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600' }}>Jetzt anmelden</Text>
-              </Pressable>
-              <Pressable onPress={() => setShowLoginHint(false)} style={{ paddingVertical: 10, alignItems: 'center' }}>
-                <Text style={{ color: c.muted, fontSize: 14 }}>Abbrechen</Text>
-              </Pressable>
             </Pressable>
           </Pressable>
         </Modal>

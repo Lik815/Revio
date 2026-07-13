@@ -500,6 +500,7 @@ export {
   formatDist,
   formatMissingProfileFields,
   getBaseUrl,
+  PUBLIC_WEB_URL,
   getPublicPracticeUrl,
   getPublicTherapistUrl,
   TUNNEL_HEADERS,

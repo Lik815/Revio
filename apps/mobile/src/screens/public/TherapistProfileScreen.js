@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Linking, Modal, View } from 'react-native';
+import { Linking, Modal, Pressable, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { appStoreSelectors, useAppStore } from '../../store/useStore';
 import { useTheme } from '../../hooks/use-theme';
@@ -29,6 +30,7 @@ export function TherapistProfileScreen() {
 
   const [therapist, setTherapist] = useState(initialTherapist);
   const [showBookingForm, setShowBookingForm] = useState(false);
+  const [showLoginRequired, setShowLoginRequired] = useState(false);
 
   const { favorites, loadFavorites, toggleFavorite, isFavorite } = useFavorites({
     authToken,
@@ -55,10 +57,16 @@ export function TherapistProfileScreen() {
 
   const handleBookingRequest = (th) => {
     if (!authToken) {
-      navigation.navigate(ROOT_ROUTES.MAIN_TABS, { screen: TAB_ROUTES.AUTH });
+      // Nicht eingeloggt: erst Hinweis-Modal statt direktem Sprung zum Login.
+      setShowLoginRequired(true);
       return;
     }
     if (th) setShowBookingForm(true);
+  };
+
+  const goToLogin = () => {
+    setShowLoginRequired(false);
+    navigation.navigate(ROOT_ROUTES.MAIN_TABS, { screen: TAB_ROUTES.AUTH });
   };
 
   const callPhone = (phone) => {
@@ -102,6 +110,37 @@ export function TherapistProfileScreen() {
           }}
           onClose={() => setShowBookingForm(false)}
         />
+      </Modal>
+
+      {/* ── Login-Hinweis bei Buchung ohne Anmeldung ────────────────────────── */}
+      <Modal visible={showLoginRequired} transparent animationType="fade" onRequestClose={() => setShowLoginRequired(false)}>
+        <Pressable
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center', padding: 24 }}
+          onPress={() => setShowLoginRequired(false)}
+        >
+          <Pressable onPress={() => {}} style={{ backgroundColor: c.card, borderRadius: 16, padding: 24, width: '100%', maxWidth: 360 }}>
+            <View style={{ alignItems: 'center', marginBottom: 16 }}>
+              <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: c.primaryBg, alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+                <Ionicons name="calendar-outline" size={26} color={c.primary} />
+              </View>
+              <Text style={{ fontSize: 17, fontWeight: '700', color: c.text, textAlign: 'center', marginBottom: 8 }}>
+                Anmeldung erforderlich
+              </Text>
+              <Text style={{ fontSize: 14, color: c.muted, textAlign: 'center', lineHeight: 20 }}>
+                Um einen Termin zu buchen, melde dich mit deinem Patienten-Konto an oder erstelle ein kostenloses Konto.
+              </Text>
+            </View>
+            <Pressable
+              onPress={goToLogin}
+              style={{ backgroundColor: c.primary, borderRadius: 10, paddingVertical: 13, alignItems: 'center', marginBottom: 10 }}
+            >
+              <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600' }}>Jetzt anmelden</Text>
+            </Pressable>
+            <Pressable onPress={() => setShowLoginRequired(false)} style={{ paddingVertical: 10, alignItems: 'center' }}>
+              <Text style={{ color: c.muted, fontSize: 14 }}>Abbrechen</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
       </Modal>
 
       <ToastOverlay message={toastMsg} anim={toastAnim} c={c} />
