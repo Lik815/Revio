@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Modal, Pressable, TextInput, View, Text } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, TextInput, View, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 export function TherapistCancelModal({ visible, onClose, onConfirm, booking, c }) {
@@ -13,6 +13,7 @@ export function TherapistCancelModal({ visible, onClose, onConfirm, booking, c }
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', padding: 24 }} onPress={onClose}>
         <Pressable onPress={(e) => e.stopPropagation()}>
           <View style={{ backgroundColor: c.card, borderRadius: 20, padding: 24, gap: 20 }}>
@@ -67,6 +68,7 @@ export function TherapistCancelModal({ visible, onClose, onConfirm, booking, c }
           </View>
         </Pressable>
       </Pressable>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
