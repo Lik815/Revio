@@ -3623,11 +3623,12 @@ describe('Therapist Patients', () => {
   });
 });
 
-// ─── Notification Routing Metadata ───────────────────────────────────────────
+// ─── Notification model (server-persisted, Stufe 4) ───────────────────────────
 
-describe('GET /notifications — routing metadata', () => {
-  it('includes bookingId and actionLabel for NEW_BOOKING_REQUEST', async () => {
+describe('GET /notifications — liest aus dem Notification-Modell', () => {
+  it('liefert nur Mitteilungen des angefragten Therapeuten, mit read-Flag und Metadaten', async () => {
     const therapistToken = 'notif-route-therapist-token';
+    const other = 'notif-route-other-token';
     const user = await prisma.user.create({
       data: { email: 'notif-route@test.de', passwordHash: 'h', role: 'therapist', sessionToken: therapistToken },
     });
@@ -3638,11 +3639,22 @@ describe('GET /notifications — routing metadata', () => {
         sessionToken: therapistToken, reviewStatus: 'APPROVED', userId: user.id,
       } as any,
     });
-    const booking = await prisma.bookingRequest.create({
+    const otherTherapist = await prisma.therapist.create({
       data: {
-        therapistId: therapist.id, patientName: 'Max M.', status: 'PENDING',
-        message: 'Hi', consentAcceptedAt: new Date(), responseDueAt: new Date(Date.now() + 86400000),
+        email: 'notif-route-other@test.de', fullName: 'Other', professionalTitle: 'PT',
+        city: 'Berlin', specializations: '', languages: 'de', certifications: '',
+        sessionToken: other, reviewStatus: 'APPROVED',
+      } as any,
+    });
+
+    const mine = await prisma.notification.create({
+      data: {
+        therapistId: therapist.id, type: 'NEW_BOOKING_REQUEST',
+        message: 'Neue Buchungsanfrage von Max M.', bookingId: 'booking-1', actionLabel: 'Anfrage öffnen',
       },
+    });
+    await prisma.notification.create({
+      data: { therapistId: otherTherapist.id, type: 'NEW_BOOKING_REQUEST', message: 'Nicht meine' },
     });
 
     const res = await app.inject({
@@ -3650,113 +3662,181 @@ describe('GET /notifications — routing metadata', () => {
       headers: { authorization: `Bearer ${therapistToken}` },
     });
     expect(res.statusCode).toBe(200);
-    const notif = res.json().notifications.find((n: any) => n.type === 'NEW_BOOKING_REQUEST');
-    expect(notif).toBeDefined();
-    expect(notif.bookingId).toBe(booking.id);
-    expect(notif.actionLabel).toBeDefined();
-    expect(typeof notif.actionLabel).toBe('string');
+    const notifs = res.json().notifications;
+    expect(notifs).toHaveLength(1);
+    expect(notifs[0].id).toBe(mine.id);
+    expect(notifs[0].bookingId).toBe('booking-1');
+    expect(notifs[0].actionLabel).toBe('Anfrage öffnen');
+    expect(notifs[0].read).toBe(false);
   });
 
-  it('includes bookingId for patient BOOKING_CONFIRMED notification', async () => {
-    const patientToken = 'notif-patient-token';
-    const patientUser = await prisma.user.create({
-      data: { email: 'notif-patient@test.de', passwordHash: 'h', role: 'patient', sessionToken: patientToken },
-    });
+  it('blendet Mitteilungen außerhalb des Retention-Fensters aus', async () => {
+    const therapistToken = 'notif-retention-token';
     const therapist = await prisma.therapist.create({
       data: {
-        email: 'notif-therapist2@test.de', fullName: 'T2', professionalTitle: 'PT',
-        city: 'Berlin', specializations: '', languages: 'de', certifications: '',
-        sessionToken: 'notif-t2-token',
-      } as any,
-    });
-    const booking = await prisma.bookingRequest.create({
-      data: {
-        therapistId: therapist.id, patientUserId: patientUser.id, patientName: 'Anna',
-        status: 'CONFIRMED', message: 'Hi',
-        consentAcceptedAt: new Date(), responseDueAt: new Date(Date.now() + 86400000),
-        respondedAt: new Date(),
-      },
-    });
-
-    const res = await app.inject({
-      method: 'GET', url: '/notifications',
-      headers: { authorization: `Bearer ${patientToken}` },
-    });
-    expect(res.statusCode).toBe(200);
-    const notif = res.json().notifications.find((n: any) => n.type === 'BOOKING_CONFIRMED');
-    expect(notif).toBeDefined();
-    expect(notif.bookingId).toBe(booking.id);
-  });
-
-  it('bündelt auto-bestätigte Serien-Termine zu einer Mitteilung, zeigt Einzeltermine separat', async () => {
-    const therapistToken = 'notif-auto-therapist-token';
-    const therapist = await prisma.therapist.create({
-      data: {
-        email: 'notif-auto@test.de', fullName: 'Auto Test', professionalTitle: 'PT',
+        email: 'notif-retention@test.de', fullName: 'Retention Test', professionalTitle: 'PT',
         city: 'Berlin', specializations: '', languages: 'de', certifications: '',
         sessionToken: therapistToken, reviewStatus: 'APPROVED',
       } as any,
     });
+    await prisma.notification.create({
+      data: {
+        therapistId: therapist.id, type: 'NEW_BOOKING_REQUEST', message: 'Alt',
+        createdAt: new Date(Date.now() - 40 * 24 * 60 * 60 * 1000),
+      },
+    });
+    const recent = await prisma.notification.create({
+      data: { therapistId: therapist.id, type: 'NEW_BOOKING_REQUEST', message: 'Neu' },
+    });
 
-    const now = new Date();
-    const inquiryId = 'fake-inquiry-id-for-grouping-test';
-    // Zwei Serien-Slots derselben Inquiry
-    await prisma.scheduledSlot.create({
-      data: {
-        therapistId: therapist.id, inquiryId, startsAt: new Date(now.getTime() + 86400000),
-        endsAt: new Date(now.getTime() + 86400000 + 1200000), patientName: 'Serie Patient',
-        status: 'SCHEDULED', autoConfirmed: true,
-      },
+    const res = await app.inject({
+      method: 'GET', url: '/notifications',
+      headers: { authorization: `Bearer ${therapistToken}` },
     });
-    await prisma.scheduledSlot.create({
-      data: {
-        therapistId: therapist.id, inquiryId, startsAt: new Date(now.getTime() + 2 * 86400000),
-        endsAt: new Date(now.getTime() + 2 * 86400000 + 1200000), patientName: 'Serie Patient',
-        status: 'SCHEDULED', autoConfirmed: true,
-      },
+    const notifs = res.json().notifications;
+    expect(notifs).toHaveLength(1);
+    expect(notifs[0].id).toBe(recent.id);
+  });
+
+  it('PATCH /notifications/:id/read markiert eine einzelne Mitteilung als gelesen', async () => {
+    const patientToken = 'notif-read-patient-token';
+    const patientUser = await prisma.user.create({
+      data: { email: 'notif-read@test.de', passwordHash: 'h', role: 'patient', sessionToken: patientToken },
     });
-    // Ein Einzeltermin-Slot (eigener Booking-Ursprung)
-    const singleSlot = await prisma.scheduledSlot.create({
-      data: {
-        therapistId: therapist.id, startsAt: new Date(now.getTime() + 3 * 86400000),
-        endsAt: new Date(now.getTime() + 3 * 86400000 + 1200000), patientName: 'Einzel Patient',
-        status: 'SCHEDULED', autoConfirmed: true,
-      },
+    const n1 = await prisma.notification.create({
+      data: { userId: patientUser.id, type: 'BOOKING_CONFIRMED', message: 'Termin bestätigt' },
     });
+    const n2 = await prisma.notification.create({
+      data: { userId: patientUser.id, type: 'BOOKING_DECLINED', message: 'Termin abgelehnt' },
+    });
+
+    const readRes = await app.inject({
+      method: 'PATCH', url: `/notifications/${n1.id}/read`,
+      headers: { authorization: `Bearer ${patientToken}` },
+    });
+    expect(readRes.statusCode).toBe(200);
+    expect(readRes.json().updated).toBe(1);
+
+    const listRes = await app.inject({
+      method: 'GET', url: '/notifications',
+      headers: { authorization: `Bearer ${patientToken}` },
+    });
+    const notifs = listRes.json().notifications;
+    expect(notifs.find((n: any) => n.id === n1.id).read).toBe(true);
+    expect(notifs.find((n: any) => n.id === n2.id).read).toBe(false);
+  });
+
+  it('PATCH /notifications/read-all markiert alle eigenen Mitteilungen als gelesen', async () => {
+    const therapistToken = 'notif-readall-token';
+    const therapist = await prisma.therapist.create({
+      data: {
+        email: 'notif-readall@test.de', fullName: 'ReadAll Test', professionalTitle: 'PT',
+        city: 'Berlin', specializations: '', languages: 'de', certifications: '',
+        sessionToken: therapistToken, reviewStatus: 'APPROVED',
+      } as any,
+    });
+    await prisma.notification.createMany({
+      data: [
+        { therapistId: therapist.id, type: 'NEW_BOOKING_REQUEST', message: 'A' },
+        { therapistId: therapist.id, type: 'NEW_BOOKING_REQUEST', message: 'B' },
+      ],
+    });
+
+    const res = await app.inject({
+      method: 'PATCH', url: '/notifications/read-all',
+      headers: { authorization: `Bearer ${therapistToken}` },
+    });
+    expect(res.json().updated).toBe(2);
+
+    const listRes = await app.inject({
+      method: 'GET', url: '/notifications',
+      headers: { authorization: `Bearer ${therapistToken}` },
+    });
+    expect(listRes.json().notifications.every((n: any) => n.read)).toBe(true);
+  });
+});
+
+describe('Notification-Schreibpfade — echte Route-Aufrufe erzeugen persistente Mitteilungen', () => {
+  it('POST /bookings + respond erzeugen NEW_BOOKING_REQUEST und BOOKING_CONFIRMED', async () => {
+    const therapistToken = 'notif-write-therapist-token';
+    const patientToken = 'notif-write-patient-token';
+    const therapist = await prisma.therapist.create({
+      data: {
+        email: 'notif-write-therapist@test.de', fullName: 'Write Test', professionalTitle: 'PT',
+        city: 'Berlin', specializations: '', languages: 'de', certifications: '', heilmittel: 'KG',
+        reviewStatus: 'APPROVED', isVisible: true, bookingMode: 'FIRST_APPOINTMENT_REQUEST',
+        sessionToken: therapistToken, qualifikationenStatus: 'VERIFIZIERT',
+      } as any,
+    });
+    await prisma.therapistWorkingHoursRule.createMany({
+      data: Array.from({ length: 7 }, (_, weekday) => ({
+        therapistId: therapist.id, weekday, startMinute: 0, endMinute: 23 * 60 + 59,
+      })),
+    });
+    await prisma.user.create({
+      data: { email: 'notif-write-patient@test.de', passwordHash: 'h', role: 'patient', sessionToken: patientToken },
+    });
+
+    const startsAt = new Date(Date.now() + 48 * 60 * 60 * 1000);
+    startsAt.setMinutes(0, 0, 0);
+
+    const bookRes = await app.inject({
+      method: 'POST', url: '/bookings',
+      headers: { authorization: `Bearer ${patientToken}`, 'content-type': 'application/json' },
+      payload: { therapistId: therapist.id, startsAt: startsAt.toISOString(), heilmittel: 'KG', consentAccepted: true },
+    });
+    expect(bookRes.statusCode).toBe(201);
+    const bookingId = bookRes.json().id;
+
+    const therapistNotifs = await app.inject({
+      method: 'GET', url: '/notifications',
+      headers: { authorization: `Bearer ${therapistToken}` },
+    });
+    const newBookingNotif = therapistNotifs.json().notifications.find((n: any) => n.type === 'NEW_BOOKING_REQUEST');
+    expect(newBookingNotif).toBeDefined();
+    expect(newBookingNotif.bookingId).toBe(bookingId);
+    expect(newBookingNotif.read).toBe(false);
+
+    const respondRes = await app.inject({
+      method: 'PATCH', url: `/bookings/${bookingId}/respond`,
+      headers: { authorization: `Bearer ${therapistToken}`, 'content-type': 'application/json' },
+      payload: { action: 'CONFIRM' },
+    });
+    expect(respondRes.statusCode).toBe(200);
+
+    const patientNotifs = await app.inject({
+      method: 'GET', url: '/notifications',
+      headers: { authorization: `Bearer ${patientToken}` },
+    });
+    const confirmedNotif = patientNotifs.json().notifications.find((n: any) => n.type === 'BOOKING_CONFIRMED');
+    expect(confirmedNotif).toBeDefined();
+    expect(confirmedNotif.bookingId).toBe(bookingId);
+  });
+
+  it('POST /admin/therapists/:id/approve erzeugt PROFILE_APPROVED für den Therapeuten', async () => {
+    const therapistToken = 'notif-approve-token';
+    const therapist = await prisma.therapist.create({
+      data: {
+        email: 'notif-approve@test.de', fullName: 'Approve Test', professionalTitle: 'PT',
+        city: 'Berlin', specializations: '', languages: 'de', certifications: '',
+        reviewStatus: 'PENDING_REVIEW', sessionToken: therapistToken,
+      } as any,
+    });
+
+    const approveRes = await app.inject({
+      method: 'POST', url: `/admin/therapists/${therapist.id}/approve`,
+      headers: AUTH,
+    });
+    expect(approveRes.statusCode).toBe(200);
 
     const notifRes = await app.inject({
       method: 'GET', url: '/notifications',
       headers: { authorization: `Bearer ${therapistToken}` },
     });
-    const autoNotifs = notifRes.json().notifications.filter((n: any) => n.type === 'AUTO_CONFIRMED_APPOINTMENT');
-    expect(autoNotifs).toHaveLength(2); // 1 gebündelt (Serie) + 1 einzeln
-    const seriesNotif = autoNotifs.find((n: any) => n.inquiryId === inquiryId);
-    expect(seriesNotif.message).toContain('2 Termine');
-    const singleNotif = autoNotifs.find((n: any) => n.id === `auto-confirmed-${singleSlot.id}`);
-    expect(singleNotif).toBeDefined();
-
-    // Unseen-Liste enthält alle 3 Slots
-    const unseenRes = await app.inject({
-      method: 'GET', url: '/bookings/auto-confirmed-unseen',
-      headers: { authorization: `Bearer ${therapistToken}` },
-    });
-    expect(unseenRes.json()).toHaveLength(3);
-
-    // Als gesehen markieren
-    const markRes = await app.inject({
-      method: 'POST', url: '/bookings/auto-confirmed-unseen/mark-seen',
-      headers: { authorization: `Bearer ${therapistToken}` },
-    });
-    expect(markRes.json().markedCount).toBe(3);
-
-    // Danach leer
-    const afterRes = await app.inject({
-      method: 'GET', url: '/bookings/auto-confirmed-unseen',
-      headers: { authorization: `Bearer ${therapistToken}` },
-    });
-    expect(afterRes.json()).toHaveLength(0);
+    const approvedNotif = notifRes.json().notifications.find((n: any) => n.type === 'PROFILE_APPROVED');
+    expect(approvedNotif).toBeDefined();
+    expect(approvedNotif.reviewStatus).toBe('APPROVED');
   });
-
 });
 
 describe('Session token expiry', () => {

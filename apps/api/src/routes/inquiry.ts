@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { sendPushNotification } from '../utils/push.js';
+import { notify } from '../utils/notify.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -81,19 +82,40 @@ async function maybeFinalizeInquiry(
     },
   });
 
-  if (hasConfirmed) {
+  const inquiry = await tx.inquiry.findUnique({
+    where: { id: inquiryId },
+    include: { patientRequest: { select: { patientUserId: true } } },
+  });
+  if (inquiry) {
+    await tx.notification.create({
+      data: hasConfirmed
+        ? {
+            userId: inquiry.patientRequest.patientUserId,
+            type: 'INQUIRY_CONFIRMED',
+            message: `Deine Terminanfrage wurde bestätigt (${inquiry.anzahlTermine} Termine).`,
+            inquiryId,
+            actionLabel: 'Anfrage öffnen',
+          }
+        : {
+            userId: inquiry.patientRequest.patientUserId,
+            type: 'INQUIRY_DECLINED',
+            message: 'Deine Terminanfrage konnte leider nicht bestätigt werden.',
+            inquiryId,
+            actionLabel: 'Details öffnen',
+          },
+    });
+  }
+
+  if (hasConfirmed && inquiry) {
     // Parallel-Inquiries schließen
-    const inquiry = await tx.inquiry.findUnique({ where: { id: inquiryId }, select: { patientRequestId: true } });
-    if (inquiry) {
-      await tx.inquiry.updateMany({
-        where: {
-          patientRequestId: inquiry.patientRequestId,
-          id: { not: inquiryId },
-          status: { in: ['SENT', 'SEEN', 'COUNTER_PROPOSED'] },
-        },
-        data: { status: 'AUTO_CLOSED' },
-      });
-    }
+    await tx.inquiry.updateMany({
+      where: {
+        patientRequestId: inquiry.patientRequestId,
+        id: { not: inquiryId },
+        status: { in: ['SENT', 'SEEN', 'COUNTER_PROPOSED'] },
+      },
+      data: { status: 'AUTO_CLOSED' },
+    });
   }
 }
 
@@ -285,8 +307,8 @@ export async function inquiryRoutes(fastify: FastifyInstance) {
           });
         });
 
+        const count = confirmedSlots.length;
         if ((therapistSettings as any)?.expoPushToken) {
-          const count = confirmedSlots.length;
           sendPushNotification(
             (therapistSettings as any).expoPushToken,
             'Termine automatisch bestätigt',
@@ -294,6 +316,13 @@ export async function inquiryRoutes(fastify: FastifyInstance) {
             { inquiryId: inq.id, screen: 'anfragen' },
           );
         }
+        await notify(fastify.prisma, {
+          therapistId: inq.therapistId,
+          type: 'AUTO_CONFIRMED_APPOINTMENT',
+          message: `${inq.patientName} · ${count} ${count === 1 ? 'Termin wurde' : 'Termine wurden'} automatisch bestätigt.`,
+          inquiryId: inq.id,
+          actionLabel: 'Anfrage öffnen',
+        });
       }
     }
 
@@ -357,6 +386,13 @@ export async function inquiryRoutes(fastify: FastifyInstance) {
             { inquiryId: inq.id, screen: 'anfragen' },
           );
         }
+        await notify(fastify.prisma, {
+          therapistId: inq.therapistId,
+          type: 'AUTO_CONFIRMED_APPOINTMENT',
+          message: `${inq.patientName} hat einen Termin am ${startsAt.toLocaleDateString('de-DE')} automatisch bestätigt bekommen.`,
+          inquiryId: inq.id,
+          actionLabel: 'Anfrage öffnen',
+        });
       }
     }
 
@@ -370,6 +406,20 @@ export async function inquiryRoutes(fastify: FastifyInstance) {
       ...i,
       status: statusById.get(i.id) ?? i.status,
     }));
+
+    // Mitteilung für den Therapeuten nur, wenn die Anfrage nicht bereits durch
+    // Auto-Accept oben bestätigt wurde — sonst gab es schon eine
+    // AUTO_CONFIRMED_APPOINTMENT-Mitteilung für dasselbe Ereignis.
+    for (const inq of patientRequest.inquiries) {
+      if (statusById.get(inq.id) === 'CONFIRMED') continue;
+      await notify(fastify.prisma, {
+        therapistId: (inq as any).therapistId,
+        type: 'NEW_INQUIRY',
+        message: `Neue Serien-Anfrage von ${patientName} (${anzahlTermine} Termine).`,
+        inquiryId: inq.id,
+        actionLabel: 'Anfrage öffnen',
+      });
+    }
 
     return reply.status(201).send({ ...patientRequest, inquiries: responseInquiries });
   });
@@ -532,6 +582,14 @@ export async function inquiryRoutes(fastify: FastifyInstance) {
       data: { status: 'AUTO_CLOSED' },
     });
 
+    await notify(fastify.prisma, {
+      userId: inquiry.patientRequest.patientUserId,
+      type: 'INQUIRY_CONFIRMED',
+      message: `Deine Terminanfrage wurde bestätigt (${inquiry.anzahlTermine} Termine).`,
+      inquiryId: id,
+      actionLabel: 'Anfrage öffnen',
+    });
+
     return reply.send({
       ...updatedInquiry,
       confirmedZeitDisplay: `${formatUhrzeit(parsed.data.uhrzeitVon)}–${formatUhrzeit(parsed.data.uhrzeitBis)}`,
@@ -548,7 +606,10 @@ export async function inquiryRoutes(fastify: FastifyInstance) {
     const { id } = request.params as { id: string };
     const inquiry = await fastify.prisma.inquiry.findUnique({
       where: { id },
-      include: { inquirySlots: { where: { status: 'PENDING' }, orderBy: { datum: 'asc' } } },
+      include: {
+        inquirySlots: { where: { status: 'PENDING' }, orderBy: { datum: 'asc' } },
+        patientRequest: true,
+      },
     });
     if (!inquiry || inquiry.therapistId !== therapist.id) return reply.status(404).send({ error: 'Nicht gefunden' });
     if (!['SENT', 'SEEN', 'COUNTER_PROPOSED'].includes(inquiry.status)) {
@@ -619,6 +680,14 @@ export async function inquiryRoutes(fastify: FastifyInstance) {
       });
 
       return inq;
+    });
+
+    await notify(fastify.prisma, {
+      userId: inquiry.patientRequest.patientUserId,
+      type: 'INQUIRY_CONFIRMED',
+      message: `Deine Terminanfrage wurde bestätigt (${inquiry.anzahlTermine} Termine).`,
+      inquiryId: id,
+      actionLabel: 'Anfrage öffnen',
     });
 
     return reply.send(updatedInquiry);
@@ -719,7 +788,10 @@ export async function inquiryRoutes(fastify: FastifyInstance) {
     if (!therapist) return reply.status(403).send({ error: 'Nur Therapeut:innen' });
 
     const { id } = request.params as { id: string };
-    const inquiry = await fastify.prisma.inquiry.findUnique({ where: { id } });
+    const inquiry = await fastify.prisma.inquiry.findUnique({
+      where: { id },
+      include: { patientRequest: true },
+    });
     if (!inquiry || inquiry.therapistId !== therapist.id) return reply.status(404).send({ error: 'Nicht gefunden' });
     if (!['SENT', 'SEEN'].includes(inquiry.status)) {
       return reply.status(409).send({ error: `Ungültiger Übergang: ${inquiry.status} → DECLINED` });
@@ -737,6 +809,13 @@ export async function inquiryRoutes(fastify: FastifyInstance) {
         ablehnungsgrund: parsed.success ? parsed.data.ablehnungsgrund : undefined,
         respondedAt: new Date(),
       },
+    });
+    await notify(fastify.prisma, {
+      userId: inquiry.patientRequest.patientUserId,
+      type: 'INQUIRY_DECLINED',
+      message: 'Deine Terminanfrage konnte leider nicht bestätigt werden.',
+      inquiryId: id,
+      actionLabel: 'Details öffnen',
     });
     return reply.send(updated);
   });

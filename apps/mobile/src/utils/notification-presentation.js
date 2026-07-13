@@ -10,6 +10,10 @@ const TYPE_META = {
   PROFILE_CHANGES_REQUESTED: { icon: 'create-outline',        tone: 'info',     title: 'Änderungen angefordert' },
   JOIN_REQUEST:              { icon: 'person-add-outline',    tone: 'info',     title: 'Beitrittsanfrage' },
   INVITE:                    { icon: 'mail-outline',          tone: 'info',     title: 'Einladung' },
+  AUTO_CONFIRMED_APPOINTMENT: { icon: 'flash',                tone: 'positive', title: 'Automatisch bestätigt' },
+  NEW_INQUIRY:               { icon: 'calendar',              tone: 'pending',  title: 'Neue Serien-Anfrage' },
+  INQUIRY_CONFIRMED:         { icon: 'checkmark-circle',      tone: 'positive', title: 'Anfrage bestätigt' },
+  INQUIRY_DECLINED:          { icon: 'close-circle',          tone: 'negative', title: 'Anfrage abgelehnt' },
 };
 
 const FALLBACK = { icon: 'notifications-outline', tone: 'neutral', title: 'Mitteilung' };

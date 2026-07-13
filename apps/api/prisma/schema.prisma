@@ -126,6 +126,7 @@ model User {
   patientRequests        PatientRequest[]        @relation("PatientRequests")
   appFeedbacks           AppFeedback[]
   therapistReviews       TherapistReview[]
+  notifications          Notification[]
 }
 
 model Therapist {
@@ -200,6 +201,33 @@ model Therapist {
   favoritedBy           UserFavoriteTherapist[]
   reviews               TherapistReview[]
   courses               Course[]               @relation("TherapistCourses")
+  notifications         Notification[]
+}
+
+// Server-seitiges Notification-Log — Ersatz für den zuvor rein virtuellen
+// (aus BookingRequest/Inquiry/ReviewStatus berechneten) Mitteilungen-Feed.
+// Genau ein Empfänger pro Zeile (userId ODER therapistId). readAt ersetzt den
+// bisherigen geräte-lokalen AsyncStorage-Read-State (revio_read_notif_ids),
+// damit der Gelesen-Status geräteübergreifend synchron ist.
+model Notification {
+  id           String    @id @default(cuid())
+  userId       String?
+  user         User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  therapistId  String?
+  therapist    Therapist? @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+  type         String
+  message      String
+  bookingId    String?
+  inquiryId    String?
+  linkId       String?
+  practiceId   String?
+  reviewStatus String?
+  actionLabel  String?
+  readAt       DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@index([userId, createdAt])
+  @@index([therapistId, createdAt])
 }
 
 model Practice {

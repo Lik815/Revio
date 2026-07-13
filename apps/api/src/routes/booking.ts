@@ -4,6 +4,7 @@ import type {
   TherapistPatientListItem, TherapistPatientAppointment, TherapistWorkingHoursRule,
 } from '@revio/shared';
 import { sendPushNotification } from '../utils/push.js';
+import { notify } from '../utils/notify.js';
 import { expireStaleBookings } from '../utils/booking-expiry.js';
 import { generateAvailableSlots, resolveServiceConfig } from '../utils/slot-generator.js';
 import { getTherapistOfferedHeilmittelKeys, syncTherapistHeilmittelFromServices } from '../utils/therapist-services.js';
@@ -451,14 +452,24 @@ export async function bookingRoutes(fastify: FastifyInstance) {
         finalStatus = 'CONFIRMED';
       }
 
+      const isAutoConfirmed = finalStatus === 'CONFIRMED';
       if (therapist.expoPushToken) {
         sendPushNotification(
           therapist.expoPushToken,
-          finalStatus === 'CONFIRMED' ? 'Termin automatisch bestätigt' : 'Neue Terminanfrage',
+          isAutoConfirmed ? 'Termin automatisch bestätigt' : 'Neue Terminanfrage',
           `${patientName} hat einen Termin am ${startsAt.toLocaleDateString('de-DE')} gebucht.`,
           { bookingId: result.id, screen: 'bookings' },
         );
       }
+      await notify(fastify.prisma, {
+        therapistId,
+        type: isAutoConfirmed ? 'AUTO_CONFIRMED_APPOINTMENT' : 'NEW_BOOKING_REQUEST',
+        message: isAutoConfirmed
+          ? `${patientName} hat automatisch einen Termin am ${startsAt.toLocaleDateString('de-DE')} erhalten.`
+          : `Neue Buchungsanfrage von ${patientName} (${startsAt.toLocaleDateString('de-DE')}).`,
+        bookingId: result.id,
+        actionLabel: isAutoConfirmed ? 'Termin öffnen' : 'Anfrage öffnen',
+      });
 
       return reply.status(201).send({
         id: result.id,
@@ -675,6 +686,15 @@ export async function bookingRoutes(fastify: FastifyInstance) {
           `${therapist.fullName} hat deinen Termin am ${confirmedAt.toLocaleDateString('de-DE')} bestaetigt.`,
           { bookingId: booking.id, screen: 'bookings' });
       }
+      if (patientUser) {
+        await notify(fastify.prisma, {
+          userId: patientUser.id,
+          type: 'BOOKING_CONFIRMED',
+          message: `Dein Termin am ${confirmedAt.toLocaleDateString('de-DE')} wurde bestätigt. 🎉`,
+          bookingId: booking.id,
+          actionLabel: 'Termin öffnen',
+        });
+      }
 
       return reply.send(updated);
     } else {
@@ -691,6 +711,15 @@ export async function bookingRoutes(fastify: FastifyInstance) {
         sendPushNotification(patientUser.expoPushToken, 'Terminanfrage abgelehnt',
           `${therapist.fullName} konnte deinen Termin leider nicht bestätigen.`,
           { bookingId: booking.id, screen: 'bookings' });
+      }
+      if (patientUser) {
+        await notify(fastify.prisma, {
+          userId: patientUser.id,
+          type: 'BOOKING_DECLINED',
+          message: 'Deine Terminanfrage konnte leider nicht bestätigt werden.',
+          bookingId: booking.id,
+          actionLabel: 'Details öffnen',
+        });
       }
 
       return reply.send(updated);
@@ -741,6 +770,13 @@ export async function bookingRoutes(fastify: FastifyInstance) {
         { bookingId: booking.id, screen: 'bookings' },
       );
     }
+    await notify(fastify.prisma, {
+      userId: patient.id,
+      type: 'BOOKING_CANCELLED',
+      message: 'Ein Termin wurde storniert.',
+      bookingId: booking.id,
+      actionLabel: 'Details öffnen',
+    });
 
     return reply.send(updated);
   });
@@ -782,6 +818,15 @@ export async function bookingRoutes(fastify: FastifyInstance) {
         `${therapist.fullName} musste deinen Termin leider absagen. Der Grund ist in den Termindetails sichtbar.`,
         { bookingId: booking.id, screen: 'bookings' },
       );
+    }
+    if (patientUser) {
+      await notify(fastify.prisma, {
+        userId: patientUser.id,
+        type: 'BOOKING_CANCELLED',
+        message: 'Ein Termin wurde storniert.',
+        bookingId: booking.id,
+        actionLabel: 'Details öffnen',
+      });
     }
 
     return reply.send(updated);

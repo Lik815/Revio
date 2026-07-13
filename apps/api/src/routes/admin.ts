@@ -10,6 +10,7 @@ import { getTherapistPublicationState, getTherapistRequestabilityState } from '.
 import { resetSearchCache } from './search.js';
 import { sendProfileApprovedEmail, sendProfileRejectedEmail, sendProfileChangesRequestedEmail } from '../utils/mailer.js';
 import { sendPushNotification } from '../utils/push.js';
+import { notify } from '../utils/notify.js';
 import { ensureDefaultCertificationOptions } from '../utils/certification-options.js';
 import { ensureDefaultHeilmittelOptions } from '../utils/heilmittel-options.js';
 import {
@@ -870,6 +871,12 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
         { type: 'profile_approved' },
       ).catch(() => {});
     }
+    await notify(fastify.prisma, {
+      therapistId: t.id,
+      type: 'PROFILE_APPROVED',
+      message: 'Dein Profil wurde freigegeben.',
+      reviewStatus: 'APPROVED',
+    });
 
     return {
       message: 'Therapeut freigegeben.',
@@ -890,6 +897,12 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
     sendProfileRejectedEmail({ to: t.email, name: t.fullName }).catch((err) =>
       fastify.log.error({ err }, 'Failed to send profile rejected email'),
     );
+    await notify(fastify.prisma, {
+      therapistId: t.id,
+      type: 'PROFILE_REJECTED',
+      message: 'Dein Profil wurde aktuell nicht freigegeben.',
+      reviewStatus: 'REJECTED',
+    });
 
     return { message: 'Therapist rejected.' };
   });
@@ -904,6 +917,12 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
     sendProfileChangesRequestedEmail({ to: t.email, name: t.fullName }).catch((err) =>
       fastify.log.error({ err }, 'Failed to send profile changes-requested email'),
     );
+    await notify(fastify.prisma, {
+      therapistId: t.id,
+      type: 'PROFILE_CHANGES_REQUESTED',
+      message: 'Für dein Profil wurden Änderungen angefordert.',
+      reviewStatus: 'CHANGES_REQUESTED',
+    });
 
     return { message: 'Changes requested.' };
   });
@@ -913,6 +932,12 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
     const t = await fastify.prisma.therapist.update({ where: { id }, data: { reviewStatus: 'SUSPENDED' } }).catch(() => null);
     if (!t) return reply.notFound('Therapist not found');
     resetSearchCache();
+    await notify(fastify.prisma, {
+      therapistId: t.id,
+      type: 'PROFILE_SUSPENDED',
+      message: 'Dein Profil wurde vorübergehend pausiert.',
+      reviewStatus: 'SUSPENDED',
+    });
 
     return { message: 'Therapist suspended.' };
   });

@@ -1,213 +1,99 @@
 import { FastifyPluginAsync } from 'fastify';
 import { getToken } from './auth-utils.js';
 
+const RETENTION_DAYS = 30;
 
 export const notificationRoutes: FastifyPluginAsync = async (fastify) => {
-  fastify.get('/notifications', async (request, reply) => {
-    const token = getToken(request);
-    if (!token) return reply.unauthorized('Kein Token');
-
-    const notifications: {
-      id: string;
-      type: string;
-      message: string;
-      createdAt: Date;
-      reviewStatus?: string;
-      therapistId?: string;
-      bookingId?: string;
-      inquiryId?: string;
-      linkId?: string;
-      practiceId?: string;
-      actionLabel?: string;
-    }[] = [];
-
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-
-    // ── Resolve user (patient or therapist-via-user) ──────────────────────
+  // ── Resolve user (patient or therapist-via-user) ─────────────────────────
+  async function resolveRecipient(token: string) {
     const user = await fastify.prisma.user.findUnique({
       where: { sessionToken: token },
       include: { therapistProfile: true },
     });
-
-    // ── Therapist path ─────────────────────────────────────────────────────
     const therapist =
       user?.therapistProfile ??
       (await fastify.prisma.therapist.findUnique({ where: { sessionToken: token } }));
+    if (therapist) return { kind: 'therapist' as const, therapistId: therapist.id };
+    if (user && !user.therapistProfile) return { kind: 'patient' as const, userId: user.id };
+    return null;
+  }
 
-    if (therapist) {
-      // Review status
-      if (therapist.reviewStatus === 'APPROVED') {
-        notifications.push({
-          id: `review-${therapist.id}-approved`,
-          type: 'PROFILE_APPROVED',
-          message: 'Dein Profil wurde freigegeben.',
-          createdAt: therapist.updatedAt,
-          reviewStatus: therapist.reviewStatus,
-          therapistId: therapist.id,
-        });
-      } else if (therapist.reviewStatus === 'CHANGES_REQUESTED') {
-        notifications.push({
-          id: `review-${therapist.id}-changes-requested`,
-          type: 'PROFILE_CHANGES_REQUESTED',
-          message: 'Für dein Profil wurden Änderungen angefordert.',
-          createdAt: therapist.updatedAt,
-          reviewStatus: therapist.reviewStatus,
-          therapistId: therapist.id,
-        });
-      } else if (therapist.reviewStatus === 'REJECTED') {
-        notifications.push({
-          id: `review-${therapist.id}-rejected`,
-          type: 'PROFILE_REJECTED',
-          message: 'Dein Profil wurde aktuell nicht freigegeben.',
-          createdAt: therapist.updatedAt,
-          reviewStatus: therapist.reviewStatus,
-          therapistId: therapist.id,
-        });
-      } else if (therapist.reviewStatus === 'SUSPENDED') {
-        notifications.push({
-          id: `review-${therapist.id}-suspended`,
-          type: 'PROFILE_SUSPENDED',
-          message: 'Dein Profil wurde vorübergehend pausiert.',
-          createdAt: therapist.updatedAt,
-          reviewStatus: therapist.reviewStatus,
-          therapistId: therapist.id,
-        });
-      }
+  fastify.get('/notifications', async (request, reply) => {
+    const token = getToken(request);
+    if (!token) return reply.unauthorized('Kein Token');
 
-      // Booking requests received in the last 7 days — kept visible by time
-      // window regardless of current status (matches the patient side,
-      // which keys off respondedAt rather than status), so responding to a
-      // request doesn't make its notification vanish.
-      const recentBookingRequests = await fastify.prisma.bookingRequest.findMany({
-        where: {
-          therapistId: therapist.id,
-          createdAt: { gte: sevenDaysAgo },
-        },
-        include: { patientUser: { select: { firstName: true, lastName: true } } },
-        orderBy: { createdAt: 'desc' },
-      });
-      for (const b of recentBookingRequests) {
-        const patientFullName = [b.patientUser?.firstName, b.patientUser?.lastName]
-          .filter(Boolean)
-          .join(' ');
-        const name = b.patientName || patientFullName || 'Ein Patient';
-        const date = b.createdAt.toLocaleDateString('de-DE');
-        notifications.push({
-          id: `booking-new-${b.id}`,
-          type: 'NEW_BOOKING_REQUEST',
-          message: `Neue Buchungsanfrage von ${name} (${date}).`,
-          createdAt: b.createdAt,
-          bookingId: b.id,
-          actionLabel: 'Anfrage öffnen',
-        });
-      }
+    const recipient = await resolveRecipient(token);
+    if (!recipient) return reply.unauthorized('Kein Token');
 
-      // Auto-Accept: automatisch bestätigte Termine der letzten 7 Tage.
-      // Serien-Termine (gemeinsame inquiryId) werden zu einer Mitteilung
-      // gebündelt, Einzeltermine (bookingRequestId) bleiben 1:1.
-      const recentAutoConfirmed = await fastify.prisma.scheduledSlot.findMany({
-        where: { therapistId: therapist.id, autoConfirmed: true, createdAt: { gte: sevenDaysAgo } },
-        orderBy: { createdAt: 'desc' },
-      });
-      const seriesGroups = new Map<string, typeof recentAutoConfirmed>();
-      for (const slot of recentAutoConfirmed) {
-        if (slot.inquiryId) {
-          const group = seriesGroups.get(slot.inquiryId) ?? [];
-          group.push(slot);
-          seriesGroups.set(slot.inquiryId, group);
-        } else {
-          const date = slot.createdAt.toLocaleDateString('de-DE');
-          notifications.push({
-            id: `auto-confirmed-${slot.id}`,
-            type: 'AUTO_CONFIRMED_APPOINTMENT',
-            message: `${slot.patientName} hat automatisch einen Termin am ${date} erhalten.`,
-            createdAt: slot.createdAt,
-            bookingId: slot.bookingRequestId ?? undefined,
-            actionLabel: 'Termin öffnen',
-          });
-        }
-      }
-      for (const [inquiryId, slots] of seriesGroups) {
-        const newest = slots[0];
-        const count = slots.length;
-        notifications.push({
-          id: `auto-confirmed-inquiry-${inquiryId}`,
-          type: 'AUTO_CONFIRMED_APPOINTMENT',
-          message: `${newest.patientName} · ${count} ${count === 1 ? 'Termin wurde' : 'Termine wurden'} automatisch bestätigt.`,
-          createdAt: newest.createdAt,
-          inquiryId,
-          actionLabel: 'Anfrage öffnen',
-        });
-      }
+    const since = new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000);
+    const rows = await fastify.prisma.notification.findMany({
+      where: {
+        ...(recipient.kind === 'therapist'
+          ? { therapistId: recipient.therapistId }
+          : { userId: recipient.userId }),
+        createdAt: { gte: since },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+    });
 
-      // Practice invites for this therapist
-      const invites = await (fastify.prisma as any).therapistPracticeLink.findMany({
-        where: { therapistId: therapist.id, status: 'PROPOSED', initiatedBy: 'ADMIN' },
-        include: { practice: { select: { id: true, name: true } } },
-        orderBy: { createdAt: 'desc' },
-      });
-      for (const link of invites) {
-        notifications.push({
-          id: link.id,
-          type: 'INVITE',
-          message: `${link.practice.name} hat dich eingeladen, der Praxis beizutreten.`,
-          createdAt: link.createdAt,
-          linkId: link.id,
-          practiceId: link.practice.id,
-          actionLabel: 'Einladung öffnen',
-        });
-      }
+    const notifications = rows.map((n) => ({
+      id: n.id,
+      type: n.type,
+      message: n.message,
+      createdAt: n.createdAt,
+      read: n.readAt !== null,
+      bookingId: n.bookingId ?? undefined,
+      inquiryId: n.inquiryId ?? undefined,
+      linkId: n.linkId ?? undefined,
+      practiceId: n.practiceId ?? undefined,
+      reviewStatus: n.reviewStatus ?? undefined,
+      therapistId: n.therapistId ?? undefined,
+      actionLabel: n.actionLabel ?? undefined,
+    }));
 
-      return { notifications };
-    }
+    return { notifications };
+  });
 
-    // ── Patient path ───────────────────────────────────────────────────────
-    if (user && !user.therapistProfile) {
-      const recentBookings = await fastify.prisma.bookingRequest.findMany({
-        where: {
-          patientUserId: user.id,
-          status: { in: ['CONFIRMED', 'DECLINED', 'CANCELLED'] },
-          respondedAt: { gte: sevenDaysAgo },
-        },
-        orderBy: { respondedAt: 'desc' },
-      });
+  // PATCH /notifications/:id/read — einzelne Mitteilung als gelesen markieren
+  fastify.patch('/notifications/:id/read', async (request, reply) => {
+    const token = getToken(request);
+    if (!token) return reply.unauthorized('Kein Token');
+    const recipient = await resolveRecipient(token);
+    if (!recipient) return reply.unauthorized('Kein Token');
 
-      for (const b of recentBookings) {
-        const respondedDate = b.respondedAt ?? b.createdAt;
-        if (b.status === 'CONFIRMED') {
-          const slotDate = (b.confirmedSlotAt ?? respondedDate).toLocaleDateString('de-DE');
-          notifications.push({
-            id: `booking-confirmed-${b.id}`,
-            type: 'BOOKING_CONFIRMED',
-            message: `Dein Termin am ${slotDate} wurde bestätigt. 🎉`,
-            createdAt: respondedDate,
-            bookingId: b.id,
-            actionLabel: 'Termin öffnen',
-          });
-        } else if (b.status === 'DECLINED') {
-          notifications.push({
-            id: `booking-declined-${b.id}`,
-            type: 'BOOKING_DECLINED',
-            message: `Deine Terminanfrage konnte leider nicht bestätigt werden.`,
-            createdAt: respondedDate,
-            bookingId: b.id,
-            actionLabel: 'Details öffnen',
-          });
-        } else if (b.status === 'CANCELLED') {
-          notifications.push({
-            id: `booking-cancelled-${b.id}`,
-            type: 'BOOKING_CANCELLED',
-            message: `Ein Termin wurde storniert.`,
-            createdAt: respondedDate,
-            bookingId: b.id,
-            actionLabel: 'Details öffnen',
-          });
-        }
-      }
+    const { id } = request.params as { id: string };
+    const result = await fastify.prisma.notification.updateMany({
+      where: {
+        id,
+        ...(recipient.kind === 'therapist'
+          ? { therapistId: recipient.therapistId }
+          : { userId: recipient.userId }),
+        readAt: null,
+      },
+      data: { readAt: new Date() },
+    });
 
-      return { notifications };
-    }
+    return { updated: result.count };
+  });
 
-    return reply.unauthorized('Kein Token');
+  // PATCH /notifications/read-all — alle eigenen Mitteilungen als gelesen markieren
+  fastify.patch('/notifications/read-all', async (request, reply) => {
+    const token = getToken(request);
+    if (!token) return reply.unauthorized('Kein Token');
+    const recipient = await resolveRecipient(token);
+    if (!recipient) return reply.unauthorized('Kein Token');
+
+    const result = await fastify.prisma.notification.updateMany({
+      where: {
+        ...(recipient.kind === 'therapist'
+          ? { therapistId: recipient.therapistId }
+          : { userId: recipient.userId }),
+        readAt: null,
+      },
+      data: { readAt: new Date() },
+    });
+
+    return { updated: result.count };
   });
 };

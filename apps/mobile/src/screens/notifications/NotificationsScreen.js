@@ -29,21 +29,28 @@ export function NotificationsTabScreen() {
 
   const {
     notifications,
-    readNotifIds,
     markNotificationRead,
     markAllNotificationsRead,
+    markNotificationsReadByIds,
     showReviewNotificationModal,
     reviewNotification,
     markReviewNotificationSeen,
   } = useNotifications();
 
-  const unreadCount = notifications.filter((n) => !readNotifIds.has(n.id)).length;
+  const unreadCount = notifications.filter((n) => !n.read).length;
 
+  // Markiert erst beim Verlassen des Screens als gelesen (Snapshot der beim
+  // Betreten vorhandenen IDs) — so bleiben Ungelesen-Punkte während des
+  // Besuchs sichtbar, und währenddessen neu eintreffende Mitteilungen
+  // bleiben ungelesen.
   useFocusEffect(useCallback(() => {
-    if (notifications.length > 0) markAllNotificationsRead();
-  }, [notifications, markAllNotificationsRead]));
+    const idsAtFocus = notifications.map((n) => n.id);
+    return () => {
+      if (idsAtFocus.length > 0) markNotificationsReadByIds(idsAtFocus);
+    };
+  }, [notifications, markNotificationsReadByIds]));
 
-  // Server already caps notifications to the last 7 days, so no per-item
+  // Server already caps notifications to a retention window, so no per-item
   // dismiss is needed here — items just move from unread to read.
   const sections = useMemo(() => {
     const buckets = { Heute: [], 'Diese Woche': [], Älter: [] };
@@ -58,11 +65,32 @@ export function NotificationsTabScreen() {
   const handleNotificationPress = (notification) => {
     markNotificationRead(notification.id);
     const type = notification?.type;
+
+    // Therapeut: neue Einzel-Buchungsanfrage → direkt das Buchungsdetail öffnen.
+    if (type === 'NEW_BOOKING_REQUEST' && notification.bookingId) {
+      navigation.navigate(TAB_ROUTES.THERAPY, { openBookingId: notification.bookingId });
+      return;
+    }
+    // Patient: Ergebnis einer Einzel-Buchung → den konkreten Termin öffnen.
     if (
-      type === 'NEW_BOOKING_REQUEST' || type === 'BOOKING_CONFIRMED' ||
-      type === 'BOOKING_DECLINED' || type === 'BOOKING_CANCELLED'
+      (type === 'BOOKING_CONFIRMED' || type === 'BOOKING_DECLINED' || type === 'BOOKING_CANCELLED') &&
+      notification.bookingId
     ) {
-      navigation.navigate(ROOT_ROUTES.MAIN_TABS, { screen: TAB_ROUTES.THERAPY });
+      navigation.navigate(TAB_ROUTES.THERAPY, { openAppointmentId: notification.bookingId });
+      return;
+    }
+    // Therapeut: automatisch bestätigte Termine / neue Serien-Anfrage → Anfragen-Unterreiter.
+    if (type === 'AUTO_CONFIRMED_APPOINTMENT' || type === 'NEW_INQUIRY') {
+      navigation.navigate(TAB_ROUTES.THERAPY, { openTab: 'anfragen' });
+      return;
+    }
+    // Patient: Ergebnis einer Serien-Anfrage.
+    if (type === 'INQUIRY_CONFIRMED' || type === 'INQUIRY_DECLINED') {
+      navigation.navigate(TAB_ROUTES.THERAPY);
+      return;
+    }
+    if (type === 'INVITE') {
+      navigation.navigate(ROOT_ROUTES.PROFILE);
       return;
     }
     if (
@@ -70,7 +98,10 @@ export function NotificationsTabScreen() {
       type === 'PROFILE_REJECTED' || type === 'PROFILE_SUSPENDED'
     ) {
       navigation.navigate(ROOT_ROUTES.PROFILE);
+      return;
     }
+    // Fallback für unbekannte/alte Typen ohne spezifisches Ziel.
+    navigation.navigate(TAB_ROUTES.THERAPY);
   };
 
   return (
@@ -105,7 +136,7 @@ export function NotificationsTabScreen() {
             renderItem={({ item }) => (
               <NotificationCard
                 notification={item}
-                isRead={readNotifIds.has(item.id)}
+                isRead={Boolean(item.read)}
                 onPress={() => handleNotificationPress(item)}
                 c={c}
               />

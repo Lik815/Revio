@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from './AuthContext';
 import { getBaseUrl } from '../utils/app-utils';
 import { timedFetch } from '../utils/perf-log';
@@ -14,10 +13,6 @@ const REVIEW_NOTIFICATION_TYPES = new Set([
 
 const POLL_MS = 30000;
 
-function getReviewNotificationSeenKey(therapistId) {
-  return `revio_seen_review_status_${therapistId}`;
-}
-
 const NotificationContext = createContext(null);
 
 /**
@@ -25,15 +20,20 @@ const NotificationContext = createContext(null);
  * mounted once near the root so screens consume shared state via useNotifications()
  * instead of each starting their own interval. Pauses while the app is backgrounded
  * and refreshes immediately on returning to the foreground.
+ *
+ * Gelesen-Status kommt jetzt vom Server (Notification.readAt) statt aus
+ * geräte-lokalem AsyncStorage — damit ist er über mehrere Geräte hinweg
+ * konsistent.
  */
 export function NotificationProvider({ children }) {
   const { authToken, accountType, setLoggedInTherapist } = useAuth();
   const [notifications, setNotifications] = useState([]);
-  const [readNotifIds, setReadNotifIds] = useState(new Set());
   const [showReviewNotificationModal, setShowReviewNotificationModal] = useState(false);
   const [reviewNotification, setReviewNotification] = useState(null);
   const pollRef = useRef(null);
   const appStateRef = useRef(AppState.currentState);
+  const authTokenRef = useRef(authToken);
+  authTokenRef.current = authToken;
 
   useEffect(() => {
     if (pollRef.current) clearInterval(pollRef.current);
@@ -54,38 +54,24 @@ export function NotificationProvider({ children }) {
         });
         if (!res.ok || cancelled) return;
         const data = await res.json();
-        let next = Array.isArray(data.notifications) ? data.notifications : [];
+        const next = Array.isArray(data.notifications) ? data.notifications : [];
 
         const reviewNotif = next.find(
-          (n) => REVIEW_NOTIFICATION_TYPES.has(n.type) && n.reviewStatus && n.therapistId,
+          (n) => REVIEW_NOTIFICATION_TYPES.has(n.type) && !n.read && n.reviewStatus && n.therapistId,
         );
 
-        if (accountType === 'therapist' && reviewNotif?.therapistId) {
-          const seenStatus = await AsyncStorage.getItem(
-            getReviewNotificationSeenKey(reviewNotif.therapistId),
-          );
-          if (seenStatus === reviewNotif.reviewStatus) {
-            next = next.filter((n) => n.id !== reviewNotif.id);
-          } else {
-            setReviewNotification((prev) =>
-              prev?.id === reviewNotif.id ? prev : reviewNotif,
-            );
-            setShowReviewNotificationModal(true);
-            setLoggedInTherapist((prev) => {
-              if (!prev || prev.id !== reviewNotif.therapistId || prev.reviewStatus === reviewNotif.reviewStatus) return prev;
-              return { ...prev, reviewStatus: reviewNotif.reviewStatus };
-            });
-          }
+        if (accountType === 'therapist' && reviewNotif) {
+          setReviewNotification((prev) => (prev?.id === reviewNotif.id ? prev : reviewNotif));
+          setShowReviewNotificationModal(true);
+          setLoggedInTherapist((prev) => {
+            if (!prev || prev.id !== reviewNotif.therapistId || prev.reviewStatus === reviewNotif.reviewStatus) return prev;
+            return { ...prev, reviewStatus: reviewNotif.reviewStatus };
+          });
         }
 
         if (!cancelled) setNotifications(next);
       } catch {}
     };
-
-    AsyncStorage.getItem('revio_read_notif_ids').then((raw) => {
-      if (!raw || cancelled) return;
-      try { setReadNotifIds(new Set(JSON.parse(raw))); } catch {}
-    });
 
     fetchNotifications();
     pollRef.current = setInterval(fetchNotifications, POLL_MS);
@@ -104,31 +90,47 @@ export function NotificationProvider({ children }) {
   }, [authToken, accountType, setLoggedInTherapist]);
 
   const markNotificationRead = async (id) => {
-    const next = new Set(readNotifIds);
-    next.add(id);
-    setReadNotifIds(next);
-    await AsyncStorage.setItem('revio_read_notif_ids', JSON.stringify([...next]));
+    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+    try {
+      await timedFetch('notifications-read', `${getBaseUrl()}/notifications/${id}/read`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${authTokenRef.current}` },
+      });
+    } catch {}
+  };
+
+  // Markiert eine feste Liste von IDs als gelesen (Snapshot beim Betreten des
+  // Mitteilungen-Screens), statt aller aktuell geladenen Notifications — so
+  // bleiben währenddessen neu eintreffende Einträge ungelesen.
+  const markNotificationsReadByIds = async (ids) => {
+    if (ids.length === 0) return;
+    const idSet = new Set(ids);
+    setNotifications((prev) => prev.map((n) => (idSet.has(n.id) ? { ...n, read: true } : n)));
+    try {
+      await Promise.all(ids.map((id) =>
+        timedFetch('notifications-read', `${getBaseUrl()}/notifications/${id}/read`, {
+          method: 'PATCH',
+          headers: { Authorization: `Bearer ${authTokenRef.current}` },
+        }),
+      ));
+    } catch {}
   };
 
   const markAllNotificationsRead = async () => {
-    const allIds = new Set(notifications.map((n) => n.id));
-    setReadNotifIds(allIds);
-    await AsyncStorage.setItem('revio_read_notif_ids', JSON.stringify([...allIds]));
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    try {
+      await timedFetch('notifications-read-all', `${getBaseUrl()}/notifications/read-all`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${authTokenRef.current}` },
+      });
+    } catch {}
   };
 
   const markReviewNotificationSeen = async (notification = reviewNotification) => {
     const resolvedNotification =
-      notification?.therapistId && notification?.reviewStatus
-        ? notification
-        : reviewNotification;
+      notification?.therapistId && notification?.reviewStatus ? notification : reviewNotification;
 
-    if (resolvedNotification?.therapistId && resolvedNotification?.reviewStatus) {
-      await AsyncStorage.setItem(
-        getReviewNotificationSeenKey(resolvedNotification.therapistId),
-        resolvedNotification.reviewStatus,
-      );
-    }
-    setNotifications((prev) => prev.filter((item) => item.id !== resolvedNotification?.id));
+    if (resolvedNotification?.id) await markNotificationRead(resolvedNotification.id);
     setShowReviewNotificationModal(false);
     setReviewNotification(null);
   };
@@ -136,11 +138,11 @@ export function NotificationProvider({ children }) {
   return (
     <NotificationContext.Provider value={{
       notifications, setNotifications,
-      readNotifIds, setReadNotifIds,
       showReviewNotificationModal, setShowReviewNotificationModal,
       reviewNotification, setReviewNotification,
       markNotificationRead,
       markAllNotificationsRead,
+      markNotificationsReadByIds,
       markReviewNotificationSeen,
     }}>
       {children}

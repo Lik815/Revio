@@ -81,10 +81,10 @@ function AuthTabScreen({ navigation }) {
 export function AppTabs() {
   const t = translations.de;
   const { authToken, accountType } = useAuth();
-  const { notifications, readNotifIds } = useNotifications();
+  const { notifications } = useNotifications();
   const isLoggedIn = Boolean(authToken);
   const isTherapist = accountType === 'therapist';
-  const unreadNotifications = notifications.filter((n) => !readNotifIds.has(n.id)).length;
+  const unreadNotifications = notifications.filter((n) => !n.read).length;
 
   return (
     <Tab.Navigator
