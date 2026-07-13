@@ -404,7 +404,6 @@ export function InquiryRequestForm({ c, t, therapist, authToken, onSuccess, onCl
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [autoConfirmed, setAutoConfirmed] = useState(false);
-  const [saveKassenart, setSaveKassenart] = useState(false);
 
   const availableHeilmittel = (Array.isArray(therapist?.heilmittel) ? therapist.heilmittel : [])
     .map((item) => {
@@ -440,7 +439,7 @@ export function InquiryRequestForm({ c, t, therapist, authToken, onSuccess, onCl
       setError('Bitte wähle deine Versicherungsart aus.');
       return;
     }
-    if (step === 1 && saveKassenart && selectedKassenart && authToken) {
+    if (step === 1 && !knownKassenart && selectedKassenart && authToken) {
       fetch(`${getBaseUrl()}/auth/me`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
@@ -614,22 +613,6 @@ export function InquiryRequestForm({ c, t, therapist, authToken, onSuccess, onCl
             <View>
               <Text style={{ fontSize: 15, fontWeight: '700', color: c.text, marginBottom: SPACE.sm }}>Wie bist du versichert?</Text>
               <ChipRow options={insuranceOptions} selected={selectedKassenart} onSelect={setSelectedKassenart} c={c} />
-              {loggedInPatient && !loggedInPatient.kassenart && selectedKassenart && (
-                <Pressable
-                  onPress={() => setSaveKassenart((v) => !v)}
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: SPACE.md, paddingVertical: 4 }}
-                >
-                  <View style={{
-                    width: 20, height: 20, borderRadius: 5, borderWidth: 2,
-                    borderColor: saveKassenart ? c.primary : c.border,
-                    backgroundColor: saveKassenart ? c.primary : 'transparent',
-                    alignItems: 'center', justifyContent: 'center',
-                  }}>
-                    {saveKassenart && <Ionicons name="checkmark" size={13} color="#fff" />}
-                  </View>
-                  <Text style={{ fontSize: 13, color: c.muted }}>In meinem Profil speichern</Text>
-                </Pressable>
-              )}
             </View>
           </View>
         )}
