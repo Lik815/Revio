@@ -20,14 +20,10 @@ export async function expireStaleBookings(fastify: FastifyInstance, where: Recor
   if (last !== undefined && Date.now() - last < EXPIRY_THROTTLE_MS) return;
   lastRunAt.set(key, Date.now());
 
-  const stale = await fastify.prisma.bookingRequest.findMany({
-    where: { ...where, status: 'PENDING', responseDueAt: { lt: new Date() } },
-    select: { id: true },
-  });
-  if (stale.length === 0) return;
-
+  // Ein einziger Roundtrip: updateMany mit 0 Treffern ist billiger als der
+  // frühere findMany-Vorab-Check + updateMany (Latenz API↔DB dominiert).
   await fastify.prisma.bookingRequest.updateMany({
-    where: { id: { in: stale.map((b) => b.id) } },
+    where: { ...where, status: 'PENDING', responseDueAt: { lt: new Date() } },
     data: { status: 'EXPIRED' },
   });
 }

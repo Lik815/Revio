@@ -5,14 +5,17 @@ const RETENTION_DAYS = 30;
 
 export const notificationRoutes: FastifyPluginAsync = async (fastify) => {
   // ── Resolve user (patient or therapist-via-user) ─────────────────────────
+  // Beide Lookups parallel — diese Route wird alle 30s gepollt, jeder
+  // eingesparte sequenzielle DB-Roundtrip zählt.
   async function resolveRecipient(token: string) {
-    const user = await fastify.prisma.user.findUnique({
-      where: { sessionToken: token },
-      include: { therapistProfile: true },
-    });
-    const therapist =
-      user?.therapistProfile ??
-      (await fastify.prisma.therapist.findUnique({ where: { sessionToken: token } }));
+    const [user, legacyTherapist] = await Promise.all([
+      fastify.prisma.user.findUnique({
+        where: { sessionToken: token },
+        include: { therapistProfile: true },
+      }),
+      fastify.prisma.therapist.findUnique({ where: { sessionToken: token } }),
+    ]);
+    const therapist = user?.therapistProfile ?? legacyTherapist;
     if (therapist) return { kind: 'therapist' as const, therapistId: therapist.id };
     if (user && !user.therapistProfile) return { kind: 'patient' as const, userId: user.id };
     return null;

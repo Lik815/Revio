@@ -3344,6 +3344,83 @@ describe('Dynamic Booking', () => {
     await prisma.scheduledSlot.delete({ where: { id: slot.id } });
   });
 
+  it('GET /bookings/incoming + /bookings/my — Serien-Slots älter als 90 Tage werden ausgeblendet, jüngere bleiben sichtbar', async () => {
+    const oldStartsAt = new Date(Date.now() - 100 * 24 * 60 * 60 * 1000);
+    const recentStartsAt = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
+
+    // Inquiry-Kette für den /bookings/my-Pfad (Patient sieht Slots über
+    // patientRequest → inquiry → scheduledSlot)
+    const patientUser = await prisma.user.findUnique({ where: { sessionToken: patientToken } });
+    const patientRequest = await prisma.patientRequest.create({
+      data: { patientUserId: patientUser!.id, heilmittel: 'KG' },
+    });
+    const inquiry = await prisma.inquiry.create({
+      data: {
+        patientRequestId: patientRequest.id, therapistId, status: 'CONFIRMED',
+        heilmittel: 'KG', patientName: 'Fenster Testpatient',
+        responseDueAt: new Date(Date.now() + 86400000), respondedAt: new Date(),
+      },
+    });
+
+    const oldSlot = await prisma.scheduledSlot.create({
+      data: {
+        therapistId, inquiryId: inquiry.id, startsAt: oldStartsAt,
+        endsAt: new Date(oldStartsAt.getTime() + 20 * 60_000),
+        patientName: 'Fenster Testpatient', status: 'SCHEDULED',
+      },
+    });
+    const recentSlot = await prisma.scheduledSlot.create({
+      data: {
+        therapistId, inquiryId: inquiry.id, startsAt: recentStartsAt,
+        endsAt: new Date(recentStartsAt.getTime() + 20 * 60_000),
+        patientName: 'Fenster Testpatient', status: 'SCHEDULED',
+      },
+    });
+
+    const incoming = await app.inject({
+      method: 'GET', url: '/bookings/incoming',
+      headers: { authorization: `Bearer ${therapistToken}` },
+    });
+    const incomingIds = incoming.json().map((b: { id: string }) => b.id);
+    expect(incomingIds).toContain(recentSlot.id);
+    expect(incomingIds).not.toContain(oldSlot.id);
+
+    const my = await app.inject({
+      method: 'GET', url: '/bookings/my',
+      headers: { authorization: `Bearer ${patientToken}` },
+    });
+    const myIds = my.json().map((b: { id: string }) => b.id);
+    expect(myIds).toContain(recentSlot.id);
+    expect(myIds).not.toContain(oldSlot.id);
+
+    await prisma.scheduledSlot.deleteMany({ where: { inquiryId: inquiry.id } });
+    await prisma.inquiry.delete({ where: { id: inquiry.id } });
+    await prisma.patientRequest.delete({ where: { id: patientRequest.id } });
+  });
+
+  it('GET /therapist/patients — Antwort enthält keine sensiblen User-Felder', async () => {
+    const startsAt = futureStartsAt();
+    const bookRes = await app.inject({
+      method: 'POST', url: '/bookings',
+      headers: { authorization: `Bearer ${patientToken}`, 'content-type': 'application/json' },
+      payload: { therapistId, startsAt: startsAt.toISOString(), heilmittel: 'KG', consentAccepted: true },
+    });
+    expect(bookRes.statusCode).toBe(201);
+
+    const res = await app.inject({
+      method: 'GET', url: '/therapist/patients',
+      headers: { authorization: `Bearer ${therapistToken}` },
+    });
+    expect(res.statusCode).toBe(200);
+    const { patients } = res.json();
+    expect(patients.length).toBeGreaterThan(0);
+    const raw = JSON.stringify(patients);
+    expect(raw).not.toContain('passwordHash');
+    expect(raw).not.toContain('sessionToken');
+    expect(patients[0].fullName).toBeTruthy();
+    expect(patients[0].email).toBeTruthy();
+  });
+
   it('GET /bookings/incoming — automatisch bestätigte Einzelbuchung erscheint nur einmal (nicht dupliziert über den intern erzeugten ScheduledSlot)', async () => {
     await prisma.therapist.update({
       where: { id: therapistId },

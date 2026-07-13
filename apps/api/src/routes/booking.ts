@@ -33,12 +33,16 @@ async function resolvePatient(fastify: FastifyInstance, token: string) {
 }
 
 async function resolveTherapist(fastify: FastifyInstance, token: string) {
-  const user = await fastify.prisma.user.findUnique({
-    where: { sessionToken: token },
-    include: { therapistProfile: true },
-  });
+  // Beide Lookups parallel — spart einen sequenziellen DB-Roundtrip für
+  // Therapeuten mit Legacy-Token (Therapist.sessionToken statt User).
+  const [user, therapist] = await Promise.all([
+    fastify.prisma.user.findUnique({
+      where: { sessionToken: token },
+      include: { therapistProfile: true },
+    }),
+    fastify.prisma.therapist.findUnique({ where: { sessionToken: token } }),
+  ]);
   if (user?.role === 'therapist' && user.therapistProfile) return user.therapistProfile;
-  const therapist = await fastify.prisma.therapist.findUnique({ where: { sessionToken: token } });
   return therapist ?? null;
 }
 
@@ -263,7 +267,9 @@ export async function bookingRoutes(fastify: FastifyInstance) {
 
     const bookings = await fastify.prisma.bookingRequest.findMany({
       where: { therapistId: therapist.id, patientUserId: { not: null } },
-      include: { patientUser: true },
+      // Nur die Felder, die buildPatientListItem braucht — volle User-Zeilen
+      // (inkl. Tokens/Hashes) haben die Payload unnötig aufgebläht.
+      include: { patientUser: { select: { id: true, firstName: true, lastName: true, email: true, phone: true } } },
       orderBy: { createdAt: 'desc' },
     });
 
@@ -502,24 +508,36 @@ export async function bookingRoutes(fastify: FastifyInstance) {
 
     const { where: listFilters, take } = parseBookingListQuery(request.query as Record<string, unknown>);
 
-    const bookings = await fastify.prisma.bookingRequest.findMany({
-      where: { patientUserId: patient.id, ...listFilters },
-      include: {
-        therapist: { select: { id: true, fullName: true, professionalTitle: true, city: true, photo: true, phone: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-      ...(take ? { take } : {}),
-    });
+    // Serien-Slots älter als 90 Tage ausblenden — die Tabelle wächst pro
+    // Serie um bis zu 10 Zeilen und der Verlauf wird in der App ohnehin nur
+    // für die jüngere Vergangenheit angezeigt.
+    const slotWindowStart = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+
+    // Buchungen und Inquiry-IDs parallel laden — unabhängige Queries, spart
+    // einen sequenziellen DB-Roundtrip (Latenz API↔DB dominiert die Route).
+    const [bookings, patientInquiryIds] = await Promise.all([
+      fastify.prisma.bookingRequest.findMany({
+        where: { patientUserId: patient.id, ...listFilters },
+        include: {
+          therapist: { select: { id: true, fullName: true, professionalTitle: true, city: true, photo: true, phone: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        ...(take ? { take } : {}),
+      }),
+      fastify.prisma.inquiry.findMany({
+        where: { patientRequest: { patientUserId: patient.id } },
+        select: { id: true },
+      }),
+    ]);
 
     // Inquiry-basierte ScheduledSlots (Serien-Termine) dazuladen.
     // ScheduledSlot hat kein direktes Prisma-Relation zu Inquiry, daher zwei Queries.
-    const patientInquiryIds = await fastify.prisma.inquiry.findMany({
-      where: { patientRequest: { patientUserId: patient.id } },
-      select: { id: true },
-    });
     const inquiryScheduledSlots = patientInquiryIds.length > 0
       ? await fastify.prisma.scheduledSlot.findMany({
-          where: { inquiryId: { in: patientInquiryIds.map((i) => i.id) } },
+          where: {
+            inquiryId: { in: patientInquiryIds.map((i) => i.id) },
+            startsAt: { gte: slotWindowStart },
+          },
           include: {
             therapist: { select: { id: true, fullName: true, professionalTitle: true, city: true, photo: true, phone: true } },
           },
@@ -558,15 +576,12 @@ export async function bookingRoutes(fastify: FastifyInstance) {
 
     const { where: listFilters, take } = parseBookingListQuery(request.query as Record<string, unknown>);
 
-    const bookings = await fastify.prisma.bookingRequest.findMany({
-      where: { therapistId: therapist.id, ...listFilters },
-      orderBy: { createdAt: 'desc' },
-      ...(take ? { take } : {}),
-    });
-
-    // Inquiry-basierte ScheduledSlots (Serien-Termine) dazuladen — Gegenstück
-    // zur selben Ergänzung in GET /bookings/my. Ohne das sind über den
-    // Serien-Flow bestätigte Termine im Therapeuten-Kalender unsichtbar,
+    // Beide Listen parallel laden (unabhängige Queries); Serien-Slots älter
+    // als 90 Tage ausblenden — gleiche Begründung wie in GET /bookings/my.
+    //
+    // Zu den Slots: Inquiry-basierte ScheduledSlots (Serien-Termine) sind das
+    // Gegenstück zur selben Ergänzung in GET /bookings/my. Ohne das sind über
+    // den Serien-Flow bestätigte Termine im Therapeuten-Kalender unsichtbar,
     // obwohl der Patient sie in seiner eigenen Terminliste bereits sieht.
     // WICHTIG: inquiryId muss gesetzt sein — sonst werden auch die
     // ScheduledSlots aus dem Einzelbuchungs-Flow (POST /bookings Auto-Accept
@@ -575,10 +590,22 @@ export async function bookingRoutes(fastify: FastifyInstance) {
     // ihrer eigenen BookingRequest-Zeile aus `bookings` oben (führte im
     // Kalender zu zwei sich überlappenden, halbbreiten Karten für denselben
     // Termin statt einer normalen).
-    const inquiryScheduledSlots = await fastify.prisma.scheduledSlot.findMany({
-      where: { therapistId: therapist.id, inquiryId: { not: null } },
-      orderBy: { startsAt: 'asc' },
-    });
+    const slotWindowStart = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+    const [bookings, inquiryScheduledSlots] = await Promise.all([
+      fastify.prisma.bookingRequest.findMany({
+        where: { therapistId: therapist.id, ...listFilters },
+        orderBy: { createdAt: 'desc' },
+        ...(take ? { take } : {}),
+      }),
+      fastify.prisma.scheduledSlot.findMany({
+        where: {
+          therapistId: therapist.id,
+          inquiryId: { not: null },
+          startsAt: { gte: slotWindowStart },
+        },
+        orderBy: { startsAt: 'asc' },
+      }),
+    ]);
 
     // Auf BookingRequest-kompatibles Format normalisieren.
     const normalizedSlots = inquiryScheduledSlots.map((slot) => ({
