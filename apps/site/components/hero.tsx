@@ -64,10 +64,10 @@ export function Hero({
           <div className="hero-device">
             <div className="hero-device__stack">
               <Image
-                src="/media/AppShowWeb-phone.png"
+                src="/media/iphone17pro-orange-mockup.png"
                 alt="Revio App auf einem Smartphone"
-                width={683}
-                height={1468}
+                width={1800}
+                height={3660}
                 className="hero-device__image"
                 priority
               />
