@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { Brand } from './brand';
+import { siteConfig } from '../lib/content';
 
 export function MaintenanceScreen() {
   return (
@@ -12,7 +13,7 @@ export function MaintenanceScreen() {
           Revio ist nicht offline, sondern wird gerade in Ruhe weiter geschärft. Bitte schau später noch einmal vorbei.
         </p>
         <div className="maintenance-actions">
-          <a href="mailto:admin@my-revio.de" className="button button--primary">
+          <a href={`mailto:${siteConfig.contactEmail}`} className="button button--primary">
             Kontakt per E-Mail
           </a>
           <div className="maintenance-links">

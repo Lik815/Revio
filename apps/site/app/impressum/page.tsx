@@ -30,7 +30,7 @@ export default function ImpressumPage() {
         <h3>Kontakt</h3>
         <ul className="legal-list">
           <li>Telefon: [Bitte eintragen]</li>
-          <li>E-Mail: [Bitte eintragen]</li>
+          <li>E-Mail: revioclub.app@gmail.com</li>
         </ul>
 
         <h3>Registereintrag</h3>

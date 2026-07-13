@@ -1,6 +1,6 @@
 export const siteConfig = {
   title: 'Revio',
-  contactEmail: 'admin@my-revio.de',
+  contactEmail: 'revioclub.app@gmail.com',
   nav: [
     { href: '/', label: 'Startseite' },
     { href: '/patients', label: 'Für Patienten' },
