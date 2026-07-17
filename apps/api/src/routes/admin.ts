@@ -1072,6 +1072,51 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
     return { total: practices.length, updated, failed };
   });
 
+  // POST /admin/therapists/geocode-all — geocode all therapists without homeLat/homeLng.
+  // Mirrors the profile-update geocoding in auth.ts: exact address first, city-only as
+  // fallback. homeLat/homeLng are the publicly visible coordinates (map pins).
+  fastify.post('/therapists/geocode-all', async (_request, reply) => {
+    const therapists = await fastify.prisma.therapist.findMany({
+      where: { homeLat: 0, homeLng: 0 },
+    });
+
+    let updated = 0;
+    let failed = 0;
+    let skipped = 0;
+
+    for (const t of therapists) {
+      const streetPart = [t.street, t.houseNumber].filter(Boolean).join(' ');
+      const cityPart = [t.postalCode, t.city].filter(Boolean).join(' ');
+      if (!cityPart && !t.city) { skipped++; continue; }
+
+      // Nominatim rate limit: 1 req/sec
+      await new Promise((r) => setTimeout(r, 1100));
+      const exactCoords = streetPart && t.city ? await geocodeAddress(streetPart, cityPart) : null;
+      let coords = exactCoords;
+      if (!coords) {
+        if (streetPart && t.city) await new Promise((r) => setTimeout(r, 1100));
+        coords = await geocodeAddress('', cityPart || t.city);
+      }
+
+      if (coords) {
+        await fastify.prisma.therapist.update({
+          where: { id: t.id },
+          data: {
+            homeLat: coords.lat,
+            homeLng: coords.lng,
+            ...(exactCoords ? { latitude: exactCoords.lat, longitude: exactCoords.lng } : {}),
+          },
+        });
+        updated++;
+      } else {
+        failed++;
+      }
+    }
+
+    if (updated > 0) resetSearchCache();
+    return { total: therapists.length, updated, failed, skipped };
+  });
+
 
   // Documents
   fastify.get('/therapists/:id/documents', async (request, reply) => {

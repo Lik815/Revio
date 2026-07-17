@@ -247,7 +247,7 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
 
   fastify.post('/search', async (request, reply) => {
     const parsed = searchBodySchema.safeParse(request.body);
-    if (!parsed.success) return reply.badRequest(parsed.error.flatten().toString());
+    if (!parsed.success) return reply.badRequest(JSON.stringify(parsed.error.flatten()));
 
     const input: SearchInput = parsed.data;
     fastify.log.info({ searchInput: input }, 'mobile search input');
