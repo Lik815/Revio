@@ -114,7 +114,6 @@ export function DiscoverTabScreen() {
         isFavorite={isFavorite}
         kassenart={search.kassenart}
         locationLabel={search.locationLabel}
-        mapScrollEnabled={search.mapScrollEnabled}
         mapTherapists={search.mapTherapists}
         openTherapistById={openTherapistById}
         query={search.query}
@@ -133,7 +132,6 @@ export function DiscoverTabScreen() {
         setHomeVisit={search.setHomeVisit}
         setKassenart={search.setKassenart}
         setLocationSheetCity={search.setLocationSheetCity}
-        setMapScrollEnabled={search.setMapScrollEnabled}
         setQuery={search.setQuery}
         setRequestableOnly={search.setRequestableOnly}
         setShowAutocomplete={search.setShowAutocomplete}

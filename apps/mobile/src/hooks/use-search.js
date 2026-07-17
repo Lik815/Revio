@@ -94,7 +94,6 @@ export function useSearch({ t }) {
   const [allApiTherapists, setAllApiTherapists] = useState([]);
   const [searched, setSearched] = useState(false);
   const [viewMode, setViewMode] = useState('list');
-  const [mapScrollEnabled, setMapScrollEnabled] = useState(true);
 
   // ── Kurssuche (eigener Pfad, unabhängig von Therapeuten-Ergebnissen) ───────
   // Läuft NICHT durch runSearchWith – Kurse brauchen keinen Ort und dürfen die
@@ -245,7 +244,6 @@ export function useSearch({ t }) {
     setSearched(false);
     setViewMode('list');
     setShowFilters(false);
-    setMapScrollEnabled(true);
     setCourseResults([]);
     setCourseCategoryKey(null);
   };
@@ -283,15 +281,19 @@ export function useSearch({ t }) {
     return safeList
       .map((th) => {
         if (typeof th.distKm === 'number') return th;
-        const p =
-          (th.practices ?? []).find((practice) => typeof practice.distKm === 'number') ??
-          th.practices?.[0];
-        if (!p?.lat) return { ...th, distKm: null };
-        const distKm =
-          typeof p.distKm === 'number'
-            ? p.distKm
-            : haversine(coords.lat, coords.lng, p.lat, p.lng);
-        return { ...th, distKm };
+        // Minimum über alle Praxen mit Koordinaten — nicht nur practices[0],
+        // sonst gewinnt eine weiter entfernte Erst-Praxis über eine nähere Zweite.
+        const distances = (th.practices ?? [])
+          .map((practice) =>
+            typeof practice.distKm === 'number'
+              ? practice.distKm
+              : practice.lat
+                ? haversine(coords.lat, coords.lng, practice.lat, practice.lng)
+                : null,
+          )
+          .filter((d) => typeof d === 'number');
+        if (distances.length === 0) return { ...th, distKm: null };
+        return { ...th, distKm: Math.min(...distances) };
       })
       .sort((a, b) => {
         const scoreDiff = matchScore(b) - matchScore(a);
@@ -662,7 +664,6 @@ export function useSearch({ t }) {
     allApiTherapists,
     searched, setSearched,
     viewMode, setViewMode,
-    mapScrollEnabled, setMapScrollEnabled,
     // Course search
     courseResults,
     courseLoading,

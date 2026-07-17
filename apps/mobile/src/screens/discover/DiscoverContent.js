@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   formatDist,
   getSearchMatchLabel,
+  haversine,
   quickChips,
   radiusOptions,
   RADIUS,
@@ -79,7 +80,6 @@ export function DiscoverContent(props) {
     isFavorite,
     locationLabel,
     mapTherapists,
-    mapScrollEnabled,
     openTherapistById,
     query,
     results,
@@ -96,7 +96,6 @@ export function DiscoverContent(props) {
     gender,
     setGender,
     setLocationSheetCity,
-    setMapScrollEnabled,
     setQuery,
     setShowAutocomplete,
     setShowFilters,
@@ -154,6 +153,14 @@ export function DiscoverContent(props) {
     .replace('{radius}', searchRadius)
     .replace('{location}', locationLabel || city || t('locationPlaceholder'));
   const safeMapTherapists = Array.isArray(mapTherapists) ? mapTherapists : [];
+  // Pins, die im gewählten Radius liegen — nur sie zählen für den Empty-State.
+  // Ergebnisse außerhalb bleiben als Marker sichtbar (Liste zeigt sie ja auch),
+  // aber eine leere Kartenmitte braucht trotzdem eine Erklärung.
+  const mapPinsInRadius = userCoords
+    ? safeMapTherapists.filter(
+        (th) => haversine(userCoords.lat, userCoords.lng, th._mapLat, th._mapLng) <= searchRadius
+      )
+    : safeMapTherapists;
   const safeFortbildungen = Array.isArray(fortbildungen) ? fortbildungen : [];
   const safeCertificationOptions = Array.isArray(certificationOptions)
     ? certificationOptions.filter(
@@ -169,6 +176,20 @@ export function DiscoverContent(props) {
   const showHeaderToggle = !isCourseMode && (viewMode === 'map' || searched || safeResults.length > 0);
   const [fortbildungQuery, setFortbildungQuery] = React.useState('');
   const [showRadiusPicker, setShowRadiusPicker] = React.useState(false);
+
+  // Karte ist unkontrolliert (initialRegion) — ein kontrolliertes region-Prop
+  // würde jedes Verschieben beim nächsten Re-Render zurückspringen lassen.
+  // Orts-/Radiuswechsel bewegen die Kamera stattdessen imperativ.
+  const mapRef = React.useRef(null);
+  const mapRegion = typeof getMapRegion === 'function' ? getMapRegion() : null;
+  const mapRegionKey = mapRegion
+    ? `${mapRegion.latitude},${mapRegion.longitude},${mapRegion.latitudeDelta},${mapRegion.longitudeDelta}`
+    : '';
+  React.useEffect(() => {
+    if (viewMode !== 'map' || !mapRegion) return;
+    mapRef.current?.animateToRegion?.(mapRegion, 350);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewMode, mapRegionKey]);
 
   const locationRadiusChip = (
     <View style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', borderRadius: RADIUS.full, borderWidth: 1, borderColor: c.border, backgroundColor: c.card, overflow: 'hidden' }}>
@@ -566,16 +587,21 @@ export function DiscoverContent(props) {
               {resultsSummaryLabel}
             </Text>
           )}
+          {searched && safeResults.length > safeMapTherapists.length && (
+            <Text style={{ ...TYPE.meta, color: mutedText }}>
+              {t('mapCoverageHint')
+                .replace('{x}', safeMapTherapists.length)
+                .replace('{y}', safeResults.length)}
+            </Text>
+          )}
         </View>
 
         {/* Fullscreen map */}
         <View style={{ flex: 1, position: 'relative' }}>
           <MapView
+            ref={mapRef}
             style={{ flex: 1 }}
-            region={getMapRegion()}
-            onTouchStart={() => setMapScrollEnabled(false)}
-            onTouchEnd={() => setMapScrollEnabled(true)}
-            onTouchCancel={() => setMapScrollEnabled(true)}
+            initialRegion={mapRegion ?? undefined}
           >
             {userCoords && (
               <>
@@ -597,7 +623,12 @@ export function DiscoverContent(props) {
             )}
             {userCoords && (
               <Marker coordinate={{ latitude: userCoords.lat, longitude: userCoords.lng }} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false}>
-                <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: c.primary, borderWidth: 3, borderColor: '#fff', shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 3, shadowOffset: { width: 0, height: 1 }, elevation: 5 }} />
+                <View style={{ alignItems: 'center' }}>
+                  <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: c.primary, borderWidth: 3, borderColor: '#fff', shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 3, shadowOffset: { width: 0, height: 1 }, elevation: 5 }} />
+                  <Text style={{ marginTop: 2, fontSize: 10, fontWeight: '700', color: c.primary, backgroundColor: 'rgba(255,255,255,0.85)', borderRadius: 4, paddingHorizontal: 4, paddingVertical: 1, overflow: 'hidden' }}>
+                    {t('mapYourLocation')}
+                  </Text>
+                </View>
               </Marker>
             )}
             {safeMapTherapists.map((th) => (
@@ -617,7 +648,24 @@ export function DiscoverContent(props) {
             </View>
           )}
 
-          {!searchLoading && safeMapTherapists.length === 0 && searched && (
+          {safeMapTherapists.length > 0 && (
+            <View style={{ position: 'absolute', bottom: 16, left: 16, borderRadius: RADIUS.full, borderWidth: 1, borderColor: c.border, backgroundColor: c.card, paddingHorizontal: 10, paddingVertical: 6, flexDirection: 'row', alignItems: 'center', gap: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.10, shadowRadius: 6 }}>
+              {safeMapTherapists.some((th) => th._mapType === 'home') && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: c.success }} />
+                  <Text style={{ ...TYPE.meta, color: mutedText }}>{t('mapLegendHome')}</Text>
+                </View>
+              )}
+              {safeMapTherapists.some((th) => th._mapType === 'practice') && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: c.primary }} />
+                  <Text style={{ ...TYPE.meta, color: mutedText }}>{t('mapLegendPractice')}</Text>
+                </View>
+              )}
+            </View>
+          )}
+
+          {!searchLoading && mapPinsInRadius.length === 0 && searched && (
             <View style={{ position: 'absolute', top: 20, left: 20, right: 20, padding: 20, borderRadius: 18, backgroundColor: 'rgba(17,24,39,0.82)', alignItems: 'center', justifyContent: 'center' }}>
               <Ionicons name="location-outline" size={36} color="#fff" />
               {userCoords ? (
@@ -846,7 +894,6 @@ export function DiscoverContent(props) {
       {/* Scrollbare Ergebnisse */}
       <ScrollView
         ref={discoverScrollRef}
-        scrollEnabled={mapScrollEnabled}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: 80 + bannerExtraPadding }]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"

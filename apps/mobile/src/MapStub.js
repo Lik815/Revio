@@ -36,8 +36,17 @@ function getCircleGeometry(region, layout, center, radius) {
   };
 }
 
-export default function MapView({ children, style, region }) {
+const MapView = React.forwardRef(function MapView({ children, style, region, initialRegion }, ref) {
   const [layout, setLayout] = React.useState({ width: 0, height: 0 });
+  const [internalRegion, setInternalRegion] = React.useState(initialRegion ?? null);
+
+  // Matches the react-native-maps imperative API used by DiscoverContent:
+  // uncontrolled map (initialRegion) that moves via ref.animateToRegion().
+  React.useImperativeHandle(ref, () => ({
+    animateToRegion: (nextRegion) => setInternalRegion(nextRegion),
+  }));
+
+  const effectiveRegion = region ?? internalRegion;
 
   return (
     <View
@@ -101,12 +110,14 @@ export default function MapView({ children, style, region }) {
         ))}
       </View>
 
-      <MapContext.Provider value={{ layout, region }}>
+      <MapContext.Provider value={{ layout, region: effectiveRegion }}>
         {children}
       </MapContext.Provider>
     </View>
   );
-}
+});
+
+export default MapView;
 
 export function Marker({ anchor, children, coordinate, onPress }) {
   const { layout, region } = React.useContext(MapContext);

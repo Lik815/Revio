@@ -394,6 +394,10 @@ export const translations = {
     tryAnotherLocation: 'Versuche einen anderen Ort oder einen größeren Radius.',
     noGeoData: 'Keine Therapeut:innen mit Standortdaten',
     noGeoDataBody: 'Für diese Ergebnisse liegen noch keine Koordinaten für Hausbesuche vor.',
+    mapCoverageHint: '{x} von {y} Ergebnissen auf der Karte – übrige ohne Standortangabe',
+    mapLegendHome: 'Hausbesuch',
+    mapLegendPractice: 'Praxis',
+    mapYourLocation: 'Dein Standort',
 
     // --- Public profiles ---
     aboutPractice: 'Über die Praxis',
