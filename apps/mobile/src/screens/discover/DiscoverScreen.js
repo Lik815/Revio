@@ -63,6 +63,13 @@ export function DiscoverTabScreen() {
 
   useEffect(() => {
     if (!route.params?.resetToHomeAt) return;
+    // Aus der Kartenansicht heraus: erster Tab-Druck bringt nur zurück zur
+    // letzten Suche (Listenansicht), Query/Ergebnisse bleiben erhalten. Erst
+    // ein weiterer Druck (jetzt in der Liste) setzt auf die Startseite zurück.
+    if (search.viewMode === 'map') {
+      search.setViewMode('list');
+      return;
+    }
     search.resetDiscoverState();
     discoverScrollRef.current?.scrollTo?.({ y: 0, animated: false });
   }, [route.params?.resetToHomeAt]);
