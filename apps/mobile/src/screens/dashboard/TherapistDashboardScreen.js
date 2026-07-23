@@ -321,35 +321,6 @@ function AgendaBookingRow({ item, isHighlighted, onPress, servicesByKey = {}, c 
   );
 }
 
-function AgendaCourseRow({ item, c }) {
-  const { startsAt, endsAt, session } = item;
-  const durationMin = Math.round((endsAt.getTime() - startsAt.getTime()) / 60_000);
-  const accentColor = c.accent ?? '#5A9E8E';
-  const accentBg = c.accentBg ?? '#EAF4F1';
-
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 14, backgroundColor: accentBg }}>
-      <Text style={{ width: 46, fontSize: 13, fontWeight: '600', color: accentColor }}>
-        {fmtTime(startsAt)}
-      </Text>
-      <View style={{ flex: 1, paddingLeft: 6 }}>
-        <Text style={{ fontSize: 14, fontWeight: '600', color: accentColor }} numberOfLines={1}>
-          {session?.courseTitle ?? 'Kurs'}
-        </Text>
-        {session?.runLabel ? (
-          <Text style={{ fontSize: 12, color: accentColor, opacity: 0.8, marginTop: 1 }} numberOfLines={1}>{session.runLabel}</Text>
-        ) : null}
-      </View>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-        <View style={{ backgroundColor: accentColor, borderRadius: RADIUS.sm, paddingHorizontal: 6, paddingVertical: 2 }}>
-          <Text style={{ fontSize: 10, fontWeight: '700', color: '#FFFFFF' }}>Kurs</Text>
-        </View>
-        <Text style={{ fontSize: 12, color: accentColor }}>{durationMin} Min</Text>
-      </View>
-    </View>
-  );
-}
-
 function AgendaFreeRow({ item, c }) {
   const { startsAt, endsAt } = item;
   const freeMin = Math.round((endsAt.getTime() - startsAt.getTime()) / 60_000);
@@ -417,8 +388,6 @@ function AgendaCard({ items, agendaState, onPressBooking, onPressAll, servicesBy
                 servicesByKey={servicesByKey}
                 c={c}
               />
-            ) : item.type === 'course' ? (
-              <AgendaCourseRow item={item} c={c} />
             ) : (
               <AgendaFreeRow item={item} c={c} />
             )}
@@ -518,7 +487,7 @@ export function TherapistDashboardScreen() {
     refreshTherapyTab,
   } = useTherapyData();
 
-  const { workingHoursRules, blockedTimes, courseSessions, refreshScheduleData } = useTherapistScheduleData({ authToken });
+  const { workingHoursRules, blockedTimes, refreshScheduleData } = useTherapistScheduleData({ authToken });
   const { servicesByKey } = useTherapistServices({ authToken });
 
   const [selectedDate] = useState(() => {
@@ -545,8 +514,8 @@ export function TherapistDashboardScreen() {
   );
 
   const agendaItems = useMemo(
-    () => getDayAgendaItems({ bookings: incomingBookings, workingHoursRules, blockedTimes, courseSessions, date: selectedDate }),
-    [incomingBookings, workingHoursRules, blockedTimes, courseSessions, selectedDate],
+    () => getDayAgendaItems({ bookings: incomingBookings, workingHoursRules, blockedTimes, date: selectedDate }),
+    [incomingBookings, workingHoursRules, blockedTimes, selectedDate],
   );
 
   const agendaState = useMemo(() => getCurrentAgendaState(agendaItems, now), [agendaItems, now]);

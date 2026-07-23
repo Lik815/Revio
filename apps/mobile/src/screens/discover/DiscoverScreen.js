@@ -17,7 +17,7 @@ import { appStyles } from '../../styles/app-styles';
 import { DiscoverContent } from './DiscoverContent';
 import { NextAppointmentBanner, NEXT_APPOINTMENT_BANNER_HEIGHT } from '../../components/NextAppointmentBanner';
 import { useTherapyData } from '../../context/TherapyContext';
-import { getNextPatientAppointment, courseCategoryChips } from '../../utils/app-utils';
+import { getNextPatientAppointment } from '../../utils/app-utils';
 
 const t = (key) => translations.de[key] ?? key;
 
@@ -90,13 +90,10 @@ export function DiscoverTabScreen() {
     navigation.navigate(ROOT_ROUTES.THERAPIST_PROFILE, { therapistId: id, therapist: fallback });
   };
 
-  const openCourseById = (id, title = null) => {
-    navigation.navigate(ROOT_ROUTES.COURSE_DETAIL, { courseId: id, courseTitle: title });
-  };
-
   const handleBannerPress = () => {
     navigation.navigate(ROOT_ROUTES.MAIN_TABS, {
       screen: TAB_ROUTES.THERAPY,
+      params: nextAppointment ? { openAppointmentId: nextAppointment.id } : undefined,
     });
   };
 
@@ -155,12 +152,6 @@ export function DiscoverTabScreen() {
         userCoords={search.userCoords}
         viewMode={search.viewMode}
         bannerExtraPadding={nextAppointment ? NEXT_APPOINTMENT_BANNER_HEIGHT + 16 : 0}
-        courseResults={search.courseResults}
-        courseLoading={search.courseLoading}
-        courseCategoryKey={search.courseCategoryKey}
-        selectCourseCategory={search.selectCourseCategory}
-        courseCategoryChips={courseCategoryChips}
-        openCourseById={openCourseById}
       />
 
       <NextAppointmentBanner

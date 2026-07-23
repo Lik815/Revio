@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getBaseUrl, TUNNEL_HEADERS } from '../utils/app-utils';
 
-// Schedule data (working hours, blocked times, course sessions) changes rarely,
+// Schedule data (working hours, blocked times) changes rarely,
 // so a tab-focus refresh only refetches when the last load is older than this.
 // Pass { force: true } (pull-to-refresh) to bypass.
 const SCHEDULE_STALE_MS = 30 * 1000;
@@ -9,7 +9,6 @@ const SCHEDULE_STALE_MS = 30 * 1000;
 export function useTherapistScheduleData({ authToken }) {
   const [workingHoursRules, setWorkingHoursRules] = useState([]);
   const [blockedTimes, setBlockedTimes] = useState([]);
-  const [courseSessions, setCourseSessions] = useState([]);
   const [loading, setLoading] = useState(false);
   const cancelledRef = useRef(false);
   const lastLoadedAtRef = useRef(0);
@@ -25,16 +24,12 @@ export function useTherapistScheduleData({ authToken }) {
       const to = new Date();
       to.setDate(to.getDate() + 90);
 
-      const [hoursRes, blockedRes, courseSessionsRes] = await Promise.all([
+      const [hoursRes, blockedRes] = await Promise.all([
         fetch(`${getBaseUrl()}/therapist/working-hours`, {
           headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
         }).catch(() => null),
         fetch(
           `${getBaseUrl()}/therapist/blocked-times?from=${from.toISOString()}&to=${to.toISOString()}`,
-          { headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` } },
-        ).catch(() => null),
-        fetch(
-          `${getBaseUrl()}/courses/my/sessions?from=${from.toISOString()}&to=${to.toISOString()}`,
           { headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` } },
         ).catch(() => null),
       ]);
@@ -48,10 +43,6 @@ export function useTherapistScheduleData({ authToken }) {
       if (blockedRes?.ok) {
         const d = await blockedRes.json().catch(() => ({}));
         if (!cancelledRef.current) setBlockedTimes(d.blockedTimes ?? []);
-      }
-      if (courseSessionsRes?.ok) {
-        const d = await courseSessionsRes.json().catch(() => ({}));
-        if (!cancelledRef.current) setCourseSessions(d.sessions ?? []);
       }
       if (!cancelledRef.current) lastLoadedAtRef.current = Date.now();
     } finally {
@@ -67,5 +58,5 @@ export function useTherapistScheduleData({ authToken }) {
     return () => { cancelledRef.current = true; };
   }, [load]);
 
-  return { workingHoursRules, blockedTimes, courseSessions, loading, refreshScheduleData: load };
+  return { workingHoursRules, blockedTimes, loading, refreshScheduleData: load };
 }

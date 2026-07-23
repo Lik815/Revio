@@ -196,7 +196,6 @@ model Therapist {
   scheduledSlots        ScheduledSlot[]
   inquiries             Inquiry[]               @relation("TherapistInquiries")
   reviews               TherapistReview[]
-  courses               Course[]                @relation("TherapistCourses")
   notifications         Notification[]
 }
 
@@ -246,7 +245,6 @@ model Practice {
   links             TherapistPracticeLink[]
   invitations       Invitation[]
   assignments       ManagerPracticeAssignment[]
-  courses           Course[]                    @relation("PracticeCourses")
 }
 
 model PracticeManager {
@@ -741,157 +739,3 @@ model InquirySlot {
   @@index([inquiryId])
 }
 
-// ─── Kurs-Erweiterung ────────────────────────────────────────────────────────
-
-enum CourseLocationType {
-  ONSITE
-  ONLINE
-  HYBRID
-}
-
-enum CourseRunStatus {
-  DRAFT
-  PUBLISHED
-  PAUSED
-  CANCELLED
-}
-
-enum CourseEnrollmentStatus {
-  EMAIL_UNCONFIRMED
-  PENDING
-  CONFIRMED
-  DECLINED
-  CANCELLED
-  WAITLISTED
-}
-
-model CourseCategory {
-  id        String   @id @default(cuid())
-  key       String   @unique
-  label     String   @unique
-  sortOrder Int      @default(0)
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-
-  courses   Course[]
-}
-
-model Course {
-  id          String @id @default(cuid())
-
-  therapistId String?
-  therapist   Therapist? @relation("TherapistCourses", fields: [therapistId], references: [id], onDelete: Cascade)
-  practiceId  String?
-  practice    Practice?  @relation("PracticeCourses", fields: [practiceId], references: [id], onDelete: Cascade)
-
-  categoryKey String
-  category    CourseCategory @relation(fields: [categoryKey], references: [key])
-
-  title              String
-  description        String
-  targetAudience     String?
-  prerequisites      String?
-  instructorName     String
-  instructorBio      String?
-  contactInfo        String?
-  cancellationPolicy String?
-  locationType       CourseLocationType
-
-  zppDocUrl String?
-
-  healthInsuranceEligible Boolean @default(false)
-  zppVerified             Boolean @default(false)
-
-  reviewStatus ReviewStatus @default(DRAFT)
-  adminNote    String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  runs CourseRun[]
-
-  @@index([therapistId, reviewStatus])
-  @@index([practiceId, reviewStatus])
-  @@index([categoryKey, reviewStatus])
-}
-
-model CourseRun {
-  id       String @id @default(cuid())
-  courseId String
-  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
-
-  label String?
-
-  status CourseRunStatus @default(DRAFT)
-
-  address   String?
-  city      String?
-  onlineUrl String?
-
-  maxParticipants Int
-  minParticipants Int?
-  waitlistEnabled Boolean @default(false)
-  waitlistMax     Int?
-
-  bookingDeadline DateTime?
-
-  priceAmount   Int?
-  priceCurrency String @default("EUR")
-
-  cancelledAt  DateTime?
-  cancelReason String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  sessions    CourseSession[]
-  enrollments CourseEnrollment[]
-
-  @@index([courseId, status])
-}
-
-model CourseSession {
-  id          String    @id @default(cuid())
-  courseRunId String
-  courseRun   CourseRun @relation(fields: [courseRunId], references: [id], onDelete: Cascade)
-
-  startsAt DateTime
-  endsAt   DateTime
-  location String?
-
-  createdAt DateTime @default(now())
-
-  @@index([courseRunId, startsAt])
-}
-
-model CourseEnrollment {
-  id          String    @id @default(cuid())
-  courseRunId String
-  courseRun   CourseRun @relation(fields: [courseRunId], references: [id])
-
-  patientName  String
-  patientEmail String?
-  patientPhone String?
-  message      String?
-
-  status CourseEnrollmentStatus @default(EMAIL_UNCONFIRMED)
-
-  confirmToken         String?  @unique
-  cancelToken          String   @unique
-  cancelTokenExpiresAt DateTime?
-
-  declineReason    String?
-  cancelledBy      String?
-  cancelledAt      DateTime?
-  confirmedEmailAt DateTime?
-
-  consentAcceptedAt DateTime
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([courseRunId, status])
-  @@index([patientEmail])
-  @@index([confirmToken])
-  @@index([cancelToken])
-}

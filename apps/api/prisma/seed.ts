@@ -424,24 +424,6 @@ async function main() {
     },
   });
 
-  // ── CourseCategory-Seed (§20 SGB V Handlungsfelder) ──────────────────────
-  const courseCategories = [
-    { key: 'bewegung',   label: 'Bewegungsgesundheit',  sortOrder: 1 },
-    { key: 'ernaehrung', label: 'Ernährung',             sortOrder: 2 },
-    { key: 'stress',     label: 'Stressbewältigung',     sortOrder: 3 },
-    { key: 'entspannung',label: 'Entspannung',           sortOrder: 4 },
-    { key: 'sucht',      label: 'Suchtmittelkonsum',     sortOrder: 5 },
-    { key: 'sonstiges',  label: 'Sonstiges',             sortOrder: 6 },
-  ];
-  for (const cat of courseCategories) {
-    await prisma.courseCategory.upsert({
-      where: { key: cat.key },
-      update: { label: cat.label, sortOrder: cat.sortOrder },
-      create: cat,
-    });
-  }
-  console.log(`  ${courseCategories.length} CourseCategories angelegt`);
-
   // ── SearchSuggestions ─────────────────────────────────────────────────────
   await (prisma as any).searchSuggestion.deleteMany();
 

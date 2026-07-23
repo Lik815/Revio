@@ -6,8 +6,6 @@ export const ROOT_ROUTES = {
   PRACTICE_PROFILE: 'PracticeProfile',
   LOGIN: 'Login',
   REGISTRATION: 'Registration',
-  COURSE_LIST: 'CourseList',
-  COURSE_DETAIL: 'CourseDetail',
 };
 
 export const TAB_ROUTES = {

@@ -22,11 +22,6 @@ import { notificationRoutes } from './routes/notifications.js';
 import { scheduleRoutes } from './routes/schedule.js';
 import { inquiryRoutes } from './routes/inquiry.js';
 import { matchRoutes } from './routes/match.js';
-import { courseRoutes } from './routes/courses.js';
-import { adminCourseRoutes } from './routes/admin-courses.js';
-import { publicCourseRoutes } from './routes/courses-public.js';
-import { courseEnrollmentRoutes } from './routes/courses-enrollment.js';
-import { courseFeatureGate } from './utils/course-feature-gate.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -59,17 +54,6 @@ export async function buildApp() {
   await app.register(scheduleRoutes);
   await app.register(inquiryRoutes);
   await app.register(matchRoutes);
-  // Öffentliche + Provider-Kursrouten hinter dem plattformweiten Kurs-Schalter.
-  // Ist das Feature deaktiviert, antworten alle diese Endpunkte mit 404 — der
-  // Gate-Hook wirkt nur in diesem gekapselten Kontext.
-  await app.register(async (gated) => {
-    gated.addHook('onRequest', courseFeatureGate);
-    await gated.register(courseRoutes);
-    await gated.register(publicCourseRoutes);
-    await gated.register(courseEnrollmentRoutes);
-  });
-  // Admin-Kursrouten bleiben bewusst ungegated (Aufräumen nach dem Abschalten).
-  await app.register(adminCourseRoutes);
 
   // Scheduled expiry: mark stale PENDING bookings as EXPIRED every 5 min.
   // Im dynamischen Buchungssystem gibt es keine TherapistSlot-Statusänderung

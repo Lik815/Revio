@@ -19,8 +19,7 @@ import {
   getDefaultSpecializationOptions,
   isSpecializationOptionStorageError,
 } from '../utils/specialization-options.js';
-import { getPublicSiteSettings, setBooleanAppSetting, SITE_UNDER_CONSTRUCTION_KEY, COURSES_ENABLED_KEY } from '../utils/app-settings.js';
-import { invalidateCoursesEnabledCache } from '../utils/course-feature-gate.js';
+import { getPublicSiteSettings, setBooleanAppSetting, SITE_UNDER_CONSTRUCTION_KEY } from '../utils/app-settings.js';
 
 
 const splitList = (value: string) =>
@@ -127,7 +126,6 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
   });
   const siteSettingsSchema = z.object({
     underConstruction: z.boolean().optional(),
-    coursesEnabled: z.boolean().optional(),
   });
   const blogPostSchema = z.object({
     slug: z.string().trim().min(2).max(120).regex(/^[a-z0-9-]+$/, 'Ungültiger Slug'),
@@ -239,16 +237,6 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
         SITE_UNDER_CONSTRUCTION_KEY,
         parsed.data.underConstruction,
       );
-    }
-
-    if (parsed.data.coursesEnabled !== undefined) {
-      await setBooleanAppSetting(
-        fastify.prisma,
-        COURSES_ENABLED_KEY,
-        parsed.data.coursesEnabled,
-      );
-      // Gate-Cache leeren, damit das Abschalten sofort greift.
-      invalidateCoursesEnabledCache();
     }
 
     return {

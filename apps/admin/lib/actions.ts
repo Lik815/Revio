@@ -160,29 +160,6 @@ export async function disputeLink(id: string) {
   revalidatePath('/practices');
 }
 
-// Course actions
-async function reviewCourse(id: string, status: 'APPROVED' | 'REJECTED' | 'CHANGES_REQUESTED' | 'SUSPENDED') {
-  await adminRequest(`/admin/courses/${id}/review`, { method: 'PATCH', body: { status } });
-  revalidatePath('/courses');
-  revalidatePath(`/courses/${id}`);
-}
-
-export async function approveCourse(id: string) {
-  await reviewCourse(id, 'APPROVED');
-}
-
-export async function rejectCourse(id: string) {
-  await reviewCourse(id, 'REJECTED');
-}
-
-export async function requestChangesCourse(id: string) {
-  await reviewCourse(id, 'CHANGES_REQUESTED');
-}
-
-export async function suspendCourse(id: string) {
-  await reviewCourse(id, 'SUSPENDED');
-}
-
 // Certification option actions
 export async function createCertificationOption(formData: FormData) {
   const label = String(formData.get('label') ?? '').trim();
@@ -282,17 +259,6 @@ export async function updateSiteUnderConstruction(formData: FormData) {
 
   await adminRequest('/admin/site-settings/update', {
     body: { underConstruction },
-  });
-
-  revalidatePath('/settings');
-}
-
-export async function updateCoursesEnabled(formData: FormData) {
-  const value = String(formData.get('coursesEnabled') ?? '').trim();
-  const coursesEnabled = value === 'true';
-
-  await adminRequest('/admin/site-settings/update', {
-    body: { coursesEnabled },
   });
 
   revalidatePath('/settings');

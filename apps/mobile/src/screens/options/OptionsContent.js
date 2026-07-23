@@ -3,7 +3,6 @@ import { Pressable, ScrollView, Switch, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SPACE } from '../../utils/app-utils';
 import { AccountHeader } from '../../components/AccountHeader';
-import { useConfigOptions } from '../../hooks/use-config-options';
 
 export function OptionsContent({
   loggedInTherapist, loggedInPatient,
@@ -11,11 +10,10 @@ export function OptionsContent({
   onShowLogin, onShowRegister,
   onShowFeedback, onLogout,
   onShowDebug,
-  onShowWorkingHours, onShowServices, onShowBlockedTimes, onShowMyCourses,
+  onShowWorkingHours, onShowServices, onShowBlockedTimes,
   c, t, styles,
 }) {
   const [debugTapCount, setDebugTapCount] = React.useState(0);
-  const { coursesEnabled } = useConfigOptions();
 const renderOptions = () => {
   const isLoggedIn = Boolean(loggedInTherapist || loggedInPatient);
 
@@ -92,23 +90,6 @@ const renderOptions = () => {
                 subtitle="Pausen, Hausbesuche, Urlaub, Fortbildungen blockieren"
                 icon="ban-outline"
                 onPress={onShowBlockedTimes}
-                valueColor={c.primary}
-                last
-              />
-            </OptionGroup>
-          </>
-        )}
-
-        {/* ── Kurse (alle eingeloggten Therapeuten) — nur wenn plattformweit aktiv ── */}
-        {loggedInTherapist && coursesEnabled && (
-          <>
-            <SectionHeader title="Gesundheitskurse" />
-            <OptionGroup>
-              <OptionRow
-                label="Meine Kurse"
-                subtitle="Kurse anlegen, planen und einreichen"
-                icon="school-outline"
-                onPress={onShowMyCourses}
                 valueColor={c.primary}
                 last
               />
