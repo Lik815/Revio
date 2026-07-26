@@ -11,6 +11,7 @@ import {
 import { normalizeKassenarten, serializeKassenarten } from '../utils/kassenarten.js';
 import { geocodeAddress } from '../utils/geocode.js';
 import { sendPasswordResetEmail } from '../utils/mailer.js';
+import { exportPatientData, exportTherapistData } from '../utils/subject-data.js';
 import { getTherapistOfferedHeilmittelKeys, syncTherapistHeilmittelFromServices } from '../utils/therapist-services.js';
 
 export { hashPassword, verifyPassword, getToken };
@@ -262,8 +263,11 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       include: {
         therapistProfile: {
           include: {
+            // Selbstansicht: auch ausstehende (PROPOSED) Links zeigen, damit der/die
+            // Therapeut:in den Freigabestatus der eigenen Praxis sieht. Die öffentliche
+            // Sichtbarkeit filtert getTherapistPublicationState intern auf CONFIRMED+APPROVED.
             links: {
-              where: { status: 'CONFIRMED' },
+              where: { status: { in: ['PROPOSED', 'CONFIRMED', 'DISPUTED'] } },
               include: { practice: true },
             },
             _count: {
@@ -299,7 +303,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
         where: { sessionToken: token },
         include: {
           links: {
-            where: { status: 'CONFIRMED' },
+            where: { status: { in: ['PROPOSED', 'CONFIRMED', 'DISPUTED'] } },
             include: { practice: true },
           },
           _count: {
@@ -380,6 +384,11 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
         hours: l.practice.hours,
         lat: l.practice.lat,
         lng: l.practice.lng,
+        // Selbstansicht: Link- und Freigabestatus, damit die App "In Prüfung" /
+        // "Bestätigt" anzeigen kann.
+        linkId: l.id,
+        status: l.status,
+        reviewStatus: l.practice.reviewStatus,
       })),
     };
   });
@@ -659,6 +668,111 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     };
   });
 
+  // ── POST /auth/me/practice — Therapeut:in trägt selbst eine Praxis ein ──────
+  // Legt eine neue Praxis (PENDING_REVIEW) an und verknüpft sie als PROPOSED-Link.
+  // Öffentlich sichtbar wird sie erst nach Admin-Freigabe (Praxis APPROVED + Link
+  // CONFIRMED). MVP: genau eine Praxis pro Therapeut:in.
+  fastify.post('/auth/me/practice', async (request, reply) => {
+    const token = getToken(request);
+    if (!token) return reply.unauthorized('Kein Token');
+
+    const user = await fastify.prisma.user.findUnique({ where: { sessionToken: token } });
+    const therapist = (user
+      ? (await fastify.prisma.therapist.findFirst({ where: { userId: user.id } }))
+        ?? (await fastify.prisma.therapist.findUnique({ where: { sessionToken: token } }))
+      : await fastify.prisma.therapist.findUnique({ where: { sessionToken: token } }));
+    if (!therapist) return reply.unauthorized('Ungültiger Token');
+
+    const schema = z.object({
+      name: z.string().min(1),
+      city: z.string().min(1),
+      address: z.string().optional(),
+      phone: z.string().optional(),
+    });
+    const parsed = schema.safeParse(request.body);
+    if (!parsed.success) return reply.badRequest('Name und Stadt der Praxis sind erforderlich.');
+    const data = parsed.data;
+
+    const existing = await fastify.prisma.therapistPracticeLink.findFirst({
+      where: { therapistId: therapist.id, status: { in: ['PROPOSED', 'CONFIRMED', 'DISPUTED'] } },
+    });
+    if (existing) {
+      return reply.conflict('Es ist bereits eine Praxis hinterlegt. Bitte entferne sie zuerst.');
+    }
+
+    const coords = await geocodeAddress(data.address ?? '', data.city);
+
+    const result = await fastify.prisma.$transaction(async (tx) => {
+      const practice = await tx.practice.create({
+        data: {
+          name: data.name,
+          city: data.city,
+          address: data.address ?? '',
+          phone: data.phone ?? null,
+          lat: coords?.lat ?? 0,
+          lng: coords?.lng ?? 0,
+          reviewStatus: 'PENDING_REVIEW',
+        },
+      });
+      const link = await tx.therapistPracticeLink.create({
+        data: {
+          therapistId: therapist.id,
+          practiceId: practice.id,
+          status: 'PROPOSED',
+          initiatedBy: 'THERAPIST',
+        },
+      });
+      return { practice, link };
+    });
+
+    return reply.status(201).send({
+      practice: {
+        id: result.practice.id,
+        name: result.practice.name,
+        city: result.practice.city,
+        address: result.practice.address,
+        phone: result.practice.phone,
+        lat: result.practice.lat,
+        lng: result.practice.lng,
+        linkId: result.link.id,
+        status: result.link.status,
+        reviewStatus: result.practice.reviewStatus,
+      },
+    });
+  });
+
+  // ── DELETE /auth/me/practice — hinterlegte Praxis entfernen ─────────────────
+  // Entfernt den Link. Die Praxis wird nur gelöscht, wenn kein anderer Therapeut
+  // sie noch nutzt (verwaiste, selbst angelegte Praxis).
+  fastify.delete('/auth/me/practice', async (request, reply) => {
+    const token = getToken(request);
+    if (!token) return reply.unauthorized('Kein Token');
+
+    const user = await fastify.prisma.user.findUnique({ where: { sessionToken: token } });
+    const therapist = (user
+      ? (await fastify.prisma.therapist.findFirst({ where: { userId: user.id } }))
+        ?? (await fastify.prisma.therapist.findUnique({ where: { sessionToken: token } }))
+      : await fastify.prisma.therapist.findUnique({ where: { sessionToken: token } }));
+    if (!therapist) return reply.unauthorized('Ungültiger Token');
+
+    const links = await fastify.prisma.therapistPracticeLink.findMany({
+      where: { therapistId: therapist.id, status: { in: ['PROPOSED', 'CONFIRMED', 'DISPUTED'] } },
+    });
+    if (links.length === 0) return { success: true };
+
+    await fastify.prisma.$transaction(async (tx) => {
+      for (const link of links) {
+        await tx.therapistPracticeLink.delete({ where: { id: link.id } });
+        const remaining = await tx.therapistPracticeLink.count({ where: { practiceId: link.practiceId } });
+        if (remaining === 0) {
+          await tx.practice.delete({ where: { id: link.practiceId } });
+        }
+      }
+    });
+
+    return { success: true };
+  });
+
   fastify.patch('/auth/me/auto-accept', async (request, reply) => {
     const token = getToken(request);
     if (!token) return reply.unauthorized('Kein Token');
@@ -731,6 +845,36 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       profileStatus,
       missingFields,
     };
+  });
+
+  // GET /auth/me/export — Selbstauskunft nach Art. 15/20 DSGVO (DS-40).
+  // Identität wird über den Session-Token nachgewiesen (DS-44: keine zusätzlichen
+  // Daten nötig). Liefert alle personenbezogenen Daten der eingeloggten Person als
+  // maschinenlesbares JSON, ohne P3-Geheimnisse (siehe utils/subject-data.ts).
+  fastify.get('/auth/me/export', async (request, reply) => {
+    const token = getToken(request);
+    if (!token) return reply.unauthorized('Kein Token');
+
+    const user = await fastify.prisma.user.findUnique({
+      where: { sessionToken: token },
+      include: { therapistProfile: true },
+    });
+
+    if (user?.role === 'patient') {
+      const data = await exportPatientData(fastify.prisma, user.id);
+      reply.header('Content-Disposition', 'attachment; filename="revio-datenexport.json"');
+      return data;
+    }
+
+    let therapist = user?.therapistProfile ?? null;
+    if (!therapist) {
+      therapist = await fastify.prisma.therapist.findUnique({ where: { sessionToken: token } });
+    }
+    if (!therapist) return reply.unauthorized('Ungültiger Token');
+
+    const data = await exportTherapistData(fastify.prisma, therapist.id, user?.id ?? null);
+    reply.header('Content-Disposition', 'attachment; filename="revio-datenexport.json"');
+    return data;
   });
 
   fastify.delete('/auth/me', async (request, reply) => {
@@ -927,7 +1071,9 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
 
     const parsed = z.object({ therapistId: z.string().min(1) }).safeParse(request.body);
     if (!parsed.success) {
-      fastify.log.warn({ body: request.body, error: parsed.error.flatten() }, 'POST /auth/favorites/therapists validation failed');
+      // Nur die Validierungsfehler loggen (Feldnamen/Meldungen), nicht den
+      // Request-Body — der kann personenbezogene Daten enthalten (DSGVO DS-60).
+      fastify.log.warn({ error: parsed.error.flatten() }, 'POST /auth/favorites/therapists validation failed');
       return reply.badRequest(JSON.stringify(parsed.error.flatten()));
     }
 

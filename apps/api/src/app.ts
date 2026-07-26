@@ -22,11 +22,16 @@ import { notificationRoutes } from './routes/notifications.js';
 import { scheduleRoutes } from './routes/schedule.js';
 import { inquiryRoutes } from './routes/inquiry.js';
 import { matchRoutes } from './routes/match.js';
+import { logRedactOptions } from './utils/log-redaction.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export async function buildApp() {
-  const app = Fastify({ logger: true, bodyLimit: 1 * 1024 * 1024 }); // 1MB JSON body limit
+  // Logger mit Redaction-Layer: streift PII/Geheimnisse aus Logs (DSGVO DS-60/61).
+  const app = Fastify({
+    logger: { redact: logRedactOptions },
+    bodyLimit: 1 * 1024 * 1024, // 1MB JSON body limit
+  });
 
   await app.register(cors, { origin: true });
   await app.register(sensible);

@@ -250,7 +250,17 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
     if (!parsed.success) return reply.badRequest(JSON.stringify(parsed.error.flatten()));
 
     const input: SearchInput = parsed.data;
-    fastify.log.info({ searchInput: input }, 'mobile search input');
+    // Kein Logging von Suchbegriff/Ort/Koordinaten — das ist personenbezogen (P1,
+    // Standort). Nur nicht-personenbezogene Metadaten zur Diagnose (DSGVO DS-60).
+    fastify.log.info(
+      {
+        hasQuery: Boolean(input.query),
+        hasCity: Boolean(input.city),
+        hasOrigin: Boolean(input.origin),
+        radiusKm: input.radiusKm,
+      },
+      'mobile search input',
+    );
 
     // Load all approved, publicly-visible therapists (cached ~60s — see
     // loadSearchableTherapists). Invited/manager-onboarding profiles still need an
