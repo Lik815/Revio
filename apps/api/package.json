@@ -8,6 +8,7 @@
     "start": "prisma migrate deploy && node dist/server.js",
     "lint": "tsc --noEmit -p tsconfig.json",
     "typecheck": "tsc --noEmit -p tsconfig.json",
+    "check:classification": "node prisma/check-data-classification.mjs",
     "test": "vitest run",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",

@@ -1,0 +1,131 @@
+# Subprozessor-Liste (DSGVO Art. 28 / DS-81)
+#
+# Maschinenlesbare Liste aller Drittanbieter, die personenbezogene Daten (P1/P2)
+# verarbeiten. Teil des Reviews bei JEDER neuen Abhaengigkeit (DS-80):
+# neuer Dienst, der P1 sieht -> hier eintragen, sonst Merge-Block.
+#
+# Die technischen Felder (purpose, data_categories, location_technical, code_ref,
+# used_by) sind aus dem aktiven Code belegt. Die rechtlichen/organisatorischen
+# Felder (dpa_signed, dpa_date, transfer_mechanism, dsb_approved) sind KEINE
+# technische Aussage — sie gehoeren zu Jurist:in / Datenschutzbeauftragtem (DSB)
+# und stehen bis zur Klaerung auf "OFFEN". Dieser Eintrag ersetzt keine
+# rechtliche Bewertung.
+#
+# Bei Aenderung dieser Datei die Datenschutzerklaerung abgleichen (DS-113):
+#   apps/site/app/datenschutz/page.tsx
+#
+# Stand: 2026-07-25
+
+meta:
+  last_reviewed: "2026-07-25"
+  legal_fields_pending: true   # dpa_*, transfer_mechanism, dsb_approved brauchen DSB/Anwalt
+  privacy_policy: apps/site/app/datenschutz/page.tsx
+
+subprocessors:
+  - name: Railway
+    purpose: Hosting der API und der PostgreSQL-Produktionsdatenbank (Daten at rest)
+    data_categories: [P1, P2]   # alle Nutzer-/Therapeuten-/Patientendaten
+    personal_data: true
+    location_technical: "Region unbekannt — im Railway-Projekt pruefen (EU-Region bevorzugen, DS-83)"
+    used_by: [api]
+    code_ref: railway.json
+    transfer_mechanism: OFFEN    # abhaengig von gewaehlter Region
+    dpa_signed: OFFEN
+    dpa_date: OFFEN
+    dsb_approved: OFFEN
+    notes: "Kern-Hosting. Region verifizieren; bei Nicht-EU Transfermechanismus noetig (DS-82)."
+
+  - name: Vercel
+    purpose: Hosting von Marketing-Site und Admin-Dashboard
+    data_categories: [P1]        # Request-Metadaten, IP (Hosting)
+    personal_data: true
+    location_technical: "USA (Vercel Inc.); EU-Regionen teils verfuegbar"
+    used_by: [site, admin]
+    code_ref: [apps/site/vercel.json, apps/admin/vercel.json]
+    transfer_mechanism: OFFEN    # US-Transfer -> DPF-Zertifizierung des Anbieters oder SCC+TIA pruefen (DS-82)
+    dpa_signed: OFFEN
+    dpa_date: OFFEN
+    dsb_approved: OFFEN
+    notes: >
+      @vercel/analytics und @vercel/speed-insights wurden 2026-07-26 aus dem Admin
+      entfernt (Finding F-9). Aktuell nur Hosting; kein produktseitiges Tracking.
+
+  - name: Resend
+    purpose: Versand transaktionaler E-Mails (OTP, Passwort-Reset, Profil-Status)
+    data_categories: [P1]        # E-Mail-Adresse, Name, E-Mail-Inhalt
+    personal_data: true
+    location_technical: "USA (Resend Inc.)"
+    used_by: [api]
+    code_ref: apps/api/src/utils/mailer.ts
+    transfer_mechanism: OFFEN    # US-Transfer -> DPF/SCC+TIA pruefen (DS-82)
+    dpa_signed: OFFEN
+    dpa_date: OFFEN
+    dsb_approved: OFFEN
+    notes: "Absender: noreply@my-revio.de. Rechtsgrundlage der jeweiligen Mail im VVT festhalten."
+
+  - name: Expo (Push-Dienst)
+    purpose: Versand von Push-Benachrichtigungen an die Mobile-App
+    data_categories: [P1]        # Expo-Push-Token (Geraete-Identifier), Benachrichtigungsinhalt
+    personal_data: true
+    location_technical: "USA (Expo / 650 Industries)"
+    used_by: [api, mobile]
+    code_ref: apps/api/src/utils/push.ts
+    transfer_mechanism: OFFEN    # US-Transfer -> DPF/SCC+TIA pruefen (DS-82)
+    dpa_signed: OFFEN
+    dpa_date: OFFEN
+    dsb_approved: OFFEN
+    notes: "Benachrichtigungsinhalte minimal halten (keine Gesundheitsdetails im Push-Text)."
+
+  - name: Nominatim / OpenStreetMap Foundation
+    purpose: Geocoding von Adressen und Reverse-Geocoding von Koordinaten
+    data_categories: [P1]        # Adressen (Strasse, PLZ, Ort), Suchkoordinaten, aufrufende IP
+    personal_data: true
+    location_technical: "EU/UK (OSMF-Server). UK: Angemessenheitsbeschluss vorhanden"
+    used_by: [api, mobile]
+    code_ref:
+      - apps/api/src/utils/geocode.ts          # serverseitig (Server-IP)
+      - apps/mobile/src/hooks/use-search.js     # clientseitig (Geraete-IP des Nutzers!)
+      - apps/mobile/src/screens/auth/registration/RegistrationFlow.js
+    transfer_mechanism: "EU/UK — voraussichtlich zulaessig; final durch DSB pruefen"
+    dpa_signed: OFFEN            # OSMF bietet i.d.R. keinen klassischen AVV
+    dpa_date: OFFEN
+    dsb_approved: OFFEN
+    notes: >
+      Wird auch DIREKT vom Mobile-Client aufgerufen — dabei geht die Geraete-IP der
+      Nutzer:in an OSMF, nicht nur die Server-IP. In der Datenschutzerklaerung nennen.
+
+  - name: Apple Maps (MapKit)
+    purpose: Kartendarstellung in der iOS-App (Standard-Provider von react-native-maps auf iOS)
+    data_categories: [P1]        # Standort/Viewport-Anfragen, Geraete-IP
+    personal_data: true
+    location_technical: "USA (Apple Inc.)"
+    used_by: [mobile]
+    code_ref: apps/mobile/src/screens/discover/DiscoverContent.js
+    transfer_mechanism: OFFEN
+    dpa_signed: OFFEN
+    dpa_date: OFFEN
+    dsb_approved: OFFEN
+    notes: "Kein expliziter Provider gesetzt -> iOS nutzt Apple Maps."
+
+  - name: Google Maps (Android)
+    purpose: Kartendarstellung in der Android-App (Standard-Provider von react-native-maps auf Android)
+    data_categories: [P1]        # Standort/Viewport-Anfragen, Geraete-IP
+    personal_data: true
+    location_technical: "USA (Google LLC)"
+    used_by: [mobile]
+    code_ref: apps/mobile/src/screens/discover/DiscoverContent.js
+    transfer_mechanism: OFFEN    # US-Transfer -> DPF/SCC+TIA pruefen (DS-82)
+    dpa_signed: OFFEN
+    dpa_date: OFFEN
+    dsb_approved: OFFEN
+    notes: "Android benoetigt fuer Builds einen GOOGLE_MAPS_API_KEY (app.json)."
+
+# Nur Entwicklung/Seed — verarbeitet KEINE Produktions-Personendaten, daher kein
+# Subprozessor im Sinne von Art. 28. Der Vollstaendigkeit halber dokumentiert.
+dev_only:
+  - name: randomuser.me
+    purpose: Zufaellige Profilfotos fuer Seed-/Demo-Daten
+    personal_data: false        # synthetische Demo-Daten, kein echter Personenbezug
+    used_by: [api]
+    code_ref: apps/api/prisma/seed.ts
+    notes: "Externer Abruf nur beim Seeding. Nicht in Produktion mit echten Nutzerdaten."

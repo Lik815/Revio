@@ -1,0 +1,140 @@
+# Datenklassifizierung (DSGVO DS-01 / DS-02)
+#
+# Jedes Skalarfeld jedes Prisma-Modells ist genau einer Klasse zugeordnet.
+# Liegt neben dem Schema (prisma/schema.prisma), damit die Klassifizierung im
+# Code lebt, nicht in einem Wiki. Der Validator prueft, dass KEIN Skalarfeld
+# unklassifiziert ist:
+#
+#   node prisma/check-data-classification.mjs
+#
+# Neue Spalte ohne Eintrag hier => Validator schlaegt fehl (DS-02). In CI aufnehmen.
+#
+# Klassen (siehe docs/dsgvo.md §1):
+#   P0  keine Personendaten (Config, Enums, Zeitstempel, technische IDs von Nicht-Personen)
+#   P1  personenbezogen (Name, E-Mail, Adresse, Standort, Telefon, pseudonyme IDs)
+#   P2  besondere Kategorien Art. 9 (Gesundheit: konkrete Heilmittel/Diagnose EINER Patient:in)
+#   P3  Zugangsdaten/Geheimnisse (Passwort-Hashes, Tokens) — nie im Log/Export
+#
+# Hinweis P1/P2-Abgrenzung: Das Heilmittel-/Fachangebot EINES Therapeuten ist
+# berufliche (oeffentliche) Info => P1. Das konkret angefragte Heilmittel bzw. die
+# Diagnose EINER Patient:in offenbart deren Gesundheit => P2.
+#
+# Zeitstempel (createdAt/updatedAt) und Aufzaehlungs-/Zahlfelder werden als P0
+# gefuehrt, auch wenn sie an einem P1-Datensatz haengen — sie selbst tragen keinen
+# Personenbezug. Fremdschluessel auf Personen (userId/therapistId/patientUserId)
+# sind pseudonyme Identifier und damit P1 (DS-03).
+
+models:
+  User:
+    P3: [passwordHash, sessionToken, emailVerificationToken, passwordResetToken, expoPushToken]
+    P1: [id, email, firstName, lastName, phone, kassenart]
+    P0: [role, sessionTokenExpiresAt, emailVerifiedAt, requiresEmailVerification, passwordResetExpiresAt, createdAt, updatedAt]
+
+  Therapist:
+    P3: [passwordHash, sessionToken, expoPushToken]
+    P1: [id, email, userId, fullName, professionalTitle, city, bio, specializations, certifications, heilmittel, languages, kassenart, availability, serviceRadiusKm, homeLat, homeLng, postalCode, street, houseNumber, latitude, longitude, photo, gender, phone, taxRegistrationStatus, healthAuthorityStatus, locationPrecision]
+    P0: [homeVisit, isFreelancer, isVisible, reviewStatus, employmentStatus, sessionTokenExpiresAt, visibilityPreference, isPublished, bookingMode, nextFreeSlotAt, complianceUpdatedAt, qualifikationenStatus, qualifikationenVerifiziertAt, autoAcceptEnabled, autoAcceptSingle, autoAcceptSeries, createdAt, updatedAt]
+
+  Notification:
+    P1: [id, userId, therapistId, message]
+    P0: [type, bookingId, inquiryId, linkId, practiceId, reviewStatus, actionLabel, readAt, createdAt]
+
+  Practice:
+    P1: [id, name, city, address, phone, lat, lng, logo, photos, description]
+    P0: [hours, reviewStatus, homeVisit, createdAt, updatedAt]
+
+  SearchSuggestion:
+    P1: [text, normalized, entityId]
+    P0: [id, type, weight]
+
+  TherapistPracticeLink:
+    P1: [id, therapistId, practiceId]
+    P0: [status, initiatedBy, createdAt]
+
+  TherapistDocument:
+    # Datei-Inhalt liegt auf Disk (Verifizierungsdokumente, potenziell P1/P2) —
+    # hier nur die DB-Metadaten.
+    P1: [id, therapistId, filename, originalName]
+    P0: [mimetype, uploadedAt]
+
+  BlogPost:
+    P1: [authorName]
+    P0: [id, slug, title, excerpt, content, isPublished, publishedAt, createdAt, updatedAt]
+
+  AppFeedback:
+    P1: [id, userId, email, message]
+    P0: [status, isAuthenticated, createdAt, updatedAt]
+
+  TherapistWorkingHoursRule:
+    P1: [id, therapistId]
+    P0: [weekday, startMinute, endMinute, effectiveFrom, effectiveUntil, isActive, createdAt, updatedAt]
+
+  BookingRequest:
+    P2: [heilmittel]
+    P1: [id, therapistId, patientUserId, patientName, patientEmail, patientPhone, preferredDays, preferredTimeWindows, message, kassenart, declinedReason, cancelReason]
+    P0: [slotId, status, cancelledBy, cancelledAt, startsAt, endsAt, consentAcceptedAt, createdAt, responseDueAt, respondedAt, confirmedSlotAt]
+
+  TherapistReview:
+    P1: [id, therapistId, patientUserId, comment]
+    P0: [bookingRequestId, rating, status, createdAt, updatedAt]
+
+  CertificationOption:
+    P0: [id, key, label, isActive, sortOrder, createdAt, updatedAt]
+
+  SpecializationOption:
+    P0: [id, key, label, isActive, sortOrder, createdAt, updatedAt]
+
+  HeilmittelOption:
+    P0: [id, key, label, defaultDurationMin, isActive, sortOrder, createdAt, updatedAt]
+
+  TherapistService:
+    P1: [id, therapistId]
+    P0: [heilmittelKey, durationMin, bufferAfterMin, slotIntervalMin, isActive, colorHex, kassenarten, createdAt, updatedAt]
+
+  TherapistBlockedTime:
+    P1: [id, therapistId, title]
+    P0: [startsAt, endsAt, grund, createdAt, updatedAt]
+
+  AppSetting:
+    P0: [id, key, value, createdAt, updatedAt]
+
+  EmailOtp:
+    P3: [codeHash]
+    P1: [id, email]
+    P0: [expiresAt, verifiedAt, createdAt]
+
+  UserFavoriteTherapist:
+    P1: [id, userId, therapistId]
+    P0: [createdAt]
+
+  TherapistAbsence:
+    P1: [id, therapistId]
+    P0: [von, bis, grund, ganzePraxis, createdAt, updatedAt]
+
+  ScheduledSlot:
+    P2: [heilmittel, notiz]
+    P1: [id, therapistId, patientName, patientPhone]
+    P0: [bookingRequestId, inquiryId, inquirySlotId, startsAt, endsAt, seriesIndex, status, autoConfirmed, seenByTherapistAt, createdAt, updatedAt]
+
+  PatientRequest:
+    P2: [heilmittel]
+    P1: [id, patientUserId, kassenart, message]
+    P0: [frequenz, anzahlTermine, suchtyp, migrated, createdAt, updatedAt]
+
+  PatientTimeWindow:
+    P1: [id, patientRequestId]
+    P0: [weekday, vonMinute, bisMinute, createdAt]
+
+  PrescriptionData:
+    P2: [icdCode, heilmittelposNr, indikationsSchluessel, arztName, arztDatum]
+    P1: [id, patientRequestId]
+    P0: [createdAt, updatedAt]
+
+  Inquiry:
+    P2: [heilmittel, patientFreitext]
+    P1: [id, patientRequestId, therapistId, patientName, patientEmail, patientPhone, kassenart, ablehnungsgrund]
+    P0: [status, frequenz, anzahlTermine, suchtyp, parallelAnfragenAnzahl, cancelReason, cancelActor, cancelledAt, respondedAt, responseDueAt, reminderSentAt, wunschDatum, wunschUhrzeitVon, wunschUhrzeitBis, confirmedDatum, confirmedUhrzeitVon, confirmedUhrzeitBis, migrated, createdAt, updatedAt]
+
+  InquirySlot:
+    P1: [id, inquiryId]
+    P0: [datum, uhrzeitVon, uhrzeitBis, status, createdAt, updatedAt]

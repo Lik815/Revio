@@ -66,6 +66,7 @@ Registration rule:
 - Do not blindly extend large legacy mobile files. Prefer extracting screens, services, hooks, or helpers first.
 - When developing the React/React Native apps, respect the existing structure (screens, components, hooks, context, navigation, styles). Place new code in the matching folder instead of growing one file or bypassing established patterns.
 - Keep patient data minimal and access-controlled.
+- **GDPR/DSGVO is binding.** Any change that touches personal data (`P1`) or health/special-category data (`P2` — Revio processes health-adjacent data, so most patient/therapist fields qualify) MUST follow `docs/dsgvo.md`. Hard rules that apply on almost every change: never log personal data or secrets (no full request bodies, emails, tokens, names, coordinates — see DS-60/61); minimize API response and query fields (DS-21/22); no third-party service/SDK/CDN that receives personal data without an entry in the plan and `docs/dsgvo.md` (DS-80/81); new `P1` fields must extend the data-subject export and deletion paths (DS-40/41). When a change plausibly conflicts with a `DS-xx` rule, flag it rather than proceeding silently. Legal assessment (legal basis, DPAs, DPIA) is out of scope — surface it, don't decide it.
 - Public provider visibility requires approval or another explicit trust gate verified in active code.
 - Do not introduce payments, reviews, or medical-data features while working on MVP code.
 - Keep app UI German-only unless the active code clearly supports another language strategy.
@@ -103,6 +104,7 @@ Open only the focused doc you need:
 - `docs/freelancer-first-appointment-mvp.md`: freelancer booking blueprint
 - `docs/dynamisches-buchungssystem.md`: dynamic time-slot booking (services, blocked times, slot generator)
 - `docs/plattform-architektur-reverse-engineering.md`: long-form architecture notes
+- `docs/dsgvo.md`: binding GDPR/DSGVO ruleset (`DS-xx` rules), PR Definition-of-Done, audit procedure, and current Revio audit findings (Teil C). Related artifacts: `apps/api/prisma/data-classification.yaml` (every field classified; validate with `pnpm --filter @revio/api check:classification`), `subprocessors.yaml`, `docs/loeschkonzept.md`, `docs/vvt.md`
 
 Treat `history.md` as archive only.
 
