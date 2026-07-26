@@ -180,6 +180,25 @@ export function TherapistProfileContent(props) {
           </View>
         ) : null}
 
+        {/* ── Praxis ──────────────────────────────────────────────────────────── */}
+        {(th.practices ?? [])[0] ? (
+          <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
+            <Text style={{ color: c.muted, fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 10 }}>Praxis</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
+              <Ionicons name="business-outline" size={18} color={c.muted} style={{ marginTop: 2 }} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 15, fontWeight: '700', color: c.text }}>{th.practices[0].name}</Text>
+                {th.practices[0].address ? (
+                  <Text style={{ fontSize: 14, color: c.muted, marginTop: 2 }}>{th.practices[0].address}</Text>
+                ) : null}
+                {th.practices[0].city ? (
+                  <Text style={{ fontSize: 14, color: c.muted, marginTop: 2 }}>{th.practices[0].city}</Text>
+                ) : null}
+              </View>
+            </View>
+          </View>
+        ) : null}
+
         {/* ── Qualifikationen ─────────────────────────────────────────────────── */}
         <TherapistQualifications
           c={c}

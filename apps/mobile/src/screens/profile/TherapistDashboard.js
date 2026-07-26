@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import {
+  ActivityIndicator,
   Image,
   Modal,
   ScrollView,
@@ -109,6 +110,178 @@ function StatusMiniCard({ icon, label, value, color, c }) {
       <Ionicons name={icon} size={18} color={color} />
       <Text style={{ ...TYPE.label, color: c.textMuted ?? c.muted }}>{label}</Text>
       <Text style={{ ...TYPE.meta, color, fontWeight: '600' }}>{value}</Text>
+    </View>
+  );
+}
+
+// ── Praxis-Sektion ────────────────────────────────────────────────────────
+// Therapeut:in trägt selbst eine Praxis ein. Diese wird erst nach Admin-Freigabe
+// (Praxis APPROVED + Link CONFIRMED) öffentlich auf Profil/Suchkarte sichtbar.
+// Genau eine Praxis pro Therapeut:in (MVP).
+function TherapistPracticeCard({ practice, authToken, onChanged, c, t }) {
+  const [showForm, setShowForm] = useState(false);
+  const [name, setName] = useState('');
+  const [address, setAddress] = useState('');
+  const [postalCode, setPostalCode] = useState('');
+  const [city, setCity] = useState('');
+  const [phone, setPhone] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [removing, setRemoving] = useState(false);
+
+  const isConfirmed = practice?.status === 'CONFIRMED' && practice?.reviewStatus === 'APPROVED';
+
+  const handleSave = async () => {
+    if (!name.trim() || !city.trim()) {
+      Alert.alert('Angaben fehlen', 'Bitte Name und Stadt der Praxis angeben.');
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await fetch(`${getBaseUrl()}/auth/me/practice`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({
+          name: name.trim(),
+          city: city.trim(),
+          address: [address.trim(), postalCode.trim()].filter(Boolean).join(', ') || undefined,
+          phone: phone.trim() || undefined,
+        }),
+      });
+      if (res.ok) {
+        setShowForm(false);
+        setName(''); setAddress(''); setPostalCode(''); setCity(''); setPhone('');
+        await onChanged?.();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        Alert.alert('Fehler', data.message ?? 'Praxis konnte nicht gespeichert werden.');
+      }
+    } catch {
+      Alert.alert('Verbindungsfehler', 'Bitte später erneut versuchen.');
+    }
+    setSaving(false);
+  };
+
+  const handleRemove = () => {
+    Alert.alert('Praxis entfernen', 'Möchtest du die hinterlegte Praxis wirklich entfernen?', [
+      { text: 'Abbrechen', style: 'cancel' },
+      {
+        text: 'Entfernen', style: 'destructive', onPress: async () => {
+          setRemoving(true);
+          try {
+            const res = await fetch(`${getBaseUrl()}/auth/me/practice`, {
+              method: 'DELETE',
+              headers: { ...TUNNEL_HEADERS, Authorization: `Bearer ${authToken}` },
+            });
+            if (res.ok) await onChanged?.();
+            else Alert.alert('Fehler', 'Praxis konnte nicht entfernt werden.');
+          } catch {
+            Alert.alert('Verbindungsfehler', 'Bitte später erneut versuchen.');
+          }
+          setRemoving(false);
+        },
+      },
+    ]);
+  };
+
+  return (
+    <View style={{ backgroundColor: c.card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: c.border, padding: SPACE.lg, marginBottom: SPACE.md }}>
+      <Text style={{ fontSize: 15, fontWeight: '700', color: c.text, marginBottom: SPACE.md }}>Praxis</Text>
+
+      {practice ? (
+        <>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: SPACE.md }}>
+            <Ionicons name="business-outline" size={18} color={c.muted} style={{ marginTop: 2 }} />
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 15, fontWeight: '600', color: c.text }}>{practice.name}</Text>
+              {practice.address ? (
+                <Text style={{ fontSize: 13, color: c.muted, marginTop: 1 }}>{practice.address}</Text>
+              ) : null}
+              {practice.city ? (
+                <Text style={{ fontSize: 13, color: c.muted, marginTop: 1 }}>{practice.city}</Text>
+              ) : null}
+              <View style={{ alignSelf: 'flex-start', marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: isConfirmed ? (c.successBg ?? '#f0fdf4') : (c.warningBg ?? '#FEF3C7'), borderRadius: RADIUS.full, paddingHorizontal: 10, paddingVertical: 4 }}>
+                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: isConfirmed ? c.success : (c.warning ?? '#B78700') }} />
+                <Text style={{ fontSize: 12, fontWeight: '600', color: isConfirmed ? c.success : (c.warning ?? '#92400E') }}>
+                  {isConfirmed ? 'Bestätigt' : 'In Prüfung'}
+                </Text>
+              </View>
+            </View>
+          </View>
+          {!isConfirmed ? (
+            <Text style={{ fontSize: 12, color: c.muted, marginTop: 10 }}>
+              Deine Praxis wird nach Freigabe durch das Revio-Team öffentlich auf deinem Profil und in der Suche angezeigt.
+            </Text>
+          ) : null}
+          <Pressable onPress={handleRemove} disabled={removing} style={{ marginTop: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: RADIUS.md, borderWidth: 1, borderColor: c.border }}>
+            {removing ? <ActivityIndicator size="small" color={c.muted} /> : (
+              <>
+                <Ionicons name="trash-outline" size={15} color={c.muted} />
+                <Text style={{ fontSize: 13, color: c.muted, fontWeight: '600' }}>Entfernen</Text>
+              </>
+            )}
+          </Pressable>
+        </>
+      ) : showForm ? (
+        <>
+          <TextInput
+            style={[{ borderWidth: 1, borderRadius: RADIUS.md, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15 }, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg }]}
+            value={name}
+            onChangeText={setName}
+            placeholder="Name der Praxis"
+            placeholderTextColor={c.muted}
+          />
+          <TextInput
+            style={[{ borderWidth: 1, borderRadius: RADIUS.md, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15, marginTop: 8 }, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg }]}
+            value={address}
+            onChangeText={setAddress}
+            placeholder="Straße und Hausnummer"
+            placeholderTextColor={c.muted}
+          />
+          <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+            <TextInput
+              style={[{ borderWidth: 1, borderRadius: RADIUS.md, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15, width: 100 }, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg }]}
+              value={postalCode}
+              onChangeText={setPostalCode}
+              placeholder="PLZ"
+              placeholderTextColor={c.muted}
+              keyboardType="numeric"
+            />
+            <TextInput
+              style={[{ borderWidth: 1, borderRadius: RADIUS.md, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15, flex: 1 }, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg }]}
+              value={city}
+              onChangeText={setCity}
+              placeholder="Stadt"
+              placeholderTextColor={c.muted}
+            />
+          </View>
+          <TextInput
+            style={[{ borderWidth: 1, borderRadius: RADIUS.md, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15, marginTop: 8 }, { color: c.text, borderColor: c.border, backgroundColor: c.mutedBg }]}
+            value={phone}
+            onChangeText={setPhone}
+            placeholder="Telefon (optional)"
+            placeholderTextColor={c.muted}
+            keyboardType="phone-pad"
+          />
+          <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
+            <Pressable onPress={() => setShowForm(false)} disabled={saving} style={{ flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: RADIUS.md, backgroundColor: c.border }}>
+              <Text style={{ fontSize: 14, fontWeight: '700', color: c.text }}>{t('cancelBtn') ?? 'Abbrechen'}</Text>
+            </Pressable>
+            <Pressable onPress={handleSave} disabled={saving} style={{ flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: RADIUS.md, backgroundColor: saving ? c.border : c.primary }}>
+              {saving ? <ActivityIndicator size="small" color="#fff" /> : <Text style={{ fontSize: 14, fontWeight: '700', color: '#fff' }}>Speichern</Text>}
+            </Pressable>
+          </View>
+        </>
+      ) : (
+        <>
+          <Text style={{ fontSize: 13, color: c.muted, marginBottom: 12 }}>
+            Trage die Praxis ein, in der du arbeitest. Sie wird nach Freigabe auf deinem Profil und in der Suche angezeigt.
+          </Text>
+          <Pressable onPress={() => setShowForm(true)} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, borderRadius: RADIUS.md, borderWidth: 1.5, borderColor: c.primary }}>
+            <Ionicons name="add" size={18} color={c.primary} />
+            <Text style={{ fontSize: 14, fontWeight: '700', color: c.primary }}>Praxis hinzufügen</Text>
+          </Pressable>
+        </>
+      )}
     </View>
   );
 }
@@ -771,6 +944,15 @@ export function TherapistDashboardScreen({ c, t, styles, certificationOptions, s
               <Text style={{ fontSize: 13, color: c.muted }}>Noch keine Leistungen konfiguriert.</Text>
             )}
           </View>
+
+          {/* ── Praxis ───────────────────────────────────────────────── */}
+          <TherapistPracticeCard
+            practice={(th.practices ?? [])[0] ?? null}
+            authToken={authToken}
+            onChanged={refreshProfile}
+            c={c}
+            t={t}
+          />
 
           {/* ── Spezialisierungen ────────────────────────────────────── */}
           {(th.specializations ?? []).length > 0 && (

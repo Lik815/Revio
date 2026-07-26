@@ -896,6 +896,7 @@ export function DiscoverContent(props) {
 
       {viewMode === 'list' && !searchLoading && safeResults.map((therapist, index) => {
         const spec = (therapist.specializations ?? [])[0] ?? null;
+        const practiceName = (therapist.practices ?? [])[0]?.name ?? null;
         const initials = (therapist.fullName ?? '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
 
         const isOtherResult = therapist.cityMatch === false || therapist.radiusMatch === false;
@@ -964,8 +965,14 @@ export function DiscoverContent(props) {
             ) : null}
 
             {/* ── Eigenschaften (max. 2) ── */}
-            {(therapist.homeVisit || spec) ? (
+            {(therapist.homeVisit || spec || practiceName) ? (
               <View style={{ marginTop: 12, gap: 7 }}>
+                {practiceName ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+                    <Ionicons name="business-outline" size={14} color={mutedText} />
+                    <Text style={{ fontSize: 14, color: c.text }} numberOfLines={1}>{practiceName}</Text>
+                  </View>
+                ) : null}
                 {therapist.homeVisit ? (
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
                     <Ionicons name="home-outline" size={14} color={mutedText} />
