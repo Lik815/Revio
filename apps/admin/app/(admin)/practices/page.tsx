@@ -1,8 +1,9 @@
+import Link from 'next/link';
 import { PageShell } from '../../../components/page-shell';
 import { PracticeActions } from '../../../components/action-buttons';
 import { DeadlineTimer } from '../../../components/deadline-timer';
 import { api } from '../../../lib/api';
-import { approvePractice, rejectPractice, suspendPractice } from '../../../lib/actions';
+import { approvePractice, rejectPractice, suspendPractice, createPractice } from '../../../lib/actions';
 
 type SearchParams = Promise<{ status?: string; q?: string; city?: string }>;
 
@@ -16,6 +17,8 @@ const statusLabel: Record<string, string> = {
   REJECTED: 'Abgelehnt',
   SUSPENDED: 'Gesperrt',
   DRAFT: 'Entwurf',
+  // Directory-First-Refactor (P2): operator-angelegt, sofort öffentlich sichtbar.
+  LISTED: 'Gelistet',
 };
 
 const statusPriority: Record<string, number> = {
@@ -24,6 +27,7 @@ const statusPriority: Record<string, number> = {
   REJECTED: 2,
   SUSPENDED: 3,
   APPROVED: 4,
+  LISTED: 5,
 };
 
 function getPracticePriority(p: { reviewStatus: string; createdAt: string; links?: { status: string }[] }) {
@@ -99,11 +103,37 @@ export default async function PracticesPage({ searchParams }: { searchParams: Se
           <option value="ALL">Alle Status</option>
           <option value="PENDING_REVIEW">Ausstehend</option>
           <option value="APPROVED">Freigegeben</option>
+          <option value="LISTED">Gelistet</option>
           <option value="REJECTED">Abgelehnt</option>
           <option value="SUSPENDED">Gesperrt</option>
         </select>
         <button className="primary-btn" type="submit">Filtern</button>
       </form>
+
+      <details className="panel panel--compact" style={{ marginBottom: 20 }}>
+        <summary style={{ cursor: 'pointer', fontWeight: 600 }}>
+          Neue Praxis anlegen (Directory-First-Refactor, P2)
+        </summary>
+        <form action={createPractice} style={{ display: 'grid', gap: 12, marginTop: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+            <input className="toolbar-input" name="name" placeholder="Name der Praxis" required />
+            <input className="toolbar-input" name="city" placeholder="Stadt" required />
+            <input className="toolbar-input" name="address" placeholder="Adresse" />
+            <input className="toolbar-input" name="phone" placeholder="Telefon" />
+            <input className="toolbar-input" name="hours" placeholder="Öffnungszeiten" />
+          </div>
+          <textarea className="toolbar-input" name="description" placeholder="Kurzbeschreibung" rows={2} />
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input type="checkbox" name="homeVisit" value="true" />
+            Hausbesuche möglich
+          </label>
+          <p style={{ margin: 0, color: 'var(--muted)', fontSize: 13 }}>
+            Läuft wie eine selbstregistrierte Praxis durch die Freigabe-Warteschlange unten. Bearbeitbar, solange
+            niemand sie übernommen hat.
+          </p>
+          <button className="primary-btn" type="submit" style={{ justifySelf: 'start' }}>Praxis anlegen</button>
+        </form>
+      </details>
 
       {filtered.length === 0 ? (
         <div className="empty-state empty-state--compact">
@@ -162,15 +192,22 @@ export default async function PracticesPage({ searchParams }: { searchParams: Se
                 </span>
               </td>
               <td data-label="Aktionen">
-                <PracticeActions
-                  id={p.id}
-                  status={p.reviewStatus}
-                  actions={{
-                    approve: approvePractice,
-                    reject: rejectPractice,
-                    suspend: suspendPractice,
-                  }}
-                />
+                <div className="action-row">
+                  {p.ownerId ? (
+                    <span className="entity-meta">Übernommen</span>
+                  ) : (
+                    <Link href={`/practices/${p.id}`} className="action-btn">Bearbeiten</Link>
+                  )}
+                  <PracticeActions
+                    id={p.id}
+                    status={p.reviewStatus}
+                    actions={{
+                      approve: approvePractice,
+                      reject: rejectPractice,
+                      suspend: suspendPractice,
+                    }}
+                  />
+                </div>
               </td>
             </tr>
             );

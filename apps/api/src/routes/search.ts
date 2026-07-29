@@ -197,11 +197,19 @@ type SearchableTherapist = Prisma.TherapistGetPayload<{ include: typeof searchTh
 
 let searchTherapistCache: { data: SearchableTherapist[]; loadedAt: number } | null = null;
 
-// Drops the cached list so the next search reloads from the DB. Used by tests to
+// Directory-First-Refactor (P2): Praxen im Zustand LISTED sind öffentlich
+// sichtbar, aber unbeansprucht/nicht geprüft — sie haben keinen verknüpften
+// Therapeuten und tauchen daher NICHT im therapeuten-abgeleiteten practiceMap
+// weiter unten auf. Eigener, unabhängiger Lade-Zweig + eigener Cache.
+type ListedPractice = Prisma.PracticeGetPayload<Record<string, never>>;
+let searchListedPracticesCache: { data: ListedPractice[]; loadedAt: number } | null = null;
+
+// Drops the cached lists so the next search reloads from the DB. Used by tests to
 // keep search isolated between cases; could also be called after admin approval
-// to make a therapist searchable immediately instead of within the TTL window.
+// to make a therapist/practice searchable immediately instead of within the TTL window.
 export function resetSearchCache(): void {
   searchTherapistCache = null;
+  searchListedPracticesCache = null;
 }
 
 async function loadSearchableTherapists(fastify: FastifyInstance): Promise<SearchableTherapist[]> {
@@ -218,6 +226,17 @@ async function loadSearchableTherapists(fastify: FastifyInstance): Promise<Searc
   });
   searchTherapistCache = { data: therapists, loadedAt: Date.now() };
   return therapists;
+}
+
+async function loadListedPractices(fastify: FastifyInstance): Promise<ListedPractice[]> {
+  if (searchListedPracticesCache && Date.now() - searchListedPracticesCache.loadedAt < SEARCH_CACHE_TTL_MS) {
+    return searchListedPracticesCache.data;
+  }
+  const practices = await fastify.prisma.practice.findMany({
+    where: { reviewStatus: 'LISTED' },
+  });
+  searchListedPracticesCache = { data: practices, loadedAt: Date.now() };
+  return practices;
 }
 
 // ── Routes ─────────────────────────────────────────────────────────────────
@@ -426,6 +445,41 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
       if (input.origin && input.radiusKm != null && p.distKm != null && p.distKm > input.radiusKm) return;
       practiceMap.set(p.id, p);
     }));
+
+    // Directory-First-Refactor (P2): LISTED-Praxen ohne verknüpften Therapeuten
+    // separat einmischen. Kein Kassenart-/Heilmittel-/Spezialisierungs-Matching
+    // möglich (keine Therapeuten-Daten) — nur Stadt + Freitext auf Name/Beschreibung.
+    const normalizedQuery = normalizeText(input.query);
+    const listedPractices = await loadListedPractices(fastify);
+    listedPractices.forEach((p) => {
+      if (practiceMap.has(p.id)) return;
+      if (normalizedCity && normalizeText(p.city) !== normalizedCity) return;
+      const haystack = normalizeText(`${p.name} ${p.description ?? ''}`);
+      if (normalizedQuery && !haystack.includes(normalizedQuery)) return;
+
+      const distKm = input.origin && p.lat !== 0 && p.lng !== 0
+        ? haversine(input.origin.lat, input.origin.lng, p.lat, p.lng)
+        : undefined;
+      if (input.origin && input.radiusKm != null && distKm != null && distKm > input.radiusKm) return;
+
+      let photos: string[] | undefined;
+      if (p.photos) { try { photos = JSON.parse(p.photos); } catch {} }
+
+      practiceMap.set(p.id, {
+        id: p.id,
+        name: p.name,
+        city: p.city,
+        address: p.address ?? undefined,
+        phone: p.phone ?? undefined,
+        hours: p.hours ?? undefined,
+        description: p.description ?? undefined,
+        lat: p.lat,
+        lng: p.lng,
+        distKm,
+        logo: p.logo ?? undefined,
+        photos,
+      });
+    });
 
     return {
       therapists: limitedResults,

@@ -1,6 +1,6 @@
 import { PageShell } from '../../../components/page-shell';
 import { api } from '../../../lib/api';
-import { updateSiteUnderConstruction } from '../../../lib/actions';
+import { updateSiteUnderConstruction, updateAppBookingEnabled } from '../../../lib/actions';
 
 export default async function SettingsPage() {
   const siteSettings = await api.getSiteSettings();
@@ -52,6 +52,48 @@ export default async function SettingsPage() {
             <p>
               Der Schalter wirkt direkt auf die öffentliche Präsentationsseite und lässt Impressum sowie Datenschutz weiter erreichbar.
             </p>
+          </aside>
+        </div>
+      </article>
+
+      <article className="panel panel--compact">
+        <div className="panel-header">
+          <div className="panel-header__content">
+            <div className="kicker">Website</div>
+            <h3>App-Bewerbung &amp; Buchungs-CTA</h3>
+            <p className="panel-header__description">
+              Solange aus, zeigen Profil- und Startseite keine App-Werbung und keinen „Nur in der App"-Buchungs-CTA —
+              nur den bestehenden Kontaktweg (Anrufen/E-Mail). Teil des Directory-First-Refactors (Paket P1).
+            </p>
+          </div>
+          <span className={`badge ${siteSettings.appBookingEnabled ? 'badge--APPROVED' : 'badge--PENDING_REVIEW'}`}>
+            {siteSettings.appBookingEnabled ? 'App-Bewerbung aktiv' : 'App-Bewerbung ausgeblendet'}
+          </span>
+        </div>
+
+        <div className="settings-feature-grid">
+          <div className="settings-feature-card">
+            <div className="settings-feature-card__label">Web settings</div>
+            <h4>App-Bewerbung steuern</h4>
+            <p>
+              Schaltet Hero-App-Bild, Store-Badges und den „App herunterladen, um zu buchen"-CTA auf Profilseiten
+              website-weit ein oder aus.
+            </p>
+            <div className="settings-feature-actions">
+              <form action={updateAppBookingEnabled}>
+                <input type="hidden" name="appBookingEnabled" value={siteSettings.appBookingEnabled ? 'false' : 'true'} />
+                <button className={`primary-btn ${siteSettings.appBookingEnabled ? 'primary-btn--muted' : ''}`} type="submit">
+                  {siteSettings.appBookingEnabled ? 'App-Bewerbung ausblenden' : 'App-Bewerbung aktivieren'}
+                </button>
+              </form>
+            </div>
+          </div>
+
+          <aside className="settings-status-card">
+            <div className="settings-status-card__eyebrow">Live-Status</div>
+            <strong>{siteSettings.appBookingEnabled ? 'App-Bewerbung aktiv' : 'App-Bewerbung ausgeblendet'}</strong>
+            <p>Domain: <span>my-revio.de</span></p>
+            <p>Wirkt auf Startseite, Therapeuten- und Praxis-Profilseiten.</p>
           </aside>
         </div>
       </article>

@@ -19,7 +19,7 @@ import {
   getDefaultSpecializationOptions,
   isSpecializationOptionStorageError,
 } from '../utils/specialization-options.js';
-import { getPublicSiteSettings, setBooleanAppSetting, SITE_UNDER_CONSTRUCTION_KEY } from '../utils/app-settings.js';
+import { getPublicSiteSettings, setBooleanAppSetting, SITE_UNDER_CONSTRUCTION_KEY, APP_BOOKING_ENABLED_KEY } from '../utils/app-settings.js';
 
 
 const splitList = (value: string) =>
@@ -91,7 +91,8 @@ function mapTherapist(t: TherapistRow) {
 
 function mapPractice(p: {
   id: string; name: string; city: string; address: string | null;
-  phone: string | null; hours: string | null; lat: number; lng: number; reviewStatus: string;
+  phone: string | null; hours: string | null; description?: string | null; homeVisit?: boolean;
+  lat: number; lng: number; reviewStatus: string; ownerId?: string | null;
   createdAt: Date; updatedAt: Date;
   links?: Array<{ id: string; status: string; therapist: { id: string; fullName: string; professionalTitle: string } }>;
 }) {
@@ -99,7 +100,10 @@ function mapPractice(p: {
     id: p.id, name: p.name, city: p.city,
     address: p.address ?? undefined, phone: p.phone ?? undefined,
     hours: p.hours ?? undefined,
+    description: p.description ?? undefined, homeVisit: p.homeVisit ?? false,
     lat: p.lat, lng: p.lng, reviewStatus: p.reviewStatus,
+    // Directory-First-Refactor (P2): null = unbeansprucht, im Admin-Bereich frei bearbeitbar.
+    ownerId: p.ownerId ?? null,
     createdAt: p.createdAt.toISOString(),
     links: p.links?.map((l) => ({
       id: l.id, status: l.status,
@@ -126,6 +130,7 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
   });
   const siteSettingsSchema = z.object({
     underConstruction: z.boolean().optional(),
+    appBookingEnabled: z.boolean().optional(),
   });
   const blogPostSchema = z.object({
     slug: z.string().trim().min(2).max(120).regex(/^[a-z0-9-]+$/, 'Ungültiger Slug'),
@@ -230,12 +235,19 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
     const parsed = siteSettingsSchema.safeParse(request.body);
     if (!parsed.success) return reply.badRequest('Ungültige Eingabedaten');
 
-    // Beide Schalter sind unabhängig — nur das jeweils mitgeschickte Feld wird gesetzt.
+    // Alle Schalter sind unabhängig — nur das jeweils mitgeschickte Feld wird gesetzt.
     if (parsed.data.underConstruction !== undefined) {
       await setBooleanAppSetting(
         fastify.prisma,
         SITE_UNDER_CONSTRUCTION_KEY,
         parsed.data.underConstruction,
+      );
+    }
+    if (parsed.data.appBookingEnabled !== undefined) {
+      await setBooleanAppSetting(
+        fastify.prisma,
+        APP_BOOKING_ENABLED_KEY,
+        parsed.data.appBookingEnabled,
       );
     }
 
@@ -964,6 +976,102 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
     const { id } = request.params as { id: string };
     const practice = await fastify.prisma.practice.findUnique({ where: { id }, include: { links: { include: { therapist: true } } } });
     if (!practice) return reply.notFound('Practice not found');
+    return mapPractice(practice);
+  });
+
+  const createPracticeSchema = z.object({
+    name: z.string().trim().min(1),
+    city: z.string().trim().min(1),
+    address: z.string().trim().optional(),
+    phone: z.string().trim().optional(),
+    hours: z.string().trim().optional(),
+    description: z.string().trim().optional(),
+    homeVisit: z.boolean().optional(),
+  });
+
+  // Directory-First-Refactor (P2): Operator legt eine Praxis manuell an.
+  // ownerId bleibt null (unbeansprucht) bis zum ersten Claim; läuft durch die
+  // bestehende PENDING_REVIEW-Warteschlange wie eine selbstregistrierte Praxis.
+  fastify.post('/practices/create', async (request, reply) => {
+    const parsed = createPracticeSchema.safeParse(request.body);
+    if (!parsed.success) {
+      const msg = parsed.error.flatten().fieldErrors;
+      return reply.badRequest(Object.entries(msg).map(([k, v]) => `${k}: ${(v as string[]).join(', ')}`).join('; ') || 'Ungültige Eingabe');
+    }
+    const data = parsed.data;
+    const coords = await geocodeAddress(data.address ?? '', data.city);
+
+    const practice = await fastify.prisma.practice.create({
+      data: {
+        name: data.name,
+        city: data.city,
+        address: data.address || null,
+        phone: data.phone || null,
+        hours: data.hours || null,
+        description: data.description || null,
+        homeVisit: data.homeVisit ?? false,
+        lat: coords?.lat ?? 0,
+        lng: coords?.lng ?? 0,
+        // Directory-First-Refactor (P2): sofort öffentlich sichtbar als LISTED —
+        // kein zusätzlicher Freigabeschritt, du bist bereits der vertrauenswürdige
+        // Akteur. Unterscheidet sich bewusst von der Selbstregistrierung
+        // (PENDING_REVIEW), die weiterhin manuelle Prüfung durchläuft.
+        reviewStatus: 'LISTED',
+      },
+    });
+
+    resetSearchCache();
+    return mapPractice(practice);
+  });
+
+  const updatePracticeSchema = z.object({
+    name: z.string().trim().min(1).optional(),
+    city: z.string().trim().min(1).optional(),
+    address: z.string().trim().optional(),
+    phone: z.string().trim().optional(),
+    hours: z.string().trim().optional(),
+    description: z.string().trim().optional(),
+    homeVisit: z.boolean().optional(),
+  });
+
+  // Directory-First-Refactor (P2): Bearbeiten nur solange ownerId null ist
+  // (unbeansprucht). Sobald ein Claim stattfand, endet der Operator-Zugriff.
+  fastify.post('/practices/:id/update', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const parsed = updatePracticeSchema.safeParse(request.body);
+    if (!parsed.success) {
+      const msg = parsed.error.flatten().fieldErrors;
+      return reply.badRequest(Object.entries(msg).map(([k, v]) => `${k}: ${(v as string[]).join(', ')}`).join('; ') || 'Ungültige Eingabe');
+    }
+
+    const existing = await fastify.prisma.practice.findUnique({ where: { id } });
+    if (!existing) return reply.notFound('Practice not found');
+    if ((existing as { ownerId?: string | null }).ownerId) {
+      return reply.forbidden('Diese Praxis wurde bereits übernommen und ist nicht mehr über den Admin-Bereich bearbeitbar.');
+    }
+
+    const data = parsed.data;
+    const needsGeocode = data.address !== undefined || data.city !== undefined;
+    const coords = needsGeocode
+      ? await geocodeAddress(data.address ?? existing.address ?? '', data.city ?? existing.city)
+      : null;
+
+    const practice = await fastify.prisma.practice.update({
+      where: { id },
+      data: {
+        ...(data.name !== undefined && { name: data.name }),
+        ...(data.city !== undefined && { city: data.city }),
+        ...(data.address !== undefined && { address: data.address }),
+        ...(data.phone !== undefined && { phone: data.phone }),
+        ...(data.hours !== undefined && { hours: data.hours }),
+        ...(data.description !== undefined && { description: data.description }),
+        ...(data.homeVisit !== undefined && { homeVisit: data.homeVisit }),
+        ...(coords && { lat: coords.lat, lng: coords.lng }),
+      },
+    }).catch(() => null);
+    if (!practice) return reply.notFound('Practice not found');
+
+    resetSearchCache();
     return mapPractice(practice);
   });
 

@@ -14,6 +14,10 @@ enum ReviewStatus {
   REJECTED
   CHANGES_REQUESTED
   SUSPENDED
+  // Directory-First-Refactor (P2): öffentlich sichtbar, aber unbeansprucht/nicht
+  // geprüft — nur für Practice gedacht (operator-angelegt oder importiert).
+  // Bewusst getrennt von APPROVED, damit kein "Geprüft"-Signal vorgetäuscht wird.
+  LISTED
 }
 
 enum EmploymentStatus {
@@ -121,6 +125,7 @@ model User {
   createdAt              DateTime                @default(now())
   updatedAt              DateTime                @updatedAt
   therapistProfile       Therapist?              @relation("TherapistUser")
+  ownedPractice          Practice?               @relation("PracticeOwner")
   favoriteTherapists     UserFavoriteTherapist[]
   bookingRequests        BookingRequest[]
   patientRequests        PatientRequest[]        @relation("PatientRequests")
@@ -246,6 +251,11 @@ model Practice {
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
   links             TherapistPracticeLink[]
+  // Owner-Relation (Directory-First-Refactor, Paket P2) — null solange die Praxis
+  // unbeansprucht/operator-verwaltet ist; wird beim Claim auf den Account gesetzt,
+  // der die Praxis übernommen hat. Analog zu Therapist.userId.
+  ownerId           String?      @unique
+  owner             User?        @relation("PracticeOwner", fields: [ownerId], references: [id], onDelete: SetNull)
 }
 
 model SearchSuggestion {

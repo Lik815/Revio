@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getPublicPractice } from '../../../lib/public-api';
+import { getSiteSettings } from '../../../lib/site-settings';
 import { PublicPracticeProfile } from '../../../components/public-practice-profile';
 
 export async function generateMetadata({
@@ -33,9 +34,18 @@ export default async function PraxisPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const data = await getPublicPractice(id);
+  const [data, siteSettings] = await Promise.all([
+    getPublicPractice(id),
+    getSiteSettings(),
+  ]);
 
   if (!data) notFound();
 
-  return <PublicPracticeProfile practice={data.practice} therapists={data.therapists} />;
+  return (
+    <PublicPracticeProfile
+      practice={data.practice}
+      therapists={data.therapists}
+      appBookingEnabled={siteSettings.appBookingEnabled}
+    />
+  );
 }

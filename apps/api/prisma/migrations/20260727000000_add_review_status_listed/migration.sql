@@ -1,0 +1,10 @@
+-- AddEnumValue
+-- ReviewStatus.LISTED (Directory-First-Refactor, Paket P2): öffentlich sichtbar,
+-- aber unbeansprucht/nicht geprüft — nur für Practice vorgesehen.
+--
+-- SQLite hat keinen nativen ENUM-Typ; Prisma speichert "reviewStatus" hier als
+-- einfache TEXT-Spalte ohne CHECK-Constraint (siehe bestehende Table-Rebuild-
+-- Migrationen). Ein neuer Enum-Wert erfordert daher keine Schema-Änderung an der
+-- Spalte selbst — diese Datei dokumentiert die Änderung nur für die Migrations-
+-- Historie, damit künftige "prisma migrate dev"-Läufe sie nicht unerwartet mit
+-- einer anderen Änderung bündeln.

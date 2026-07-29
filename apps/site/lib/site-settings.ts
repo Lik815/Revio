@@ -2,6 +2,7 @@ import { getSiteApiBaseCandidates } from './api-base';
 
 export type SiteSettings = {
   underConstruction: boolean;
+  appBookingEnabled: boolean;
 };
 
 export async function getSiteSettings(): Promise<SiteSettings> {
@@ -17,5 +18,5 @@ export async function getSiteSettings(): Promise<SiteSettings> {
     }
   }
 
-  return { underConstruction: false };
+  return { underConstruction: false, appBookingEnabled: false };
 }

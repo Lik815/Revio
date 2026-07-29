@@ -58,7 +58,13 @@ function ProfileIcon({
   );
 }
 
-export function PublicTherapistProfile({ therapist }: { therapist: PublicTherapist }) {
+export function PublicTherapistProfile({
+  therapist,
+  appBookingEnabled = false,
+}: {
+  therapist: PublicTherapist;
+  appBookingEnabled?: boolean;
+}) {
   const nextSlotLabel = formatNextSlot(therapist.nextFreeSlotAt);
 
   return (
@@ -249,12 +255,14 @@ export function PublicTherapistProfile({ therapist }: { therapist: PublicTherapi
             </div>
           ) : null}
 
-          <div className="profile-app-cta-wrap">
-            <AppOnlyCta
-              title="App herunterladen, um einen Termin zu buchen"
-              body="Um einen Termin zu buchen, musst du die Revio App herunterladen. Das Profil kannst du im Web ansehen, die Buchung laeuft ueber die App."
-            />
-          </div>
+          {appBookingEnabled ? (
+            <div className="profile-app-cta-wrap">
+              <AppOnlyCta
+                title="App herunterladen, um einen Termin zu buchen"
+                body="Um einen Termin zu buchen, musst du die Revio App herunterladen. Das Profil kannst du im Web ansehen, die Buchung laeuft ueber die App."
+              />
+            </div>
+          ) : null}
         </div>
       </div>
     </section>

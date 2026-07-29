@@ -15,9 +15,11 @@ function initials(name: string) {
 export function PublicPracticeProfile({
   practice,
   therapists,
+  appBookingEnabled = false,
 }: {
   practice: PublicPractice;
   therapists: PublicTherapist[];
+  appBookingEnabled?: boolean;
 }) {
   return (
     <section className="section section--profile">
@@ -90,12 +92,14 @@ export function PublicPracticeProfile({
           )}
         </div>
 
-        <div style={{ marginTop: 20 }}>
-          <AppOnlyCta
-            title="App herunterladen, um einen Termin zu buchen"
-            body="Um einen Termin bei dieser Praxis zu buchen, musst du die Revio App herunterladen."
-          />
-        </div>
+        {appBookingEnabled ? (
+          <div style={{ marginTop: 20 }}>
+            <AppOnlyCta
+              title="App herunterladen, um einen Termin zu buchen"
+              body="Um einen Termin bei dieser Praxis zu buchen, musst du die Revio App herunterladen."
+            />
+          </div>
+        ) : null}
       </div>
     </section>
   );

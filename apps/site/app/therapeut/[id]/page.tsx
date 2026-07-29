@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getPublicTherapist } from '../../../lib/public-api';
+import { getSiteSettings } from '../../../lib/site-settings';
 import { PublicTherapistProfile } from '../../../components/public-therapist-profile';
 
 export async function generateMetadata({
@@ -33,9 +34,12 @@ export default async function TherapeutPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const therapist = await getPublicTherapist(id);
+  const [therapist, siteSettings] = await Promise.all([
+    getPublicTherapist(id),
+    getSiteSettings(),
+  ]);
 
   if (!therapist) notFound();
 
-  return <PublicTherapistProfile therapist={therapist} />;
+  return <PublicTherapistProfile therapist={therapist} appBookingEnabled={siteSettings.appBookingEnabled} />;
 }

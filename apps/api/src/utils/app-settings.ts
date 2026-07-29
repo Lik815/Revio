@@ -10,6 +10,9 @@ type AppSettingStore = {
 };
 
 export const SITE_UNDER_CONSTRUCTION_KEY = 'site_under_construction';
+// Gate für App-Bewerbung/Buchungs-CTA auf der Website (Directory-First-Refactor,
+// Paket P1) — Default aus, solange Buchung nur in der App läuft.
+export const APP_BOOKING_ENABLED_KEY = 'app_booking_enabled';
 
 export async function getBooleanAppSetting(
   prisma: AppSettingStore,
@@ -37,5 +40,6 @@ export async function setBooleanAppSetting(
 export async function getPublicSiteSettings(prisma: AppSettingStore) {
   return {
     underConstruction: await getBooleanAppSetting(prisma, SITE_UNDER_CONSTRUCTION_KEY, false),
+    appBookingEnabled: await getBooleanAppSetting(prisma, APP_BOOKING_ENABLED_KEY, false),
   };
 }

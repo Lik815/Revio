@@ -125,6 +125,7 @@ export type HeilmittelOption = {
 
 export type SiteSettings = {
   underConstruction: boolean;
+  appBookingEnabled: boolean;
 };
 
 export type BlogPost = {
@@ -146,7 +147,12 @@ export type AdminPractice = {
   city: string;
   address?: string | null;
   phone?: string | null;
+  hours?: string | null;
+  description?: string | null;
+  homeVisit?: boolean;
   reviewStatus: string;
+  // Directory-First-Refactor (P2): null = unbeansprucht, im Admin-Bereich bearbeitbar.
+  ownerId?: string | null;
   createdAt: string;
   links?: Array<{
     id: string;
@@ -183,6 +189,7 @@ export const api = {
   getAppFeedback: () => adminFetch<AppFeedback[]>('/admin/feedback'),
   getStats: () => adminFetch<AdminStats>('/admin/stats'),
   getPractices: () => adminFetch<AdminPractice[]>('/admin/practices'),
+  getPractice: (id: string) => adminFetch<AdminPractice>(`/admin/practices/${id}`),
   getLinks: () => adminFetch<AdminLink[]>('/admin/links'),
   getTherapists: () => adminFetch<TherapistWithLinks[]>('/admin/therapists'),
   getTherapist: (id: string) => adminFetch<TherapistWithLinks>(`/admin/therapists/${id}`),

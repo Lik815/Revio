@@ -3,9 +3,13 @@ import { Hero } from '../components/hero';
 import { Section } from '../components/section';
 import { getPublishedBlogPosts } from '../lib/blog';
 import { patientBenefits, therapistBenefits } from '../lib/content';
+import { getSiteSettings } from '../lib/site-settings';
 
 export default async function HomePage() {
-  const blogPosts = await getPublishedBlogPosts();
+  const [blogPosts, siteSettings] = await Promise.all([
+    getPublishedBlogPosts(),
+    getSiteSettings(),
+  ]);
   const latestPosts = blogPosts.slice(0, 3);
 
   return (
@@ -20,6 +24,7 @@ export default async function HomePage() {
         secondaryLabel="Für Therapeuten"
         searchPlaceholder="Wobei brauchst du Hilfe?"
         chips={['Rückenschmerzen', 'Kniereha', 'Sportphysiotherapie']}
+        hideImage={!siteSettings.appBookingEnabled}
       />
 
       <Section

@@ -139,6 +139,45 @@ export async function suspendPractice(id: string) {
   revalidatePath('/');
 }
 
+// Directory-First-Refactor (P2): Operator legt eine Praxis manuell an.
+export async function createPractice(formData: FormData) {
+  const name = String(formData.get('name') ?? '').trim();
+  const city = String(formData.get('city') ?? '').trim();
+  if (!name || !city) return;
+
+  await adminRequest('/admin/practices/create', {
+    body: {
+      name,
+      city,
+      address: String(formData.get('address') ?? '').trim() || undefined,
+      phone: String(formData.get('phone') ?? '').trim() || undefined,
+      hours: String(formData.get('hours') ?? '').trim() || undefined,
+      description: String(formData.get('description') ?? '').trim() || undefined,
+      homeVisit: formData.get('homeVisit') === 'true',
+    },
+  });
+
+  revalidatePath('/practices');
+}
+
+// Nur möglich solange die Praxis unbeansprucht ist (ownerId null) — die API
+// weist den Zugriff sonst mit 403 zurück.
+export async function updatePractice(id: string, formData: FormData) {
+  await adminRequest(`/admin/practices/${id}/update`, {
+    body: {
+      name: String(formData.get('name') ?? '').trim() || undefined,
+      city: String(formData.get('city') ?? '').trim() || undefined,
+      address: String(formData.get('address') ?? '').trim() || undefined,
+      phone: String(formData.get('phone') ?? '').trim() || undefined,
+      hours: String(formData.get('hours') ?? '').trim() || undefined,
+      description: String(formData.get('description') ?? '').trim() || undefined,
+      homeVisit: formData.get('homeVisit') === 'true',
+    },
+  });
+
+  revalidatePath('/practices');
+}
+
 export async function confirmLink(id: string) {
   await adminRequest(`/admin/links/${id}/confirm`);
   revalidatePath('/links');
@@ -259,6 +298,17 @@ export async function updateSiteUnderConstruction(formData: FormData) {
 
   await adminRequest('/admin/site-settings/update', {
     body: { underConstruction },
+  });
+
+  revalidatePath('/settings');
+}
+
+export async function updateAppBookingEnabled(formData: FormData) {
+  const value = String(formData.get('appBookingEnabled') ?? '').trim();
+  const appBookingEnabled = value === 'true';
+
+  await adminRequest('/admin/site-settings/update', {
+    body: { appBookingEnabled },
   });
 
   revalidatePath('/settings');
