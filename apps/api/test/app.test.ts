@@ -904,7 +904,7 @@ describe('POST /register/send-otp', () => {
     expect(otp?.verifiedAt).toBeNull();
   });
 
-  it('returns 409 when email is already a registered therapist', async () => {
+  it('returns 409 when email already belongs to a claimed therapist account', async () => {
     await prisma.therapist.create({
       data: {
         email: 'otp-existing@test.com',
@@ -914,6 +914,9 @@ describe('POST /register/send-otp', () => {
         specializations: '',
         languages: 'de',
         certifications: '',
+        // passwordHash gesetzt = echtes, bereits registriertes Konto — nicht
+        // zu verwechseln mit einem operator-angelegten, claimbaren Platzhalter.
+        passwordHash: 'irrelevant-hash',
       },
     });
     const res = await app.inject({
@@ -922,6 +925,32 @@ describe('POST /register/send-otp', () => {
       payload: { email: 'otp-existing@test.com' },
     });
     expect(res.statusCode).toBe(409);
+  });
+
+  it('returns 200 ok when email only has an unclaimed operator-created therapist placeholder', async () => {
+    // Directory-First-Refactor (R1): ein Therapist-Datensatz ohne userId/
+    // passwordHash ist ein claimbarer Platzhalter, kein registriertes Konto —
+    // die echte Person muss sich mit derselben E-Mail registrieren können.
+    await prisma.therapist.create({
+      data: {
+        email: 'otp-placeholder@test.com',
+        fullName: 'Platzhalter',
+        professionalTitle: 'PT',
+        city: 'Köln',
+        specializations: '',
+        languages: 'de',
+        certifications: '',
+        consentObtainedAt: new Date(),
+        consentChannel: 'Telefon',
+      },
+    });
+    const res = await app.inject({
+      method: 'POST',
+      url: '/register/send-otp',
+      payload: { email: 'otp-placeholder@test.com' },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().ok).toBe(true);
   });
 
   it('returns 400 for invalid email format', async () => {
@@ -1216,6 +1245,54 @@ describe('POST /register/therapist', () => {
       payload: { ...validPayload, email: validPayload.email },
     });
     expect(res.statusCode).toBe(409);
+  });
+
+  it('claims an operator-created placeholder instead of rejecting it (R1)', async () => {
+    // Regressionstest für den Fix in register.ts: ein Therapist-Datensatz ohne
+    // userId/passwordHash (so wie POST /admin/therapists/create ihn anlegt)
+    // muss übernehmbar sein, statt die echte Person mit ihrer eigenen E-Mail
+    // dauerhaft auszusperren.
+    const placeholderEmail = 'placeholder-claim@test.com';
+    const placeholder = await prisma.therapist.create({
+      data: {
+        email: placeholderEmail,
+        fullName: 'Vom Operator angelegt',
+        professionalTitle: 'PT',
+        city: 'Altstadt',
+        specializations: '',
+        languages: 'de',
+        certifications: '',
+        reviewStatus: 'PENDING_REVIEW',
+        consentObtainedAt: new Date(),
+        consentChannel: 'Telefon',
+        consentNote: 'Zustimmung am 26.07. eingeholt',
+      },
+    });
+
+    await seedConfirmedOtp(placeholderEmail);
+    const res = await app.inject({
+      method: 'POST',
+      url: '/register/therapist',
+      payload: { ...validPayload, email: placeholderEmail },
+    });
+
+    expect(res.statusCode).toBe(201);
+    const body = res.json();
+    // Dieselbe Zeile wird übernommen, nicht dupliziert.
+    expect(body.therapistId).toBe(placeholder.id);
+
+    const claimed = await prisma.therapist.findUnique({ where: { id: placeholder.id } });
+    expect(claimed?.userId).toBeTruthy();
+    expect(claimed?.fullName).toBe(validPayload.fullName);
+    // Frische Registrierung setzt den Status zurück — der Claim allein
+    // ersetzt keine erneute Prüfung.
+    expect(claimed?.reviewStatus).toBe('DRAFT');
+    // Die ursprüngliche Zustimmungsdokumentation bleibt beim Claim erhalten.
+    expect(claimed?.consentChannel).toBe('Telefon');
+    expect(claimed?.consentNote).toBe('Zustimmung am 26.07. eingeholt');
+
+    const total = await prisma.therapist.count({ where: { email: placeholderEmail } });
+    expect(total).toBe(1);
   });
 
   it('creates a practice and PROPOSED link', async () => {
