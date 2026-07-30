@@ -122,8 +122,13 @@ export const registerRoutes: FastifyPluginAsync = async (fastify) => {
 
     const email = parsed.data.email.trim().toLowerCase();
 
+    // Directory-First-Refactor (R1): ein operator-angelegter Therapeut ohne
+    // userId/passwordHash ist ein claimbarer Platzhalter, kein bereits
+    // registriertes Konto — für den lässt sich normal ein OTP anfordern.
     const existingTherapist = await fastify.prisma.therapist.findUnique({ where: { email } });
-    if (existingTherapist) return reply.conflict('Diese E-Mail-Adresse ist bereits registriert.');
+    if (existingTherapist && (existingTherapist.userId || existingTherapist.passwordHash)) {
+      return reply.conflict('Diese E-Mail-Adresse ist bereits registriert.');
+    }
     const existingUser = await fastify.prisma.user.findUnique({ where: { email } });
     if (existingUser) return reply.conflict('Diese E-Mail-Adresse ist bereits registriert.');
 
@@ -206,10 +211,14 @@ export const registerRoutes: FastifyPluginAsync = async (fastify) => {
     const fullName = data.fullName?.trim() || [firstName, lastName].filter(Boolean).join(' ').trim();
     const languages = data.languages && data.languages.length > 0 ? data.languages : ['de'];
 
+    // Directory-First-Refactor (R1): ein operator-angelegter Therapeut ohne
+    // userId/passwordHash ist ein claimbarer Platzhalter — hier wird das
+    // vorhandene Profil übernommen statt ein Konflikt gemeldet.
     const existing = await fastify.prisma.therapist.findUnique({
       where: { email: data.email },
     });
-    if (existing) {
+    const isClaimingPlaceholder = Boolean(existing) && !existing!.userId && !existing!.passwordHash;
+    if (existing && !isClaimingPlaceholder) {
       return reply.conflict('A therapist with this email already exists.');
     }
     const existingUser = await fastify.prisma.user.findUnique({
@@ -272,46 +281,55 @@ export const registerRoutes: FastifyPluginAsync = async (fastify) => {
         },
       });
 
-      const therapist = await tx.therapist.create({
-        data: {
-          email: data.email,
-          userId: user.id,
-          fullName,
-          professionalTitle: 'Physiotherapeut',
-          city: data.city ?? '',
-          postalCode: data.postalCode ?? null,
-          street: data.street ?? null,
-          houseNumber: data.houseNumber ?? null,
-          locationPrecision: precision,
-          latitude: exactCoords?.lat ?? null,
-          longitude: exactCoords?.lng ?? null,
-          ...(publicLat != null ? { homeLat: publicLat, homeLng: publicLng! } : {}),
-          gender: data.gender ?? null,
-          specializations: data.specializations.join(', '),
-          languages: languages.join(', '),
-          certifications: data.certifications.join(', '),
-          homeVisit: data.homeVisit ?? false,
-          isFreelancer: true,
-          serviceRadiusKm: data.serviceRadiusKm ?? null,
-          kassenart: serializeKassenarten(data.kassenarten ?? data.kassenart),
-          availability: data.availability ?? '',
-          passwordHash,
-          employmentStatus: data.employmentStatus,
-          // New accounts start as a private DRAFT — never publicly visible until the
-          // therapist explicitly submits for review (POST /therapists/me/submit-for-review).
-          reviewStatus: 'DRAFT',
-          isVisible: false,
-          isPublished: false,
-          sessionToken,
-          ...(data.compliance?.taxRegistrationStatus !== undefined && {
-            taxRegistrationStatus: data.compliance.taxRegistrationStatus,
-          }),
-          ...(data.compliance?.healthAuthorityStatus !== undefined && {
-            healthAuthorityStatus: data.compliance.healthAuthorityStatus,
-          }),
-          ...(data.compliance && { complianceUpdatedAt: new Date() }),
-        },
-      });
+      // Gemeinsame Felder für Neuanlage und Claim eines Operator-Platzhalters.
+      // Absichtlich NICHT enthalten: consentObtainedAt/consentChannel/consentNote —
+      // die ursprüngliche Zustimmungsdokumentation bleibt beim Claim unangetastet.
+      const therapistFields = {
+        userId: user.id,
+        fullName,
+        professionalTitle: 'Physiotherapeut',
+        city: data.city ?? '',
+        postalCode: data.postalCode ?? null,
+        street: data.street ?? null,
+        houseNumber: data.houseNumber ?? null,
+        locationPrecision: precision,
+        latitude: exactCoords?.lat ?? null,
+        longitude: exactCoords?.lng ?? null,
+        ...(publicLat != null ? { homeLat: publicLat, homeLng: publicLng! } : {}),
+        gender: data.gender ?? null,
+        specializations: data.specializations.join(', '),
+        languages: languages.join(', '),
+        certifications: data.certifications.join(', '),
+        homeVisit: data.homeVisit ?? false,
+        isFreelancer: true,
+        serviceRadiusKm: data.serviceRadiusKm ?? null,
+        kassenart: serializeKassenarten(data.kassenarten ?? data.kassenart),
+        availability: data.availability ?? '',
+        passwordHash,
+        employmentStatus: data.employmentStatus,
+        // New accounts start as a private DRAFT — never publicly visible until the
+        // therapist explicitly submits for review (POST /therapists/me/submit-for-review).
+        reviewStatus: 'DRAFT' as const,
+        isVisible: false,
+        isPublished: false,
+        sessionToken,
+        ...(data.compliance?.taxRegistrationStatus !== undefined && {
+          taxRegistrationStatus: data.compliance.taxRegistrationStatus,
+        }),
+        ...(data.compliance?.healthAuthorityStatus !== undefined && {
+          healthAuthorityStatus: data.compliance.healthAuthorityStatus,
+        }),
+        ...(data.compliance && { complianceUpdatedAt: new Date() }),
+      };
+
+      const therapist = isClaimingPlaceholder
+        ? await tx.therapist.update({
+            where: { id: existing!.id },
+            data: therapistFields,
+          })
+        : await tx.therapist.create({
+            data: { email: data.email, ...therapistFields },
+          });
 
       if (data.practice) {
         const practiceCoords = await geocodeAddress(

@@ -183,6 +183,12 @@ model Therapist {
   locationPrecision     String       @default("approximate")
   latitude              Float?
   longitude             Float?
+  // Zustimmungs-Gate (Directory-First-Refactor, Paket R1): Pflichtnachweis, wenn
+  // ein Operator dieses Profil anlegt statt der Therapeut selbst — dokumentiert,
+  // dass die Person vorher zugestimmt hat. Bleibt leer bei Selbstregistrierung.
+  consentObtainedAt     DateTime?
+  consentChannel        String?
+  consentNote           String?
   // Compliance (added via migration 20260409113000)
   taxRegistrationStatus  String?
   healthAuthorityStatus  String?

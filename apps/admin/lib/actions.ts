@@ -93,6 +93,29 @@ export async function logoutAdmin() {
 }
 
 // Therapist actions
+
+// Directory-First-Refactor (R1): Operator legt ein Therapeuten-Profil an —
+// nur mit dokumentierter Zustimmung.
+export async function createTherapist(formData: FormData) {
+  const email = String(formData.get('email') ?? '').trim();
+  const fullName = String(formData.get('fullName') ?? '').trim();
+  const city = String(formData.get('city') ?? '').trim();
+  const consentChannel = String(formData.get('consentChannel') ?? '').trim();
+  if (!email || !fullName || !city || !consentChannel) return;
+
+  await adminRequest('/admin/therapists/create', {
+    body: {
+      email,
+      fullName,
+      city,
+      consentChannel,
+      consentNote: String(formData.get('consentNote') ?? '').trim() || undefined,
+    },
+  });
+
+  revalidatePath('/therapists');
+}
+
 export async function approveTherapist(id: string) {
   await adminRequest(`/admin/therapists/${id}/approve`);
   revalidatePath('/therapists');

@@ -17,6 +17,7 @@ import {
   rejectTherapist,
   requestChangesTherapist,
   suspendTherapist,
+  createTherapist,
 } from '../../../lib/actions';
 
 type SearchParams = Promise<{ status?: string; q?: string; city?: string }>;
@@ -126,6 +127,23 @@ export default async function TherapistsPage({ searchParams }: { searchParams: S
             <button className="primary-btn" type="submit">Anwenden</button>
           </form>
         </AdminToolbar>
+      </AdminSectionCard>
+
+      <AdminSectionCard
+        eyebrow="Directory-First-Refactor (R1)"
+        title="Neuen Therapeuten anlegen"
+        description="Nur mit dokumentierter Zustimmung — ohne Kanal/Zeitpunkt kein Speichern. Läuft danach wie eine Selbstregistrierung durch die Freigabe-Warteschlange; der echte Therapeut kann das Profil später mit derselben E-Mail selbst übernehmen."
+      >
+        <form action={createTherapist} style={{ display: 'grid', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+            <input className="toolbar-input" name="email" type="email" placeholder="E-Mail" required />
+            <input className="toolbar-input" name="fullName" placeholder="Vollständiger Name" required />
+            <input className="toolbar-input" name="city" placeholder="Stadt" required />
+            <input className="toolbar-input" name="consentChannel" placeholder="Zustimmung über welchen Kanal (z. B. Telefon 26.07.)" required />
+          </div>
+          <textarea className="toolbar-input" name="consentNote" placeholder="Notiz zur Zustimmung (optional)" rows={2} />
+          <button className="primary-btn" type="submit" style={{ justifySelf: 'start' }}>Therapeut anlegen</button>
+        </form>
       </AdminSectionCard>
 
       {filtered.length === 0 ? (

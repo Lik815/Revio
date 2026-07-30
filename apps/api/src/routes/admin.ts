@@ -822,6 +822,60 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
     return mapTherapist(therapist);
   });
 
+  const createTherapistSchema = z.object({
+    email: z.string().email(),
+    fullName: z.string().trim().min(1),
+    city: z.string().trim().min(1),
+    consentChannel: z.string().trim().min(1),
+    consentNote: z.string().trim().optional(),
+  });
+
+  // Directory-First-Refactor (R1): Operator legt ein Therapeuten-Profil an —
+  // nur mit dokumentierter Zustimmung (Pflichtfelder), da das im Unterschied
+  // zu Praxen personenbezogene Daten einer Einzelperson sind. userId bleibt
+  // null (unbeansprucht) — claimbar über die normale Registrierung, siehe den
+  // Platzhalter-Check in register.ts. Bewusst PENDING_REVIEW statt LISTED:
+  // Zustimmung allein ersetzt keine berufliche Verifizierung.
+  fastify.post('/therapists/create', async (request, reply) => {
+    const parsed = createTherapistSchema.safeParse(request.body);
+    if (!parsed.success) {
+      const msg = parsed.error.flatten().fieldErrors;
+      return reply.badRequest(Object.entries(msg).map(([k, v]) => `${k}: ${(v as string[]).join(', ')}`).join('; ') || 'Ungültige Eingabe');
+    }
+    const data = parsed.data;
+    const email = data.email.trim().toLowerCase();
+
+    const existingTherapist = await fastify.prisma.therapist.findUnique({ where: { email } });
+    if (existingTherapist) return reply.conflict('Diese E-Mail-Adresse ist bereits vergeben.');
+    const existingUser = await fastify.prisma.user.findUnique({ where: { email } });
+    if (existingUser) return reply.conflict('Diese E-Mail-Adresse ist bereits vergeben.');
+
+    const created = await fastify.prisma.therapist.create({
+      data: {
+        email,
+        fullName: data.fullName,
+        professionalTitle: 'Physiotherapeut',
+        city: data.city,
+        specializations: '',
+        languages: 'de',
+        employmentStatus: 'SELF_EMPLOYED',
+        isFreelancer: true,
+        reviewStatus: 'PENDING_REVIEW',
+        consentObtainedAt: new Date(),
+        consentChannel: data.consentChannel,
+        consentNote: data.consentNote || null,
+      },
+    });
+
+    const therapist = await fastify.prisma.therapist.findUnique({
+      where: { id: created.id },
+      include: { links: { include: { practice: true } } },
+    });
+
+    resetSearchCache();
+    return mapTherapist(therapist!);
+  });
+
   fastify.post('/therapists/:id/approve', async (request, reply) => {
     const { id } = request.params as { id: string };
     const existing = await fastify.prisma.therapist.findUnique({ where: { id } });
