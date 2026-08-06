@@ -15,6 +15,9 @@ enum ReviewStatus {
   REJECTED
   CHANGES_REQUESTED
   SUSPENDED
+  // Directory-First-Refactor (P2): öffentlich sichtbar, aber unbeansprucht/nicht
+  // geprüft — nur für Practice gedacht (operator-angelegt oder importiert).
+  LISTED
 }
 
 enum EmploymentStatus {
@@ -123,6 +126,7 @@ model User {
   updatedAt              DateTime                @updatedAt
   therapistProfile       Therapist?              @relation("TherapistUser")
   managerProfile         PracticeManager?
+  ownedPractice          Practice?               @relation("PracticeOwner")
   favoriteTherapists     UserFavoriteTherapist[]
   bookingRequests        BookingRequest[]
   patientRequests        PatientRequest[]        @relation("PatientRequests")
@@ -169,6 +173,11 @@ model Therapist {
   autoAcceptEnabled     Boolean      @default(false)
   autoAcceptSingle      Boolean      @default(false)
   autoAcceptSeries      Boolean      @default(false)
+  // Zustimmungs-Gate (Directory-First-Refactor, Paket R1): Pflichtnachweis, wenn
+  // ein Operator dieses Profil anlegt statt der Therapeut selbst.
+  consentObtainedAt     DateTime?
+  consentChannel        String?
+  consentNote           String?
   taxRegistrationStatus String?
   healthAuthorityStatus String?
   complianceUpdatedAt   DateTime?
@@ -245,6 +254,11 @@ model Practice {
   links             TherapistPracticeLink[]
   invitations       Invitation[]
   assignments       ManagerPracticeAssignment[]
+  // Owner-Relation (Directory-First-Refactor, Paket P2) — null solange die Praxis
+  // unbeansprucht/operator-verwaltet ist; wird beim Claim auf den Account gesetzt,
+  // der die Praxis übernommen hat. Analog zu Therapist.userId.
+  ownerId           String?      @unique
+  owner             User?        @relation("PracticeOwner", fields: [ownerId], references: [id], onDelete: SetNull)
 }
 
 model PracticeManager {
