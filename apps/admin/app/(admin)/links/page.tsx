@@ -1,7 +1,7 @@
 import { PageShell } from '../../../components/page-shell';
 import { LinkActions } from '../../../components/action-buttons';
 import { api } from '../../../lib/api';
-import { confirmLink, rejectLink, disputeLink } from '../../../lib/actions';
+import { confirmLink, rejectLink, disputeLink, createLink } from '../../../lib/actions';
 
 type SearchParams = Promise<{ status?: string; q?: string }>;
 
@@ -34,7 +34,11 @@ const statusPriority: Record<string, number> = {
 
 export default async function LinksPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams;
-  const links = await api.getLinks();
+  const [links, therapists, practices] = await Promise.all([
+    api.getLinks(),
+    api.getTherapists(),
+    api.getPractices(),
+  ]);
   const statusFilter = params.status ?? 'ALL';
   const q = (params.q ?? '').toLowerCase();
 
@@ -99,6 +103,33 @@ export default async function LinksPage({ searchParams }: { searchParams: Search
           obwohl Therapeut und Praxis bereits freigegeben sind — diese Einträge erscheinen noch nicht in der Suche.
         </div>
       )}
+
+      <div className="panel panel--compact" style={{ marginBottom: 20 }}>
+        <div className="panel-header">
+          <div className="panel-header__content">
+            <div className="kicker">Directory-First-Refactor (R2)</div>
+            <h3>Praxis mit Therapeut verknüpfen</h3>
+            <p className="panel-header__description">
+              Legt eine neue Verknüpfung direkt als bestätigt an — erscheint sofort in Suche und Profilseite.
+            </p>
+          </div>
+        </div>
+        <form action={createLink} style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+          <select name="therapistId" className="toolbar-select" required defaultValue="">
+            <option value="" disabled>Therapeut wählen</option>
+            {therapists.map((t) => (
+              <option key={t.id} value={t.id}>{t.fullName} — {t.professionalTitle}</option>
+            ))}
+          </select>
+          <select name="practiceId" className="toolbar-select" required defaultValue="">
+            <option value="" disabled>Praxis wählen</option>
+            {practices.map((p) => (
+              <option key={p.id} value={p.id}>{p.name} — {p.city}</option>
+            ))}
+          </select>
+          <button className="primary-btn" type="submit">Verknüpfen</button>
+        </form>
+      </div>
 
       <form className="toolbar toolbar--compact" action="/links">
         <input name="q" defaultValue={params.q ?? ''} className="toolbar-input" placeholder="Nach Therapeut oder Praxis suchen" />

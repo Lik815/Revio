@@ -208,6 +208,22 @@ export async function confirmLink(id: string) {
   revalidatePath('/practices');
 }
 
+// Directory-First-Refactor (R2): Admin verknüpft eine bestehende Praxis mit
+// einem bestehenden Therapeuten manuell — startet direkt als CONFIRMED.
+export async function createLink(formData: FormData) {
+  const therapistId = String(formData.get('therapistId') ?? '').trim();
+  const practiceId = String(formData.get('practiceId') ?? '').trim();
+  if (!therapistId || !practiceId) return;
+
+  await adminRequest('/admin/links', {
+    body: { therapistId, practiceId },
+  });
+
+  revalidatePath('/links');
+  revalidatePath('/therapists');
+  revalidatePath('/practices');
+}
+
 export async function rejectLink(id: string) {
   await adminRequest(`/admin/links/${id}/reject`);
   revalidatePath('/links');

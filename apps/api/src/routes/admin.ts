@@ -1171,6 +1171,49 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
     }));
   });
 
+  const createLinkSchema = z.object({
+    therapistId: z.string().trim().min(1),
+    practiceId: z.string().trim().min(1),
+  });
+
+  // Directory-First-Refactor (R2): Admin verknüpft eine bestehende Praxis mit
+  // einem bestehenden Therapeuten manuell. Existierte bisher nicht — Admin
+  // konnte nur bereits bestehende Links bestätigen/ablehnen/anfechten, keinen
+  // neuen anlegen.
+  fastify.post('/links', async (request, reply) => {
+    const parsed = createLinkSchema.safeParse(request.body);
+    if (!parsed.success) {
+      const msg = parsed.error.flatten().fieldErrors;
+      return reply.badRequest(Object.entries(msg).map(([k, v]) => `${k}: ${(v as string[]).join(', ')}`).join('; ') || 'Ungültige Eingabe');
+    }
+    const { therapistId, practiceId } = parsed.data;
+
+    const therapist = await fastify.prisma.therapist.findUnique({ where: { id: therapistId } });
+    if (!therapist) return reply.notFound('Therapeut nicht gefunden.');
+    const practice = await fastify.prisma.practice.findUnique({ where: { id: practiceId } });
+    if (!practice) return reply.notFound('Praxis nicht gefunden.');
+
+    const existing = await fastify.prisma.therapistPracticeLink.findUnique({
+      where: { therapistId_practiceId: { therapistId, practiceId } },
+    });
+    if (existing) return reply.conflict('Diese Verknüpfung existiert bereits.');
+
+    const link = await fastify.prisma.therapistPracticeLink.create({
+      data: { therapistId, practiceId, status: 'CONFIRMED', initiatedBy: 'ADMIN' },
+      include: {
+        therapist: { select: { id: true, fullName: true, professionalTitle: true } },
+        practice: { select: { id: true, name: true, city: true } },
+      },
+    });
+
+    resetSearchCache();
+    return {
+      id: link.id, therapistId: link.therapistId, practiceId: link.practiceId,
+      status: link.status, createdAt: link.createdAt.toISOString(),
+      therapist: link.therapist, practice: link.practice,
+    };
+  });
+
   fastify.post('/links/:id/confirm', async (request, reply) => {
     const { id } = request.params as { id: string };
     const l = await fastify.prisma.therapistPracticeLink.update({ where: { id }, data: { status: 'CONFIRMED' } }).catch(() => null);
