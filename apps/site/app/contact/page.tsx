@@ -3,7 +3,22 @@ import { Hero } from '../../components/hero';
 import { Section } from '../../components/section';
 import { siteConfig } from '../../lib/content';
 
-export default function ContactPage() {
+type ContactSearchParams = Promise<{ practiceId?: string; practiceName?: string }>;
+
+export default async function ContactPage({
+  searchParams,
+}: {
+  searchParams: ContactSearchParams;
+}) {
+  const params = await searchParams;
+  // Directory-First-Refactor (R4): Vorbefüllte Opt-out-Anfrage von einer
+  // unverifizierten Praxis-Profilseite — kein eigener Endpunkt, damit niemand
+  // ohne Eigentümernachweis fremde Einträge sofort entfernen lassen kann.
+  // Ein Mensch liest die Nachricht und entfernt den Eintrag manuell.
+  const defaultMessage = params.practiceId
+    ? `Ich möchte, dass die Praxis „${params.practiceName ?? ''}" (ID: ${params.practiceId}) aus dem Revio-Verzeichnis entfernt wird.`
+    : undefined;
+
   return (
     <>
       <Hero
@@ -31,7 +46,7 @@ export default function ContactPage() {
             </p>
           </div>
 
-          <ContactForm />
+          <ContactForm defaultMessage={defaultMessage} />
         </div>
       </Section>
     </>

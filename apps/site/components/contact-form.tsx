@@ -10,11 +10,11 @@ const roleOptions = [
 
 type Status = 'idle' | 'sending' | 'success' | 'error';
 
-export function ContactForm() {
+export function ContactForm({ defaultMessage }: { defaultMessage?: string }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [role, setRole] = useState(roleOptions[0].value);
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useState(defaultMessage ?? '');
   const [status, setStatus] = useState<Status>('idle');
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
