@@ -51,6 +51,8 @@ export type PublicPractice = {
   logo?: string;
   photos?: string[];
   distKm?: number;
+  // Directory-First-Refactor (R3): true nur bei geprüften (APPROVED) Praxen.
+  verified?: boolean;
 };
 
 export type PublicTherapist = {
@@ -90,6 +92,7 @@ function normalizePractice(raw: any): PublicPractice {
       ? (raw.photos.map((p: string) => resolveMediaUrl(p)).filter(Boolean) as string[])
       : undefined,
     distKm: typeof raw.distKm === 'number' ? raw.distKm : undefined,
+    verified: Boolean(raw.verified),
   };
 }
 

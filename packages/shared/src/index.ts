@@ -173,6 +173,10 @@ export interface SearchPractice {
   distKm?: number;
   logo?: string;
   photos?: string[];
+  // Directory-First-Refactor (R3): true nur bei reviewStatus APPROVED — leakt
+  // bewusst nicht den rohen internen Status nach außen, nur das verdichtete
+  // Vertrauenssignal (analog zum "Geprüft"-Konzept bei Therapeuten).
+  verified?: boolean;
 }
 
 export interface SearchTherapist {

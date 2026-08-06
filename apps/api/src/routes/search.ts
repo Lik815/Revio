@@ -356,6 +356,9 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
             distKm,
             logo: link.practice.logo ?? undefined,
             photos,
+            // Nur APPROVED-Praxen erreichen diesen Zweig (siehe
+            // searchTherapistInclude.links.where.practice.reviewStatus).
+            verified: true,
           };
         })
         .sort((a, b) => (a.distKm ?? Number.POSITIVE_INFINITY) - (b.distKm ?? Number.POSITIVE_INFINITY));
@@ -478,6 +481,9 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
         distKm,
         logo: p.logo ?? undefined,
         photos,
+        // Dieser Zweig lädt ausschließlich reviewStatus: LISTED — unbeansprucht,
+        // nie APPROVED (siehe loadListedPractices).
+        verified: false,
       });
     });
 
@@ -590,6 +596,7 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
         hours: practice.hours ?? undefined, description: practice.description ?? undefined,
         lat: practice.lat, lng: practice.lng,
         logo: practice.logo ?? undefined, photos,
+        verified: practice.reviewStatus === 'APPROVED',
       },
       therapists: practice.links
         .filter((l) =>
