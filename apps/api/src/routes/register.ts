@@ -114,8 +114,12 @@ export const registerRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   // ── POST /register/send-otp ────────────────────────────────────────────────
+  // Grobe Zusatzbremse pro Absender; der eigentliche Missbrauchsschutz ist das
+  // E-Mail-basierte Limit weiter unten (max. 3 Sends/Stunde pro Adresse). War
+  // zuvor auf 6/Minute — so knapp, dass der komplette Testlauf (eine geteilte
+  // App-Instanz über die ganze Datei) ohne jeden Puffer genau daran hing.
   fastify.post('/register/send-otp', {
-    config: { rateLimit: { max: 6, timeWindow: '1 minute' } },
+    config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
   }, async (request, reply) => {
     const parsed = z.object({ email: z.string().email() }).safeParse(request.body);
     if (!parsed.success) return reply.badRequest('Ungültige E-Mail-Adresse.');
