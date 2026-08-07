@@ -44,6 +44,9 @@ enum Role {
   manager
   admin
   patient
+  // Directory-First-Refactor (R5): Konto, das über den Claim-Flow eine Praxis
+  // übernommen hat. Kein Therapist-Profil verknüpft.
+  practice_owner
 }
 
 enum BookingMode {

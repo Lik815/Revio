@@ -53,6 +53,8 @@ export type PublicPractice = {
   distKm?: number;
   // Directory-First-Refactor (R3): true nur bei geprüften (APPROVED) Praxen.
   verified?: boolean;
+  // Directory-First-Refactor (R5): true sobald jemand die Praxis übernommen hat.
+  claimed?: boolean;
 };
 
 export type PublicTherapist = {
@@ -93,6 +95,7 @@ function normalizePractice(raw: any): PublicPractice {
       : undefined,
     distKm: typeof raw.distKm === 'number' ? raw.distKm : undefined,
     verified: Boolean(raw.verified),
+    claimed: Boolean(raw.claimed),
   };
 }
 

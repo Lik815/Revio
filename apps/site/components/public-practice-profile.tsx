@@ -45,8 +45,17 @@ export function PublicPracticeProfile({
         {!practice.verified ? (
           <div className="surface-card" style={{ marginTop: 20, fontSize: 14 }}>
             <p style={{ margin: 0 }}>
-              Dieses Profil ist gelistet, aber noch nicht verifiziert. Ist das deine Praxis, oder stimmen die
-              Daten nicht?{' '}
+              Dieses Profil ist gelistet, aber noch nicht verifiziert.{' '}
+              {!practice.claimed ? (
+                <>
+                  Ist das deine Praxis?{' '}
+                  <Link href={`/uebernehmen/${practice.id}`} className="page-back-link" style={{ display: 'inline' }}>
+                    Jetzt übernehmen
+                  </Link>{' '}
+                  — oder{' '}
+                </>
+              ) : null}
+              stimmen die Daten nicht?{' '}
               <Link
                 href={`/contact?practiceId=${encodeURIComponent(practice.id)}&practiceName=${encodeURIComponent(practice.name)}`}
                 className="page-back-link"

@@ -177,6 +177,9 @@ export interface SearchPractice {
   // bewusst nicht den rohen internen Status nach außen, nur das verdichtete
   // Vertrauenssignal (analog zum "Geprüft"-Konzept bei Therapeuten).
   verified?: boolean;
+  // Directory-First-Refactor (R5): true sobald ownerId gesetzt ist — steuert,
+  // ob die Website den "Praxis übernehmen"-Einstieg zeigt.
+  claimed?: boolean;
 }
 
 export interface SearchTherapist {

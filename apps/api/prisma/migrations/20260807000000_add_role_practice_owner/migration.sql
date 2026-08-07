@@ -1,0 +1,7 @@
+-- AddEnumValue
+-- Role.practice_owner (Directory-First-Refactor, Paket R5): Konto, das über
+-- den Claim-Flow eine Praxis übernommen hat.
+--
+-- SQLite hat keinen nativen ENUM-Typ; "role" ist hier eine einfache TEXT-Spalte
+-- ohne CHECK-Constraint. Kein DDL nötig — diese Datei dokumentiert die
+-- Änderung nur für die Migrations-Historie.

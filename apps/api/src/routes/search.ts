@@ -359,6 +359,7 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
             // Nur APPROVED-Praxen erreichen diesen Zweig (siehe
             // searchTherapistInclude.links.where.practice.reviewStatus).
             verified: true,
+            claimed: Boolean((link.practice as any).ownerId),
           };
         })
         .sort((a, b) => (a.distKm ?? Number.POSITIVE_INFINITY) - (b.distKm ?? Number.POSITIVE_INFINITY));
@@ -481,9 +482,11 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
         distKm,
         logo: p.logo ?? undefined,
         photos,
-        // Dieser Zweig lädt ausschließlich reviewStatus: LISTED — unbeansprucht,
-        // nie APPROVED (siehe loadListedPractices).
+        // Dieser Zweig lädt ausschließlich reviewStatus: LISTED — nie APPROVED
+        // (siehe loadListedPractices). Kann aber bereits geclaimt sein (R5),
+        // ownerId ändert reviewStatus nicht automatisch.
         verified: false,
+        claimed: Boolean((p as any).ownerId),
       });
     });
 
@@ -597,6 +600,7 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
         lat: practice.lat, lng: practice.lng,
         logo: practice.logo ?? undefined, photos,
         verified: practice.reviewStatus === 'APPROVED',
+        claimed: Boolean((practice as any).ownerId),
       },
       therapists: practice.links
         .filter((l) =>
