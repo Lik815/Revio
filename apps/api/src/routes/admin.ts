@@ -1122,6 +1122,77 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
     return mapPractice(practice);
   });
 
+  const importPracticesSchema = z.object({
+    practices: z.array(z.object({
+      name: z.string().trim().min(1),
+      city: z.string().trim().min(1),
+      address: z.string().trim().optional(),
+      phone: z.string().trim().optional(),
+      hours: z.string().trim().optional(),
+      description: z.string().trim().optional(),
+      homeVisit: z.boolean().optional(),
+    })).min(1).max(500),
+  });
+
+  // Directory-First-Refactor (R7): Massen-Import öffentlicher Praxisdaten für
+  // eine Startregion. Läuft wie /practices/create einzeln (LISTED, ownerId
+  // null), aber in einer Schleife mit Nominatim-Rate-Limit (1 req/sec, siehe
+  // /practices/geocode-all) und Dubletten-Erkennung (Name+Stadt), damit ein
+  // erneuter Lauf mit derselben Liste keine Duplikate anlegt.
+  fastify.post('/practices/import', async (request, reply) => {
+    const parsed = importPracticesSchema.safeParse(request.body);
+    if (!parsed.success) {
+      const msg = parsed.error.flatten().fieldErrors;
+      return reply.badRequest(Object.entries(msg).map(([k, v]) => `${k}: ${(v as string[]).join(', ')}`).join('; ') || 'Ungültige Eingabe');
+    }
+
+    // "mode: insensitive" ist Postgres-spezifisch und existiert auf dem
+    // SQLite-Client nicht (siehe schema.prisma vs. schema.production.prisma) —
+    // deshalb einmalig alle Namen/Städte laden und in JS case-insensitiv
+    // vergleichen, statt einer provider-abhängigen Prisma-Funktion.
+    const existingPractices = await fastify.prisma.practice.findMany({
+      select: { name: true, city: true },
+    });
+    const existingKeys = new Set(
+      existingPractices.map((p) => `${p.name.toLowerCase()}::${p.city.toLowerCase()}`),
+    );
+
+    let created = 0;
+    const skipped: Array<{ name: string; city: string; reason: string }> = [];
+
+    for (const entry of parsed.data.practices) {
+      const key = `${entry.name.toLowerCase()}::${entry.city.toLowerCase()}`;
+      if (existingKeys.has(key)) {
+        skipped.push({ name: entry.name, city: entry.city, reason: 'Existiert bereits (Name + Stadt)' });
+        continue;
+      }
+      existingKeys.add(key); // Dubletten innerhalb derselben Import-Liste auch fangen
+
+      // Nominatim rate limit: 1 req/sec
+      if (created + skipped.length > 0) await new Promise((r) => setTimeout(r, 1100));
+      const coords = await geocodeAddress(entry.address ?? '', entry.city);
+
+      await fastify.prisma.practice.create({
+        data: {
+          name: entry.name,
+          city: entry.city,
+          address: entry.address || null,
+          phone: entry.phone || null,
+          hours: entry.hours || null,
+          description: entry.description || null,
+          homeVisit: entry.homeVisit ?? false,
+          lat: coords?.lat ?? 0,
+          lng: coords?.lng ?? 0,
+          reviewStatus: 'LISTED',
+        },
+      });
+      created++;
+    }
+
+    resetSearchCache();
+    return { created, skipped };
+  });
+
   const updatePracticeSchema = z.object({
     name: z.string().trim().min(1).optional(),
     city: z.string().trim().min(1).optional(),

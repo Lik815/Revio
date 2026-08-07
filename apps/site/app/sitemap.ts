@@ -1,5 +1,6 @@
 import type { MetadataRoute } from 'next';
 import { getPublishedBlogPosts } from '../lib/blog';
+import { getCitiesWithListings } from '../lib/public-api';
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://my-revio.de';
 
@@ -42,7 +43,7 @@ const STATIC_ROUTES: MetadataRoute.Sitemap = [
 ];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const posts = await getPublishedBlogPosts();
+  const [posts, cities] = await Promise.all([getPublishedBlogPosts(), getCitiesWithListings()]);
 
   const blogRoutes: MetadataRoute.Sitemap = posts.map((post) => ({
     url: `${SITE_URL}/blog/${post.slug}`,
@@ -51,5 +52,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.7,
   }));
 
-  return [...STATIC_ROUTES, ...blogRoutes];
+  // Directory-First-Refactor (R7): eine Stadtseite pro Stadt mit echten Einträgen.
+  const cityRoutes: MetadataRoute.Sitemap = cities.map((city) => ({
+    url: `${SITE_URL}/physiotherapie/${encodeURIComponent(city)}`,
+    changeFrequency: 'weekly',
+    priority: 0.85,
+  }));
+
+  return [...STATIC_ROUTES, ...blogRoutes, ...cityRoutes];
 }

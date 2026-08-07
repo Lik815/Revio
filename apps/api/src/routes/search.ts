@@ -662,6 +662,31 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
     return { suggestions: Array.from(groups.values()) };
   });
 
+  // ── GET /cities ────────────────────────────────────────────────────────────
+  // Directory-First-Refactor (R7): Städte mit echten, öffentlich sichtbaren
+  // Einträgen — Grundlage für die SEO-Stadtseiten. Bewusst nur Städte mit
+  // realem Inhalt (keine spekulativen/leeren Seiten, kein Thin Content).
+  fastify.get('/cities', async () => {
+    const [practices, therapists] = await Promise.all([
+      fastify.prisma.practice.findMany({
+        where: { reviewStatus: { in: ['APPROVED', 'LISTED'] } },
+        select: { city: true },
+        distinct: ['city'],
+      }),
+      fastify.prisma.therapist.findMany({
+        where: { reviewStatus: 'APPROVED', isVisible: true, employmentStatus: 'SELF_EMPLOYED' },
+        select: { city: true },
+        distinct: ['city'],
+      }),
+    ]);
+    const cities = new Set<string>();
+    [...practices, ...therapists].forEach((row) => {
+      const city = row.city?.trim();
+      if (city) cities.add(city);
+    });
+    return { cities: Array.from(cities).sort((a, b) => a.localeCompare(b, 'de')) };
+  });
+
   // ── GET /practices/search?q=... ──────────────────────────────────────────
   // Used during registration to find an existing practice by name/city
 

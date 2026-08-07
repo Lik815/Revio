@@ -172,3 +172,10 @@ export async function getPublicPractice(
     therapists: Array.isArray(data.therapists) ? data.therapists.map(normalizeTherapist) : [],
   };
 }
+
+// Directory-First-Refactor (R7): Städte mit echten Einträgen — Grundlage der
+// SEO-Stadtseiten. Nur Städte mit realem Inhalt, keine spekulativen Seiten.
+export async function getCitiesWithListings(): Promise<string[]> {
+  const data = await fetchFromApi('/cities');
+  return Array.isArray(data?.cities) ? data.cities : [];
+}
