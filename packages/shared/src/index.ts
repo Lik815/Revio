@@ -96,6 +96,9 @@ export interface BookingRequest {
 export interface Therapist {
   id: string;
   email: string;
+  // Directory-First-Refactor: null = unbeansprucht (operator-angelegt), im
+  // Admin-Bereich bearbeitbar; gesetzt sobald die Person selbst registriert ist.
+  userId?: string | null;
   fullName: string;
   professionalTitle: string;
   gender?: string | null;

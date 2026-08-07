@@ -32,6 +32,9 @@ export function PracticeResultCard({ practice }: { practice: PublicPractice }) {
       <div className="result-card__footer">
         <span>{practice.city || 'Ort unbekannt'}</span>
         {practice.phone ? <span>{practice.phone}</span> : null}
+        {!practice.verified ? (
+          <span style={{ color: 'var(--muted)', fontSize: 12 }}>Nicht verifiziert</span>
+        ) : null}
       </div>
     </Link>
   );

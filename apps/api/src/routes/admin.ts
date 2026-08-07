@@ -28,7 +28,7 @@ const splitList = (value: string) =>
 type TherapistRow = {
   id: string; email: string; fullName: string; professionalTitle: string;
   city: string; bio: string | null; homeVisit: boolean; specializations: string;
-  isFreelancer: boolean;
+  isFreelancer: boolean; userId?: string | null;
   languages: string; certifications: string; reviewStatus: string;
   employmentStatus?: string | null;
   serviceRadiusKm: number | null; kassenart: string;
@@ -66,6 +66,8 @@ function computeVisibility(t: TherapistRow) {
 function mapTherapist(t: TherapistRow) {
   return {
     id: t.id, email: t.email, fullName: t.fullName,
+    // Directory-First-Refactor: null = unbeansprucht, im Admin-Bereich bearbeitbar.
+    userId: t.userId ?? null,
     professionalTitle: t.professionalTitle, city: t.city,
     bio: t.bio ?? undefined, homeVisit: t.homeVisit,
     isFreelancer: t.isFreelancer,
@@ -874,6 +876,48 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
 
     resetSearchCache();
     return mapTherapist(therapist!);
+  });
+
+  const updateTherapistSchema = z.object({
+    fullName: z.string().trim().min(1).optional(),
+    professionalTitle: z.string().trim().min(1).optional(),
+    city: z.string().trim().min(1).optional(),
+    bio: z.string().trim().optional(),
+  });
+
+  // Directory-First-Refactor (Nacharbeit zu R1): Bearbeiten für einen
+  // operator-angelegten Therapeuten — bisher gab es nur „Anlegen", kein
+  // Bearbeiten. Nur solange userId null ist (unbeansprucht); analog zur
+  // ownerId-Sperre bei Praxen.
+  fastify.post('/therapists/:id/update', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const parsed = updateTherapistSchema.safeParse(request.body);
+    if (!parsed.success) {
+      const msg = parsed.error.flatten().fieldErrors;
+      return reply.badRequest(Object.entries(msg).map(([k, v]) => `${k}: ${(v as string[]).join(', ')}`).join('; ') || 'Ungültige Eingabe');
+    }
+
+    const existing = await fastify.prisma.therapist.findUnique({ where: { id } });
+    if (!existing) return reply.notFound('Therapist not found');
+    if (existing.userId) {
+      return reply.forbidden('Dieser Therapeut wurde bereits übernommen und ist nicht mehr über den Admin-Bereich bearbeitbar.');
+    }
+
+    const data = parsed.data;
+    const therapist = await fastify.prisma.therapist.update({
+      where: { id },
+      data: {
+        ...(data.fullName !== undefined && { fullName: data.fullName }),
+        ...(data.professionalTitle !== undefined && { professionalTitle: data.professionalTitle }),
+        ...(data.city !== undefined && { city: data.city }),
+        ...(data.bio !== undefined && { bio: data.bio }),
+      },
+      include: { links: { include: { practice: true } } },
+    }).catch(() => null);
+    if (!therapist) return reply.notFound('Therapist not found');
+
+    resetSearchCache();
+    return mapTherapist(therapist);
   });
 
   fastify.post('/therapists/:id/approve', async (request, reply) => {

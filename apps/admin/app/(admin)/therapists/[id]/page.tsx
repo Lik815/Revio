@@ -7,6 +7,7 @@ import {
   requestChangesTherapist,
   suspendTherapist,
   setQualifikationStatus,
+  updateTherapist,
 } from '../../../../lib/actions';
 import { api } from '../../../../lib/api';
 import { getAdminVisibilityIssues } from '../../../../lib/visibility';
@@ -193,6 +194,26 @@ export default async function TherapistDetailPage({ params, searchParams }: Prop
           />
         </div>
       </div>
+
+      {/* Directory-First-Refactor: Bearbeiten, solange unbeansprucht (userId null) */}
+      <section className="card" style={{ padding: '20px 24px', marginBottom: 32 }}>
+        <div className="kicker" style={{ marginBottom: 12 }}>Directory-First-Refactor</div>
+        {therapist.userId ? (
+          <p style={{ margin: 0, color: 'var(--muted)' }}>
+            Dieses Profil wurde bereits übernommen und ist nicht mehr über den Admin-Bereich bearbeitbar.
+          </p>
+        ) : (
+          <form action={updateTherapist.bind(null, therapist.id)} style={{ display: 'grid', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+              <input className="toolbar-input" name="fullName" defaultValue={therapist.fullName} placeholder="Vollständiger Name" required />
+              <input className="toolbar-input" name="professionalTitle" defaultValue={therapist.professionalTitle} placeholder="Berufsbezeichnung" />
+              <input className="toolbar-input" name="city" defaultValue={therapist.city} placeholder="Stadt" required />
+            </div>
+            <textarea className="toolbar-input" name="bio" defaultValue={therapist.bio ?? ''} placeholder="Kurzbeschreibung" rows={2} />
+            <button className="primary-btn" type="submit" style={{ justifySelf: 'start' }}>Speichern</button>
+          </form>
+        )}
+      </section>
 
       {/* Profile details */}
       <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 24, marginBottom: 32 }}>

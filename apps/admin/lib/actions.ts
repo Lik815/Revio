@@ -116,6 +116,22 @@ export async function createTherapist(formData: FormData) {
   revalidatePath('/therapists');
 }
 
+// Nur möglich solange der Therapeut unbeansprucht ist (userId null) — die
+// API weist den Zugriff sonst mit 403 zurück.
+export async function updateTherapist(id: string, formData: FormData) {
+  await adminRequest(`/admin/therapists/${id}/update`, {
+    body: {
+      fullName: String(formData.get('fullName') ?? '').trim() || undefined,
+      professionalTitle: String(formData.get('professionalTitle') ?? '').trim() || undefined,
+      city: String(formData.get('city') ?? '').trim() || undefined,
+      bio: String(formData.get('bio') ?? '').trim() || undefined,
+    },
+  });
+
+  revalidatePath('/therapists');
+  revalidatePath(`/therapists/${id}`);
+}
+
 export async function approveTherapist(id: string) {
   await adminRequest(`/admin/therapists/${id}/approve`);
   revalidatePath('/therapists');
