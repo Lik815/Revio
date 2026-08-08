@@ -112,7 +112,7 @@ export default async function PracticesPage({ searchParams }: { searchParams: Se
 
       <details className="panel panel--compact" style={{ marginBottom: 20 }}>
         <summary style={{ cursor: 'pointer', fontWeight: 600 }}>
-          Neue Praxis anlegen (Directory-First-Refactor, P2)
+          Neue Praxis anlegen
         </summary>
         <form action={createPractice} style={{ display: 'grid', gap: 12, marginTop: 16 }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>

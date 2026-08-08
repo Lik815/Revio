@@ -14,7 +14,7 @@ export default async function PracticeEditPage({ params }: { params: Promise<{ i
   return (
     <PageShell
       title={practice.name}
-      description="Directory-First-Refactor (P2): Solange die Praxis unbeansprucht ist (kein Claim), kann sie hier frei bearbeitet werden."
+      description="Solange die Praxis unbeansprucht ist (kein Claim), kann sie hier frei bearbeitet werden."
       eyebrow="Praxis"
       actions={<Link href="/practices" className="action-btn">Zurück zur Warteschlange</Link>}
     >

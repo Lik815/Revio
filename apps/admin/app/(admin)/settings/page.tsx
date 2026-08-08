@@ -63,7 +63,7 @@ export default async function SettingsPage() {
             <h3>App-Bewerbung &amp; Buchungs-CTA</h3>
             <p className="panel-header__description">
               Solange aus, zeigen Profil- und Startseite keine App-Werbung und keinen „Nur in der App"-Buchungs-CTA —
-              nur den bestehenden Kontaktweg (Anrufen/E-Mail). Teil des Directory-First-Refactors (Paket P1).
+              nur den bestehenden Kontaktweg (Anrufen/E-Mail).
             </p>
           </div>
           <span className={`badge ${siteSettings.appBookingEnabled ? 'badge--APPROVED' : 'badge--PENDING_REVIEW'}`}>

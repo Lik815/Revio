@@ -107,7 +107,7 @@ export default async function LinksPage({ searchParams }: { searchParams: Search
       <div className="panel panel--compact" style={{ marginBottom: 20 }}>
         <div className="panel-header">
           <div className="panel-header__content">
-            <div className="kicker">Directory-First-Refactor (R2)</div>
+            <div className="kicker">Verknüpfung anlegen</div>
             <h3>Praxis mit Therapeut verknüpfen</h3>
             <p className="panel-header__description">
               Legt eine neue Verknüpfung direkt als bestätigt an — erscheint sofort in Suche und Profilseite.

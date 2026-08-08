@@ -130,7 +130,7 @@ export default async function TherapistsPage({ searchParams }: { searchParams: S
       </AdminSectionCard>
 
       <AdminSectionCard
-        eyebrow="Directory-First-Refactor (R1)"
+        eyebrow="Neuanlage"
         title="Neuen Therapeuten anlegen"
         description="Nur mit dokumentierter Zustimmung — ohne Kanal/Zeitpunkt kein Speichern. Läuft danach wie eine Selbstregistrierung durch die Freigabe-Warteschlange; der echte Therapeut kann das Profil später mit derselben E-Mail selbst übernehmen."
       >

@@ -197,7 +197,7 @@ export default async function TherapistDetailPage({ params, searchParams }: Prop
 
       {/* Directory-First-Refactor: Bearbeiten, solange unbeansprucht (userId null) */}
       <section className="card" style={{ padding: '20px 24px', marginBottom: 32 }}>
-        <div className="kicker" style={{ marginBottom: 12 }}>Directory-First-Refactor</div>
+        <div className="kicker" style={{ marginBottom: 12 }}>Profil bearbeiten</div>
         {therapist.userId ? (
           <p style={{ margin: 0, color: 'var(--muted)' }}>
             Dieses Profil wurde bereits übernommen und ist nicht mehr über den Admin-Bereich bearbeitbar.
