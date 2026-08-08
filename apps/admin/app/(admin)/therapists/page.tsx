@@ -17,10 +17,9 @@ import {
   rejectTherapist,
   requestChangesTherapist,
   suspendTherapist,
-  createTherapist,
 } from '../../../lib/actions';
 
-type SearchParams = Promise<{ status?: string; q?: string; city?: string; formError?: string; created?: string }>;
+type SearchParams = Promise<{ status?: string; q?: string; city?: string; created?: string }>;
 
 function getQueueCopy({
   overdueCount,
@@ -69,7 +68,12 @@ export default async function TherapistsPage({ searchParams }: { searchParams: S
       title="Therapeuten"
       description="Review-Queue, Sichtbarkeit und die nächste sinnvolle Entscheidung in einer Arbeitsansicht."
       eyebrow="Reviews"
-      actions={<div className="hero-pill">{filtered.length} Profile in der Ansicht</div>}
+      actions={
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <div className="hero-pill">{filtered.length} Profile in der Ansicht</div>
+          <Link href="/therapists/neu" className="primary-btn">Neuen Therapeuten anlegen</Link>
+        </div>
+      }
     >
       <div className="review-summary-grid">
         <AdminSummaryCard
@@ -129,28 +133,9 @@ export default async function TherapistsPage({ searchParams }: { searchParams: S
         </AdminToolbar>
       </AdminSectionCard>
 
-      <AdminSectionCard
-        eyebrow="Neuanlage"
-        title="Neuen Therapeuten anlegen"
-        description="Nur mit dokumentierter Zustimmung — ohne Kanal/Zeitpunkt kein Speichern. Läuft danach wie eine Selbstregistrierung durch die Freigabe-Warteschlange; der echte Therapeut kann das Profil später mit derselben E-Mail selbst übernehmen."
-      >
-        {params.formError ? (
-          <AdminNotice title="Anlegen fehlgeschlagen" tone="warning">{params.formError}</AdminNotice>
-        ) : null}
-        {params.created ? (
-          <AdminNotice title="Angelegt" tone="success">{params.created} wurde angelegt und steht in der Warteschlange.</AdminNotice>
-        ) : null}
-        <form action={createTherapist} style={{ display: 'grid', gap: 12 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
-            <input className="toolbar-input" name="email" type="email" placeholder="E-Mail" required />
-            <input className="toolbar-input" name="fullName" placeholder="Vollständiger Name" required />
-            <input className="toolbar-input" name="city" placeholder="Stadt" required />
-            <input className="toolbar-input" name="consentChannel" placeholder="Zustimmung über welchen Kanal (z. B. Telefon 26.07.)" required />
-          </div>
-          <textarea className="toolbar-input" name="consentNote" placeholder="Notiz zur Zustimmung (optional)" rows={2} />
-          <button className="primary-btn" type="submit" style={{ justifySelf: 'start' }}>Therapeut anlegen</button>
-        </form>
-      </AdminSectionCard>
+      {params.created ? (
+        <AdminNotice title="Angelegt" tone="success">{params.created} wurde angelegt und steht in der Warteschlange.</AdminNotice>
+      ) : null}
 
       {filtered.length === 0 ? (
         <AdminEmptyState

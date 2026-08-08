@@ -115,7 +115,7 @@ export async function createTherapist(formData: FormData) {
   const city = String(formData.get('city') ?? '').trim();
   const consentChannel = String(formData.get('consentChannel') ?? '').trim();
   if (!email || !fullName || !city || !consentChannel) {
-    redirect('/therapists?formError=' + encodeURIComponent('Bitte E-Mail, Name, Stadt und Zustimmungs-Kanal ausfüllen.'));
+    redirect('/therapists/neu?formError=' + encodeURIComponent('Bitte E-Mail, Name, Stadt und Zustimmungs-Kanal ausfüllen.'));
   }
 
   let errorMessage: string | null = null;
@@ -134,8 +134,9 @@ export async function createTherapist(formData: FormData) {
   }
 
   // redirect() wirft intern NEXT_REDIRECT — deshalb außerhalb des try/catch.
+  // Fehler: zurück zum Formular. Erfolg: zur Liste mit Bestätigung.
   if (errorMessage) {
-    redirect('/therapists?formError=' + encodeURIComponent(errorMessage));
+    redirect('/therapists/neu?formError=' + encodeURIComponent(errorMessage));
   }
 
   revalidatePath('/therapists');
