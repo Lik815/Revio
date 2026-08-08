@@ -28,7 +28,18 @@ async function adminRequest(path: string, init?: { method?: 'POST' | 'PATCH' | '
         },
         ...(init?.body !== undefined ? { body: JSON.stringify(init.body) } : {}),
       });
-      if (!res.ok) throw new Error(`API ${res.status}: ${path}`);
+      if (!res.ok) {
+        // Die menschenlesbare Fehlermeldung der API durchreichen (z. B.
+        // "Diese E-Mail-Adresse ist bereits vergeben."), statt nur den Status.
+        // 4xx sind fachliche Fehler → nicht auf den nächsten Base-Kandidaten
+        // ausweichen, sondern sofort weiterreichen.
+        let message = `API ${res.status}: ${path}`;
+        try {
+          const body = await res.json();
+          if (body?.message) message = body.message;
+        } catch {}
+        throw new Error(message);
+      }
       return;
     } catch (error) {
       lastError = error;
@@ -95,25 +106,40 @@ export async function logoutAdmin() {
 // Therapist actions
 
 // Directory-First-Refactor (R1): Operator legt ein Therapeuten-Profil an —
-// nur mit dokumentierter Zustimmung.
+// nur mit dokumentierter Zustimmung. Fehler (z. B. 409 "E-Mail bereits
+// vergeben") werden abgefangen und als Meldung zur Seite zurückgegeben, statt
+// die Server-Component-Render mit einem ungefangenen Throw abstürzen zu lassen.
 export async function createTherapist(formData: FormData) {
   const email = String(formData.get('email') ?? '').trim();
   const fullName = String(formData.get('fullName') ?? '').trim();
   const city = String(formData.get('city') ?? '').trim();
   const consentChannel = String(formData.get('consentChannel') ?? '').trim();
-  if (!email || !fullName || !city || !consentChannel) return;
+  if (!email || !fullName || !city || !consentChannel) {
+    redirect('/therapists?formError=' + encodeURIComponent('Bitte E-Mail, Name, Stadt und Zustimmungs-Kanal ausfüllen.'));
+  }
 
-  await adminRequest('/admin/therapists/create', {
-    body: {
-      email,
-      fullName,
-      city,
-      consentChannel,
-      consentNote: String(formData.get('consentNote') ?? '').trim() || undefined,
-    },
-  });
+  let errorMessage: string | null = null;
+  try {
+    await adminRequest('/admin/therapists/create', {
+      body: {
+        email,
+        fullName,
+        city,
+        consentChannel,
+        consentNote: String(formData.get('consentNote') ?? '').trim() || undefined,
+      },
+    });
+  } catch (error) {
+    errorMessage = error instanceof Error ? error.message : 'Anlegen fehlgeschlagen.';
+  }
+
+  // redirect() wirft intern NEXT_REDIRECT — deshalb außerhalb des try/catch.
+  if (errorMessage) {
+    redirect('/therapists?formError=' + encodeURIComponent(errorMessage));
+  }
 
   revalidatePath('/therapists');
+  redirect('/therapists?created=' + encodeURIComponent(fullName));
 }
 
 // Nur möglich solange der Therapeut unbeansprucht ist (userId null) — die

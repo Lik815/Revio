@@ -20,7 +20,7 @@ import {
   createTherapist,
 } from '../../../lib/actions';
 
-type SearchParams = Promise<{ status?: string; q?: string; city?: string }>;
+type SearchParams = Promise<{ status?: string; q?: string; city?: string; formError?: string; created?: string }>;
 
 function getQueueCopy({
   overdueCount,
@@ -134,6 +134,12 @@ export default async function TherapistsPage({ searchParams }: { searchParams: S
         title="Neuen Therapeuten anlegen"
         description="Nur mit dokumentierter Zustimmung — ohne Kanal/Zeitpunkt kein Speichern. Läuft danach wie eine Selbstregistrierung durch die Freigabe-Warteschlange; der echte Therapeut kann das Profil später mit derselben E-Mail selbst übernehmen."
       >
+        {params.formError ? (
+          <AdminNotice title="Anlegen fehlgeschlagen" tone="warning">{params.formError}</AdminNotice>
+        ) : null}
+        {params.created ? (
+          <AdminNotice title="Angelegt" tone="success">{params.created} wurde angelegt und steht in der Warteschlange.</AdminNotice>
+        ) : null}
         <form action={createTherapist} style={{ display: 'grid', gap: 12 }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
             <input className="toolbar-input" name="email" type="email" placeholder="E-Mail" required />
