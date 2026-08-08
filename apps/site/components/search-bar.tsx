@@ -20,7 +20,7 @@ export function SearchBar({ defaultQuery = '', defaultCity = '', defaultHomeVisi
         </label>
         <div className="field">
           <label htmlFor="finden-city">Ort</label>
-          <CityInput id="finden-city" name="city" defaultValue={defaultCity} placeholder="z. B. Köln" required />
+          <CityInput id="finden-city" name="city" defaultValue={defaultCity} placeholder="z. B. Köln" required autoDetect={!defaultCity} />
         </div>
       </div>
 

@@ -10,7 +10,15 @@ type CityInputProps = {
   required?: boolean;
   wrapperClassName?: string;
   inputClassName?: string;
+  // Wenn true und das Feld leer ist, wird der Standort beim Mounten aktiv
+  // erkannt (zeigt ggf. einmal den Browser-Prompt). Für die Suchseite /finden,
+  // wo der Nutzer bereits Suchabsicht gezeigt hat. Auf der Startseite false.
+  autoDetect?: boolean;
 };
+
+// City-genaue Genauigkeit reicht — kein GPS-Fix nötig. maximumAge akzeptiert eine
+// bis zu 5 Min alte Position, damit die Erkennung nahezu sofort ist statt zu hängen.
+const GEO_OPTIONS: PositionOptions = { enableHighAccuracy: false, timeout: 10000, maximumAge: 300_000 };
 
 async function reverseGeocodeCity(lat: number, lng: number): Promise<string> {
   const res = await fetch(
@@ -31,6 +39,7 @@ export function CityInput({
   required,
   wrapperClassName = '',
   inputClassName = '',
+  autoDetect = false,
 }: CityInputProps) {
   const [value, setValue] = useState(defaultValue);
   const [locating, setLocating] = useState(false);
@@ -50,15 +59,24 @@ export function CityInput({
         }
       },
       () => setLocating(false),
-      { enableHighAccuracy: true, timeout: 10000 },
+      GEO_OPTIONS,
     );
   };
 
   useEffect(() => {
-    // Only auto-fill if the field is still empty and permission was already
-    // granted in a previous visit — never trigger a fresh permission prompt
-    // without an explicit click.
-    if (value || !navigator.permissions || !navigator.geolocation) return;
+    if (value || !navigator.geolocation) return;
+
+    // Suchseite (autoDetect): Standort aktiv erkennen. getCurrentPosition zeigt
+    // bei Bedarf einmal den Prompt und funktioniert auch in Safari, wo
+    // navigator.permissions.query({name:'geolocation'}) nicht verlässlich ist.
+    if (autoDetect) {
+      detectLocation();
+      return;
+    }
+
+    // Startseite: nur automatisch füllen, wenn die Berechtigung bereits erteilt
+    // wurde — kein frischer Prompt ohne Klick.
+    if (!navigator.permissions) return;
     let cancelled = false;
     navigator.permissions
       .query({ name: 'geolocation' })

@@ -41,7 +41,8 @@ export function HeroSearchBar({ placeholder }: HeroSearchBarProps) {
         }
       },
       () => setLocating(false),
-      { enableHighAccuracy: true, timeout: 10000 },
+      // City-genaue Genauigkeit reicht; maximumAge macht die Erkennung nahezu sofort.
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 300_000 },
     );
   };
 
