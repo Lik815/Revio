@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 type CityInputProps = {
   name: string;
@@ -43,15 +43,23 @@ export function CityInput({
 }: CityInputProps) {
   const [value, setValue] = useState(defaultValue);
   const [locating, setLocating] = useState(false);
+  const [autoSubmit, setAutoSubmit] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  const detectLocation = () => {
+  const detectLocation = (submitAfter = false) => {
     if (!navigator.geolocation) return;
     setLocating(true);
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         try {
           const city = await reverseGeocodeCity(position.coords.latitude, position.coords.longitude);
-          if (city) setValue(city);
+          if (city) {
+            setValue(city);
+            // Kam der Nutzer über einen Chip/Hero-Link (autoDetect) auf /finden
+            // ohne Stadt, wird nach erfolgreicher Erkennung direkt gesucht, damit
+            // Ergebnisse mit Standort erscheinen — ohne zusätzlichen Klick.
+            if (submitAfter) setAutoSubmit(true);
+          }
         } catch {
           // silent — manual entry still works
         } finally {
@@ -70,7 +78,7 @@ export function CityInput({
     // bei Bedarf einmal den Prompt und funktioniert auch in Safari, wo
     // navigator.permissions.query({name:'geolocation'}) nicht verlässlich ist.
     if (autoDetect) {
-      detectLocation();
+      detectLocation(true);
       return;
     }
 
@@ -88,9 +96,22 @@ export function CityInput({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Formular abschicken, sobald der automatisch erkannte Ort im (kontrollierten)
+  // Feld steht — so submittet der Browser den aktuellen Wert, nicht den alten.
+  useEffect(() => {
+    if (!autoSubmit || !value) return;
+    setAutoSubmit(false);
+    const form = inputRef.current?.form;
+    if (form) {
+      if (typeof form.requestSubmit === 'function') form.requestSubmit();
+      else form.submit();
+    }
+  }, [autoSubmit, value]);
+
   return (
     <span className={`city-input ${wrapperClassName}`}>
       <input
+        ref={inputRef}
         id={id}
         className={`city-input__input ${inputClassName}`}
         name={name}
@@ -102,7 +123,7 @@ export function CityInput({
       />
       <button
         type="button"
-        onClick={detectLocation}
+        onClick={() => detectLocation()}
         disabled={locating}
         className="city-input__locate"
         aria-label="Standort verwenden"
