@@ -8,14 +8,20 @@ import {
   suspendTherapist,
   setQualifikationStatus,
   updateTherapist,
+  uploadTherapistPhoto,
 } from '../../../../lib/actions';
 import { api } from '../../../../lib/api';
 import { getAdminVisibilityIssues } from '../../../../lib/visibility';
 import { humanizeBlockingReason } from '../../../../lib/review-status';
+import { AdminNotice } from '../../../../components/admin-notice';
+
+// Profilfotos liegen als relative URL (/uploads/profile-photos/...) auf der API
+// — fürs Anzeigen im Admin die öffentliche API-Basis davorsetzen.
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000').replace(/\/$/, '');
 
 type Props = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ source?: string; issue?: string }>;
+  searchParams: Promise<{ source?: string; issue?: string; photoError?: string; photoOk?: string }>;
 };
 
 const statusLabel: Record<string, string> = {
@@ -203,15 +209,41 @@ export default async function TherapistDetailPage({ params, searchParams }: Prop
             Dieses Profil wurde bereits übernommen und ist nicht mehr über den Admin-Bereich bearbeitbar.
           </p>
         ) : (
-          <form action={updateTherapist.bind(null, therapist.id)} style={{ display: 'grid', gap: 12 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
-              <input className="toolbar-input" name="fullName" defaultValue={therapist.fullName} placeholder="Vollständiger Name" required />
-              <input className="toolbar-input" name="professionalTitle" defaultValue={therapist.professionalTitle} placeholder="Berufsbezeichnung" />
-              <input className="toolbar-input" name="city" defaultValue={therapist.city} placeholder="Stadt" required />
+          <>
+            <form action={updateTherapist.bind(null, therapist.id)} style={{ display: 'grid', gap: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+                <input className="toolbar-input" name="fullName" defaultValue={therapist.fullName} placeholder="Vollständiger Name" required />
+                <input className="toolbar-input" name="professionalTitle" defaultValue={therapist.professionalTitle} placeholder="Berufsbezeichnung" />
+                <input className="toolbar-input" name="city" defaultValue={therapist.city} placeholder="Stadt" required />
+              </div>
+              <textarea className="toolbar-input" name="bio" defaultValue={therapist.bio ?? ''} placeholder="Kurzbeschreibung" rows={2} />
+              <button className="primary-btn" type="submit" style={{ justifySelf: 'start' }}>Speichern</button>
+            </form>
+
+            <div style={{ marginTop: 20, borderTop: '1px solid var(--border, #e5e7eb)', paddingTop: 20 }}>
+              <div className="kicker" style={{ marginBottom: 12 }}>Profilfoto</div>
+              {query.photoError ? <AdminNotice title="Upload fehlgeschlagen" tone="warning">{query.photoError}</AdminNotice> : null}
+              {query.photoOk ? <AdminNotice title="Gespeichert" tone="success">Profilfoto aktualisiert.</AdminNotice> : null}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                {therapist.photo ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={`${API_BASE}${therapist.photo}`}
+                    alt={therapist.fullName}
+                    style={{ width: 72, height: 72, borderRadius: '50%', objectFit: 'cover' }}
+                  />
+                ) : (
+                  <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'var(--muted-bg, #f0f0f0)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)' }}>
+                    Kein Foto
+                  </div>
+                )}
+                <form action={uploadTherapistPhoto.bind(null, therapist.id)} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input type="file" name="photo" accept="image/jpeg,image/png,image/webp" required />
+                  <button className="primary-btn" type="submit">Foto hochladen</button>
+                </form>
+              </div>
             </div>
-            <textarea className="toolbar-input" name="bio" defaultValue={therapist.bio ?? ''} placeholder="Kurzbeschreibung" rows={2} />
-            <button className="primary-btn" type="submit" style={{ justifySelf: 'start' }}>Speichern</button>
-          </form>
+          </>
         )}
       </section>
 

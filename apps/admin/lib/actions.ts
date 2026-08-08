@@ -180,6 +180,48 @@ export async function updateTherapist(id: string, formData: FormData) {
   revalidatePath(`/therapists/${id}`);
 }
 
+// Profilfoto hochladen — als Multipart an die API weitergereicht (adminRequest
+// sendet nur JSON, deshalb hier ein eigener fetch mit FormData).
+export async function uploadTherapistPhoto(id: string, formData: FormData) {
+  const file = formData.get('photo');
+  if (!(file instanceof File) || file.size === 0) {
+    redirect(`/therapists/${id}?photoError=` + encodeURIComponent('Bitte eine Bilddatei auswählen.'));
+  }
+
+  const token = await getAdminToken();
+  const forward = new FormData();
+  forward.append('photo', file as File);
+
+  let errorMessage: string | null = null;
+  for (const base of getApiBaseCandidates()) {
+    try {
+      const res = await fetch(`${base}/admin/therapists/${id}/photo`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: forward,
+      });
+      if (!res.ok) {
+        let message = `API ${res.status}`;
+        try { const b = await res.json(); if (b?.message) message = b.message; } catch {}
+        errorMessage = message;
+      } else {
+        errorMessage = null;
+      }
+      break;
+    } catch (error) {
+      errorMessage = error instanceof Error ? error.message : 'Upload fehlgeschlagen.';
+    }
+  }
+
+  if (errorMessage) {
+    redirect(`/therapists/${id}?photoError=` + encodeURIComponent(errorMessage));
+  }
+
+  revalidatePath('/therapists');
+  revalidatePath(`/therapists/${id}`);
+  redirect(`/therapists/${id}?photoOk=1`);
+}
+
 export async function approveTherapist(id: string) {
   await adminRequest(`/admin/therapists/${id}/approve`);
   revalidatePath('/therapists');

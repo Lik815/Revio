@@ -4,7 +4,9 @@ import { hashPassword } from './auth-utils.js';
 import { createReadStream, existsSync } from 'fs';
 import { join, basename } from 'path';
 import { getEnv } from '../env.js';
-import { THERAPIST_VERIFICATIONS_DIR } from '../utils/storage-paths.js';
+import { THERAPIST_VERIFICATIONS_DIR, PROFILE_PHOTOS_DIR } from '../utils/storage-paths.js';
+import { uploadFile } from '../utils/storage.js';
+import { randomBytes } from 'crypto';
 import { geocodeAddress } from '../utils/geocode.js';
 import { serializeKassenarten } from '../utils/kassenarten.js';
 import { getTherapistPublicationState, getTherapistRequestabilityState } from '../utils/profile-completeness.js';
@@ -29,7 +31,7 @@ const splitList = (value: string) =>
 type TherapistRow = {
   id: string; email: string; fullName: string; professionalTitle: string;
   city: string; bio: string | null; homeVisit: boolean; specializations: string;
-  isFreelancer: boolean; userId?: string | null;
+  isFreelancer: boolean; userId?: string | null; photo?: string | null;
   languages: string; certifications: string; reviewStatus: string;
   employmentStatus?: string | null;
   serviceRadiusKm: number | null; kassenart: string;
@@ -69,6 +71,7 @@ function mapTherapist(t: TherapistRow) {
     id: t.id, email: t.email, fullName: t.fullName,
     // Directory-First-Refactor: null = unbeansprucht, im Admin-Bereich bearbeitbar.
     userId: t.userId ?? null,
+    photo: t.photo ?? null,
     professionalTitle: t.professionalTitle, city: t.city,
     bio: t.bio ?? undefined, homeVisit: t.homeVisit,
     isFreelancer: t.isFreelancer,
@@ -957,6 +960,39 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
 
     resetSearchCache();
     return mapTherapist(therapist);
+  });
+
+  // Profilfoto für einen (unbeanspruchten) Therapeuten hochladen. Anders als
+  // /upload/photo (Therapeuten-Session) läuft das über die Admin-Auth. Gesperrt
+  // sobald das Profil übernommen wurde (userId gesetzt).
+  fastify.post('/therapists/:id/photo', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const existing = await fastify.prisma.therapist.findUnique({ where: { id } });
+    if (!existing) return reply.notFound('Therapist not found');
+    if (existing.userId) {
+      return reply.forbidden('Dieser Therapeut wurde bereits übernommen und ist nicht mehr über den Admin-Bereich bearbeitbar.');
+    }
+
+    const data = await (request as any).file();
+    if (!data) return reply.badRequest('Keine Datei übermittelt');
+    const allowedMimes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!allowedMimes.includes(data.mimetype)) {
+      return reply.badRequest('Nur JPEG, PNG und WebP sind erlaubt');
+    }
+
+    const ext = data.mimetype === 'image/png' ? 'png' : data.mimetype === 'image/webp' ? 'webp' : 'jpg';
+    const key = `${randomBytes(16).toString('hex')}.${ext}`;
+    const url = await uploadFile({
+      key,
+      stream: data.file,
+      mimetype: data.mimetype,
+      localDir: PROFILE_PHOTOS_DIR,
+      publicPrefix: '/uploads/profile-photos',
+    });
+
+    await fastify.prisma.therapist.update({ where: { id }, data: { photo: url } });
+    resetSearchCache();
+    return { url };
   });
 
   fastify.post('/therapists/:id/approve', async (request, reply) => {

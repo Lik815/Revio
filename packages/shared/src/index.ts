@@ -99,6 +99,7 @@ export interface Therapist {
   // Directory-First-Refactor: null = unbeansprucht (operator-angelegt), im
   // Admin-Bereich bearbeitbar; gesetzt sobald die Person selbst registriert ist.
   userId?: string | null;
+  photo?: string | null;
   fullName: string;
   professionalTitle: string;
   gender?: string | null;
