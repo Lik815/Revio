@@ -118,6 +118,13 @@ export async function createTherapist(formData: FormData) {
     redirect('/therapists/neu?formError=' + encodeURIComponent('Bitte E-Mail, Name, Stadt und Zustimmungs-Kanal ausfüllen.'));
   }
 
+  // Mehrfach-Checkboxen liefern mehrere Werte unter demselben Namen → getAll.
+  const list = (key: string) => formData.getAll(key).map((v) => String(v).trim()).filter(Boolean);
+  const str = (key: string) => String(formData.get(key) ?? '').trim() || undefined;
+  const radiusRaw = str('serviceRadiusKm');
+  const serviceRadiusKm = radiusRaw ? Number(radiusRaw) : undefined;
+  const gender = str('gender');
+
   let errorMessage: string | null = null;
   try {
     await adminRequest('/admin/therapists/create', {
@@ -126,7 +133,21 @@ export async function createTherapist(formData: FormData) {
         fullName,
         city,
         consentChannel,
-        consentNote: String(formData.get('consentNote') ?? '').trim() || undefined,
+        consentNote: str('consentNote'),
+        professionalTitle: str('professionalTitle'),
+        gender: gender === 'female' || gender === 'male' ? gender : undefined,
+        bio: str('bio'),
+        phone: str('phone'),
+        postalCode: str('postalCode'),
+        street: str('street'),
+        houseNumber: str('houseNumber'),
+        homeVisit: formData.get('homeVisit') === 'true',
+        serviceRadiusKm: serviceRadiusKm && !Number.isNaN(serviceRadiusKm) ? serviceRadiusKm : undefined,
+        specializations: list('specializations'),
+        languages: list('languages'),
+        certifications: list('certifications'),
+        heilmittel: list('heilmittel'),
+        kassenarten: list('kassenarten'),
       },
     });
   } catch (error) {

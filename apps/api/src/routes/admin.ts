@@ -6,6 +6,7 @@ import { join, basename } from 'path';
 import { getEnv } from '../env.js';
 import { THERAPIST_VERIFICATIONS_DIR } from '../utils/storage-paths.js';
 import { geocodeAddress } from '../utils/geocode.js';
+import { serializeKassenarten } from '../utils/kassenarten.js';
 import { getTherapistPublicationState, getTherapistRequestabilityState } from '../utils/profile-completeness.js';
 import { resetSearchCache } from './search.js';
 import { sendProfileApprovedEmail, sendProfileRejectedEmail, sendProfileChangesRequestedEmail } from '../utils/mailer.js';
@@ -830,6 +831,22 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
     city: z.string().trim().min(1),
     consentChannel: z.string().trim().min(1),
     consentNote: z.string().trim().optional(),
+    // Vollständige Profildaten (optional) — Operator kann sie direkt beim
+    // Anlegen mitgeben, statt sie später einzeln nachzupflegen.
+    professionalTitle: z.string().trim().optional(),
+    gender: z.enum(['female', 'male']).optional(),
+    bio: z.string().trim().optional(),
+    phone: z.string().trim().optional(),
+    postalCode: z.string().trim().optional(),
+    street: z.string().trim().optional(),
+    houseNumber: z.string().trim().optional(),
+    homeVisit: z.boolean().optional(),
+    serviceRadiusKm: z.number().min(1).max(200).nullable().optional(),
+    specializations: z.array(z.string()).optional(),
+    languages: z.array(z.string()).optional(),
+    certifications: z.array(z.string()).optional(),
+    heilmittel: z.array(z.string()).optional(),
+    kassenarten: z.array(z.string()).optional(),
   });
 
   // Directory-First-Refactor (R1): Operator legt ein Therapeuten-Profil an —
@@ -852,14 +869,36 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
     const existingUser = await fastify.prisma.user.findUnique({ where: { email } });
     if (existingUser) return reply.conflict('Diese E-Mail-Adresse ist bereits vergeben.');
 
+    // Adresse geocoden (best-effort, blockiert das Anlegen nie) — wie bei der
+    // Selbstregistrierung, damit die Karte den Therapeuten verorten kann.
+    const streetPart = [data.street, data.houseNumber].filter(Boolean).join(' ');
+    const cityPart = [data.postalCode, data.city].filter(Boolean).join(' ');
+    const coords = (data.street && data.city)
+      ? await geocodeAddress(streetPart, cityPart)
+      : await geocodeAddress('', cityPart || data.city);
+
+    const languages = data.languages && data.languages.length > 0 ? data.languages : ['de'];
+
     const created = await fastify.prisma.therapist.create({
       data: {
         email,
         fullName: data.fullName,
-        professionalTitle: 'Physiotherapeut',
+        professionalTitle: data.professionalTitle?.trim() || 'Physiotherapeut',
         city: data.city,
-        specializations: '',
-        languages: 'de',
+        gender: data.gender ?? null,
+        bio: data.bio || null,
+        phone: data.phone || null,
+        postalCode: data.postalCode || null,
+        street: data.street || null,
+        houseNumber: data.houseNumber || null,
+        ...(coords ? { homeLat: coords.lat, homeLng: coords.lng, latitude: coords.lat, longitude: coords.lng } : {}),
+        homeVisit: data.homeVisit ?? false,
+        serviceRadiusKm: data.serviceRadiusKm ?? null,
+        specializations: (data.specializations ?? []).join(', '),
+        languages: languages.join(', '),
+        certifications: (data.certifications ?? []).join(', '),
+        heilmittel: (data.heilmittel ?? []).join(', '),
+        kassenart: serializeKassenarten(data.kassenarten),
         employmentStatus: 'SELF_EMPLOYED',
         isFreelancer: true,
         reviewStatus: 'PENDING_REVIEW',
