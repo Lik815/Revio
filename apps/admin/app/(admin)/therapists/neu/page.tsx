@@ -76,10 +76,16 @@ export default async function NewTherapistPage({ searchParams }: { searchParams:
               <span>E-Mail *</span>
               <input className="toolbar-input" name="email" type="email" placeholder="name@beispiel.de" required />
             </label>
-            <label className="field">
-              <span>Vollständiger Name *</span>
-              <input className="toolbar-input" name="fullName" placeholder="Vor- und Nachname" required />
-            </label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <label className="field">
+                <span>Vorname *</span>
+                <input className="toolbar-input" name="firstName" placeholder="Vorname" required />
+              </label>
+              <label className="field">
+                <span>Nachname *</span>
+                <input className="toolbar-input" name="lastName" placeholder="Nachname" required />
+              </label>
+            </div>
             <label className="field">
               <span>Berufsbezeichnung</span>
               <input className="toolbar-input" name="professionalTitle" placeholder="Physiotherapeut" />

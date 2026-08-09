@@ -144,11 +144,15 @@ export async function logoutAdmin() {
 // die Server-Component-Render mit einem ungefangenen Throw abstürzen zu lassen.
 export async function createTherapist(formData: FormData) {
   const email = String(formData.get('email') ?? '').trim();
-  const fullName = String(formData.get('fullName') ?? '').trim();
+  const firstName = String(formData.get('firstName') ?? '').trim();
+  const lastName = String(formData.get('lastName') ?? '').trim();
+  // Therapist.fullName ist ein einzelnes Feld — aus Vor- und Nachname
+  // zusammengesetzt, wie bei der Selbstregistrierung (register.ts).
+  const fullName = [firstName, lastName].filter(Boolean).join(' ');
   const city = String(formData.get('city') ?? '').trim();
   const consentChannel = String(formData.get('consentChannel') ?? '').trim();
-  if (!email || !fullName || !city || !consentChannel) {
-    redirect('/therapists/neu?formError=' + encodeURIComponent('Bitte E-Mail, Name, Stadt und Zustimmungs-Kanal ausfüllen.'));
+  if (!email || !firstName || !lastName || !city || !consentChannel) {
+    redirect('/therapists/neu?formError=' + encodeURIComponent('Bitte E-Mail, Vorname, Nachname, Stadt und Zustimmungs-Kanal ausfüllen.'));
   }
 
   // Mehrfach-Checkboxen liefern mehrere Werte unter demselben Namen → getAll.
@@ -341,24 +345,39 @@ export async function suspendPractice(id: string) {
 export async function createPractice(formData: FormData) {
   const name = String(formData.get('name') ?? '').trim();
   const city = String(formData.get('city') ?? '').trim();
-  if (!name || !city) return;
+  if (!name || !city) {
+    redirect('/practices/neu?formError=' + encodeURIComponent('Bitte Name und Stadt ausfüllen.'));
+  }
 
-  await adminRequest('/admin/practices/create', {
-    body: {
-      name,
-      city,
-      address: String(formData.get('address') ?? '').trim() || undefined,
-      street: String(formData.get('street') ?? '').trim() || undefined,
-      houseNumber: String(formData.get('houseNumber') ?? '').trim() || undefined,
-      postalCode: String(formData.get('postalCode') ?? '').trim() || undefined,
-      phone: String(formData.get('phone') ?? '').trim() || undefined,
-      hours: String(formData.get('hours') ?? '').trim() || undefined,
-      description: String(formData.get('description') ?? '').trim() || undefined,
-      homeVisit: formData.get('homeVisit') === 'true',
-    },
-  });
+  const str = (key: string) => String(formData.get(key) ?? '').trim() || undefined;
+
+  let errorMessage: string | null = null;
+  try {
+    await adminRequest('/admin/practices/create', {
+      body: {
+        name,
+        city,
+        address: str('address'),
+        street: str('street'),
+        houseNumber: str('houseNumber'),
+        postalCode: str('postalCode'),
+        phone: str('phone'),
+        hours: str('hours'),
+        description: str('description'),
+        homeVisit: formData.get('homeVisit') === 'true',
+      },
+    });
+  } catch (error) {
+    errorMessage = error instanceof Error ? error.message : 'Anlegen fehlgeschlagen.';
+  }
+
+  // redirect() wirft intern NEXT_REDIRECT — deshalb außerhalb des try/catch.
+  if (errorMessage) {
+    redirect('/practices/neu?formError=' + encodeURIComponent(errorMessage));
+  }
 
   revalidatePath('/practices');
+  redirect('/practices?created=' + encodeURIComponent(name));
 }
 
 // Nur möglich solange die Praxis unbeansprucht ist (ownerId null) — die API
