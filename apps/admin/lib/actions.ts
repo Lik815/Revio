@@ -40,7 +40,14 @@ async function adminRequest(path: string, init?: { method?: 'POST' | 'PATCH' | '
         } catch {}
         throw new Error(message);
       }
-      return;
+      // Antwort-Body zurückgeben (z. B. für die ID eines neu angelegten
+      // Datensatzes). Rückwärtskompatibel — Aufrufer, die nichts brauchen,
+      // ignorieren den Rückgabewert. Kein/leerer Body → null.
+      try {
+        return await res.json();
+      } catch {
+        return null;
+      }
     } catch (error) {
       lastError = error;
     }
@@ -48,6 +55,32 @@ async function adminRequest(path: string, init?: { method?: 'POST' | 'PATCH' | '
 
   if (lastError instanceof Error) throw lastError;
   throw new Error(`API nicht erreichbar: ${path}`);
+}
+
+// Profilfoto als Multipart an die API weiterreichen (adminRequest sendet nur
+// JSON). Gibt eine Fehlermeldung zurück oder null bei Erfolg.
+async function forwardTherapistPhoto(id: string, file: File): Promise<string | null> {
+  const token = await getAdminToken();
+  const forward = new FormData();
+  forward.append('photo', file);
+  for (const base of getApiBaseCandidates()) {
+    try {
+      const res = await fetch(`${base}/admin/therapists/${id}/photo`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: forward,
+      });
+      if (!res.ok) {
+        let message = `API ${res.status}`;
+        try { const b = await res.json(); if (b?.message) message = b.message; } catch {}
+        return message;
+      }
+      return null;
+    } catch (error) {
+      return error instanceof Error ? error.message : 'Upload fehlgeschlagen.';
+    }
+  }
+  return 'API nicht erreichbar.';
 }
 
 export async function loginAdmin(_: LoginState, formData: FormData): Promise<LoginState> {
@@ -126,8 +159,9 @@ export async function createTherapist(formData: FormData) {
   const gender = str('gender');
 
   let errorMessage: string | null = null;
+  let createdId: string | null = null;
   try {
-    await adminRequest('/admin/therapists/create', {
+    const created = await adminRequest('/admin/therapists/create', {
       body: {
         email,
         fullName,
@@ -150,14 +184,27 @@ export async function createTherapist(formData: FormData) {
         kassenarten: list('kassenarten'),
       },
     });
+    createdId = created?.id ?? null;
   } catch (error) {
     errorMessage = error instanceof Error ? error.message : 'Anlegen fehlgeschlagen.';
   }
 
   // redirect() wirft intern NEXT_REDIRECT — deshalb außerhalb des try/catch.
-  // Fehler: zurück zum Formular. Erfolg: zur Liste mit Bestätigung.
   if (errorMessage) {
     redirect('/therapists/neu?formError=' + encodeURIComponent(errorMessage));
+  }
+
+  // Optionales Profilfoto direkt mit anlegen: Der Therapeut ist schon erstellt,
+  // das Foto wird als zweiter Schritt hochgeladen. Schlägt das fehl, bleibt der
+  // Therapeut bestehen — wir leiten dann zur Detailseite, wo das Foto erneut
+  // hochgeladen werden kann, statt das ganze Anlegen zu verwerfen.
+  const photo = formData.get('photo');
+  if (createdId && photo instanceof File && photo.size > 0) {
+    const photoError = await forwardTherapistPhoto(createdId, photo);
+    if (photoError) {
+      revalidatePath('/therapists');
+      redirect(`/therapists/${createdId}?photoError=` + encodeURIComponent('Therapeut angelegt, aber Foto-Upload fehlgeschlagen: ' + photoError));
+    }
   }
 
   revalidatePath('/therapists');
@@ -180,39 +227,14 @@ export async function updateTherapist(id: string, formData: FormData) {
   revalidatePath(`/therapists/${id}`);
 }
 
-// Profilfoto hochladen — als Multipart an die API weitergereicht (adminRequest
-// sendet nur JSON, deshalb hier ein eigener fetch mit FormData).
+// Profilfoto hochladen (Bearbeiten-Seite).
 export async function uploadTherapistPhoto(id: string, formData: FormData) {
   const file = formData.get('photo');
   if (!(file instanceof File) || file.size === 0) {
     redirect(`/therapists/${id}?photoError=` + encodeURIComponent('Bitte eine Bilddatei auswählen.'));
   }
 
-  const token = await getAdminToken();
-  const forward = new FormData();
-  forward.append('photo', file as File);
-
-  let errorMessage: string | null = null;
-  for (const base of getApiBaseCandidates()) {
-    try {
-      const res = await fetch(`${base}/admin/therapists/${id}/photo`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body: forward,
-      });
-      if (!res.ok) {
-        let message = `API ${res.status}`;
-        try { const b = await res.json(); if (b?.message) message = b.message; } catch {}
-        errorMessage = message;
-      } else {
-        errorMessage = null;
-      }
-      break;
-    } catch (error) {
-      errorMessage = error instanceof Error ? error.message : 'Upload fehlgeschlagen.';
-    }
-  }
-
+  const errorMessage = await forwardTherapistPhoto(id, file as File);
   if (errorMessage) {
     redirect(`/therapists/${id}?photoError=` + encodeURIComponent(errorMessage));
   }

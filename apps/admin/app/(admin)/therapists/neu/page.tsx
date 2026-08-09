@@ -135,6 +135,10 @@ export default async function NewTherapistPage({ searchParams }: { searchParams:
         <AdminSectionCard eyebrow="Profil" title="Fachliche Angaben">
           <div style={{ display: 'grid', gap: 16 }}>
             <label className="field">
+              <span>Profilfoto (optional)</span>
+              <input className="toolbar-input" type="file" name="photo" accept="image/jpeg,image/png,image/webp" />
+            </label>
+            <label className="field">
               <span>Kurzbeschreibung / Bio</span>
               <textarea className="toolbar-input" name="bio" rows={3} />
             </label>
