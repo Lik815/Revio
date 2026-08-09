@@ -2145,6 +2145,26 @@ describe('Admin practice routes', () => {
   });
 
   it('POST /admin/practices/:id/approve sets APPROVED', async () => {
+    // Freigabe verlangt vollständige Adresse + Geokoordinaten + mindestens
+    // einen bestätigten Therapeuten (Praxis-Pflichtdaten-Gate).
+    await prisma.practice.update({
+      where: { id: practiceId },
+      data: { street: 'Domkloster', houseNumber: '4', postalCode: '50667', lat: 50.94, lng: 6.96 },
+    });
+    const therapist = await prisma.therapist.create({
+      data: {
+        email: `approve-link-${practiceId}@test.com`,
+        fullName: 'Link Therapeut',
+        professionalTitle: 'PT',
+        city: 'Köln',
+        specializations: '',
+        languages: 'de',
+      },
+    });
+    await prisma.therapistPracticeLink.create({
+      data: { therapistId: therapist.id, practiceId, status: 'CONFIRMED' },
+    });
+
     const res = await app.inject({
       method: 'POST',
       url: `/admin/practices/${practiceId}/approve`,
