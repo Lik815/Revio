@@ -38,6 +38,13 @@ export default async function PracticeEditPage({ params }: { params: Promise<{ i
           <span className={`badge badge--${practice.reviewStatus}`}>{practice.reviewStatus}</span>
         </div>
 
+        {!practice.addressComplete ? (
+          <p style={{ margin: '0 0 12px', color: 'var(--warning, #b45309)', fontSize: 13 }}>
+            Adresse unvollständig — Straße, Hausnummer und PLZ fehlen. Ohne vollständige Adresse und
+            mindestens einen bestätigten Therapeuten kann diese Praxis nicht freigegeben werden.
+          </p>
+        ) : null}
+
         <form
           action={updatePractice.bind(null, practice.id)}
           className="catalog-inline-form"
@@ -53,8 +60,16 @@ export default async function PracticeEditPage({ params }: { params: Promise<{ i
               <input className="toolbar-input" name="city" defaultValue={practice.city} required />
             </label>
             <label>
-              Adresse
-              <input className="toolbar-input" name="address" defaultValue={practice.address ?? ''} />
+              Straße
+              <input className="toolbar-input" name="street" defaultValue={practice.street ?? ''} />
+            </label>
+            <label>
+              Hausnummer
+              <input className="toolbar-input" name="houseNumber" defaultValue={practice.houseNumber ?? ''} />
+            </label>
+            <label>
+              PLZ
+              <input className="toolbar-input" name="postalCode" defaultValue={practice.postalCode ?? ''} />
             </label>
             <label>
               Telefon

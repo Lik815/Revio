@@ -192,6 +192,10 @@ model Therapist {
   consentObtainedAt     DateTime?
   consentChannel        String?
   consentNote           String?
+  // Soft-Delete/Archiv: gesetzt = archiviert (aus Suche + normaler Admin-Liste
+  // ausgeblendet, aber Daten bleiben erhalten und wiederherstellbar). Endgültiges
+  // Löschen ist nur aus dem Archiv heraus möglich.
+  archivedAt            DateTime?
   // Compliance (added via migration 20260409113000)
   taxRegistrationStatus  String?
   healthAuthorityStatus  String?
@@ -248,6 +252,12 @@ model Practice {
   name              String
   city              String
   address           String?
+  // Adress-Einzelfelder (Pflicht für Live-Schaltung, siehe
+  // docs/praxis-pflichtdaten-umsetzung.md) — address bleibt als kombinierter
+  // Anzeige-/Legacy-String bestehen.
+  street            String?
+  houseNumber       String?
+  postalCode        String?
   phone             String?
   hours             String?
   lat               Float        @default(0)

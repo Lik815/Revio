@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { randomBytes } from 'crypto';
 import { hashPassword, getToken } from './auth-utils.js';
 import { resetSearchCache } from './search.js';
+import { geocodeAddress } from '../utils/geocode.js';
 
 const TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 Tage, gleiche Laufzeit wie auth.ts
 const newTokenExpiry = () => new Date(Date.now() + TOKEN_TTL_MS);
@@ -115,6 +116,9 @@ export const claimRoutes: FastifyPluginAsync = async (fastify) => {
     name: z.string().trim().min(1).optional(),
     city: z.string().trim().min(1).optional(),
     address: z.string().trim().optional(),
+    street: z.string().trim().optional(),
+    houseNumber: z.string().trim().optional(),
+    postalCode: z.string().trim().optional(),
     phone: z.string().trim().optional(),
     hours: z.string().trim().optional(),
     description: z.string().trim().optional(),
@@ -145,6 +149,18 @@ export const claimRoutes: FastifyPluginAsync = async (fastify) => {
       );
     }
     const data = parsed.data;
+    const existing = user.ownedPractice;
+    const nextStreet = data.street !== undefined ? data.street : existing.street ?? undefined;
+    const nextHouseNumber = data.houseNumber !== undefined ? data.houseNumber : existing.houseNumber ?? undefined;
+    const nextPostalCode = data.postalCode !== undefined ? data.postalCode : existing.postalCode ?? undefined;
+    const needsGeocode = data.address !== undefined || data.city !== undefined
+      || data.street !== undefined || data.houseNumber !== undefined || data.postalCode !== undefined;
+    const addressQuery = nextStreet && nextHouseNumber
+      ? `${nextStreet} ${nextHouseNumber}${nextPostalCode ? `, ${nextPostalCode}` : ''}`
+      : (data.address ?? existing.address ?? '');
+    const coords = needsGeocode
+      ? await geocodeAddress(addressQuery, data.city ?? existing.city)
+      : null;
 
     const practice = await fastify.prisma.practice.update({
       where: { id: user.ownedPractice.id },
@@ -152,10 +168,14 @@ export const claimRoutes: FastifyPluginAsync = async (fastify) => {
         ...(data.name !== undefined && { name: data.name }),
         ...(data.city !== undefined && { city: data.city }),
         ...(data.address !== undefined && { address: data.address }),
+        ...(data.street !== undefined && { street: data.street }),
+        ...(data.houseNumber !== undefined && { houseNumber: data.houseNumber }),
+        ...(data.postalCode !== undefined && { postalCode: data.postalCode }),
         ...(data.phone !== undefined && { phone: data.phone }),
         ...(data.hours !== undefined && { hours: data.hours }),
         ...(data.description !== undefined && { description: data.description }),
         ...(data.homeVisit !== undefined && { homeVisit: data.homeVisit }),
+        ...(coords && { lat: coords.lat, lng: coords.lng }),
       },
     });
 

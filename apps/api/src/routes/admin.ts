@@ -31,7 +31,7 @@ const splitList = (value: string) =>
 type TherapistRow = {
   id: string; email: string; fullName: string; professionalTitle: string;
   city: string; bio: string | null; homeVisit: boolean; specializations: string;
-  isFreelancer: boolean; userId?: string | null; photo?: string | null;
+  isFreelancer: boolean; userId?: string | null; photo?: string | null; archivedAt?: Date | null;
   languages: string; certifications: string; reviewStatus: string;
   employmentStatus?: string | null;
   serviceRadiusKm: number | null; kassenart: string;
@@ -72,6 +72,7 @@ function mapTherapist(t: TherapistRow) {
     // Directory-First-Refactor: null = unbeansprucht, im Admin-Bereich bearbeitbar.
     userId: t.userId ?? null,
     photo: t.photo ?? null,
+    archivedAt: t.archivedAt?.toISOString() ?? null,
     professionalTitle: t.professionalTitle, city: t.city,
     bio: t.bio ?? undefined, homeVisit: t.homeVisit,
     isFreelancer: t.isFreelancer,
@@ -95,8 +96,16 @@ function mapTherapist(t: TherapistRow) {
   };
 }
 
+// "Volle Adresse" (siehe docs/praxis-pflichtdaten-umsetzung.md, Abschnitt 4):
+// Straße, Hausnummer, PLZ und Stadt müssen gesetzt sein — Voraussetzung für die
+// Live-Schaltung einer Praxis (Approve-Gate + Suche, siehe unten).
+function hasFullAddress(p: { street?: string | null; houseNumber?: string | null; postalCode?: string | null; city?: string | null }): boolean {
+  return Boolean(p.street?.trim() && p.houseNumber?.trim() && p.postalCode?.trim() && p.city?.trim());
+}
+
 function mapPractice(p: {
   id: string; name: string; city: string; address: string | null;
+  street?: string | null; houseNumber?: string | null; postalCode?: string | null;
   phone: string | null; hours: string | null; description?: string | null; homeVisit?: boolean;
   lat: number; lng: number; reviewStatus: string; ownerId?: string | null;
   createdAt: Date; updatedAt: Date;
@@ -105,11 +114,15 @@ function mapPractice(p: {
   return {
     id: p.id, name: p.name, city: p.city,
     address: p.address ?? undefined, phone: p.phone ?? undefined,
+    street: p.street ?? undefined, houseNumber: p.houseNumber ?? undefined, postalCode: p.postalCode ?? undefined,
     hours: p.hours ?? undefined,
     description: p.description ?? undefined, homeVisit: p.homeVisit ?? false,
     lat: p.lat, lng: p.lng, reviewStatus: p.reviewStatus,
     // Directory-First-Refactor (P2): null = unbeansprucht, im Admin-Bereich frei bearbeitbar.
     ownerId: p.ownerId ?? null,
+    // Live-Schaltung setzt volle Adresse + mind. einen bestätigten Therapeuten voraus
+    // (siehe /practices/:id/approve und search.ts loadListedPractices).
+    addressComplete: hasFullAddress(p),
     createdAt: p.createdAt.toISOString(),
     links: p.links?.map((l) => ({
       id: l.id, status: l.status,
@@ -995,17 +1008,46 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
     return { url };
   });
 
-  // Unbeanspruchten (operator-angelegten) Therapeuten endgültig löschen.
-  // Bewusst gesperrt für übernommene Profile (userId gesetzt) — ein echtes,
-  // selbst registriertes Konto darf hierüber nie entfernt werden.
+  // Therapeut archivieren (Soft-Delete): aus Suche + normaler Liste ausblenden,
+  // Daten bleiben erhalten. Reversibel via unarchive. Funktioniert für jeden
+  // Therapeuten (auch übernommene), da nichts zerstört wird.
+  fastify.post('/therapists/:id/archive', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const existing = await fastify.prisma.therapist.findUnique({ where: { id } });
+    if (!existing) return reply.notFound('Therapist not found');
+    await fastify.prisma.therapist.update({ where: { id }, data: { archivedAt: new Date() } });
+    resetSearchCache();
+    return { archived: true };
+  });
+
+  // Archivierten Therapeuten wiederherstellen.
+  fastify.post('/therapists/:id/unarchive', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const existing = await fastify.prisma.therapist.findUnique({ where: { id } });
+    if (!existing) return reply.notFound('Therapist not found');
+    await fastify.prisma.therapist.update({ where: { id }, data: { archivedAt: null } });
+    resetSearchCache();
+    return { archived: false };
+  });
+
+  // Endgültig löschen — nur aus dem Archiv heraus (archivedAt gesetzt), damit
+  // nie versehentlich hart gelöscht wird. Achtung: reißt per Cascade auch
+  // Buchungen/Bewertungen mit und entfernt das verknüpfte Login-Konto, falls
+  // vorhanden (sonst bliebe ein verwaistes User-Konto zurück).
   fastify.post('/therapists/:id/delete', async (request, reply) => {
     const { id } = request.params as { id: string };
     const existing = await fastify.prisma.therapist.findUnique({ where: { id } });
     if (!existing) return reply.notFound('Therapist not found');
-    if (existing.userId) {
-      return reply.forbidden('Übernommene Profile können nicht gelöscht werden.');
+    if (!existing.archivedAt) {
+      return reply.badRequest('Bitte zuerst archivieren. Endgültiges Löschen ist nur aus dem Archiv möglich.');
     }
+    const linkedUserId = existing.userId;
     await fastify.prisma.therapist.delete({ where: { id } });
+    if (linkedUserId) {
+      // Verknüpftes Login-Konto (Rolle therapist) mitentfernen, um keinen
+      // verwaisten Login zu hinterlassen. Best-effort.
+      await fastify.prisma.user.delete({ where: { id: linkedUserId } }).catch(() => null);
+    }
     resetSearchCache();
     return { deleted: true };
   });
@@ -1171,6 +1213,9 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
     name: z.string().trim().min(1),
     city: z.string().trim().min(1),
     address: z.string().trim().optional(),
+    street: z.string().trim().optional(),
+    houseNumber: z.string().trim().optional(),
+    postalCode: z.string().trim().optional(),
     phone: z.string().trim().optional(),
     hours: z.string().trim().optional(),
     description: z.string().trim().optional(),
@@ -1180,6 +1225,9 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
   // Directory-First-Refactor (P2): Operator legt eine Praxis manuell an.
   // ownerId bleibt null (unbeansprucht) bis zum ersten Claim; läuft durch die
   // bestehende PENDING_REVIEW-Warteschlange wie eine selbstregistrierte Praxis.
+  // Straße/Hausnummer/PLZ sind hier bewusst NICHT Pflicht (Anlegen bleibt
+  // niedrigschwellig) — ohne volle Adresse bleibt die Praxis aber unsichtbar,
+  // siehe hasFullAddress()-Gate in /practices/:id/approve und in der Suche.
   fastify.post('/practices/create', async (request, reply) => {
     const parsed = createPracticeSchema.safeParse(request.body);
     if (!parsed.success) {
@@ -1187,13 +1235,19 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.badRequest(Object.entries(msg).map(([k, v]) => `${k}: ${(v as string[]).join(', ')}`).join('; ') || 'Ungültige Eingabe');
     }
     const data = parsed.data;
-    const coords = await geocodeAddress(data.address ?? '', data.city);
+    const addressQuery = data.street && data.houseNumber
+      ? `${data.street} ${data.houseNumber}${data.postalCode ? `, ${data.postalCode}` : ''}`
+      : (data.address ?? '');
+    const coords = await geocodeAddress(addressQuery, data.city);
 
     const practice = await fastify.prisma.practice.create({
       data: {
         name: data.name,
         city: data.city,
-        address: data.address || null,
+        address: data.address || (data.street && data.houseNumber ? `${data.street} ${data.houseNumber}` : null),
+        street: data.street || null,
+        houseNumber: data.houseNumber || null,
+        postalCode: data.postalCode || null,
         phone: data.phone || null,
         hours: data.hours || null,
         description: data.description || null,
@@ -1203,7 +1257,9 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
         // Directory-First-Refactor (P2): sofort öffentlich sichtbar als LISTED —
         // kein zusätzlicher Freigabeschritt, du bist bereits der vertrauenswürdige
         // Akteur. Unterscheidet sich bewusst von der Selbstregistrierung
-        // (PENDING_REVIEW), die weiterhin manuelle Prüfung durchläuft.
+        // (PENDING_REVIEW), die weiterhin manuelle Prüfung durchläuft. Öffentlich
+        // sichtbar wird sie trotzdem erst mit voller Adresse + Therapeut, siehe
+        // loadListedPractices() in search.ts.
         reviewStatus: 'LISTED',
       },
     });
@@ -1217,6 +1273,9 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
       name: z.string().trim().min(1),
       city: z.string().trim().min(1),
       address: z.string().trim().optional(),
+      street: z.string().trim().optional(),
+      houseNumber: z.string().trim().optional(),
+      postalCode: z.string().trim().optional(),
       phone: z.string().trim().optional(),
       hours: z.string().trim().optional(),
       description: z.string().trim().optional(),
@@ -1260,13 +1319,19 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
 
       // Nominatim rate limit: 1 req/sec
       if (created + skipped.length > 0) await new Promise((r) => setTimeout(r, 1100));
-      const coords = await geocodeAddress(entry.address ?? '', entry.city);
+      const importAddressQuery = entry.street && entry.houseNumber
+        ? `${entry.street} ${entry.houseNumber}${entry.postalCode ? `, ${entry.postalCode}` : ''}`
+        : (entry.address ?? '');
+      const coords = await geocodeAddress(importAddressQuery, entry.city);
 
       await fastify.prisma.practice.create({
         data: {
           name: entry.name,
           city: entry.city,
-          address: entry.address || null,
+          address: entry.address || (entry.street && entry.houseNumber ? `${entry.street} ${entry.houseNumber}` : null),
+          street: entry.street || null,
+          houseNumber: entry.houseNumber || null,
+          postalCode: entry.postalCode || null,
           phone: entry.phone || null,
           hours: entry.hours || null,
           description: entry.description || null,
@@ -1287,6 +1352,9 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
     name: z.string().trim().min(1).optional(),
     city: z.string().trim().min(1).optional(),
     address: z.string().trim().optional(),
+    street: z.string().trim().optional(),
+    houseNumber: z.string().trim().optional(),
+    postalCode: z.string().trim().optional(),
     phone: z.string().trim().optional(),
     hours: z.string().trim().optional(),
     description: z.string().trim().optional(),
@@ -1310,9 +1378,17 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     const data = parsed.data;
-    const needsGeocode = data.address !== undefined || data.city !== undefined;
+    const existingAny = existing as { street?: string | null; houseNumber?: string | null; postalCode?: string | null };
+    const nextStreet = data.street !== undefined ? data.street : existingAny.street ?? undefined;
+    const nextHouseNumber = data.houseNumber !== undefined ? data.houseNumber : existingAny.houseNumber ?? undefined;
+    const nextPostalCode = data.postalCode !== undefined ? data.postalCode : existingAny.postalCode ?? undefined;
+    const needsGeocode = data.address !== undefined || data.city !== undefined
+      || data.street !== undefined || data.houseNumber !== undefined || data.postalCode !== undefined;
+    const addressQuery = nextStreet && nextHouseNumber
+      ? `${nextStreet} ${nextHouseNumber}${nextPostalCode ? `, ${nextPostalCode}` : ''}`
+      : (data.address ?? existing.address ?? '');
     const coords = needsGeocode
-      ? await geocodeAddress(data.address ?? existing.address ?? '', data.city ?? existing.city)
+      ? await geocodeAddress(addressQuery, data.city ?? existing.city)
       : null;
 
     const practice = await fastify.prisma.practice.update({
@@ -1321,6 +1397,9 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
         ...(data.name !== undefined && { name: data.name }),
         ...(data.city !== undefined && { city: data.city }),
         ...(data.address !== undefined && { address: data.address }),
+        ...(data.street !== undefined && { street: data.street }),
+        ...(data.houseNumber !== undefined && { houseNumber: data.houseNumber }),
+        ...(data.postalCode !== undefined && { postalCode: data.postalCode }),
         ...(data.phone !== undefined && { phone: data.phone }),
         ...(data.hours !== undefined && { hours: data.hours }),
         ...(data.description !== undefined && { description: data.description }),
@@ -1334,8 +1413,26 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
     return mapPractice(practice);
   });
 
+  // Live-Gate (docs/praxis-pflichtdaten-umsetzung.md, Abschnitt 5): eine Praxis
+  // darf erst APPROVED werden, wenn sie eine vollständige, geokodierte Adresse
+  // hat UND mindestens einen bestätigten (CONFIRMED) Therapeuten-Link.
   fastify.post('/practices/:id/approve', async (request, reply) => {
     const { id } = request.params as { id: string };
+    const existing = await fastify.prisma.practice.findUnique({
+      where: { id },
+      include: { links: { where: { status: 'CONFIRMED' } } },
+    });
+    if (!existing) return reply.notFound('Practice not found');
+    if (!hasFullAddress(existing)) {
+      return reply.badRequest('Praxis kann nicht freigegeben werden: Straße, Hausnummer, PLZ und Stadt müssen vollständig gesetzt sein.');
+    }
+    if (existing.lat === 0 && existing.lng === 0) {
+      return reply.badRequest('Praxis kann nicht freigegeben werden: Adresse konnte nicht geokodiert werden.');
+    }
+    if (existing.links.length === 0) {
+      return reply.badRequest('Praxis kann nicht freigegeben werden: mindestens ein bestätigter Therapeut ist erforderlich.');
+    }
+
     const p = await fastify.prisma.practice.update({ where: { id }, data: { reviewStatus: 'APPROVED' } }).catch(() => null);
     if (!p) return reply.notFound('Practice not found');
     resetSearchCache();

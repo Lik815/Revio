@@ -10,6 +10,8 @@ import {
   updateTherapist,
   uploadTherapistPhoto,
   deleteTherapist,
+  archiveTherapist,
+  unarchiveTherapist,
 } from '../../../../lib/actions';
 import { api } from '../../../../lib/api';
 import { getAdminVisibilityIssues } from '../../../../lib/visibility';
@@ -22,7 +24,7 @@ const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000').re
 
 type Props = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ source?: string; issue?: string; photoError?: string; photoOk?: string }>;
+  searchParams: Promise<{ source?: string; issue?: string; photoError?: string; photoOk?: string; restored?: string }>;
 };
 
 const statusLabel: Record<string, string> = {
@@ -244,16 +246,40 @@ export default async function TherapistDetailPage({ params, searchParams }: Prop
                 </form>
               </div>
             </div>
+          </>
+        )}
+      </section>
 
-            <div style={{ marginTop: 20, borderTop: '1px solid var(--border, #e5e7eb)', paddingTop: 20 }}>
-              <div className="kicker" style={{ marginBottom: 8 }}>Profil löschen</div>
-              <p style={{ margin: '0 0 12px', color: 'var(--muted)', fontSize: 13 }}>
-                Entfernt dieses unbeanspruchte Profil endgültig. Nicht rückgängig zu machen.
-              </p>
+      {/* Archiv & endgültiges Löschen — für jeden Therapeuten (auch übernommene) */}
+      <section className="card" style={{ padding: '20px 24px', marginBottom: 32 }}>
+        <div className="kicker" style={{ marginBottom: 12 }}>Archiv</div>
+        {query.photoError ? <AdminNotice title="Fehlgeschlagen" tone="warning">{query.photoError}</AdminNotice> : null}
+        {query.restored ? <AdminNotice title="Wiederhergestellt" tone="success">Das Profil ist wieder aktiv.</AdminNotice> : null}
+        {therapist.archivedAt ? (
+          <>
+            <p style={{ margin: '0 0 12px', color: 'var(--muted)', fontSize: 14 }}>
+              Dieses Profil ist archiviert (seit {formatDate(therapist.archivedAt)}) — nicht in Suche oder normaler Liste sichtbar.
+            </p>
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+              <form action={unarchiveTherapist.bind(null, therapist.id)}>
+                <button className="primary-btn" type="submit">Wiederherstellen</button>
+              </form>
               <form action={deleteTherapist.bind(null, therapist.id)}>
-                <button className="action-btn action-btn--reject" type="submit">Profil löschen</button>
+                <button className="action-btn action-btn--reject" type="submit">Endgültig löschen</button>
               </form>
             </div>
+            <p style={{ margin: '12px 0 0', color: 'var(--muted)', fontSize: 13 }}>
+              Endgültiges Löschen entfernt auch verknüpfte Buchungen, Bewertungen und das Login-Konto. Nicht umkehrbar.
+            </p>
+          </>
+        ) : (
+          <>
+            <p style={{ margin: '0 0 12px', color: 'var(--muted)', fontSize: 14 }}>
+              Archivieren blendet das Profil aus Suche und Liste aus, ohne Daten zu löschen. Reversibel.
+            </p>
+            <form action={archiveTherapist.bind(null, therapist.id)}>
+              <button className="action-btn action-btn--warn" type="submit">Archivieren</button>
+            </form>
           </>
         )}
       </section>

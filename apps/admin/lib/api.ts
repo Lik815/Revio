@@ -146,6 +146,9 @@ export type AdminPractice = {
   name: string;
   city: string;
   address?: string | null;
+  street?: string | null;
+  houseNumber?: string | null;
+  postalCode?: string | null;
   phone?: string | null;
   hours?: string | null;
   description?: string | null;
@@ -153,6 +156,8 @@ export type AdminPractice = {
   reviewStatus: string;
   // Directory-First-Refactor (P2): null = unbeansprucht, im Admin-Bereich bearbeitbar.
   ownerId?: string | null;
+  // Live-Gate (docs/praxis-pflichtdaten-umsetzung.md): true wenn Straße/Hausnummer/PLZ/Stadt gesetzt sind.
+  addressComplete?: boolean;
   createdAt: string;
   links?: Array<{
     id: string;

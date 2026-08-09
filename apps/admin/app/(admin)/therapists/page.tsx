@@ -17,9 +17,11 @@ import {
   rejectTherapist,
   requestChangesTherapist,
   suspendTherapist,
+  unarchiveTherapist,
+  deleteTherapist,
 } from '../../../lib/actions';
 
-type SearchParams = Promise<{ status?: string; q?: string; city?: string; created?: string; deleted?: string }>;
+type SearchParams = Promise<{ status?: string; q?: string; city?: string; created?: string; deleted?: string; archived?: string }>;
 
 function getQueueCopy({
   overdueCount,
@@ -45,9 +47,15 @@ export default async function TherapistsPage({ searchParams }: { searchParams: S
   const q = (params.q ?? '').toLowerCase();
   const city = (params.city ?? '').toLowerCase();
 
+  // Archiv als eigene Ansicht: status=ARCHIVED zeigt nur archivierte Profile,
+  // alle anderen Ansichten blenden archivierte grundsätzlich aus.
+  const showArchived = statusFilter === 'ARCHIVED';
+
   const filtered = therapists
     .filter((therapist) => {
-      const matchesStatus = statusFilter === 'ALL' || therapist.reviewStatus === statusFilter;
+      const isArchived = Boolean(therapist.archivedAt);
+      if (showArchived ? !isArchived : isArchived) return false;
+      const matchesStatus = showArchived || statusFilter === 'ALL' || therapist.reviewStatus === statusFilter;
       const matchesQuery = !q || [therapist.fullName, therapist.professionalTitle, therapist.city, therapist.specializations.join(' ')]
         .join(' ')
         .toLowerCase()
@@ -56,6 +64,8 @@ export default async function TherapistsPage({ searchParams }: { searchParams: S
       return matchesStatus && matchesQuery && matchesCity;
     })
     .sort((a, b) => getReviewPriority(a).weight - getReviewPriority(b).weight);
+
+  const archivedCount = therapists.filter((t) => t.archivedAt).length;
 
   const pendingCount = filtered.filter((therapist) => therapist.reviewStatus === 'PENDING_REVIEW').length;
   const overdueCount = filtered.filter((therapist) => getReviewPriority(therapist).overdue).length;
@@ -71,6 +81,11 @@ export default async function TherapistsPage({ searchParams }: { searchParams: S
       actions={
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <div className="hero-pill">{filtered.length} Profile in der Ansicht</div>
+          {showArchived ? (
+            <Link href="/therapists" className="secondary-btn">Zurück zu aktiv</Link>
+          ) : (
+            <Link href="/therapists?status=ARCHIVED" className="secondary-btn">Archiv ({archivedCount})</Link>
+          )}
           <Link href="/therapists/neu" className="primary-btn">Neuen Therapeuten anlegen</Link>
         </div>
       }
@@ -127,6 +142,7 @@ export default async function TherapistsPage({ searchParams }: { searchParams: S
               <option value="REJECTED">Abgelehnt</option>
               <option value="SUSPENDED">Gesperrt</option>
               <option value="DRAFT">Entwurf</option>
+              <option value="ARCHIVED">Archiviert</option>
             </select>
             <button className="primary-btn" type="submit">Anwenden</button>
           </form>
@@ -137,7 +153,12 @@ export default async function TherapistsPage({ searchParams }: { searchParams: S
         <AdminNotice title="Angelegt" tone="success">{params.created} wurde angelegt und steht in der Warteschlange.</AdminNotice>
       ) : null}
       {params.deleted ? (
-        <AdminNotice title="Gelöscht" tone="success">Das Profil wurde entfernt.</AdminNotice>
+        <AdminNotice title="Gelöscht" tone="success">Das Profil wurde endgültig entfernt.</AdminNotice>
+      ) : null}
+      {params.archived ? (
+        <AdminNotice title="Archiviert" tone="success">
+          Das Profil wurde archiviert. <Link href="/therapists?status=ARCHIVED">Zum Archiv ({archivedCount})</Link>
+        </AdminNotice>
       ) : null}
 
       {filtered.length === 0 ? (
@@ -259,16 +280,27 @@ export default async function TherapistsPage({ searchParams }: { searchParams: S
                       </div>
                     </td>
                     <td data-label="Aktionen">
-                      <TherapistActions
-                        id={therapist.id}
-                        status={therapist.reviewStatus}
-                        actions={{
-                          approve: approveTherapist,
-                          reject: rejectTherapist,
-                          requestChanges: requestChangesTherapist,
-                          suspend: suspendTherapist,
-                        }}
-                      />
+                      {showArchived ? (
+                        <div className="action-row">
+                          <form action={unarchiveTherapist.bind(null, therapist.id)}>
+                            <button className="action-btn" type="submit">Wiederherstellen</button>
+                          </form>
+                          <form action={deleteTherapist.bind(null, therapist.id)}>
+                            <button className="action-btn action-btn--reject" type="submit">Endgültig löschen</button>
+                          </form>
+                        </div>
+                      ) : (
+                        <TherapistActions
+                          id={therapist.id}
+                          status={therapist.reviewStatus}
+                          actions={{
+                            approve: approveTherapist,
+                            reject: rejectTherapist,
+                            requestChanges: requestChangesTherapist,
+                            suspend: suspendTherapist,
+                          }}
+                        />
+                      )}
                     </td>
                   </tr>
                 );

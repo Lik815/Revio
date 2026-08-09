@@ -100,6 +100,7 @@ export interface Therapist {
   // Admin-Bereich bearbeitbar; gesetzt sobald die Person selbst registriert ist.
   userId?: string | null;
   photo?: string | null;
+  archivedAt?: string | null;
   fullName: string;
   professionalTitle: string;
   gender?: string | null;

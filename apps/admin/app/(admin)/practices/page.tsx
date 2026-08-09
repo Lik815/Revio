@@ -118,7 +118,9 @@ export default async function PracticesPage({ searchParams }: { searchParams: Se
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
             <input className="toolbar-input" name="name" placeholder="Name der Praxis" required />
             <input className="toolbar-input" name="city" placeholder="Stadt" required />
-            <input className="toolbar-input" name="address" placeholder="Adresse" />
+            <input className="toolbar-input" name="street" placeholder="Straße" />
+            <input className="toolbar-input" name="houseNumber" placeholder="Hausnummer" />
+            <input className="toolbar-input" name="postalCode" placeholder="PLZ" />
             <input className="toolbar-input" name="phone" placeholder="Telefon" />
             <input className="toolbar-input" name="hours" placeholder="Öffnungszeiten" />
           </div>
@@ -129,7 +131,7 @@ export default async function PracticesPage({ searchParams }: { searchParams: Se
           </label>
           <p style={{ margin: 0, color: 'var(--muted)', fontSize: 13 }}>
             Läuft wie eine selbstregistrierte Praxis durch die Freigabe-Warteschlange unten. Bearbeitbar, solange
-            niemand sie übernommen hat.
+            niemand sie übernommen hat. Straße, Hausnummer und PLZ sind Voraussetzung für die spätere Freigabe/Sichtbarkeit.
           </p>
           <button className="primary-btn" type="submit" style={{ justifySelf: 'start' }}>Praxis anlegen</button>
         </form>

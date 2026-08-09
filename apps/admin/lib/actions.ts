@@ -244,7 +244,39 @@ export async function uploadTherapistPhoto(id: string, formData: FormData) {
   redirect(`/therapists/${id}?photoOk=1`);
 }
 
-// Unbeanspruchten Therapeuten löschen (API sperrt übernommene Profile).
+// Therapeut archivieren (Soft-Delete, reversibel).
+export async function archiveTherapist(id: string) {
+  let errorMessage: string | null = null;
+  try {
+    await adminRequest(`/admin/therapists/${id}/archive`);
+  } catch (error) {
+    errorMessage = error instanceof Error ? error.message : 'Archivieren fehlgeschlagen.';
+  }
+  if (errorMessage) {
+    redirect(`/therapists/${id}?photoError=` + encodeURIComponent(errorMessage));
+  }
+  revalidatePath('/therapists');
+  revalidatePath(`/therapists/${id}`);
+  redirect('/therapists?archived=1');
+}
+
+// Archivierten Therapeuten wiederherstellen.
+export async function unarchiveTherapist(id: string) {
+  let errorMessage: string | null = null;
+  try {
+    await adminRequest(`/admin/therapists/${id}/unarchive`);
+  } catch (error) {
+    errorMessage = error instanceof Error ? error.message : 'Wiederherstellen fehlgeschlagen.';
+  }
+  if (errorMessage) {
+    redirect(`/therapists/${id}?photoError=` + encodeURIComponent(errorMessage));
+  }
+  revalidatePath('/therapists');
+  revalidatePath(`/therapists/${id}`);
+  redirect(`/therapists/${id}?restored=1`);
+}
+
+// Endgültig löschen — API erlaubt das nur für bereits archivierte Profile.
 export async function deleteTherapist(id: string) {
   let errorMessage: string | null = null;
   try {
@@ -256,7 +288,7 @@ export async function deleteTherapist(id: string) {
     redirect(`/therapists/${id}?photoError=` + encodeURIComponent(errorMessage));
   }
   revalidatePath('/therapists');
-  redirect('/therapists?deleted=1');
+  redirect('/therapists?deleted=1&status=ARCHIVED');
 }
 
 export async function approveTherapist(id: string) {
@@ -316,6 +348,9 @@ export async function createPractice(formData: FormData) {
       name,
       city,
       address: String(formData.get('address') ?? '').trim() || undefined,
+      street: String(formData.get('street') ?? '').trim() || undefined,
+      houseNumber: String(formData.get('houseNumber') ?? '').trim() || undefined,
+      postalCode: String(formData.get('postalCode') ?? '').trim() || undefined,
       phone: String(formData.get('phone') ?? '').trim() || undefined,
       hours: String(formData.get('hours') ?? '').trim() || undefined,
       description: String(formData.get('description') ?? '').trim() || undefined,
@@ -334,6 +369,9 @@ export async function updatePractice(id: string, formData: FormData) {
       name: String(formData.get('name') ?? '').trim() || undefined,
       city: String(formData.get('city') ?? '').trim() || undefined,
       address: String(formData.get('address') ?? '').trim() || undefined,
+      street: String(formData.get('street') ?? '').trim() || undefined,
+      houseNumber: String(formData.get('houseNumber') ?? '').trim() || undefined,
+      postalCode: String(formData.get('postalCode') ?? '').trim() || undefined,
       phone: String(formData.get('phone') ?? '').trim() || undefined,
       hours: String(formData.get('hours') ?? '').trim() || undefined,
       description: String(formData.get('description') ?? '').trim() || undefined,

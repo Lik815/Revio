@@ -221,6 +221,7 @@ async function loadSearchableTherapists(fastify: FastifyInstance): Promise<Searc
       reviewStatus: 'APPROVED',
       isVisible: true,
       employmentStatus: 'SELF_EMPLOYED',
+      archivedAt: null,
     },
     include: searchTherapistInclude,
   });
@@ -232,11 +233,23 @@ async function loadListedPractices(fastify: FastifyInstance): Promise<ListedPrac
   if (searchListedPracticesCache && Date.now() - searchListedPracticesCache.loadedAt < SEARCH_CACHE_TTL_MS) {
     return searchListedPracticesCache.data;
   }
+  // Live-Gate (docs/praxis-pflichtdaten-umsetzung.md, Abschnitt 5): eine Praxis
+  // erscheint öffentlich nur mit vollständiger Adresse und mindestens einem
+  // bestätigten (CONFIRMED) Therapeuten-Link.
   const practices = await fastify.prisma.practice.findMany({
-    where: { reviewStatus: 'LISTED' },
+    where: {
+      reviewStatus: 'LISTED',
+      street: { not: null },
+      houseNumber: { not: null },
+      postalCode: { not: null },
+      links: { some: { status: 'CONFIRMED' } },
+    },
   });
-  searchListedPracticesCache = { data: practices, loadedAt: Date.now() };
-  return practices;
+  const fullyAddressed = practices.filter((p) =>
+    p.street?.trim() && p.houseNumber?.trim() && p.postalCode?.trim(),
+  );
+  searchListedPracticesCache = { data: fullyAddressed, loadedAt: Date.now() };
+  return fullyAddressed;
 }
 
 // ── Routes ─────────────────────────────────────────────────────────────────
@@ -570,6 +583,7 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
               reviewStatus: 'APPROVED',
               isVisible: true,
               employmentStatus: 'SELF_EMPLOYED',
+              archivedAt: null,
             },
           },
           include: {
@@ -674,7 +688,7 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
         distinct: ['city'],
       }),
       fastify.prisma.therapist.findMany({
-        where: { reviewStatus: 'APPROVED', isVisible: true, employmentStatus: 'SELF_EMPLOYED' },
+        where: { reviewStatus: 'APPROVED', isVisible: true, employmentStatus: 'SELF_EMPLOYED', archivedAt: null },
         select: { city: true },
         distinct: ['city'],
       }),

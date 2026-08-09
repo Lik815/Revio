@@ -14,6 +14,7 @@ import {
   Pressable,
   ScrollView,
   Share,
+  StyleSheet,
   Text,
   View,
 } from 'react-native';
@@ -181,21 +182,33 @@ export function TherapistProfileContent(props) {
         ) : null}
 
         {/* ── Praxis ──────────────────────────────────────────────────────────── */}
-        {(th.practices ?? [])[0] ? (
+        {(th.practices ?? []).length > 0 ? (
           <View style={[styles.infoSection, { backgroundColor: c.card, borderColor: c.border }]}>
-            <Text style={{ color: c.muted, fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 10 }}>Praxis</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
-              <Ionicons name="business-outline" size={18} color={c.muted} style={{ marginTop: 2 }} />
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 15, fontWeight: '700', color: c.text }}>{th.practices[0].name}</Text>
-                {th.practices[0].address ? (
-                  <Text style={{ fontSize: 14, color: c.muted, marginTop: 2 }}>{th.practices[0].address}</Text>
-                ) : null}
-                {th.practices[0].city ? (
-                  <Text style={{ fontSize: 14, color: c.muted, marginTop: 2 }}>{th.practices[0].city}</Text>
-                ) : null}
+            <Text style={{ color: c.muted, fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 10 }}>
+              {th.practices.length > 1 ? 'Praxen' : 'Praxis'}
+            </Text>
+            {th.practices.map((practice, index) => (
+              <View
+                key={practice.id ?? index}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'flex-start',
+                  gap: 10,
+                  ...(index > 0 ? { marginTop: 12, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.border } : {}),
+                }}
+              >
+                <Ionicons name="business-outline" size={18} color={c.muted} style={{ marginTop: 2 }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 15, fontWeight: '700', color: c.text }}>{practice.name}</Text>
+                  {practice.address ? (
+                    <Text style={{ fontSize: 14, color: c.muted, marginTop: 2 }}>{practice.address}</Text>
+                  ) : null}
+                  {practice.city ? (
+                    <Text style={{ fontSize: 14, color: c.muted, marginTop: 2 }}>{practice.city}</Text>
+                  ) : null}
+                </View>
               </View>
-            </View>
+            ))}
           </View>
         ) : null}
 
