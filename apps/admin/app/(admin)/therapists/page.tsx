@@ -19,7 +19,7 @@ import {
   suspendTherapist,
 } from '../../../lib/actions';
 
-type SearchParams = Promise<{ status?: string; q?: string; city?: string; created?: string }>;
+type SearchParams = Promise<{ status?: string; q?: string; city?: string; created?: string; deleted?: string }>;
 
 function getQueueCopy({
   overdueCount,
@@ -135,6 +135,9 @@ export default async function TherapistsPage({ searchParams }: { searchParams: S
 
       {params.created ? (
         <AdminNotice title="Angelegt" tone="success">{params.created} wurde angelegt und steht in der Warteschlange.</AdminNotice>
+      ) : null}
+      {params.deleted ? (
+        <AdminNotice title="Gelöscht" tone="success">Das Profil wurde entfernt.</AdminNotice>
       ) : null}
 
       {filtered.length === 0 ? (

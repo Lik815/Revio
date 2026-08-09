@@ -9,6 +9,7 @@ import {
   setQualifikationStatus,
   updateTherapist,
   uploadTherapistPhoto,
+  deleteTherapist,
 } from '../../../../lib/actions';
 import { api } from '../../../../lib/api';
 import { getAdminVisibilityIssues } from '../../../../lib/visibility';
@@ -242,6 +243,16 @@ export default async function TherapistDetailPage({ params, searchParams }: Prop
                   <button className="primary-btn" type="submit">Foto hochladen</button>
                 </form>
               </div>
+            </div>
+
+            <div style={{ marginTop: 20, borderTop: '1px solid var(--border, #e5e7eb)', paddingTop: 20 }}>
+              <div className="kicker" style={{ marginBottom: 8 }}>Profil löschen</div>
+              <p style={{ margin: '0 0 12px', color: 'var(--muted)', fontSize: 13 }}>
+                Entfernt dieses unbeanspruchte Profil endgültig. Nicht rückgängig zu machen.
+              </p>
+              <form action={deleteTherapist.bind(null, therapist.id)}>
+                <button className="action-btn action-btn--reject" type="submit">Profil löschen</button>
+              </form>
             </div>
           </>
         )}

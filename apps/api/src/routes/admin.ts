@@ -995,6 +995,21 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
     return { url };
   });
 
+  // Unbeanspruchten (operator-angelegten) Therapeuten endgültig löschen.
+  // Bewusst gesperrt für übernommene Profile (userId gesetzt) — ein echtes,
+  // selbst registriertes Konto darf hierüber nie entfernt werden.
+  fastify.post('/therapists/:id/delete', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const existing = await fastify.prisma.therapist.findUnique({ where: { id } });
+    if (!existing) return reply.notFound('Therapist not found');
+    if (existing.userId) {
+      return reply.forbidden('Übernommene Profile können nicht gelöscht werden.');
+    }
+    await fastify.prisma.therapist.delete({ where: { id } });
+    resetSearchCache();
+    return { deleted: true };
+  });
+
   fastify.post('/therapists/:id/approve', async (request, reply) => {
     const { id } = request.params as { id: string };
     const existing = await fastify.prisma.therapist.findUnique({ where: { id } });

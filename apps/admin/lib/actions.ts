@@ -222,6 +222,21 @@ export async function uploadTherapistPhoto(id: string, formData: FormData) {
   redirect(`/therapists/${id}?photoOk=1`);
 }
 
+// Unbeanspruchten Therapeuten löschen (API sperrt übernommene Profile).
+export async function deleteTherapist(id: string) {
+  let errorMessage: string | null = null;
+  try {
+    await adminRequest(`/admin/therapists/${id}/delete`);
+  } catch (error) {
+    errorMessage = error instanceof Error ? error.message : 'Löschen fehlgeschlagen.';
+  }
+  if (errorMessage) {
+    redirect(`/therapists/${id}?photoError=` + encodeURIComponent(errorMessage));
+  }
+  revalidatePath('/therapists');
+  redirect('/therapists?deleted=1');
+}
+
 export async function approveTherapist(id: string) {
   await adminRequest(`/admin/therapists/${id}/approve`);
   revalidatePath('/therapists');
