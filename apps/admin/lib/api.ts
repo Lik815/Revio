@@ -153,6 +153,13 @@ export type AdminPractice = {
   hours?: string | null;
   description?: string | null;
   homeVisit?: boolean;
+  email?: string | null;
+  website?: string | null;
+  wheelchairAccessible?: boolean;
+  parkingAvailable?: boolean;
+  publicTransportNote?: string | null;
+  logo?: string | null;
+  photos?: string[];
   reviewStatus: string;
   // Directory-First-Refactor (P2): null = unbeansprucht, im Admin-Bereich bearbeitbar.
   ownerId?: string | null;

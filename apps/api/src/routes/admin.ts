@@ -8,6 +8,14 @@ import { THERAPIST_VERIFICATIONS_DIR, PROFILE_PHOTOS_DIR } from '../utils/storag
 import { uploadFile } from '../utils/storage.js';
 import { randomBytes } from 'crypto';
 import { geocodeAddress } from '../utils/geocode.js';
+import {
+  isAllowedPracticeImageMime,
+  uploadPracticeLogo,
+  uploadPracticePhoto,
+  parsePracticePhotos,
+  serializePracticePhotos,
+  PRACTICE_PHOTOS_MAX,
+} from '../utils/practice-media.js';
 import { serializeKassenarten } from '../utils/kassenarten.js';
 import { getTherapistPublicationState, getTherapistRequestabilityState } from '../utils/profile-completeness.js';
 import { resetSearchCache } from './search.js';
@@ -107,6 +115,9 @@ function mapPractice(p: {
   id: string; name: string; city: string; address: string | null;
   street?: string | null; houseNumber?: string | null; postalCode?: string | null;
   phone: string | null; hours: string | null; description?: string | null; homeVisit?: boolean;
+  email?: string | null; website?: string | null;
+  wheelchairAccessible?: boolean; parkingAvailable?: boolean; publicTransportNote?: string | null;
+  logo?: string | null; photos?: string | null;
   lat: number; lng: number; reviewStatus: string; ownerId?: string | null;
   createdAt: Date; updatedAt: Date;
   links?: Array<{ id: string; status: string; therapist: { id: string; fullName: string; professionalTitle: string } }>;
@@ -115,6 +126,12 @@ function mapPractice(p: {
     id: p.id, name: p.name, city: p.city,
     address: p.address ?? undefined, phone: p.phone ?? undefined,
     street: p.street ?? undefined, houseNumber: p.houseNumber ?? undefined, postalCode: p.postalCode ?? undefined,
+    email: p.email ?? undefined, website: p.website ?? undefined,
+    wheelchairAccessible: p.wheelchairAccessible ?? false,
+    parkingAvailable: p.parkingAvailable ?? false,
+    publicTransportNote: p.publicTransportNote ?? undefined,
+    logo: p.logo ?? undefined,
+    photos: parsePracticePhotos(p.photos),
     hours: p.hours ?? undefined,
     description: p.description ?? undefined, homeVisit: p.homeVisit ?? false,
     lat: p.lat, lng: p.lng, reviewStatus: p.reviewStatus,
@@ -1220,6 +1237,11 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
     hours: z.string().trim().optional(),
     description: z.string().trim().optional(),
     homeVisit: z.boolean().optional(),
+    email: z.string().trim().email().optional(),
+    website: z.string().trim().optional(),
+    wheelchairAccessible: z.boolean().optional(),
+    parkingAvailable: z.boolean().optional(),
+    publicTransportNote: z.string().trim().optional(),
   });
 
   // Directory-First-Refactor (P2): Operator legt eine Praxis manuell an.
@@ -1252,6 +1274,11 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
         hours: data.hours || null,
         description: data.description || null,
         homeVisit: data.homeVisit ?? false,
+        email: data.email || null,
+        website: data.website || null,
+        wheelchairAccessible: data.wheelchairAccessible ?? false,
+        parkingAvailable: data.parkingAvailable ?? false,
+        publicTransportNote: data.publicTransportNote || null,
         lat: coords?.lat ?? 0,
         lng: coords?.lng ?? 0,
         // Directory-First-Refactor (P2): sofort öffentlich sichtbar als LISTED —
@@ -1280,6 +1307,11 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
       hours: z.string().trim().optional(),
       description: z.string().trim().optional(),
       homeVisit: z.boolean().optional(),
+      email: z.string().trim().email().optional(),
+      website: z.string().trim().optional(),
+      wheelchairAccessible: z.boolean().optional(),
+      parkingAvailable: z.boolean().optional(),
+      publicTransportNote: z.string().trim().optional(),
     })).min(1).max(500),
   });
 
@@ -1336,6 +1368,11 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
           hours: entry.hours || null,
           description: entry.description || null,
           homeVisit: entry.homeVisit ?? false,
+          email: entry.email || null,
+          website: entry.website || null,
+          wheelchairAccessible: entry.wheelchairAccessible ?? false,
+          parkingAvailable: entry.parkingAvailable ?? false,
+          publicTransportNote: entry.publicTransportNote || null,
           lat: coords?.lat ?? 0,
           lng: coords?.lng ?? 0,
           reviewStatus: 'LISTED',
@@ -1359,6 +1396,11 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
     hours: z.string().trim().optional(),
     description: z.string().trim().optional(),
     homeVisit: z.boolean().optional(),
+    email: z.string().trim().email().optional(),
+    website: z.string().trim().optional(),
+    wheelchairAccessible: z.boolean().optional(),
+    parkingAvailable: z.boolean().optional(),
+    publicTransportNote: z.string().trim().optional(),
   });
 
   // Directory-First-Refactor (P2): Bearbeiten nur solange ownerId null ist
@@ -1404,11 +1446,90 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
         ...(data.hours !== undefined && { hours: data.hours }),
         ...(data.description !== undefined && { description: data.description }),
         ...(data.homeVisit !== undefined && { homeVisit: data.homeVisit }),
+        ...(data.email !== undefined && { email: data.email }),
+        ...(data.website !== undefined && { website: data.website }),
+        ...(data.wheelchairAccessible !== undefined && { wheelchairAccessible: data.wheelchairAccessible }),
+        ...(data.parkingAvailable !== undefined && { parkingAvailable: data.parkingAvailable }),
+        ...(data.publicTransportNote !== undefined && { publicTransportNote: data.publicTransportNote }),
         ...(coords && { lat: coords.lat, lng: coords.lng }),
       },
     }).catch(() => null);
     if (!practice) return reply.notFound('Practice not found');
 
+    resetSearchCache();
+    return mapPractice(practice);
+  });
+
+  // Medien (docs/praxis-zusatzdaten-umsetzung.md, Teil A). Gleiche Vorbedingung
+  // wie /practices/:id/update: nur solange die Praxis unbeansprucht ist.
+  fastify.post('/practices/:id/logo', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const existing = await fastify.prisma.practice.findUnique({ where: { id } });
+    if (!existing) return reply.notFound('Practice not found');
+    if ((existing as { ownerId?: string | null }).ownerId) {
+      return reply.forbidden('Diese Praxis wurde bereits übernommen und ist nicht mehr über den Admin-Bereich bearbeitbar.');
+    }
+
+    const data = await (request as any).file();
+    if (!data) return reply.badRequest('Keine Datei übermittelt');
+    if (!isAllowedPracticeImageMime(data.mimetype)) {
+      return reply.badRequest('Nur JPEG, PNG und WebP sind erlaubt');
+    }
+
+    const url = await uploadPracticeLogo(data);
+    const practice = await fastify.prisma.practice.update({ where: { id }, data: { logo: url } });
+    resetSearchCache();
+    return mapPractice(practice);
+  });
+
+  fastify.post('/practices/:id/photos', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const existing = await fastify.prisma.practice.findUnique({ where: { id } });
+    if (!existing) return reply.notFound('Practice not found');
+    if ((existing as { ownerId?: string | null }).ownerId) {
+      return reply.forbidden('Diese Praxis wurde bereits übernommen und ist nicht mehr über den Admin-Bereich bearbeitbar.');
+    }
+
+    const currentPhotos = parsePracticePhotos((existing as { photos?: string | null }).photos);
+    if (currentPhotos.length >= PRACTICE_PHOTOS_MAX) {
+      return reply.badRequest(`Maximal ${PRACTICE_PHOTOS_MAX} Fotos pro Praxis erlaubt.`);
+    }
+
+    const data = await (request as any).file();
+    if (!data) return reply.badRequest('Keine Datei übermittelt');
+    if (!isAllowedPracticeImageMime(data.mimetype)) {
+      return reply.badRequest('Nur JPEG, PNG und WebP sind erlaubt');
+    }
+
+    const url = await uploadPracticePhoto(data);
+    const nextPhotos = [...currentPhotos, url];
+    const practice = await fastify.prisma.practice.update({
+      where: { id },
+      data: { photos: serializePracticePhotos(nextPhotos) },
+    });
+    resetSearchCache();
+    return mapPractice(practice);
+  });
+
+  const removePracticePhotoSchema = z.object({ url: z.string().trim().min(1) });
+
+  fastify.post('/practices/:id/photos/remove', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const parsed = removePracticePhotoSchema.safeParse(request.body);
+    if (!parsed.success) return reply.badRequest('Ungültige Eingabe');
+
+    const existing = await fastify.prisma.practice.findUnique({ where: { id } });
+    if (!existing) return reply.notFound('Practice not found');
+    if ((existing as { ownerId?: string | null }).ownerId) {
+      return reply.forbidden('Diese Praxis wurde bereits übernommen und ist nicht mehr über den Admin-Bereich bearbeitbar.');
+    }
+
+    const currentPhotos = parsePracticePhotos((existing as { photos?: string | null }).photos);
+    const nextPhotos = currentPhotos.filter((p) => p !== parsed.data.url);
+    const practice = await fastify.prisma.practice.update({
+      where: { id },
+      data: { photos: serializePracticePhotos(nextPhotos) },
+    });
     resetSearchCache();
     return mapPractice(practice);
   });

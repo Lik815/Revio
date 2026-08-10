@@ -2,10 +2,11 @@ import Link from 'next/link';
 import { PageShell } from '../../../components/page-shell';
 import { PracticeActions } from '../../../components/action-buttons';
 import { DeadlineTimer } from '../../../components/deadline-timer';
+import { AdminNotice } from '../../../components/admin-notice';
 import { api } from '../../../lib/api';
-import { approvePractice, rejectPractice, suspendPractice, createPractice } from '../../../lib/actions';
+import { approvePractice, rejectPractice, suspendPractice } from '../../../lib/actions';
 
-type SearchParams = Promise<{ status?: string; q?: string; city?: string }>;
+type SearchParams = Promise<{ status?: string; q?: string; city?: string; created?: string }>;
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -76,8 +77,17 @@ export default async function PracticesPage({ searchParams }: { searchParams: Se
       title="Praxis-Warteschlange"
       description="Behalte Praxiseinreichungen im Blick, die auf Freigabe warten, und prüfe verknüpfte Therapeuten-Aktivitäten, bevor etwas veröffentlicht wird."
       eyebrow="Reviews"
-      actions={<div className="hero-pill">{filtered.length} Ergebnisse</div>}
+      actions={
+        <>
+          <div className="hero-pill">{filtered.length} Ergebnisse</div>
+          <Link href="/practices/neu" className="primary-btn">Neue Praxis anlegen</Link>
+        </>
+      }
     >
+      {params.created ? (
+        <AdminNotice title="Angelegt" tone="success">{params.created} wurde angelegt und steht in der Warteschlange.</AdminNotice>
+      ) : null}
+
       <div className="review-summary-grid">
         <article className="review-summary-card">
           <div className="kicker">Jetzt prüfen</div>
@@ -109,33 +119,6 @@ export default async function PracticesPage({ searchParams }: { searchParams: Se
         </select>
         <button className="primary-btn" type="submit">Filtern</button>
       </form>
-
-      <details className="panel panel--compact" style={{ marginBottom: 20 }}>
-        <summary style={{ cursor: 'pointer', fontWeight: 600 }}>
-          Neue Praxis anlegen
-        </summary>
-        <form action={createPractice} style={{ display: 'grid', gap: 12, marginTop: 16 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
-            <input className="toolbar-input" name="name" placeholder="Name der Praxis" required />
-            <input className="toolbar-input" name="city" placeholder="Stadt" required />
-            <input className="toolbar-input" name="street" placeholder="Straße" />
-            <input className="toolbar-input" name="houseNumber" placeholder="Hausnummer" />
-            <input className="toolbar-input" name="postalCode" placeholder="PLZ" />
-            <input className="toolbar-input" name="phone" placeholder="Telefon" />
-            <input className="toolbar-input" name="hours" placeholder="Öffnungszeiten" />
-          </div>
-          <textarea className="toolbar-input" name="description" placeholder="Kurzbeschreibung" rows={2} />
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <input type="checkbox" name="homeVisit" value="true" />
-            Hausbesuche möglich
-          </label>
-          <p style={{ margin: 0, color: 'var(--muted)', fontSize: 13 }}>
-            Läuft wie eine selbstregistrierte Praxis durch die Freigabe-Warteschlange unten. Bearbeitbar, solange
-            niemand sie übernommen hat. Straße, Hausnummer und PLZ sind Voraussetzung für die spätere Freigabe/Sichtbarkeit.
-          </p>
-          <button className="primary-btn" type="submit" style={{ justifySelf: 'start' }}>Praxis anlegen</button>
-        </form>
-      </details>
 
       {filtered.length === 0 ? (
         <div className="empty-state empty-state--compact">

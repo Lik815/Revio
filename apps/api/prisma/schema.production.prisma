@@ -253,6 +253,12 @@ model Practice {
   postalCode        String?
   phone             String?
   hours             String?
+  // Zusatzdaten (docs/praxis-zusatzdaten-umsetzung.md, Teil B.1)
+  email             String?
+  website           String?
+  wheelchairAccessible Boolean   @default(false)
+  parkingAvailable  Boolean      @default(false)
+  publicTransportNote String?
   lat               Float        @default(0)
   lng               Float        @default(0)
   reviewStatus      ReviewStatus @default(PENDING_REVIEW)

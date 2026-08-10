@@ -4,6 +4,14 @@ import { randomBytes } from 'crypto';
 import { hashPassword, getToken } from './auth-utils.js';
 import { resetSearchCache } from './search.js';
 import { geocodeAddress } from '../utils/geocode.js';
+import {
+  isAllowedPracticeImageMime,
+  uploadPracticeLogo,
+  uploadPracticePhoto,
+  parsePracticePhotos,
+  serializePracticePhotos,
+  PRACTICE_PHOTOS_MAX,
+} from '../utils/practice-media.js';
 
 const TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 Tage, gleiche Laufzeit wie auth.ts
 const newTokenExpiry = () => new Date(Date.now() + TOKEN_TTL_MS);
@@ -123,6 +131,11 @@ export const claimRoutes: FastifyPluginAsync = async (fastify) => {
     hours: z.string().trim().optional(),
     description: z.string().trim().optional(),
     homeVisit: z.boolean().optional(),
+    email: z.string().trim().email().optional(),
+    website: z.string().trim().optional(),
+    wheelchairAccessible: z.boolean().optional(),
+    parkingAvailable: z.boolean().optional(),
+    publicTransportNote: z.string().trim().optional(),
   });
 
   // POST /claim/me/update — Selbstverwaltung nach dem Claim (Teil der
@@ -175,11 +188,95 @@ export const claimRoutes: FastifyPluginAsync = async (fastify) => {
         ...(data.hours !== undefined && { hours: data.hours }),
         ...(data.description !== undefined && { description: data.description }),
         ...(data.homeVisit !== undefined && { homeVisit: data.homeVisit }),
+        ...(data.email !== undefined && { email: data.email }),
+        ...(data.website !== undefined && { website: data.website }),
+        ...(data.wheelchairAccessible !== undefined && { wheelchairAccessible: data.wheelchairAccessible }),
+        ...(data.parkingAvailable !== undefined && { parkingAvailable: data.parkingAvailable }),
+        ...(data.publicTransportNote !== undefined && { publicTransportNote: data.publicTransportNote }),
         ...(coords && { lat: coords.lat, lng: coords.lng }),
       },
     });
 
     resetSearchCache();
     return { practice };
+  });
+
+  // Medien-Selbstverwaltung (docs/praxis-zusatzdaten-umsetzung.md, Teil A.4).
+  // Gleiche Auth-Vorbedingung wie /claim/me/update.
+  async function requireOwnedPractice(request: any, reply: any) {
+    const token = getToken(request);
+    if (!token) { reply.unauthorized('Kein Token'); return null; }
+
+    const user = await fastify.prisma.user.findUnique({
+      where: { sessionToken: token },
+      include: { ownedPractice: true },
+    });
+    if (!user || user.role !== 'practice_owner') { reply.unauthorized('Kein Zugriff.'); return null; }
+    if (user.sessionTokenExpiresAt && user.sessionTokenExpiresAt < new Date()) {
+      reply.unauthorized('Sitzung abgelaufen. Bitte erneut anmelden.');
+      return null;
+    }
+    if (!user.ownedPractice) { reply.notFound('Keine Praxis verknüpft.'); return null; }
+    return user.ownedPractice;
+  }
+
+  fastify.post('/claim/me/logo', async (request, reply) => {
+    const practice = await requireOwnedPractice(request, reply);
+    if (!practice) return;
+
+    const data = await (request as any).file();
+    if (!data) return reply.badRequest('Keine Datei übermittelt');
+    if (!isAllowedPracticeImageMime(data.mimetype)) {
+      return reply.badRequest('Nur JPEG, PNG und WebP sind erlaubt');
+    }
+
+    const url = await uploadPracticeLogo(data);
+    const updated = await fastify.prisma.practice.update({ where: { id: practice.id }, data: { logo: url } });
+    resetSearchCache();
+    return { practice: updated };
+  });
+
+  fastify.post('/claim/me/photos', async (request, reply) => {
+    const practice = await requireOwnedPractice(request, reply);
+    if (!practice) return;
+
+    const currentPhotos = parsePracticePhotos(practice.photos);
+    if (currentPhotos.length >= PRACTICE_PHOTOS_MAX) {
+      return reply.badRequest(`Maximal ${PRACTICE_PHOTOS_MAX} Fotos pro Praxis erlaubt.`);
+    }
+
+    const data = await (request as any).file();
+    if (!data) return reply.badRequest('Keine Datei übermittelt');
+    if (!isAllowedPracticeImageMime(data.mimetype)) {
+      return reply.badRequest('Nur JPEG, PNG und WebP sind erlaubt');
+    }
+
+    const url = await uploadPracticePhoto(data);
+    const nextPhotos = [...currentPhotos, url];
+    const updated = await fastify.prisma.practice.update({
+      where: { id: practice.id },
+      data: { photos: serializePracticePhotos(nextPhotos) },
+    });
+    resetSearchCache();
+    return { practice: updated };
+  });
+
+  const removeOwnedPracticePhotoSchema = z.object({ url: z.string().trim().min(1) });
+
+  fastify.post('/claim/me/photos/remove', async (request, reply) => {
+    const practice = await requireOwnedPractice(request, reply);
+    if (!practice) return;
+
+    const parsed = removeOwnedPracticePhotoSchema.safeParse(request.body);
+    if (!parsed.success) return reply.badRequest('Ungültige Eingabe');
+
+    const currentPhotos = parsePracticePhotos(practice.photos);
+    const nextPhotos = currentPhotos.filter((p) => p !== parsed.data.url);
+    const updated = await fastify.prisma.practice.update({
+      where: { id: practice.id },
+      data: { photos: serializePracticePhotos(nextPhotos) },
+    });
+    resetSearchCache();
+    return { practice: updated };
   });
 };

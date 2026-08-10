@@ -9,6 +9,8 @@ export const API_STORAGE_DIR = join(API_ROOT, 'storage');
 
 export const PUBLIC_UPLOADS_DIR = join(API_STORAGE_DIR, 'public/uploads');
 export const PROFILE_PHOTOS_DIR = join(PUBLIC_UPLOADS_DIR, 'profile-photos');
+export const PRACTICE_LOGOS_DIR = join(PUBLIC_UPLOADS_DIR, 'practice-logos');
+export const PRACTICE_PHOTOS_DIR = join(PUBLIC_UPLOADS_DIR, 'practice-photos');
 
 export const PRIVATE_DOCUMENTS_DIR = join(API_STORAGE_DIR, 'private/documents');
 export const THERAPIST_VERIFICATIONS_DIR = join(PRIVATE_DOCUMENTS_DIR, 'therapist-verifications');

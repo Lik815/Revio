@@ -365,6 +365,11 @@ export async function createPractice(formData: FormData) {
         hours: str('hours'),
         description: str('description'),
         homeVisit: formData.get('homeVisit') === 'true',
+        email: str('email'),
+        website: str('website'),
+        wheelchairAccessible: formData.get('wheelchairAccessible') === 'true',
+        parkingAvailable: formData.get('parkingAvailable') === 'true',
+        publicTransportNote: str('publicTransportNote'),
       },
     });
   } catch (error) {
@@ -395,10 +400,79 @@ export async function updatePractice(id: string, formData: FormData) {
       hours: String(formData.get('hours') ?? '').trim() || undefined,
       description: String(formData.get('description') ?? '').trim() || undefined,
       homeVisit: formData.get('homeVisit') === 'true',
+      email: String(formData.get('email') ?? '').trim() || undefined,
+      website: String(formData.get('website') ?? '').trim() || undefined,
+      wheelchairAccessible: formData.get('wheelchairAccessible') === 'true',
+      parkingAvailable: formData.get('parkingAvailable') === 'true',
+      publicTransportNote: String(formData.get('publicTransportNote') ?? '').trim() || undefined,
     },
   });
 
   revalidatePath('/practices');
+}
+
+// Logo/Fotos: adminRequest sendet nur JSON, deshalb Multipart direkt weiterreichen
+// (analog zu forwardTherapistPhoto).
+async function forwardPracticeImage(path: string, file: File): Promise<string | null> {
+  const token = await getAdminToken();
+  const forward = new FormData();
+  forward.append('file', file);
+  for (const base of getApiBaseCandidates()) {
+    try {
+      const res = await fetch(`${base}${path}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: forward,
+      });
+      if (!res.ok) {
+        let message = `API ${res.status}`;
+        try { const b = await res.json(); if (b?.message) message = b.message; } catch {}
+        return message;
+      }
+      return null;
+    } catch (error) {
+      return error instanceof Error ? error.message : 'Upload fehlgeschlagen.';
+    }
+  }
+  return 'API nicht erreichbar.';
+}
+
+export async function uploadPracticeLogo(id: string, formData: FormData) {
+  const file = formData.get('logo');
+  if (!(file instanceof File) || file.size === 0) {
+    redirect(`/practices/${id}?mediaError=` + encodeURIComponent('Bitte eine Bilddatei auswählen.'));
+  }
+
+  const errorMessage = await forwardPracticeImage(`/admin/practices/${id}/logo`, file as File);
+  if (errorMessage) {
+    redirect(`/practices/${id}?mediaError=` + encodeURIComponent(errorMessage));
+  }
+
+  revalidatePath('/practices');
+  revalidatePath(`/practices/${id}`);
+  redirect(`/practices/${id}?mediaOk=1`);
+}
+
+export async function uploadPracticePhoto(id: string, formData: FormData) {
+  const file = formData.get('photo');
+  if (!(file instanceof File) || file.size === 0) {
+    redirect(`/practices/${id}?mediaError=` + encodeURIComponent('Bitte eine Bilddatei auswählen.'));
+  }
+
+  const errorMessage = await forwardPracticeImage(`/admin/practices/${id}/photos`, file as File);
+  if (errorMessage) {
+    redirect(`/practices/${id}?mediaError=` + encodeURIComponent(errorMessage));
+  }
+
+  revalidatePath('/practices');
+  revalidatePath(`/practices/${id}`);
+  redirect(`/practices/${id}?mediaOk=1`);
+}
+
+export async function removePracticePhoto(id: string, url: string) {
+  await adminRequest(`/admin/practices/${id}/photos/remove`, { body: { url } });
+  revalidatePath('/practices');
+  revalidatePath(`/practices/${id}`);
 }
 
 export async function confirmLink(id: string) {

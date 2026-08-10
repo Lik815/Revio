@@ -40,8 +40,8 @@ models:
     P0: [type, bookingId, inquiryId, linkId, practiceId, reviewStatus, actionLabel, readAt, createdAt]
 
   Practice:
-    P1: [id, name, city, address, street, houseNumber, postalCode, phone, lat, lng, logo, photos, description]
-    P0: [hours, reviewStatus, homeVisit, createdAt, updatedAt]
+    P1: [id, name, city, address, street, houseNumber, postalCode, phone, email, website, lat, lng, logo, photos, description]
+    P0: [hours, reviewStatus, homeVisit, wheelchairAccessible, parkingAvailable, publicTransportNote, createdAt, updatedAt]
 
   SearchSuggestion:
     P1: [text, normalized, entityId]
