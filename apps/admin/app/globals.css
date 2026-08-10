@@ -1112,6 +1112,55 @@ a {
   margin-top: 2px;
 }
 
+/* Tippen-zum-Filtern-Combobox (Verknüpfung anlegen: Therapeut/Praxis suchen
+   statt aus einer langen <select>-Liste scrollen). */
+
+.searchable-select {
+  position: relative;
+  min-width: 240px;
+}
+
+.searchable-select__list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  max-height: 260px;
+  overflow-y: auto;
+  background: var(--surface-solid);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  padding: 6px;
+  list-style: none;
+  margin: 0;
+}
+
+.searchable-select__option {
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.searchable-select__option:hover,
+.searchable-select__option--active {
+  background: rgba(75, 101, 114, 0.08);
+}
+
+.searchable-select__option-sublabel {
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin-top: 1px;
+}
+
+.searchable-select__empty {
+  padding: 10px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
 .form-submit-bar {
   position: sticky;
   bottom: 16px;

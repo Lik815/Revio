@@ -532,15 +532,23 @@ export async function confirmLink(id: string) {
 export async function createLink(formData: FormData) {
   const therapistId = String(formData.get('therapistId') ?? '').trim();
   const practiceId = String(formData.get('practiceId') ?? '').trim();
-  if (!therapistId || !practiceId) return;
+  if (!therapistId || !practiceId) {
+    redirect('/links?linkError=' + encodeURIComponent('Bitte Therapeut und Praxis auswählen.'));
+  }
 
-  await adminRequest('/admin/links', {
-    body: { therapistId, practiceId },
-  });
+  try {
+    await adminRequest('/admin/links', {
+      body: { therapistId, practiceId },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Verknüpfen fehlgeschlagen.';
+    redirect('/links?linkError=' + encodeURIComponent(message));
+  }
 
   revalidatePath('/links');
   revalidatePath('/therapists');
   revalidatePath('/practices');
+  redirect('/links?linked=1');
 }
 
 export async function rejectLink(id: string) {

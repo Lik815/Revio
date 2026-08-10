@@ -1,9 +1,11 @@
 import { PageShell } from '../../../components/page-shell';
 import { LinkActions } from '../../../components/action-buttons';
+import { CreateLinkForm } from '../../../components/create-link-form';
+import { AdminNotice } from '../../../components/admin-notice';
 import { api } from '../../../lib/api';
 import { confirmLink, rejectLink, disputeLink, createLink } from '../../../lib/actions';
 
-type SearchParams = Promise<{ status?: string; q?: string }>;
+type SearchParams = Promise<{ status?: string; q?: string; linked?: string; linkError?: string }>;
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -41,6 +43,8 @@ export default async function LinksPage({ searchParams }: { searchParams: Search
   ]);
   const statusFilter = params.status ?? 'ALL';
   const q = (params.q ?? '').toLowerCase();
+  const therapistOptions = therapists.map((t) => ({ value: t.id, label: t.fullName, sublabel: t.professionalTitle }));
+  const practiceOptions = practices.map((p) => ({ value: p.id, label: p.name, sublabel: p.city }));
 
   // A link is "broken chain" when both therapist + practice are approved, but link itself is not confirmed
   const brokenChains = links.filter(
@@ -104,6 +108,13 @@ export default async function LinksPage({ searchParams }: { searchParams: Search
         </div>
       )}
 
+      {params.linked ? (
+        <AdminNotice title="Verknüpft" tone="success">Die Verknüpfung wurde angelegt und ist sofort bestätigt.</AdminNotice>
+      ) : null}
+      {params.linkError ? (
+        <AdminNotice title="Verknüpfen fehlgeschlagen" tone="warning">{params.linkError}</AdminNotice>
+      ) : null}
+
       <div className="panel panel--compact" style={{ marginBottom: 20 }}>
         <div className="panel-header">
           <div className="panel-header__content">
@@ -114,21 +125,7 @@ export default async function LinksPage({ searchParams }: { searchParams: Search
             </p>
           </div>
         </div>
-        <form action={createLink} style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-          <select name="therapistId" className="toolbar-select" required defaultValue="">
-            <option value="" disabled>Therapeut wählen</option>
-            {therapists.map((t) => (
-              <option key={t.id} value={t.id}>{t.fullName} — {t.professionalTitle}</option>
-            ))}
-          </select>
-          <select name="practiceId" className="toolbar-select" required defaultValue="">
-            <option value="" disabled>Praxis wählen</option>
-            {practices.map((p) => (
-              <option key={p.id} value={p.id}>{p.name} — {p.city}</option>
-            ))}
-          </select>
-          <button className="primary-btn" type="submit">Verknüpfen</button>
-        </form>
+        <CreateLinkForm therapistOptions={therapistOptions} practiceOptions={practiceOptions} action={createLink} />
       </div>
 
       <form className="toolbar toolbar--compact" action="/links">
