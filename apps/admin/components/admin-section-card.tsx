@@ -1,12 +1,14 @@
 import { ReactNode } from 'react';
 
 export function AdminSectionCard({
+  id,
   eyebrow,
   title,
   description,
   actions,
   children,
 }: {
+  id?: string;
   eyebrow?: string;
   title?: string;
   description?: string;
@@ -14,7 +16,7 @@ export function AdminSectionCard({
   children: ReactNode;
 }) {
   return (
-    <article className="panel panel--compact">
+    <article id={id} className="panel panel--compact" style={id ? { scrollMarginTop: 24 } : undefined}>
       {(eyebrow || title || description || actions) ? (
         <div className="panel-header panel-header--split">
           <div className="panel-header__content">
