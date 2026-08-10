@@ -323,20 +323,39 @@ export async function setQualifikationStatus(id: string, status: 'UNGEPRÜFT' | 
   revalidatePath(`/therapists/${id}`);
 }
 
+// approve kann fachlich fehlschlagen (Live-Gate: unvollständige Adresse oder
+// kein bestätigter Therapeut, siehe /admin/practices/:id/approve) — Fehler
+// deshalb abfangen und als Query-Param zurückgeben, statt die aufrufende
+// Server-Component-Render mit einem ungefangenen Throw abstürzen zu lassen.
 export async function approvePractice(id: string) {
-  await adminRequest(`/admin/practices/${id}/approve`);
+  try {
+    await adminRequest(`/admin/practices/${id}/approve`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Freigabe fehlgeschlagen.';
+    redirect('/practices?approveError=' + encodeURIComponent(message));
+  }
   revalidatePath('/practices');
   revalidatePath('/');
 }
 
 export async function rejectPractice(id: string) {
-  await adminRequest(`/admin/practices/${id}/reject`);
+  try {
+    await adminRequest(`/admin/practices/${id}/reject`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Ablehnen fehlgeschlagen.';
+    redirect('/practices?approveError=' + encodeURIComponent(message));
+  }
   revalidatePath('/practices');
   revalidatePath('/');
 }
 
 export async function suspendPractice(id: string) {
-  await adminRequest(`/admin/practices/${id}/suspend`);
+  try {
+    await adminRequest(`/admin/practices/${id}/suspend`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Sperren fehlgeschlagen.';
+    redirect('/practices?approveError=' + encodeURIComponent(message));
+  }
   revalidatePath('/practices');
   revalidatePath('/');
 }

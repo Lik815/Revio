@@ -6,7 +6,7 @@ import { AdminNotice } from '../../../components/admin-notice';
 import { api } from '../../../lib/api';
 import { approvePractice, rejectPractice, suspendPractice } from '../../../lib/actions';
 
-type SearchParams = Promise<{ status?: string; q?: string; city?: string; created?: string }>;
+type SearchParams = Promise<{ status?: string; q?: string; city?: string; created?: string; approveError?: string }>;
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -86,6 +86,9 @@ export default async function PracticesPage({ searchParams }: { searchParams: Se
     >
       {params.created ? (
         <AdminNotice title="Angelegt" tone="success">{params.created} wurde angelegt und steht in der Warteschlange.</AdminNotice>
+      ) : null}
+      {params.approveError ? (
+        <AdminNotice title="Aktion fehlgeschlagen" tone="warning">{params.approveError}</AdminNotice>
       ) : null}
 
       <div className="review-summary-grid">
