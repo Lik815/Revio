@@ -14,6 +14,9 @@ type HeroProps = {
   hideImage?: boolean;
   searchPlaceholder?: string;
   chips?: string[];
+  // Auf Mobil als fixierte Leiste am unteren Rand darstellen (wie die App).
+  // Opt-in, damit die übrigen Hero-Seiten unverändert bleiben.
+  stickyActions?: boolean;
 };
 
 export function Hero({
@@ -27,6 +30,7 @@ export function Hero({
   hideImage = false,
   searchPlaceholder,
   chips,
+  stickyActions = false,
 }: HeroProps) {
   return (
     <section className={`hero${hideImage ? ' hero--no-image' : ''}`}>
@@ -48,16 +52,31 @@ export function Hero({
             </div>
           ) : null}
 
-          <div className="hero__actions">
-            <Link href={primaryHref} className="button button--primary">
-              {primaryLabel}
-            </Link>
-            {secondaryHref && secondaryLabel ? (
-              <Link href={secondaryHref} className="button button--ghost">
-                {secondaryLabel}
-              </Link>
-            ) : null}
-          </div>
+          {(() => {
+            const actionLinks = (
+              <>
+                <Link href={primaryHref} className="button button--primary">
+                  {primaryLabel}
+                </Link>
+                {secondaryHref && secondaryLabel ? (
+                  <Link href={secondaryHref} className="button button--ghost">
+                    {secondaryLabel}
+                  </Link>
+                ) : null}
+              </>
+            );
+
+            // Sticky-Variante bekommt eine innere Karte (App: äußerer Streifen in
+            // Seitenfarbe + Safe-Area, innen weiße Karte). Ohne stickyActions
+            // bleibt das Markup identisch zu vorher.
+            return stickyActions ? (
+              <div className="hero__actions hero__actions--sticky">
+                <div className="hero__actions-bar">{actionLinks}</div>
+              </div>
+            ) : (
+              <div className="hero__actions">{actionLinks}</div>
+            );
+          })()}
         </div>
 
         {!hideImage ? (

@@ -24,6 +24,7 @@ export default async function HomePage() {
         searchPlaceholder="Wobei brauchst du Hilfe?"
         chips={['Rückenschmerzen', 'Kniereha', 'Sportphysiotherapie']}
         hideImage={!siteSettings.appBookingEnabled}
+        stickyActions
       />
 
       <Section

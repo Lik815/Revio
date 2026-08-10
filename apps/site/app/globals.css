@@ -254,15 +254,20 @@ h3 {
   margin-top: 28px;
 }
 
+/* Form an die App-Suchleiste angeglichen (apps/mobile styles/app-styles.js
+   searchBox): abgerundetes Rechteck mit RADIUS.md statt Pille, 1px Rahmen,
+   SHADOW.card. --radius-md (16px) und --shadow (0 2px 8px, 6 %) entsprechen
+   bereits exakt den App-Tokens. */
 .hero-search {
   display: flex;
   align-items: center;
-  border: 1.5px solid var(--line);
-  border-radius: 999px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
   background: var(--surface);
-  padding: 0 8px 0 16px;
-  height: 54px;
-  box-shadow: var(--shadow-card);
+  padding: 0 4px 0 14px;
+  height: 52px;
+  gap: 10px;
+  box-shadow: var(--shadow);
   transition: border-color 140ms ease;
 }
 
@@ -282,9 +287,10 @@ h3 {
   background: transparent;
   outline: none;
   font-family: inherit;
-  font-size: 0.97rem;
+  /* App TYPE.body: 15px. Abstände kommen jetzt vom gap der Leiste. */
+  font-size: 0.94rem;
   color: var(--ink);
-  padding: 0 12px;
+  padding: 0;
   min-width: 0;
 }
 
@@ -296,27 +302,132 @@ h3 {
   color: var(--muted);
 }
 
-.hero-search__locate,
-.hero-search__filter {
+/* Trennstrich vor den Icons — App: width 1, height 24, opacity 0.5 */
+.hero-search__divider {
+  width: 1px;
+  height: 24px;
+  background: var(--line);
+  opacity: 0.5;
+  flex-shrink: 0;
+}
+
+.hero-search__tools {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+/* Ort und Filter sind in der App schlichte Icons (kein gefüllter Kreis) —
+   muted, im Akzent wenn aktiv. */
+.hero-search__tool {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
+  min-width: 40px;
+  height: 44px;
+  border: none;
+  padding: 0 8px;
+  font: inherit;
+  background: transparent;
+  color: var(--muted);
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.hero-search__tool--active {
+  color: var(--accent);
+}
+
+/* Status-Punkt „Ort gesetzt" — App: 7px, Success, 1.5px Rand in Kartenfarbe */
+.hero-search__dot {
+  position: absolute;
+  top: 9px;
+  right: 7px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #5A9E8E;
+  border: 1.5px solid var(--surface);
+}
+
+/* Anzahl aktiver Filter, wie in der App */
+.hero-search__badge {
+  position: absolute;
+  top: 6px;
+  right: 3px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 15px;
+  text-align: center;
+}
+
+/* Absenden bleibt bewusst ein gefüllter Knopf — die App sendet über die
+   Tastatur ab, im Web braucht es einen sichtbaren Auslöser. */
+.hero-search__submit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   border: none;
   padding: 0;
   font: inherit;
-  background: var(--accent-soft);
-  color: var(--accent);
-  flex-shrink: 0;
-  cursor: pointer;
-  margin-left: 6px;
-}
-
-.hero-search__locate--active {
   background: var(--accent);
   color: #fff;
+  flex-shrink: 0;
+  cursor: pointer;
+  margin-left: 2px;
+}
+
+/* ── Filter-Panel (Hausbesuch + Kassenart) ─────────────────── */
+.hero-search-filter__check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.92rem;
+  color: var(--ink);
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+.hero-search-filter__select {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+  font-size: 0.92rem;
+  color: var(--ink);
+}
+
+.hero-search-filter__select select {
+  font: inherit;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 7px 10px;
+  min-width: 140px;
+}
+
+.hero-search-filter__reset {
+  margin-top: 12px;
+  border: none;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  font-size: 0.85rem;
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline;
 }
 
 /* ── Hero location dropdown ────────────────────────────────── */
@@ -425,6 +536,15 @@ h3 {
 
 .hero__actions {
   margin-top: 28px;
+}
+
+/* Auf Desktop verhält sich die Sticky-Variante wie normale Inline-Aktionen —
+   die innere Karte ist dort nur ein durchsichtiger Flex-Container. */
+.hero__actions-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .button {
@@ -1244,6 +1364,41 @@ h3 {
 
   .hero__actions {
     margin-top: 16px;
+  }
+
+  /* Fixe Aktionsleiste wie in der App (apps/mobile navigation/CustomTabBar.js,
+     Gast-Ansicht): außen Seitenfarbe + Safe-Area, innen weiße Karte mit
+     RADIUS.lg und SHADOW.modal, Buttons je zur Hälfte. */
+  .hero__actions--sticky {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 30;
+    margin: 0;
+    padding: 8px 16px calc(8px + env(safe-area-inset-bottom, 0px));
+    background: var(--bg);
+  }
+
+  .hero__actions--sticky .hero__actions-bar {
+    background: var(--surface);
+    border-radius: var(--radius-lg);
+    padding: 8px;
+    gap: 4px;
+    flex-wrap: nowrap;
+    box-shadow: 0 8px 24px rgba(28, 43, 51, 0.12);
+  }
+
+  .hero__actions--sticky .button {
+    flex: 1;
+    min-width: 0;
+    padding: 0 12px;
+    border-radius: var(--radius-md);
+  }
+
+  /* Platz am Seitenende, damit die fixe Leiste keine Inhalte verdeckt. */
+  body:has(.hero__actions--sticky) {
+    padding-bottom: 88px;
   }
 
   .section {
