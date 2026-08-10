@@ -29,7 +29,6 @@ export function TherapistResultCard({ therapist }: { therapist: PublicTherapist 
           <h3>{therapist.fullName}</h3>
           <p className="result-card__title">{therapist.professionalTitle}</p>
         </div>
-        {therapist.requestable ? <span className="result-card__badge">Direkt buchbar</span> : null}
       </div>
 
       {topSpecializations.length > 0 || therapist.homeVisit ? (
