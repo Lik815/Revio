@@ -15,7 +15,6 @@ export default async function HomePage() {
   return (
     <>
       <Hero
-        eyebrow="Revio"
         title="Den richtigen Physio für dein Problem finden."
         body="Geprüfte Physiotherapeuten in deiner Nähe — nach Beschwerde, Spezialisierung und Verfügbarkeit."
         primaryHref="/patients"
