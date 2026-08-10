@@ -47,7 +47,13 @@ export default async function HomePage() {
       title="Übersicht"
       eyebrow="Dashboard"
       description="Die wichtigsten offenen Entscheidungen auf einen Blick."
-      actions={<div className="hero-pill">{totalTherapists} Profile</div>}
+      actions={
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <div className="hero-pill">{totalTherapists} Profile</div>
+          <Link href="/practices/neu" className="secondary-btn">Neue Praxis</Link>
+          <Link href="/therapists/neu" className="primary-btn">Neuer Therapeut</Link>
+        </div>
+      }
     >
       {dashboardError ? (
         <article className="panel panel--compact" style={{ marginBottom: 20 }}>
