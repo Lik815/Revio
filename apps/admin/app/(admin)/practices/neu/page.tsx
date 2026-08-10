@@ -96,6 +96,23 @@ export default async function NewPracticePage({ searchParams }: { searchParams: 
           </div>
         </AdminSectionCard>
 
+        <AdminSectionCard eyebrow="Medien" title="Logo & Fotos (optional)">
+          <div style={{ display: 'grid', gap: 12 }}>
+            <label className="field">
+              <span>Logo</span>
+              <input className="toolbar-input" type="file" name="logo" accept="image/jpeg,image/png,image/webp" />
+            </label>
+            <label className="field">
+              <span>Fotos (max. 10)</span>
+              <input className="toolbar-input" type="file" name="photos" accept="image/jpeg,image/png,image/webp" multiple />
+            </label>
+            <p style={{ margin: 0, color: 'var(--muted)', fontSize: 13 }}>
+              Schlägt der Upload fehl, bleibt die Praxis trotzdem angelegt — Medien lassen sich dann auf der
+              Bearbeiten-Seite nachtragen.
+            </p>
+          </div>
+        </AdminSectionCard>
+
         <div style={{ display: 'flex', gap: 12 }}>
           <button className="primary-btn" type="submit">Praxis anlegen</button>
           <Link href="/practices" className="secondary-btn">Abbrechen</Link>

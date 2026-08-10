@@ -352,8 +352,9 @@ export async function createPractice(formData: FormData) {
   const str = (key: string) => String(formData.get(key) ?? '').trim() || undefined;
 
   let errorMessage: string | null = null;
+  let createdId: string | null = null;
   try {
-    await adminRequest('/admin/practices/create', {
+    const created = await adminRequest('/admin/practices/create', {
       body: {
         name,
         city,
@@ -372,6 +373,7 @@ export async function createPractice(formData: FormData) {
         publicTransportNote: str('publicTransportNote'),
       },
     });
+    createdId = created?.id ?? null;
   } catch (error) {
     errorMessage = error instanceof Error ? error.message : 'Anlegen fehlgeschlagen.';
   }
@@ -379,6 +381,30 @@ export async function createPractice(formData: FormData) {
   // redirect() wirft intern NEXT_REDIRECT — deshalb außerhalb des try/catch.
   if (errorMessage) {
     redirect('/practices/neu?formError=' + encodeURIComponent(errorMessage));
+  }
+
+  // Logo/Fotos direkt mit anlegen: Die Praxis ist schon erstellt, Medien werden
+  // als zweiter Schritt hochgeladen (gleiches Muster wie createTherapist).
+  // Schlägt das fehl, bleibt die Praxis bestehen — wir leiten dann zur
+  // Bearbeiten-Seite, wo Medien erneut hochgeladen werden können.
+  if (createdId) {
+    const logo = formData.get('logo');
+    if (logo instanceof File && logo.size > 0) {
+      const error = await forwardPracticeImage(`/admin/practices/${createdId}/logo`, logo);
+      if (error) {
+        revalidatePath('/practices');
+        redirect(`/practices/${createdId}?mediaError=` + encodeURIComponent('Praxis angelegt, aber Logo-Upload fehlgeschlagen: ' + error));
+      }
+    }
+
+    const photos = formData.getAll('photos').filter((f): f is File => f instanceof File && f.size > 0);
+    for (const photo of photos) {
+      const error = await forwardPracticeImage(`/admin/practices/${createdId}/photos`, photo);
+      if (error) {
+        revalidatePath('/practices');
+        redirect(`/practices/${createdId}?mediaError=` + encodeURIComponent('Praxis angelegt, aber Foto-Upload fehlgeschlagen: ' + error));
+      }
+    }
   }
 
   revalidatePath('/practices');
