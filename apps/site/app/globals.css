@@ -1199,8 +1199,51 @@ h3 {
     white-space: nowrap;
   }
 
+  /* Mobil an die App-Startseite angeglichen (apps/mobile DiscoverContent):
+     dort ist der Hero-Block bewusst kompakt — paddingTop 8, paddingBottom 4,
+     gap 8 zwischen Titel und Untertext. Nur im Mobil-Breakpoint, damit die
+     Desktop-Komposition unverändert bleibt. */
   .hero {
-    padding-top: 48px;
+    padding-top: 16px;
+    padding-bottom: 24px;
+  }
+
+  .hero__copy {
+    padding: 0;
+  }
+
+  .hero__body {
+    margin-top: 8px;
+    font-size: 0.94rem;
+    line-height: 1.47;
+  }
+
+  .hero-chips {
+    /* App: eine Reihe, die seitlich wegläuft (horizontal ScrollView) statt
+       auf zwei Zeilen umzubrechen. Negative Ränder = Bleed bis Displaykante. */
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    margin-top: 10px;
+    margin-left: -12px;
+    margin-right: -12px;
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .hero-chips::-webkit-scrollbar {
+    display: none;
+  }
+
+  .hero-chip {
+    /* App: paddingVertical 9, minHeight 36 — größere Trefferfläche */
+    padding: 9px 14px;
+    min-height: 36px;
+    flex-shrink: 0;
+  }
+
+  .hero__actions {
+    margin-top: 16px;
   }
 
   .section {
@@ -1220,8 +1263,17 @@ h3 {
     font-size: clamp(2rem, 8vw, 2.6rem);
   }
 
+  /* Nur die Hero-Headline auf den App-Wert (TYPE.xl: 26px / lineHeight 34 =
+     1.31). Bewusst NICHT global für h1 — Blog- und Profilseiten behalten ihre
+     größere Überschrift. */
+  .hero h1 {
+    font-size: 1.63rem;
+    line-height: 1.31;
+  }
+
   .hero-search-wrap {
     max-width: 100%;
+    margin-top: 16px;
   }
 
   .flow-steps {
