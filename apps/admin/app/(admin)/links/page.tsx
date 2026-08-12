@@ -43,8 +43,15 @@ export default async function LinksPage({ searchParams }: { searchParams: Search
   ]);
   const statusFilter = params.status ?? 'ALL';
   const q = (params.q ?? '').toLowerCase();
-  const therapistOptions = therapists.map((t) => ({ value: t.id, label: t.fullName, sublabel: t.professionalTitle }));
+  // Archivierte Profile gehören nicht in die Auswahl — sie sind aus Suche und
+  // Liste ausgeblendet und sollen auch nicht neu verknüpfbar sein.
+  const therapistOptions = therapists
+    .filter((t) => !t.archivedAt)
+    .map((t) => ({ value: t.id, label: t.fullName, sublabel: t.professionalTitle }));
   const practiceOptions = practices.map((p) => ({ value: p.id, label: p.name, sublabel: p.city }));
+  // Schon bestehende Paare, damit das Formular sie gar nicht erst anbietet
+  // (die API lehnt sie sonst erst nach dem Absenden mit 409 ab).
+  const existingPairs = links.map((l) => `${l.therapistId}::${l.practiceId}`);
 
   // A link is "broken chain" when both therapist + practice are approved, but link itself is not confirmed
   const brokenChains = links.filter(
@@ -125,7 +132,12 @@ export default async function LinksPage({ searchParams }: { searchParams: Search
             </p>
           </div>
         </div>
-        <CreateLinkForm therapistOptions={therapistOptions} practiceOptions={practiceOptions} action={createLink} />
+        <CreateLinkForm
+          therapistOptions={therapistOptions}
+          practiceOptions={practiceOptions}
+          existingPairs={existingPairs}
+          action={createLink}
+        />
       </div>
 
       <form className="toolbar toolbar--compact" action="/links">
