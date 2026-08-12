@@ -1366,20 +1366,31 @@ h3 {
     margin-top: 16px;
   }
 
-  /* Volle Displaybreite statt schwebender fixer Karte — sitzt im normalen
-     Dokumentfluss direkt unter den Chips (negative Ränder = Bleed bis
-     Displaykante, siehe .hero-chips oben). Bewusst nicht mehr position:fixed:
-     das überlappte beim Laden sofort den nächsten Abschnitt, weil die Leiste
-     immer am unteren Viewport-Rand klebte, unabhängig vom Scroll-Stand. */
+  /* Echte Bottom-Bar wie in der App (apps/mobile navigation/CustomTabBar.js,
+     Gast-Ansicht): fix am unteren Rand, volle Displaybreite, mit klarer
+     Kante zum Seiteninhalt statt Verschmelzen. Zwei Reserve-Abstände sorgen
+     dafür, dass kein Inhalt darunter verschwindet:
+       1. .hero bekommt selbst Padding in Bar-Höhe, damit der nächste
+          Abschnitt beim ersten Laden garantiert oberhalb der Bar startet
+          (nicht erst am Seitenende — das war der Bug beim letzten Versuch).
+       2. body reserviert dieselbe Höhe am Seitenende für Footer/letzten
+          Abschnitt. */
   .hero__actions--sticky {
-    margin-top: 20px;
-    margin-left: -20px;
-    margin-right: -20px;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 30;
+    display: flex;
+    justify-content: center;
     padding: 12px 20px calc(12px + env(safe-area-inset-bottom, 0px));
     background: var(--bg);
+    border-top: 1px solid var(--line);
+    box-shadow: 0 -8px 24px rgba(28, 43, 51, 0.08);
   }
 
   .hero__actions--sticky .hero__actions-bar {
+    width: 100%;
     gap: 10px;
     flex-wrap: nowrap;
   }
@@ -1387,6 +1398,14 @@ h3 {
   .hero__actions--sticky .button {
     flex: 1;
     min-width: 0;
+  }
+
+  .hero:has(.hero__actions--sticky) {
+    padding-bottom: 92px;
+  }
+
+  body:has(.hero__actions--sticky) {
+    padding-bottom: 92px;
   }
 
   .section {
