@@ -13,17 +13,25 @@ export function HomeHeroScrollReveal() {
     const mobile = window.matchMedia('(max-width: 720px)');
     if (!hero || !mobile.matches) return;
 
-    let revealed = false;
-    const reveal = () => {
-      if (revealed || window.scrollY < 12) return;
-      revealed = true;
-      hero.classList.add('hero--scroll-revealed');
-      window.removeEventListener('scroll', reveal);
+    let frameId: number | null = null;
+    const updateRevealState = () => {
+      frameId = null;
+      // Der kleine Abstand verhindert ein Flackern rund um scrollY = 0.
+      // Beim Zurückkehren an den Anfang wird die anfängliche, luftige
+      // Startansicht wiederhergestellt.
+      hero.classList.toggle('hero--scroll-revealed', window.scrollY > 18);
     };
 
-    window.addEventListener('scroll', reveal, { passive: true });
-    reveal();
-    return () => window.removeEventListener('scroll', reveal);
+    const onScroll = () => {
+      if (frameId === null) frameId = window.requestAnimationFrame(updateRevealState);
+    };
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    updateRevealState();
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      if (frameId !== null) window.cancelAnimationFrame(frameId);
+    };
   }, []);
 
   return null;
