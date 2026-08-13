@@ -51,8 +51,8 @@ subprocessors:
       entfernt (Finding F-9). Aktuell nur Hosting; kein produktseitiges Tracking.
 
   - name: Resend
-    purpose: Versand transaktionaler E-Mails (OTP, Passwort-Reset, Profil-Status)
-    data_categories: [P1]        # E-Mail-Adresse, Name, E-Mail-Inhalt
+    purpose: Versand transaktionaler E-Mails (OTP, Passwort-Reset, Profil-Status, Kontaktformular)
+    data_categories: [P1, P2]    # E-Mail-Adresse, Name, E-Mail-Inhalt; Kontaktformular-Freitext kann Gesundheitsbezug haben
     personal_data: true
     location_technical: "USA (Resend Inc.)"
     used_by: [api]
@@ -61,7 +61,13 @@ subprocessors:
     dpa_signed: OFFEN
     dpa_date: OFFEN
     dsb_approved: OFFEN
-    notes: "Absender: noreply@my-revio.de. Rechtsgrundlage der jeweiligen Mail im VVT festhalten."
+    notes: >
+      Absender: noreply@my-revio.de. Rechtsgrundlage der jeweiligen Mail im VVT festhalten.
+      Seit 2026-08-13 laeuft auch das Kontaktformular der Website hierueber
+      (apps/api/src/routes/contact.ts). Es ersetzt EmailJS, das bis dahin
+      undokumentiert Kontaktdaten an einen US-Dienst uebertragen hat (DS-80/81)
+      und mangels gesetzter Keys ohnehin nie zugestellt hat. Nachrichten werden
+      nur versendet, nicht gespeichert.
 
   - name: Expo (Push-Dienst)
     purpose: Versand von Push-Benachrichtigungen an die Mobile-App

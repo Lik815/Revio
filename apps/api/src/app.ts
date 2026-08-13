@@ -23,6 +23,7 @@ import { notificationRoutes } from './routes/notifications.js';
 import { scheduleRoutes } from './routes/schedule.js';
 import { inquiryRoutes } from './routes/inquiry.js';
 import { matchRoutes } from './routes/match.js';
+import { contactRoutes } from './routes/contact.js';
 import { logRedactOptions } from './utils/log-redaction.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -61,6 +62,7 @@ export async function buildApp() {
   await app.register(scheduleRoutes);
   await app.register(inquiryRoutes);
   await app.register(matchRoutes);
+  await app.register(contactRoutes);
 
   // Scheduled expiry: mark stale PENDING bookings as EXPIRED every 5 min.
   // Im dynamischen Buchungssystem gibt es keine TherapistSlot-Statusänderung

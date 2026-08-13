@@ -63,6 +63,20 @@ Abkürzungen RG (Art. 6/9): `Vertrag`=6(1)b · `Einwilligung`=6(1)a / 9(2)a ·
 - **RG (Vorschlag):** bI.
 - **Frist:** nach Bearbeitung (Löschkonzept, offen).
 
+## V-8 Kontaktformular Website  ⚠ Freitext kann Gesundheitsbezug haben
+- **Zweck:** Anfragen von der Website entgegennehmen und beantworten.
+- **Betroffene:** Website-Besucher:innen (Interessierte, Therapeut:innen).
+- **Daten:** Name (optional), E-Mail, Rolle, Freitext. Keine Speicherung in der
+  Datenbank — die Nachricht wird ausschließlich per E-Mail zugestellt
+  (`apps/api/src/routes/contact.ts`).
+- **RG (Vorschlag):** bI bzw. vorvertraglich; bei gesundheitsbezogenem Freitext
+  Art. 9 prüfen — die Person gibt die Angaben selbst preis, was nicht automatisch
+  eine Einwilligung nach 9(2)a darstellt.
+- **Empfänger:** Resend (E-Mail-Versand), Railway (Hosting).
+- **Frist:** Aufbewahrung richtet sich nach dem Postfach, nicht nach Revio-Systemen
+  — Löschroutine für das Kontaktpostfach ist offen.
+- **Drittland:** Resend (US) → Transfermechanismus offen (F-6).
+
 ---
 
 ## Offene VVT-Punkte
@@ -70,3 +84,6 @@ Abkürzungen RG (Art. 6/9): `Vertrag`=6(1)b · `Einwilligung`=6(1)a / 9(2)a ·
 - **DSFA (Art. 35)** für V-2 erstellen (P2-Gesundheitsdaten, Kernaktivität).
 - Einwilligungstext + Version für die Gesundheitsdaten dokumentieren (DS-53; `consentAcceptedAt` prüfen).
 - Empfänger-Transfermechanismen (F-6) und Löschfristen (Löschkonzept) je Zeile finalisieren.
+- **V-8:** Löschroutine für das Kontaktpostfach festlegen und die Verarbeitung in
+  die Datenschutzerklärung aufnehmen — das Formular ist live, die Erklärung noch
+  eine MVP-Vorlage.

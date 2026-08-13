@@ -9,6 +9,17 @@ function getResend() {
   return new Resend(process.env.RESEND_API_KEY);
 }
 
+// Kontaktformular-Text stammt aus dem offenen Internet und wird in HTML
+// eingebettet — deshalb escapen, anders als bei den intern erzeugten Mails.
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 export async function sendEmailOtpEmail(opts: { to: string; code: string }) {
   const { to, code } = opts;
   await getResend().emails.send({
@@ -272,5 +283,36 @@ export async function sendReinviteEmail(opts: {
       </div>
     `,
     text: `Hallo ${therapistName},\n\n${practiceName} hat dir eine neue Einladung geschickt.\n\nKlicke hier:\n${inviteLink}\n\nDieser Link ist 7 Tage gültig.`,
+  });
+}
+
+export async function sendContactMessageEmail(opts: {
+  to: string;
+  fromName: string;
+  fromEmail: string;
+  role: string;
+  message: string;
+}) {
+  const { to, fromName, fromEmail, role, message } = opts;
+
+  await getResend().emails.send({
+    from: FROM,
+    to,
+    // Antworten gehen direkt an die absendende Person, ohne dass die Adresse
+    // als Absender gefälscht werden muss (SPF/DKIM bleiben intakt).
+    replyTo: fromEmail,
+    subject: `Kontaktanfrage von ${fromName} (${role})`,
+    html: `
+      <div style="font-family:sans-serif;max-width:540px;margin:0 auto;color:#1a1a1a">
+        <h2 style="color:#6F8793">Neue Kontaktanfrage</h2>
+        <p style="margin:0 0 4px"><strong>Name:</strong> ${escapeHtml(fromName)}</p>
+        <p style="margin:0 0 4px"><strong>E-Mail:</strong> ${escapeHtml(fromEmail)}</p>
+        <p style="margin:0 0 20px"><strong>Rolle:</strong> ${escapeHtml(role)}</p>
+        <div style="white-space:pre-wrap;background:#f6f7f8;border-radius:8px;padding:16px">${escapeHtml(message)}</div>
+        <hr style="border:none;border-top:1px solid #e5e7eb;margin:28px 0"/>
+        <p style="color:#9ca3af;font-size:12px">Gesendet über das Kontaktformular auf my-revio.de</p>
+      </div>
+    `,
+    text: `Neue Kontaktanfrage\n\nName: ${fromName}\nE-Mail: ${fromEmail}\nRolle: ${role}\n\n${message}\n`,
   });
 }

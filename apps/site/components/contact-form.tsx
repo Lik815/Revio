@@ -1,7 +1,7 @@
 'use client';
 
-import emailjs from '@emailjs/browser';
 import { FormEvent, useState } from 'react';
+import { siteConfig } from '../lib/content';
 
 const roleOptions = [
   { value: 'Physio finden', label: 'Ich suche Physiotherapie' },
@@ -10,39 +10,50 @@ const roleOptions = [
 
 type Status = 'idle' | 'sending' | 'success' | 'error';
 
+// Getrennt gehaltene Fehlerarten: Ein "nochmal versuchen" hilft nur beim
+// temporären Fehler — bei einem Kanalproblem schickt es Leute ins Leere.
+type ErrorKind = 'temporary' | 'channel';
+
+function apiBase() {
+  return (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000').replace(/\/$/, '');
+}
+
 export function ContactForm({ defaultMessage }: { defaultMessage?: string }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [role, setRole] = useState(roleOptions[0].value);
   const [message, setMessage] = useState(defaultMessage ?? '');
+  const [website, setWebsite] = useState('');
   const [status, setStatus] = useState<Status>('idle');
+  const [errorKind, setErrorKind] = useState<ErrorKind>('temporary');
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setStatus('sending');
 
-    const serviceId = process.env.NEXT_PUBLIC_EMAILJS_SERVICE_ID ?? '';
-    const templateId = process.env.NEXT_PUBLIC_EMAILJS_TEMPLATE_ID ?? '';
-    const publicKey = process.env.NEXT_PUBLIC_EMAILJS_PUBLIC_KEY ?? '';
-
     try {
-      await emailjs.send(
-        serviceId,
-        templateId,
-        {
-          from_name: name || 'Anonym',
-          from_email: email,
-          role,
-          message: message || '—',
-        },
-        { publicKey },
-      );
+      const res = await fetch(`${apiBase()}/contact`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, role, message, website }),
+      });
+
+      if (!res.ok) {
+        // 503 = Zustellkanal nicht konfiguriert, 502 = Versand abgelehnt.
+        // In beiden Fällen bringt ein erneuter Versuch nichts.
+        setErrorKind(res.status === 503 || res.status === 502 ? 'channel' : 'temporary');
+        setStatus('error');
+        return;
+      }
+
       setStatus('success');
       setName('');
       setEmail('');
       setRole(roleOptions[0].value);
       setMessage('');
+      setWebsite('');
     } catch {
+      setErrorKind('temporary');
       setStatus('error');
     }
   };
@@ -112,9 +123,33 @@ export function ContactForm({ defaultMessage }: { defaultMessage?: string }) {
         />
       </label>
 
+      {/* Honeypot — vor Menschen und Screenreadern verborgen, für Bots sichtbar. */}
+      <div aria-hidden="true" style={{ position: 'absolute', left: '-9999px' }}>
+        <label>
+          Website
+          <input
+            type="text"
+            tabIndex={-1}
+            autoComplete="off"
+            value={website}
+            onChange={(e) => setWebsite(e.target.value)}
+          />
+        </label>
+      </div>
+
       {status === 'error' && (
         <p className="form-error">
-          Beim Senden ist ein Fehler aufgetreten. Bitte versuche es erneut oder schreib uns direkt per E-Mail.
+          {errorKind === 'channel' ? (
+            <>
+              Das Kontaktformular ist gerade nicht erreichbar. Schreib uns bitte direkt an{' '}
+              <a href={`mailto:${siteConfig.contactEmail}`}>{siteConfig.contactEmail}</a>.
+            </>
+          ) : (
+            <>
+              Beim Senden ist ein Fehler aufgetreten. Bitte versuche es erneut oder schreib uns
+              direkt an <a href={`mailto:${siteConfig.contactEmail}`}>{siteConfig.contactEmail}</a>.
+            </>
+          )}
         </p>
       )}
 
