@@ -16,7 +16,8 @@ export default async function HomePage() {
     <>
       <Hero
         title="Den richtigen Physio für dein Problem finden."
-        body="Geprüfte Physiotherapeuten in deiner Nähe — nach Beschwerde, Spezialisierung und Verfügbarkeit."
+        body="Physiotherapeuten in deiner Nähe — nach Beschwerde, Spezialisierung und Standort."
+        mobileBody="Freiberufliche Physiotherapeut:innen in deiner Nähe – finde die passende Expertise für dein Anliegen."
         primaryHref="/patients"
         primaryLabel="Für Patienten"
         secondaryHref="/therapists"
@@ -24,13 +25,13 @@ export default async function HomePage() {
         searchPlaceholder="Wobei brauchst du Hilfe?"
         chips={['Rückenschmerzen', 'Kniereha', 'Sportphysiotherapie']}
         hideImage={!siteSettings.appBookingEnabled}
-        stickyActions
+        appHome
       />
 
       <Section
         eyebrow="Für Patienten"
         title="Passende Physiotherapie ohne Umwege"
-        body="Ob Rückenschmerzen, Reha oder neurologische Beschwerden: Revio zeigt dir geprüfte Therapeuten nach Fachgebiet, Standort und freien Terminen."
+        body="Ob Rückenschmerzen, Reha oder neurologische Beschwerden: Revio zeigt dir Therapeuten nach Fachgebiet, Standort und Behandlungsangebot."
       >
         <div className="split-panel">
           <div className="surface-card">
@@ -69,7 +70,7 @@ export default async function HomePage() {
           <div className="quote-card">
             <h3>Kein Marketplace-Lärm</h3>
             <p>
-              Finde geprüfte Therapeuten nach Spezialisierung, Ort, Hausbesuch und freien Terminen — in einem Umfeld, das Expertise sichtbar macht statt zu überfordern.
+              Finde Therapeuten nach Spezialisierung, Ort, Hausbesuch und Behandlungsangebot — in einem Umfeld, das Expertise sichtbar macht statt zu überfordern.
             </p>
             <Link href="/therapists" className="button button--ghost" style={{ marginTop: 16 }}>
               Mehr für Therapeuten

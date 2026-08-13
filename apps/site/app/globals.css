@@ -538,13 +538,21 @@ h3 {
   margin-top: 28px;
 }
 
-/* Auf Desktop verhält sich die Sticky-Variante wie normale Inline-Aktionen —
-   die innere Karte ist dort nur ein durchsichtiger Flex-Container. */
-.hero__actions-bar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
+/* ── App-Startseite (appHome) ───────────────────────────────
+   Logo-Kopf, zweiter (mobiler) Untertitel und die fixierte
+   Bottom-Bar sind auf Desktop und allen anderen Hero-Seiten
+   unsichtbar; erst der Breakpoint bei 720px unten schaltet sie
+   für die Startseite auf Mobil frei. */
+.hero__app-logo {
+  display: none;
+}
+
+.hero__body--app-home {
+  display: none;
+}
+
+.hero-app-bottom-bar {
+  display: none;
 }
 
 .button {
@@ -1366,46 +1374,125 @@ h3 {
     margin-top: 16px;
   }
 
-  /* Echte Bottom-Bar wie in der App (apps/mobile navigation/CustomTabBar.js,
-     Gast-Ansicht): fix am unteren Rand, volle Displaybreite, mit klarer
-     Kante zum Seiteninhalt statt Verschmelzen. Zwei Reserve-Abstände sorgen
-     dafür, dass kein Inhalt darunter verschwindet:
-       1. .hero bekommt selbst Padding in Bar-Höhe, damit der nächste
-          Abschnitt beim ersten Laden garantiert oberhalb der Bar startet
-          (nicht erst am Seitenende — das war der Bug beim letzten Versuch).
-       2. body reserviert dieselbe Höhe am Seitenende für Footer/letzten
-          Abschnitt. */
-  .hero__actions--sticky {
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 30;
+  /* ── App-Startseite (appHome, nur /) ───────────────────────
+     Eigener Logo-Kopf statt Site-Header, Hero füllt die Bildschirmhöhe
+     (100dvh), und eine echte Bottom-Bar wie in der App (apps/mobile
+     navigation/CustomTabBar.js) ersetzt die normalen Hero-Actions. Alles
+     über .hero--app-home eingegrenzt, damit die anderen Hero-Seiten
+     (Patienten, Therapeuten, Über uns, Kontakt) unverändert bleiben. */
+  body:has(.hero--app-home) .site-header {
+    display: none;
+  }
+
+  .hero--app-home {
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    padding-top: 0;
+    padding-bottom: 108px;
+  }
+
+  .hero--app-home .shell {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+  }
+
+  .hero--app-home .hero__copy {
+    flex: 1;
+  }
+
+  .hero--app-home .hero__app-logo {
     display: flex;
     justify-content: center;
-    padding: 12px 20px calc(12px + env(safe-area-inset-bottom, 0px));
-    background: var(--bg);
-    border-top: 1px solid var(--line);
-    box-shadow: 0 -8px 24px rgba(28, 43, 51, 0.08);
+    padding: 28px 0 20px;
   }
 
-  .hero__actions--sticky .hero__actions-bar {
-    width: 100%;
+  .hero--app-home .hero__app-logo .brand-logo {
+    width: 116px;
+    height: auto;
+  }
+
+  /* Eigener, kürzerer Untertitel für Mobil — der Desktop-Fließtext (body)
+     bleibt im DOM, wird hier aber zugunsten von mobileBody ausgeblendet. */
+  .hero--app-home .hero__body {
+    display: none;
+  }
+
+  .hero--app-home .hero__body--app-home {
+    display: block;
+    margin-top: 8px;
+    font-size: 0.94rem;
+    line-height: 1.47;
+  }
+
+  .hero--app-home .hero-search-wrap {
+    margin-top: 20px;
+  }
+
+  .hero--app-home .hero-search {
+    height: 56px;
+    border-radius: var(--radius-lg);
+    box-shadow: 0 6px 20px rgba(28, 43, 51, 0.1);
+  }
+
+  /* App sendet über die Tastatur ab; auf Mobil braucht die Karte keinen
+     zusätzlichen runden Such-Button. */
+  .hero--app-home .hero-search__submit {
+    display: none;
+  }
+
+  .hero--app-home .hero-chips {
+    margin-bottom: 8px;
+  }
+
+  /* Für Patienten/Für Therapeuten und das Telefon-Mockup weichen der
+     Bottom-Bar; auf Mobil wird sonst nichts benötigt. */
+  .hero--app-home .hero__actions,
+  .hero--app-home .hero-device {
+    display: none;
+  }
+
+  .hero-app-bottom-bar {
+    display: flex;
+    position: fixed;
+    left: 16px;
+    right: 16px;
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    z-index: 30;
     gap: 10px;
-    flex-wrap: nowrap;
+    padding: 8px;
+    background: var(--surface);
+    border-radius: 999px;
+    box-shadow: 0 12px 32px rgba(28, 43, 51, 0.16);
   }
 
-  .hero__actions--sticky .button {
+  .hero-app-bottom-bar__action {
     flex: 1;
-    min-width: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 46px;
+    border-radius: 999px;
+    font-weight: 600;
+    font-size: 0.93rem;
   }
 
-  .hero:has(.hero__actions--sticky) {
-    padding-bottom: 92px;
+  .hero-app-bottom-bar__action--primary {
+    background: var(--accent);
+    color: #fff;
   }
 
-  body:has(.hero__actions--sticky) {
-    padding-bottom: 92px;
+  .hero-app-bottom-bar__action--ghost {
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+
+  /* Reserviert dieselbe Höhe am Seitenende, damit die fixierte Bar nichts
+     überdeckt — die Bar bleibt beim Scrollen über der gesamten Seite sichtbar. */
+  body:has(.hero-app-bottom-bar) {
+    padding-bottom: 96px;
   }
 
   .section {

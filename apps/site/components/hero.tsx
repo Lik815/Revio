@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import Image from 'next/image';
+import { Brand } from './brand';
 import { HeroSearchBar } from './hero-search-bar';
 import { StoreBadges } from './store-badges';
 
@@ -14,9 +15,15 @@ type HeroProps = {
   hideImage?: boolean;
   searchPlaceholder?: string;
   chips?: string[];
-  // Auf Mobil als fixierte Leiste am unteren Rand darstellen (wie die App).
-  // Opt-in, damit die übrigen Hero-Seiten unverändert bleiben.
-  stickyActions?: boolean;
+  // Eigener Untertitel für die mobile App-Startseite (appHome). Optional —
+  // ohne Angabe wird auf allen Breakpoints `body` verwendet.
+  mobileBody?: string;
+  // App-artige Startseite auf Mobil (≤720px, siehe globals.css): eigener
+  // Logo-Kopf statt Site-Header, Hero füllt die Bildschirmhöhe, und eine
+  // fixierte Bottom-Bar (Suche/Anmelden) ersetzt die normalen Hero-Actions
+  // dort. Opt-in und bislang nur von der Startseite genutzt — andere
+  // Hero-Seiten und Desktop bleiben unverändert.
+  appHome?: boolean;
 };
 
 export function Hero({
@@ -30,15 +37,18 @@ export function Hero({
   hideImage = false,
   searchPlaceholder,
   chips,
-  stickyActions = false,
+  mobileBody,
+  appHome = false,
 }: HeroProps) {
   return (
-    <section className={`hero${hideImage ? ' hero--no-image' : ''}`}>
+    <section className={`hero${hideImage ? ' hero--no-image' : ''}${appHome ? ' hero--app-home' : ''}`}>
       <div className={`shell${hideImage ? '' : ' hero__grid'}`}>
         <div className="hero__copy">
+          {appHome ? <Brand href="/" variant="header" className="hero__app-logo" priority /> : null}
           {eyebrow ? <div className="eyebrow">{eyebrow}</div> : null}
           <h1>{title}</h1>
           <p className="hero__body">{body}</p>
+          {appHome && mobileBody ? <p className="hero__body hero__body--app-home">{mobileBody}</p> : null}
 
           {searchPlaceholder ? <HeroSearchBar placeholder={searchPlaceholder} /> : null}
 
@@ -52,31 +62,16 @@ export function Hero({
             </div>
           ) : null}
 
-          {(() => {
-            const actionLinks = (
-              <>
-                <Link href={primaryHref} className="button button--primary">
-                  {primaryLabel}
-                </Link>
-                {secondaryHref && secondaryLabel ? (
-                  <Link href={secondaryHref} className="button button--ghost">
-                    {secondaryLabel}
-                  </Link>
-                ) : null}
-              </>
-            );
-
-            // Sticky-Variante bekommt eine innere Karte (App: äußerer Streifen in
-            // Seitenfarbe + Safe-Area, innen weiße Karte). Ohne stickyActions
-            // bleibt das Markup identisch zu vorher.
-            return stickyActions ? (
-              <div className="hero__actions hero__actions--sticky">
-                <div className="hero__actions-bar">{actionLinks}</div>
-              </div>
-            ) : (
-              <div className="hero__actions">{actionLinks}</div>
-            );
-          })()}
+          <div className="hero__actions">
+            <Link href={primaryHref} className="button button--primary">
+              {primaryLabel}
+            </Link>
+            {secondaryHref && secondaryLabel ? (
+              <Link href={secondaryHref} className="button button--ghost">
+                {secondaryLabel}
+              </Link>
+            ) : null}
+          </div>
         </div>
 
         {!hideImage ? (
@@ -95,6 +90,26 @@ export function Hero({
           </div>
         ) : null}
       </div>
+
+      {appHome ? (
+        <nav className="hero-app-bottom-bar" aria-label="Startseite Aktionen">
+          <Link href="/finden" className="hero-app-bottom-bar__action hero-app-bottom-bar__action--primary">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            <span>Suche</span>
+          </Link>
+          <Link href="/contact" className="hero-app-bottom-bar__action hero-app-bottom-bar__action--ghost">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+              <path d="M10 17l5-5-5-5" />
+              <path d="M15 12H3" />
+            </svg>
+            <span>Anmelden</span>
+          </Link>
+        </nav>
+      ) : null}
     </section>
   );
 }
