@@ -1650,6 +1650,9 @@ h3 {
     /* The app wordmark is part of its left-aligned header, not a centered
        hero element. */
     justify-content: flex-start;
+    /* The PNG includes transparent space to the left of the mark. Offset it
+       by that inset so the visible logo aligns with the hero copy. */
+    margin-left: -16px;
     padding: 28px 0 20px;
   }
 
