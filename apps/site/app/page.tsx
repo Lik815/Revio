@@ -4,13 +4,20 @@ import { Section } from '../components/section';
 import { getPublishedBlogPosts } from '../lib/blog';
 import { patientBenefits, therapistBenefits } from '../lib/content';
 import { getSiteSettings } from '../lib/site-settings';
+import { searchTherapists } from '../lib/public-api';
+
+// Die Hero-Karte zeigt ein aktuelles, öffentliches Profil. Sie darf daher
+// nicht mit einem einmaligen Build-Snapshot der Therapeut:innen-Liste leben.
+export const dynamic = 'force-dynamic';
 
 export default async function HomePage() {
-  const [blogPosts, siteSettings] = await Promise.all([
+  const [blogPosts, siteSettings, heroSearch] = await Promise.all([
     getPublishedBlogPosts(),
     getSiteSettings(),
+    searchTherapists({ query: 'physiotherapie', city: 'Köln' }),
   ]);
   const latestPosts = blogPosts.slice(0, 3);
+  const heroTherapist = heroSearch.therapists[0] ?? null;
 
   return (
     <>

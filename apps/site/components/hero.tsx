@@ -3,6 +3,8 @@ import Image from 'next/image';
 import { Brand } from './brand';
 import { HeroSearchBar } from './hero-search-bar';
 import { StoreBadges } from './store-badges';
+import { HeroMap } from './hero-map';
+import type { PublicTherapist } from '../lib/public-api';
 
 type HeroProps = {
   eyebrow?: string;
@@ -18,6 +20,7 @@ type HeroProps = {
   // Eigener Untertitel für die mobile App-Startseite (appHome). Optional —
   // ohne Angabe wird auf allen Breakpoints `body` verwendet.
   mobileBody?: string;
+  mapTherapist?: PublicTherapist | null;
   // App-artige Startseite auf Mobil (≤720px, siehe globals.css): eigener
   // Logo-Kopf statt Site-Header, Hero füllt die Bildschirmhöhe, und eine
   // fixierte Bottom-Bar (Suche/Anmelden) ersetzt die normalen Hero-Actions
@@ -38,11 +41,12 @@ export function Hero({
   searchPlaceholder,
   chips,
   mobileBody,
+  mapTherapist,
   appHome = false,
 }: HeroProps) {
   return (
-    <section className={`hero${hideImage ? ' hero--no-image' : ''}${appHome ? ' hero--app-home' : ''}`}>
-      <div className={`shell${hideImage ? '' : ' hero__grid'}`}>
+    <section className={`hero${hideImage ? ' hero--no-image' : ''}${appHome ? ' hero--app-home' : ''}${mapTherapist ? ' hero--with-map' : ''}`}>
+      <div className={`shell${!hideImage || mapTherapist ? ' hero__grid' : ''}`}>
         <div className="hero__copy">
           {appHome ? <Brand href="/" variant="header" className="hero__app-logo" priority /> : null}
           {eyebrow ? <div className="eyebrow">{eyebrow}</div> : null}
@@ -74,7 +78,7 @@ export function Hero({
           </div>
         </div>
 
-        {!hideImage ? (
+        {!hideImage && !mapTherapist ? (
           <div className="hero-device">
             <div className="hero-device__stack">
               <Image
@@ -89,6 +93,8 @@ export function Hero({
             </div>
           </div>
         ) : null}
+
+        {mapTherapist ? <HeroMap therapist={mapTherapist} /> : null}
       </div>
 
       {appHome ? (
