@@ -25,7 +25,10 @@ export default async function ContactPage({
     : undefined;
 
   return (
-    <>
+    // Dezente Eintritts-Animation nur auf Mobil (siehe globals.css) — greift
+    // bei jedem Neu-Mount dieser Seite, also sowohl bei einem Klick auf
+    // „Kontakt" in der MobileBottomNav als auch bei Browser-Vor/Zurück.
+    <div className="page-enter-mobile">
       <Hero
         eyebrow="Kontakt"
         title="Interesse an Revio"
@@ -54,6 +57,6 @@ export default async function ContactPage({
           <ContactForm defaultMessage={defaultMessage} />
         </div>
       </Section>
-    </>
+    </div>
   );
 }

@@ -15,6 +15,9 @@
   /* Zentrale Dauer für das Einklappen des mobilen Hero-Spacers
      (home-hero-scroll-reveal.tsx). An einer Stelle anpassbar. */
   --hero-reveal-duration: 900ms;
+  /* Zentrale Dauer für die mobile Seiteneintritts-Animation (z. B. Kontakt),
+     siehe .page-enter-mobile weiter unten. */
+  --mobile-page-enter-duration: 320ms;
 }
 
 * {
@@ -559,10 +562,9 @@ h3 {
 }
 
 /* ── App-Startseite (appHome) ───────────────────────────────
-   Logo-Kopf, zweiter (mobiler) Untertitel und die fixierte
-   Bottom-Bar sind auf Desktop und allen anderen Hero-Seiten
-   unsichtbar; erst der Breakpoint bei 720px unten schaltet sie
-   für die Startseite auf Mobil frei. */
+   Logo-Kopf und zweiter (mobiler) Untertitel sind auf Desktop und
+   allen anderen Hero-Seiten unsichtbar; erst der Breakpoint bei
+   720px unten schaltet sie für die Startseite auf Mobil frei. */
 .hero__app-logo {
   display: none;
 }
@@ -571,7 +573,10 @@ h3 {
   display: none;
 }
 
-.hero-app-bottom-bar {
+/* ── Globale mobile Schnellnavigation (MobileBottomNav) ──────
+   Auf jeder öffentlichen Seite im RootLayout gerendert, aber nur
+   unterhalb des 720px-Breakpoints sichtbar (siehe @media unten). */
+.mobile-bottom-nav {
   display: none;
 }
 
@@ -1570,10 +1575,10 @@ h3 {
 
   /* ── App-Startseite (appHome, nur /) ───────────────────────
      Eigener Logo-Kopf statt Site-Header, Hero füllt die Bildschirmhöhe
-     (100dvh), und eine echte Bottom-Bar wie in der App (apps/mobile
-     navigation/CustomTabBar.js) ersetzt die normalen Hero-Actions. Alles
-     über .hero--app-home eingegrenzt, damit die anderen Hero-Seiten
-     (Patienten, Therapeuten, Über uns, Kontakt) unverändert bleiben. */
+     (100dvh). Die globale MobileBottomNav (siehe unten) ersetzt dort die
+     normalen Hero-Actions. Über .hero--app-home eingegrenzt, damit die
+     anderen Hero-Seiten (Patienten, Therapeuten, Über uns, Kontakt)
+     unverändert bleiben. */
   body:has(.hero--app-home) .site-header {
     display: none;
   }
@@ -1695,7 +1700,10 @@ h3 {
     display: none;
   }
 
-  .hero-app-bottom-bar {
+  /* Globale mobile Schnellnavigation (components/mobile-bottom-nav.tsx) —
+     auf allen öffentlichen Seiten sichtbar, nicht mehr auf die Startseite
+     beschränkt. */
+  .mobile-bottom-nav {
     display: flex;
     position: fixed;
     left: 16px;
@@ -1709,7 +1717,7 @@ h3 {
     box-shadow: 0 12px 32px rgba(28, 43, 51, 0.16);
   }
 
-  .hero-app-bottom-bar__action {
+  .mobile-bottom-nav__action {
     flex: 1;
     display: inline-flex;
     align-items: center;
@@ -1719,28 +1727,49 @@ h3 {
     border-radius: 999px;
     font-weight: 600;
     font-size: 0.93rem;
-    /* Eine Aktion ist ein <button type="submit">, keine <a> — Browser-Defaults
-       zurücksetzen, damit beide Aktionen identisch aussehen. */
+    /* Die Suche-Aktion ist auf der Startseite ein <button type="submit">,
+       keine <a> — Browser-Defaults zurücksetzen, damit beide Aktionen
+       identisch aussehen. */
     border: none;
     font-family: inherit;
     cursor: pointer;
   }
 
-  .hero-app-bottom-bar__action--primary {
+  .mobile-bottom-nav__action--primary {
     background: var(--accent);
     color: #fff;
   }
 
-  .hero-app-bottom-bar__action--ghost {
+  .mobile-bottom-nav__action--ghost {
     /* In the native guest tab bar only the selected tab is filled. */
     background: transparent;
     color: var(--accent);
   }
 
-  /* Reserviert dieselbe Höhe am Seitenende, damit die fixierte Bar nichts
-     überdeckt — die Bar bleibt beim Scrollen über der gesamten Seite sichtbar. */
-  body:has(.hero-app-bottom-bar) {
-    padding-bottom: 96px;
+  /* Reserviert dieselbe Höhe am Seitenende, damit die fixierte Leiste
+     nichts überdeckt — sie bleibt beim Scrollen über jeder Seite sichtbar. */
+  body {
+    padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* Dezente Eintritts-Animation für Seiten, die einen ruhigen "Wisch"-Effekt
+     beim Öffnen bekommen sollen (aktuell: Kontakt, siehe contact/page.tsx).
+     Reiner CSS-Keyframe statt JS — läuft automatisch bei jedem Neu-Mount des
+     Elements, also bei Soft-Navigation über die MobileBottomNav genauso wie
+     bei Browser-Vor/Zurück. Nur mobil, Desktop bleibt unverändert. */
+  .page-enter-mobile {
+    animation: page-enter-mobile var(--mobile-page-enter-duration) cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  @keyframes page-enter-mobile {
+    from {
+      opacity: 0;
+      transform: translateY(14px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -1750,6 +1779,10 @@ h3 {
 
     .hero-app-home__hint {
       transition: none;
+    }
+
+    .page-enter-mobile {
+      animation: none;
     }
   }
 

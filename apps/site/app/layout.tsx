@@ -2,6 +2,7 @@ import './globals.css';
 import type { Metadata } from 'next';
 import { ReactNode } from 'react';
 import { MaintenanceScreen } from '../components/maintenance-screen';
+import { MobileBottomNav } from '../components/mobile-bottom-nav';
 import { SiteFooter } from '../components/site-footer';
 import { SiteHeader } from '../components/site-header';
 import { getSiteSettings } from '../lib/site-settings';
@@ -46,6 +47,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
             <SiteHeader />
             <main>{children}</main>
             <SiteFooter />
+            <MobileBottomNav />
           </div>
         )}
       </body>

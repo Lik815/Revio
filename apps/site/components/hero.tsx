@@ -23,10 +23,11 @@ type HeroProps = {
   mobileBody?: string;
   mapTherapist?: PublicTherapist | null;
   // App-artige Startseite auf Mobil (≤720px, siehe globals.css): eigener
-  // Logo-Kopf statt Site-Header, Hero füllt die Bildschirmhöhe, und eine
-  // fixierte Bottom-Bar (Suche/Kontakt) ersetzt die normalen Hero-Actions
-  // dort. Opt-in und bislang nur von der Startseite genutzt — andere
-  // Hero-Seiten und Desktop bleiben unverändert.
+  // Logo-Kopf statt Site-Header, und der Hero füllt die Bildschirmhöhe
+  // (siehe HomeHeroScrollReveal). Die globale MobileBottomNav (im
+  // RootLayout) ersetzt dort die normalen Hero-Actions. Opt-in und
+  // bislang nur von der Startseite genutzt — andere Hero-Seiten und
+  // Desktop bleiben unverändert.
   appHome?: boolean;
 };
 
@@ -108,25 +109,6 @@ export function Hero({
             </svg>
           </div>
         </div>
-      ) : null}
-
-      {appHome ? (
-        <nav className="hero-app-bottom-bar" aria-label="Startseite Aktionen">
-          <button type="submit" form="hero-search-form" className="hero-app-bottom-bar__action hero-app-bottom-bar__action--primary">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <circle cx="11" cy="11" r="8" />
-              <line x1="21" y1="21" x2="16.65" y2="16.65" />
-            </svg>
-            <span>Suche</span>
-          </button>
-          <Link href="/contact" className="hero-app-bottom-bar__action hero-app-bottom-bar__action--ghost">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M3 8l9 6 9-6" />
-              <rect x="3" y="5" width="18" height="14" rx="2" />
-            </svg>
-            <span>Kontakt</span>
-          </Link>
-        </nav>
       ) : null}
     </section>
   );
