@@ -50,6 +50,17 @@ export function MobileBottomNav() {
           <SearchIcon />
           <span>Suche</span>
         </button>
+      ) : isContactActive ? (
+        // Von Kontakt aus gibt es kein Suchformular auf der Seite — statt
+        // direkt zu ungefilterten /finden-Ergebnissen führt „Suche" zurück
+        // zur Startseite mit dem eigentlichen Sucheinstieg.
+        <Link
+          href="/"
+          className={`mobile-bottom-nav__action mobile-bottom-nav__action--${searchVariant}`}
+        >
+          <SearchIcon />
+          <span>Suche</span>
+        </Link>
       ) : (
         <Link
           href="/finden"
