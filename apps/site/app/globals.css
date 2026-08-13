@@ -1575,6 +1575,7 @@ h3 {
     flex-direction: column;
     padding-top: 0;
     padding-bottom: 108px;
+    transition: min-height 320ms cubic-bezier(0.22, 1, 0.36, 1);
   }
 
   .hero--app-home .shell {
@@ -1585,6 +1586,18 @@ h3 {
 
   .hero--app-home .hero__copy {
     flex: 1;
+  }
+
+  /* Beim ersten Scrollen wird nur der absichtlich reservierte Viewport-Raum
+     eingeklappt. Der Inhalt bleibt im normalen Dokumentfluss, sodass der
+     nächste Abschnitt ohne Lücke und ohne Overlay sichtbar wird. */
+  .hero--app-home.hero--scroll-revealed {
+    min-height: 0;
+  }
+
+  .hero--app-home.hero--scroll-revealed .shell,
+  .hero--app-home.hero--scroll-revealed .hero__copy {
+    flex: 0 0 auto;
   }
 
   .hero--app-home .hero__app-logo {
@@ -1683,6 +1696,12 @@ h3 {
      überdeckt — die Bar bleibt beim Scrollen über der gesamten Seite sichtbar. */
   body:has(.hero-app-bottom-bar) {
     padding-bottom: 96px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .hero--app-home {
+      transition: none;
+    }
   }
 
   .section {

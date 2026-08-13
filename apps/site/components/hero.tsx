@@ -4,6 +4,7 @@ import { Brand } from './brand';
 import { HeroSearchBar } from './hero-search-bar';
 import { StoreBadges } from './store-badges';
 import { HeroMap } from './hero-map';
+import { HomeHeroScrollReveal } from './home-hero-scroll-reveal';
 import type { PublicTherapist } from '../lib/public-api';
 
 type HeroProps = {
@@ -46,6 +47,7 @@ export function Hero({
 }: HeroProps) {
   return (
     <section className={`hero${hideImage ? ' hero--no-image' : ''}${appHome ? ' hero--app-home' : ''}${mapTherapist ? ' hero--with-map' : ''}`}>
+      {appHome ? <HomeHeroScrollReveal /> : null}
       <div className={`shell${!hideImage || mapTherapist ? ' hero__grid' : ''}`}>
         <div className="hero__copy">
           {appHome ? <Brand href="/" variant="header" className="hero__app-logo" priority /> : null}
