@@ -23,6 +23,12 @@ import {
 
 type SearchParams = Promise<{ status?: string; q?: string; city?: string; created?: string; deleted?: string; archived?: string }>;
 
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://my-revio.de').replace(/\/$/, '');
+
+function getPublicProfileUrl(therapistId: string) {
+  return `${SITE_URL}/therapeut/${encodeURIComponent(therapistId)}`;
+}
+
 function getQueueCopy({
   overdueCount,
   incompleteCount,
@@ -248,6 +254,16 @@ export default async function TherapistsPage({ searchParams }: { searchParams: S
                         </span>
                         {blockerSummary ? (
                           <span className="entity-meta entity-meta--strong">{blockerSummary}</span>
+                        ) : null}
+                        {therapist.visibility.visibilityState === 'visible' ? (
+                          <a
+                            href={getPublicProfileUrl(therapist.id)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="entity-meta"
+                          >
+                            Profil ansehen ↗
+                          </a>
                         ) : null}
                       </div>
                     </td>

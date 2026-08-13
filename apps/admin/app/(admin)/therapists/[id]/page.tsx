@@ -21,6 +21,11 @@ import { AdminNotice } from '../../../../components/admin-notice';
 // Profilfotos liegen als relative URL (/uploads/profile-photos/...) auf der API
 // — fürs Anzeigen im Admin die öffentliche API-Basis davorsetzen.
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000').replace(/\/$/, '');
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://my-revio.de').replace(/\/$/, '');
+
+function getPublicProfileUrl(therapistId: string) {
+  return `${SITE_URL}/therapeut/${encodeURIComponent(therapistId)}`;
+}
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -107,6 +112,16 @@ export default async function TherapistDetailPage({ params, searchParams }: Prop
           <span className={publicVisibilityBadge.className}>
             {publicVisibilityBadge.label}
           </span>
+          {therapist.visibility.visibilityState === 'visible' && (
+            <a
+              href={getPublicProfileUrl(therapist.id)}
+              target="_blank"
+              rel="noreferrer"
+              className="secondary-btn"
+            >
+              Öffentliches Profil öffnen ↗
+            </a>
+          )}
         </div>
       }
     >
@@ -158,6 +173,11 @@ export default async function TherapistDetailPage({ params, searchParams }: Prop
           <p className="status-copy">
             {getVisibilityCopy(therapist)}
           </p>
+          {therapist.visibility.visibilityState !== 'visible' && (
+            <p style={{ margin: '8px 0 0', color: 'var(--muted)', fontSize: 13 }}>
+              Das öffentliche Profil ist erst nach vollständiger Freigabe und Sichtbarkeitsprüfung erreichbar.
+            </p>
+          )}
         </article>
 
         <article className="card">
