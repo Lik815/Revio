@@ -178,6 +178,13 @@ p {
   padding: 64px 0 48px;
 }
 
+/* Die Startseite soll beim ersten Laden vollständig den Bereich unter der
+   Navigation einnehmen. So beginnt der nachfolgende Inhaltsabschnitt erst
+   nach dem Scrollen und ist nicht bereits unter der Suche angeschnitten. */
+.hero--app-home {
+  min-height: calc(100svh - 65px);
+}
+
 .hero__grid {
   display: grid;
   grid-template-columns: 1.2fr 0.8fr;
