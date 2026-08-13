@@ -50,7 +50,7 @@ export default async function NewTherapistPage({ searchParams }: { searchParams:
   return (
     <PageShell
       title="Neuen Therapeuten anlegen"
-      description="Nur mit dokumentierter Zustimmung — ohne Kanal/Zeitpunkt kein Speichern. Alle weiteren Angaben sind optional und können auch später ergänzt werden."
+      description="Alle weiteren Angaben sind optional und können auch später ergänzt werden."
       eyebrow="Neuanlage"
       actions={<Link href="/therapists" className="secondary-btn secondary-btn--compact">Zurück zur Liste</Link>}
     >
@@ -87,10 +87,6 @@ export default async function NewTherapistPage({ searchParams }: { searchParams:
                   <option value="female">Weiblich</option>
                   <option value="male">Männlich</option>
                 </select>
-              </label>
-              <label className="field">
-                <span>Zustimmung über welchen Kanal *</span>
-                <input className="toolbar-input" name="consentChannel" placeholder="z. B. Telefon 08.08." required />
               </label>
               <label className="field field--optional">
                 <span>Notiz zur Zustimmung</span>

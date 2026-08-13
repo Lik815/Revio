@@ -862,7 +862,6 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
     email: z.string().email(),
     fullName: z.string().trim().min(1),
     city: z.string().trim().min(1),
-    consentChannel: z.string().trim().min(1),
     consentNote: z.string().trim().optional(),
     // Vollständige Profildaten (optional) — Operator kann sie direkt beim
     // Anlegen mitgeben, statt sie später einzeln nachzupflegen.
@@ -882,12 +881,11 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
     kassenarten: z.array(z.string()).optional(),
   });
 
-  // Directory-First-Refactor (R1): Operator legt ein Therapeuten-Profil an —
-  // nur mit dokumentierter Zustimmung (Pflichtfelder), da das im Unterschied
-  // zu Praxen personenbezogene Daten einer Einzelperson sind. userId bleibt
-  // null (unbeansprucht) — claimbar über die normale Registrierung, siehe den
-  // Platzhalter-Check in register.ts. Bewusst PENDING_REVIEW statt LISTED:
-  // Zustimmung allein ersetzt keine berufliche Verifizierung.
+  // Directory-First-Refactor (R1): Operator legt ein Therapeuten-Profil an.
+  // userId bleibt null (unbeansprucht) — claimbar über die normale
+  // Registrierung, siehe den Platzhalter-Check in register.ts. Bewusst
+  // PENDING_REVIEW statt LISTED: Anlage allein ersetzt keine berufliche
+  // Verifizierung.
   fastify.post('/therapists/create', async (request, reply) => {
     const parsed = createTherapistSchema.safeParse(request.body);
     if (!parsed.success) {
@@ -936,7 +934,6 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
         isFreelancer: true,
         reviewStatus: 'PENDING_REVIEW',
         consentObtainedAt: new Date(),
-        consentChannel: data.consentChannel,
         consentNote: data.consentNote || null,
       },
     });

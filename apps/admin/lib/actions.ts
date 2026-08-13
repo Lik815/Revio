@@ -138,10 +138,10 @@ export async function logoutAdmin() {
 
 // Therapist actions
 
-// Directory-First-Refactor (R1): Operator legt ein Therapeuten-Profil an —
-// nur mit dokumentierter Zustimmung. Fehler (z. B. 409 "E-Mail bereits
-// vergeben") werden abgefangen und als Meldung zur Seite zurückgegeben, statt
-// die Server-Component-Render mit einem ungefangenen Throw abstürzen zu lassen.
+// Directory-First-Refactor (R1): Operator legt ein Therapeuten-Profil an.
+// Fehler (z. B. 409 "E-Mail bereits vergeben") werden abgefangen und als
+// Meldung zur Seite zurückgegeben, statt die Server-Component-Render mit
+// einem ungefangenen Throw abstürzen zu lassen.
 export async function createTherapist(formData: FormData) {
   const email = String(formData.get('email') ?? '').trim();
   const firstName = String(formData.get('firstName') ?? '').trim();
@@ -150,9 +150,8 @@ export async function createTherapist(formData: FormData) {
   // zusammengesetzt, wie bei der Selbstregistrierung (register.ts).
   const fullName = [firstName, lastName].filter(Boolean).join(' ');
   const city = String(formData.get('city') ?? '').trim();
-  const consentChannel = String(formData.get('consentChannel') ?? '').trim();
-  if (!email || !firstName || !lastName || !city || !consentChannel) {
-    redirect('/therapists/neu?formError=' + encodeURIComponent('Bitte E-Mail, Vorname, Nachname, Stadt und Zustimmungs-Kanal ausfüllen.'));
+  if (!email || !firstName || !lastName || !city) {
+    redirect('/therapists/neu?formError=' + encodeURIComponent('Bitte E-Mail, Vorname, Nachname und Stadt ausfüllen.'));
   }
 
   // Mehrfach-Checkboxen liefern mehrere Werte unter demselben Namen → getAll.
@@ -170,7 +169,6 @@ export async function createTherapist(formData: FormData) {
         email,
         fullName,
         city,
-        consentChannel,
         consentNote: str('consentNote'),
         professionalTitle: str('professionalTitle'),
         gender: gender === 'female' || gender === 'male' ? gender : undefined,
