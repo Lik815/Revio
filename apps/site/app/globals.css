@@ -12,6 +12,9 @@
   --radius-md: 16px;
   --radius-sm: 12px;
   --shell: 1160px;
+  /* Zentrale Dauer für das Einklappen des mobilen Hero-Spacers
+     (home-hero-scroll-reveal.tsx). An einer Stelle anpassbar. */
+  --hero-reveal-duration: 900ms;
 }
 
 * {
@@ -187,6 +190,12 @@ p {
    nach dem Scrollen und ist nicht bereits unter der Suche angeschnitten. */
 .hero--app-home {
   min-height: calc(100svh - 65px);
+}
+
+/* Nur auf Mobil (siehe @media max-width: 720px unten) sichtbar — auf Desktop
+   entfällt der App-Bottom-Bar-Spacer/-Hinweis vollständig. */
+.hero-app-home__spacer {
+  display: none;
 }
 
 .hero__grid {
@@ -1569,35 +1578,66 @@ h3 {
     display: none;
   }
 
+  /* min-height bleibt bewusst UNANIMIERT: Sie beruht auf 100dvh, das sich in
+     Safari beim Ein-/Ausblenden der Browserleisten laufend ändert. Würde man
+     dieses min-height transitionieren, würde jede dieser Änderungen eine
+     unruhige Layout-Animation auslösen. Stattdessen animiert ausschließlich
+     der separate .hero-app-home__spacer unten — er wird per JS auf einen
+     festen Pixelwert eingefroren, bevor er zu 0 kollabiert, sodass dvh-
+     Schwankungen ihn nicht berühren. */
   .hero--app-home {
     min-height: 100dvh;
     display: flex;
     flex-direction: column;
     padding-top: 0;
     padding-bottom: 108px;
-    transition: min-height 900ms cubic-bezier(0.22, 1, 0.36, 1);
   }
 
   .hero--app-home .shell {
     display: flex;
     flex-direction: column;
-    flex: 1;
+    flex: 0 0 auto;
   }
 
   .hero--app-home .hero__copy {
-    flex: 1;
-  }
-
-  /* Beim ersten Scrollen wird nur der absichtlich reservierte Viewport-Raum
-     eingeklappt. Der Inhalt bleibt im normalen Dokumentfluss, sodass der
-     nächste Abschnitt ohne Lücke und ohne Overlay sichtbar wird. */
-  .hero--app-home.hero--scroll-revealed {
-    min-height: 0;
-  }
-
-  .hero--app-home.hero--scroll-revealed .shell,
-  .hero--app-home.hero--scroll-revealed .hero__copy {
     flex: 0 0 auto;
+  }
+
+  /* Dekorativer, separater Leerraum unterhalb der Hero-Inhalte: füllt beim
+     ersten Laden per flex:1 die restliche Viewporthöhe, sodass der Hero
+     mindestens bildschirmhoch wirkt. home-hero-scroll-reveal.tsx friert seine
+     Höhe beim Scrollen auf einen Pixelwert ein und animiert sie zu 0, statt
+     den gesamten Hero zu verkleinern. */
+  .hero-app-home__spacer {
+    display: block;
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .hero-app-home__spacer[data-collapsing='true'] {
+    transition: height var(--hero-reveal-duration) cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .hero-app-home__hint {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 12px;
+    color: var(--muted);
+    font-size: 0.8rem;
+    opacity: 0.75;
+    transition: opacity 300ms ease;
+    pointer-events: none;
+  }
+
+  .hero--app-home.hero--scroll-revealed .hero-app-home__hint {
+    opacity: 0;
   }
 
   .hero--app-home .hero__app-logo {
@@ -1679,6 +1719,11 @@ h3 {
     border-radius: 999px;
     font-weight: 600;
     font-size: 0.93rem;
+    /* Eine Aktion ist ein <button type="submit">, keine <a> — Browser-Defaults
+       zurücksetzen, damit beide Aktionen identisch aussehen. */
+    border: none;
+    font-family: inherit;
+    cursor: pointer;
   }
 
   .hero-app-bottom-bar__action--primary {
@@ -1699,7 +1744,11 @@ h3 {
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .hero--app-home {
+    .hero-app-home__spacer[data-collapsing='true'] {
+      transition: none;
+    }
+
+    .hero-app-home__hint {
       transition: none;
     }
   }

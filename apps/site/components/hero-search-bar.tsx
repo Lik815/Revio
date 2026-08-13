@@ -93,7 +93,7 @@ export function HeroSearchBar({ placeholder }: HeroSearchBarProps) {
 
   return (
     <div className="hero-search-wrap" ref={wrapRef}>
-      <form method="GET" action="/finden" className="hero-search">
+      <form method="GET" action="/finden" className="hero-search" id="hero-search-form">
         <span className="hero-search__icon">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="11" cy="11" r="8" />
