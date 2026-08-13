@@ -87,6 +87,24 @@ export default async function HomePage() {
         </div>
       </Section>
 
+      <Section
+        eyebrow="Warum Revio?"
+        title="Physiotherapie klarer zugänglich machen"
+        body="Revio hilft Menschen, passende physiotherapeutische Expertise leichter zu finden – und gibt Therapeut:innen einen professionellen, verständlichen Auftritt."
+      >
+        <div className="why-revio-card">
+          <div>
+            <h3>Weniger Suchen. Besser entscheiden.</h3>
+            <p>
+              Wir setzen auf nachvollziehbare Profile, relevante Spezialisierungen und einen direkten Kontaktweg – ohne unnötig komplizierten Buchungsprozess.
+            </p>
+          </div>
+          <Link href="/about" className="button button--ghost">
+            Mehr über Revio
+          </Link>
+        </div>
+      </Section>
+
       {latestPosts.length > 0 ? (
         <Section
           eyebrow="Blog"

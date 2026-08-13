@@ -65,6 +65,10 @@ p {
   gap: 24px;
 }
 
+.site-header--compact .site-header__inner {
+  justify-content: space-between;
+}
+
 .brand {
   display: inline-flex;
   align-items: center;
@@ -941,6 +945,32 @@ h3 {
   background: rgba(255, 255, 255, 0.25);
 }
 
+.why-revio-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 28px 32px;
+  border: 1px solid rgba(62, 98, 113, 0.18);
+  border-radius: var(--radius-lg);
+  background: var(--accent-soft);
+}
+
+.why-revio-card h3 {
+  margin-bottom: 8px;
+}
+
+.why-revio-card p {
+  max-width: 64ch;
+  color: var(--muted);
+  font-size: 0.98rem;
+  line-height: 1.65;
+}
+
+.why-revio-card .button {
+  flex-shrink: 0;
+}
+
 .contact-layout {
   grid-template-columns: 0.8fr 1.2fr;
   align-items: start;
@@ -1126,6 +1156,11 @@ h3 {
   .cta-banner {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .why-revio-card {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .maintenance-card {
