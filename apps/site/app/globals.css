@@ -1456,7 +1456,10 @@ h3 {
   }
 
   .shell {
-    width: min(var(--shell), calc(100% - 24px));
+    /* DiscoverContent in the app uses 16px horizontal padding. Keeping the
+       same inset also prevents the chips from starting closer to the edge
+       than the logo, headline and search field. */
+    width: min(var(--shell), calc(100% - 32px));
   }
 
   .site-header__inner {
@@ -1551,7 +1554,9 @@ h3 {
 
   .hero--app-home .hero__app-logo {
     display: flex;
-    justify-content: center;
+    /* The app wordmark is part of its left-aligned header, not a centered
+       hero element. */
+    justify-content: flex-start;
     padding: 28px 0 20px;
   }
 
@@ -1578,9 +1583,11 @@ h3 {
   }
 
   .hero--app-home .hero-search {
-    height: 56px;
-    border-radius: var(--radius-lg);
-    box-shadow: 0 6px 20px rgba(28, 43, 51, 0.1);
+    /* Same searchBox token as DiscoverContent: 52px / radius 16 / card
+       shadow. The generic hero-search already carries those values. */
+    height: 52px;
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow);
   }
 
   /* App sendet über die Tastatur ab; auf Mobil braucht die Karte keinen
@@ -1632,7 +1639,8 @@ h3 {
   }
 
   .hero-app-bottom-bar__action--ghost {
-    background: var(--accent-soft);
+    /* In the native guest tab bar only the selected tab is filled. */
+    background: transparent;
     color: var(--accent);
   }
 
