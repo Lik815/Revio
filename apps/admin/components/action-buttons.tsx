@@ -102,6 +102,33 @@ export function QualifikationActions({ id, currentStatus, action }: {
   );
 }
 
+// Submit-Button für <form action={serverAction}>, der vor dem Absenden eine
+// native Bestätigung verlangt (z. B. Archivieren/Löschen). Bricht das Formular
+// per preventDefault ab, wenn die Bestätigung abgelehnt wird.
+export function ConfirmSubmitButton({
+  confirmMessage,
+  className,
+  children,
+}: {
+  confirmMessage: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="submit"
+      className={className}
+      onClick={(e) => {
+        if (!window.confirm(confirmMessage)) {
+          e.preventDefault();
+        }
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
 export function LinkActions({ id, status, actions }: {
   id: string;
   status: string;

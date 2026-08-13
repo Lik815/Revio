@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { PageShell } from '../../../../components/page-shell';
-import { TherapistActions, QualifikationActions } from '../../../../components/action-buttons';
+import { TherapistActions, QualifikationActions, ConfirmSubmitButton } from '../../../../components/action-buttons';
 import {
   approveTherapist,
   rejectTherapist,
@@ -298,7 +298,12 @@ export default async function TherapistDetailPage({ params, searchParams }: Prop
               Archivieren blendet das Profil aus Suche und Liste aus, ohne Daten zu löschen. Reversibel.
             </p>
             <form action={archiveTherapist.bind(null, therapist.id)}>
-              <button className="action-btn action-btn--warn" type="submit">Archivieren</button>
+              <ConfirmSubmitButton
+                className="action-btn action-btn--warn"
+                confirmMessage={`„${therapist.fullName}“ wirklich archivieren? Das Profil wird aus Suche und Liste ausgeblendet.`}
+              >
+                Archivieren
+              </ConfirmSubmitButton>
             </form>
           </>
         )}
