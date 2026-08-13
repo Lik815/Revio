@@ -138,6 +138,23 @@ model User {
   notifications          Notification[]
 }
 
+// Zugriffsprotokoll für die Admin-Patientensuche (DS-74: Zugriff auf
+// Produktionsdaten durch Mitarbeitende ist protokolliert). Bewusst ohne
+// Relation/FK auf User — der Log-Eintrag soll bestehen bleiben, auch wenn
+// der Patient später gelöscht wird (DS-41 Löschkonzept betrifft die
+// Personendaten selbst, nicht das Protokoll, dass ein Zugriff stattfand).
+// targetUserId ist deshalb nur eine lose Referenz, keine erzwungene FK.
+model AdminAccessLog {
+  id           String   @id @default(cuid())
+  createdAt    DateTime @default(now())
+  action       String
+  query        String?
+  targetUserId String?
+
+  @@index([createdAt])
+  @@index([targetUserId])
+}
+
 model Therapist {
   id                    String       @id @default(cuid())
   email                 String       @unique
