@@ -32,6 +32,7 @@ export default async function HomePage() {
         searchPlaceholder="Wobei brauchst du Hilfe?"
         chips={['Rückenschmerzen', 'Kniereha', 'Sportphysiotherapie']}
         hideImage={!siteSettings.appBookingEnabled}
+        mapTherapist={heroTherapist}
         appHome
       />
 
@@ -81,27 +82,6 @@ export default async function HomePage() {
             </p>
             <Link href="/therapists" className="button button--ghost" style={{ marginTop: 16 }}>
               Als Therapeut starten
-            </Link>
-          </div>
-        </div>
-      </Section>
-
-      <Section
-        eyebrow="Jetzt loslegen"
-        title="Revio nutzen oder dabei sein"
-        body=""
-      >
-        <div className="cta-banner">
-          <div>
-            <h3>Interesse an Revio?</h3>
-            <p>Wir bauen Revio Schritt für Schritt auf — als klare, vertrauenswürdige Plattform für moderne Physiotherapie.</p>
-          </div>
-          <div className="cta-banner__actions">
-            <Link href="/contact" className="button button--primary">
-              Kontakt aufnehmen
-            </Link>
-            <Link href="/about" className="button button--ghost">
-              Über Revio
             </Link>
           </div>
         </div>
