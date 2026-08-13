@@ -27,25 +27,6 @@ export default async function FindenPage({
   const homeVisit = params.homeVisit === 'true';
   const kassenart = (params.kassenart ?? '').trim();
 
-  // The API requires a city (or geolocation, which the website doesn't
-  // collect yet) — ask for it before calling /search at all.
-  if (!city) {
-    return (
-      <section className="section section--search">
-        <div className="shell">
-          <div className="section-heading">
-            <div className="eyebrow">Suche</div>
-            <h1>Physiotherapeuten finden</h1>
-            <p className="section-copy">
-              Gib an, wobei du Hilfe brauchst und in welcher Stadt — wir zeigen dir passende Therapeuten in deiner Nähe.
-            </p>
-          </div>
-          <SearchBar defaultQuery={query} />
-        </div>
-      </section>
-    );
-  }
-
   const { therapists, practices } = await searchTherapists({
     query: query || 'physiotherapie',
     city,
@@ -61,8 +42,8 @@ export default async function FindenPage({
           <h1>Physiotherapeuten finden</h1>
           <p className="section-copy">
             {therapists.length > 0
-              ? `${therapists.length} ${therapists.length === 1 ? 'Therapeut' : 'Therapeuten'} in ${city}${query ? ` für „${query}“` : ''}.`
-              : `Keine Treffer für „${query || 'Physiotherapie'}“ in ${city}.`}
+              ? `${therapists.length} ${therapists.length === 1 ? 'Therapeut' : 'Therapeuten'}${city ? ` in ${city}` : ' bundesweit'}${query ? ` für „${query}“` : ''}.`
+              : `Keine Treffer für „${query || 'Physiotherapie'}“${city ? ` in ${city}` : ''}.`}
           </p>
         </div>
 
@@ -86,7 +67,7 @@ export default async function FindenPage({
           <>
             <div className="section-heading" style={{ marginTop: 48 }}>
               <div className="eyebrow">Praxen</div>
-              <h2>Praxen in {city}</h2>
+              <h2>{city ? `Praxen in ${city}` : 'Passende Praxen'}</h2>
             </div>
             <div className="result-grid">
               {practices.map((practice) => (

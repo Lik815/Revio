@@ -269,8 +269,6 @@ const searchBodySchema = z.object({
   kassenart: z.string().optional(),
   gender: z.enum(['female', 'male']).optional(),
   requestable: z.boolean().optional(),
-}).refine((data) => Boolean(data.city) || Boolean(data.origin), {
-  message: 'city oder origin ist erforderlich',
 });
 
 export const searchRoutes: FastifyPluginAsync = async (fastify) => {

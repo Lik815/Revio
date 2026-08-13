@@ -126,7 +126,7 @@ function normalizeTherapist(raw: any): PublicTherapist {
 
 export type SearchInput = {
   query: string;
-  city: string;
+  city?: string;
   homeVisit?: boolean;
   kassenart?: string;
 };
@@ -136,15 +136,14 @@ export type SearchResult = {
   practices: PublicPractice[];
 };
 
-// The API requires `city` (or `origin`, which the website doesn't collect
-// in this first pass) — callers must not call this without a non-empty city.
+// A location improves ordering, but a query can also be searched nationwide.
 export async function searchTherapists(input: SearchInput): Promise<SearchResult> {
   const data = await fetchFromApi('/search', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       query: input.query,
-      city: input.city,
+      city: input.city || undefined,
       homeVisit: input.homeVisit || undefined,
       kassenart: input.kassenart || undefined,
     }),
