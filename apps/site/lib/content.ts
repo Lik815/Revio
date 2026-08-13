@@ -3,8 +3,8 @@ export const siteConfig = {
   contactEmail: 'revioclub.app@gmail.com',
   nav: [
     { href: '/', label: 'Startseite' },
-    { href: '/patients', label: 'Für Patienten' },
-    { href: '/therapists', label: 'Für Therapeuten' },
+    { href: '/patients', label: 'Physio finden' },
+    { href: '/therapists', label: 'Als Therapeut starten' },
     { href: '/blog', label: 'Blog' },
     { href: '/about', label: 'Über Revio' },
     { href: '/contact', label: 'Kontakt' },
@@ -56,10 +56,10 @@ export const patientBenefits = [
 export const therapistBenefits = [
   {
     title: 'Mit einem professionellen Profil sichtbar werden',
-    body: 'Dein Revio-Profil zeigt Fachgebiete, Qualifikationen und Schwerpunkte klar strukturiert — damit Patienten dich fachlich einordnen können.',
+    body: 'Dein Revio-Profil zeigt Fachgebiete, Qualifikationen und Schwerpunkte klar strukturiert — damit Klient:innen dich fachlich einordnen können.',
   },
   {
-    title: 'Von passenden Patienten besser gefunden werden',
+    title: 'Von passenden Klient:innen besser gefunden werden',
     body: 'Revio bringt dich nicht in eine endlose Liste, sondern matcht dich mit Menschen, deren Beschwerdebild zu deiner Expertise passt.',
   },
   {

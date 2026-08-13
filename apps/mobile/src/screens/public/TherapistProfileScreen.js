@@ -127,7 +127,7 @@ export function TherapistProfileScreen() {
                 Anmeldung erforderlich
               </Text>
               <Text style={{ fontSize: 14, color: c.muted, textAlign: 'center', lineHeight: 20 }}>
-                Um einen Termin zu buchen, melde dich mit deinem Patienten-Konto an oder erstelle ein kostenloses Konto.
+                Um einen Termin zu buchen, melde dich mit deinem Nutzerkonto an oder erstelle ein kostenloses Konto.
               </Text>
             </View>
             <Pressable

@@ -29,7 +29,7 @@ const SLOT_STATUS_CONFIG = {
 const CANCEL_REASONS = [
   { key: 'PRAXIS_KRANKHEIT', label: 'Krankheit' },
   { key: 'PRAXIS_ABSAGE',    label: 'Praxis-Absage' },
-  { key: 'PATIENT_WUNSCH',   label: 'Patientenwunsch' },
+  { key: 'PATIENT_WUNSCH',   label: 'Klient:innenwunsch' },
   { key: 'SONSTIGES',        label: 'Sonstiges' },
 ];
 
@@ -424,7 +424,7 @@ export function InquiryCard({ inquiry, authToken, c, onUpdate }) {
             <View style={{ backgroundColor: '#FEF3C7', borderRadius: RADIUS.sm, padding: 10, flexDirection: 'row', gap: 8, alignItems: 'center' }}>
               <Ionicons name="information-circle-outline" size={16} color="#92400E" />
               <Text style={{ fontSize: 12, color: '#92400E', flex: 1 }}>
-                Patient hat {inquiry.parallelAnfragenAnzahl} weitere {inquiry.parallelAnfragenAnzahl === 1 ? 'Praxis' : 'Praxen'} gleichzeitig angefragt.
+                Klient:in hat {inquiry.parallelAnfragenAnzahl} weitere {inquiry.parallelAnfragenAnzahl === 1 ? 'Praxis' : 'Praxen'} gleichzeitig angefragt.
               </Text>
             </View>
           )}

@@ -165,7 +165,7 @@ export async function sendProfileApprovedEmail(opts: {
         <p>Hallo ${name},</p>
         <p>
           Gute Neuigkeiten! Dein Therapeutenprofil auf Revio wurde geprüft und
-          <strong>freigegeben</strong>. Du bist jetzt für Patienten sichtbar.
+          <strong>freigegeben</strong>. Du bist jetzt für Klient:innen sichtbar.
         </p>
         <p style="color:#6b7280;font-size:13px">
           Melde dich in der App an, um dein Profil zu verwalten.
@@ -174,7 +174,7 @@ export async function sendProfileApprovedEmail(opts: {
         <p style="color:#9ca3af;font-size:12px">Revio · noreply@my-revio.de</p>
       </div>
     `,
-    text: `Hallo ${name},\n\nDein Therapeutenprofil auf Revio wurde geprüft und freigegeben. Du bist jetzt für Patienten sichtbar.\n\nMelde dich in der App an, um dein Profil zu verwalten.`,
+    text: `Hallo ${name},\n\nDein Therapeutenprofil auf Revio wurde geprüft und freigegeben. Du bist jetzt für Klient:innen sichtbar.\n\nMelde dich in der App an, um dein Profil zu verwalten.`,
   });
 }
 
@@ -274,4 +274,3 @@ export async function sendReinviteEmail(opts: {
     text: `Hallo ${therapistName},\n\n${practiceName} hat dir eine neue Einladung geschickt.\n\nKlicke hier:\n${inviteLink}\n\nDieser Link ist 7 Tage gültig.`,
   });
 }
-

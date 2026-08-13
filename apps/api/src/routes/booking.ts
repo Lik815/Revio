@@ -261,7 +261,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
     const token = request.headers.authorization?.replace('Bearer ', '');
     if (!token) return reply.status(401).send({ error: 'Unauthorized' });
     const therapist = await resolveTherapist(fastify, token);
-    if (!therapist) return reply.status(403).send({ error: 'Only therapists can view their patients' });
+    if (!therapist) return reply.status(403).send({ error: 'Only therapists can view their clients' });
 
     await expireStaleBookings(fastify, { therapistId: therapist.id });
 
@@ -293,7 +293,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
     const token = request.headers.authorization?.replace('Bearer ', '');
     if (!token) return reply.status(401).send({ error: 'Unauthorized' });
     const therapist = await resolveTherapist(fastify, token);
-    if (!therapist) return reply.status(403).send({ error: 'Only therapists can view their patients' });
+    if (!therapist) return reply.status(403).send({ error: 'Only therapists can view their clients' });
 
     await expireStaleBookings(fastify, { therapistId: therapist.id });
 
@@ -305,7 +305,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
     });
 
     if (bookings.length === 0 || !bookings[0].patientUser) {
-      return reply.status(404).send({ error: 'Patient not found' });
+      return reply.status(404).send({ error: 'Client not found' });
     }
 
     const patient = buildPatientListItem(bookings[0].patientUser, bookings);
@@ -322,7 +322,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
     if (!token) return reply.status(401).send({ error: 'Unauthorized' });
 
     const patient = await resolvePatient(fastify, token);
-    if (!patient) return reply.status(403).send({ error: 'Only patients can create booking requests' });
+    if (!patient) return reply.status(403).send({ error: 'Only registered users can create booking requests' });
 
     const schema = z.object({
       therapistId: z.string(),
@@ -502,7 +502,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
     const token = request.headers.authorization?.replace('Bearer ', '');
     if (!token) return reply.status(401).send({ error: 'Unauthorized' });
     const patient = await resolvePatient(fastify, token);
-    if (!patient) return reply.status(403).send({ error: 'Only patients can view their bookings' });
+    if (!patient) return reply.status(403).send({ error: 'Only registered users can view their bookings' });
 
     await expireStaleBookings(fastify, { patientUserId: patient.id });
 
@@ -765,7 +765,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
     const token = request.headers.authorization?.replace('Bearer ', '');
     if (!token) return reply.status(401).send({ error: 'Unauthorized' });
     const patient = await resolvePatient(fastify, token);
-    if (!patient) return reply.status(403).send({ error: 'Only patients can cancel booking requests' });
+    if (!patient) return reply.status(403).send({ error: 'Only registered users can cancel booking requests' });
 
     const { id } = request.params as { id: string };
     const booking = await fastify.prisma.bookingRequest.findUnique({

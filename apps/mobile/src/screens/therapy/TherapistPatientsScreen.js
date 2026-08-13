@@ -95,7 +95,7 @@ export function PatientsPane({
         <TextInput
           value={query}
           onChangeText={setQuery}
-          placeholder="Patienten suchen..."
+          placeholder="Klient:innen suchen..."
           placeholderTextColor={c.muted}
           style={{ flex: 1, color: c.text, fontSize: 14, paddingHorizontal: 10, paddingVertical: 0 }}
           autoCapitalize="none"
@@ -143,7 +143,7 @@ export function PatientsPane({
       return (
         <View style={{ borderWidth: 1, borderColor: c.border, borderRadius: RADIUS.lg, paddingVertical: 32, paddingHorizontal: 20, alignItems: 'center', gap: 8 }}>
           <Ionicons name="people-outline" size={36} color={c.muted} />
-          <Text style={{ fontSize: 16, fontWeight: '700', color: c.text, textAlign: 'center' }}>Noch keine Patienten</Text>
+          <Text style={{ fontSize: 16, fontWeight: '700', color: c.text, textAlign: 'center' }}>Noch keine Klient:innen</Text>
           <Text style={{ fontSize: 13, color: c.muted, textAlign: 'center', lineHeight: 20 }}>
             Sobald jemand einen Termin bei dir bucht, erscheint die Person hier.
           </Text>
@@ -161,7 +161,7 @@ export function PatientsPane({
     return (
       <View style={{ borderWidth: 1, borderColor: c.border, borderRadius: RADIUS.lg, paddingVertical: 28, paddingHorizontal: 20, alignItems: 'center', gap: 8 }}>
         <Ionicons name="search-outline" size={30} color={c.muted} />
-        <Text style={{ fontSize: 15, fontWeight: '700', color: c.text, textAlign: 'center' }}>Keine passenden Patienten</Text>
+        <Text style={{ fontSize: 15, fontWeight: '700', color: c.text, textAlign: 'center' }}>Keine passenden Klient:innen</Text>
       </View>
     );
   };

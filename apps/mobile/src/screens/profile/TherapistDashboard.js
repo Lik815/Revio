@@ -723,7 +723,7 @@ export function TherapistDashboardScreen({ c, t, styles, certificationOptions, s
           <View style={[styles.detailInfoRow, { marginTop: 12 }]}>
             <View style={{ flex: 1 }}>
               <Text style={[styles.detailInfoLabel, { color: c.text }]}>{t('bookingModeLabel') ?? 'Terminanfragen aktivieren'}</Text>
-              <Text style={{ fontSize: 12, color: c.muted, marginTop: 2 }}>{t('bookingModeSub') ?? 'Patienten können direkt einen Termin anfragen.'}</Text>
+              <Text style={{ fontSize: 12, color: c.muted, marginTop: 2 }}>{t('bookingModeSub') ?? 'Klient:innen können direkt einen Termin anfragen.'}</Text>
             </View>
             <Switch
               value={editBookingMode === 'FIRST_APPOINTMENT_REQUEST'}

@@ -4,8 +4,8 @@ import emailjs from '@emailjs/browser';
 import { FormEvent, useState } from 'react';
 
 const roleOptions = [
-  { value: 'Patient', label: 'Patient' },
-  { value: 'Therapeut', label: 'Therapeut' },
+  { value: 'Physio finden', label: 'Ich suche Physiotherapie' },
+  { value: 'Therapeut:in', label: 'Ich arbeite therapeutisch' },
 ];
 
 type Status = 'idle' | 'sending' | 'success' | 'error';

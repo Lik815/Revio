@@ -121,7 +121,7 @@ export function PatientDashboardScreen({
             <Text style={{ fontSize: 18, fontWeight: '700', color: c.text }} numberOfLines={1}>
               {firstName} {lastName}
             </Text>
-            <Text style={{ fontSize: 13, color: c.muted, marginTop: 2 }}>{t('patientRoleLabel') ?? 'Patient:in'}</Text>
+            <Text style={{ fontSize: 13, color: c.muted, marginTop: 2 }}>{t('patientRoleLabel') ?? 'Nutzer:in'}</Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
               {profileComplete && (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: (c.successBg ?? '#f0fdf4'), borderRadius: 20, paddingVertical: 3, paddingHorizontal: 8 }}>

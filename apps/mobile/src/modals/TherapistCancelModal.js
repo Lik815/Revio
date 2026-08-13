@@ -28,7 +28,7 @@ export function TherapistCancelModal({ visible, onClose, onConfirm, booking, c }
             {booking && (
               <View style={{ backgroundColor: c.mutedBg, borderRadius: 12, padding: 14, gap: 4 }}>
                 <Text style={{ fontSize: 15, fontWeight: '700', color: c.text }}>
-                  {booking.patientName ?? 'Patient'}
+                  {booking.patientName ?? 'Klient:in'}
                 </Text>
                 {booking.patientPhone ? (
                   <Text style={{ fontSize: 13, color: c.muted }}>{booking.patientPhone}</Text>
@@ -36,7 +36,7 @@ export function TherapistCancelModal({ visible, onClose, onConfirm, booking, c }
               </View>
             )}
             <Text style={{ fontSize: 14, color: c.muted, textAlign: 'center', lineHeight: 21 }}>
-              Bitte gib einen Grund an. Der Patient wird informiert.
+              Bitte gib einen Grund an. Die Klientin oder der Klient wird informiert.
             </Text>
             <TextInput
               value={reason}

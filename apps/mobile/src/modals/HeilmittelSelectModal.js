@@ -29,7 +29,7 @@ export function HeilmittelSelectModal({ visible, onClose, onConfirm, options, lo
                 Welche Heilmittel behandelst du?
               </Text>
               <Text style={{ fontSize: 14, color: c.muted, textAlign: 'center', lineHeight: 20 }}>
-                Patient:innen sehen das automatisch auf deinem Profil und im Buchungsbereich — du musst es nur einmal festlegen.
+                Klient:innen sehen das automatisch auf deinem Profil und im Buchungsbereich — du musst es nur einmal festlegen.
               </Text>
             </View>
 

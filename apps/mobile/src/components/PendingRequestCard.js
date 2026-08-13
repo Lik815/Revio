@@ -50,7 +50,7 @@ export function PendingRequestCard({ c, slot, booking, onRespond }) {
   const [loading, setLoading] = useState(false);
   const [showDeclineModal, setShowDeclineModal] = useState(false);
   const [error, setError] = useState('');
-  const patientName = booking?.patientName || 'Patient';
+  const patientName = booking?.patientName || 'Klient:in';
   const contact = booking?.patientPhone || booking?.patientEmail || '';
   const requestTime = formatRequestCreatedAt(booking?.createdAt);
   const slotLabel = formatRequestSlot(slot, booking);

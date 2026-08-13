@@ -268,7 +268,7 @@ export function LoginScreen({ c, styles, t, onClose, bookingTargetTherapist, onB
           onPress={() => loginWithCredentials('demo.patient@revio.de', 'Demo1234!')}
           style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1.5, borderColor: c.border, backgroundColor: c.card }}
         >
-          <Text style={{ fontSize: 13, fontWeight: '600', color: c.text }}>Patient</Text>
+          <Text style={{ fontSize: 13, fontWeight: '600', color: c.text }}>Nutzer:in</Text>
         </Pressable>
         <Pressable
           onPress={() => loginWithCredentials('demo.physio@revio.de', 'Demo1234!')}

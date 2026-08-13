@@ -132,7 +132,7 @@ export async function inquiryRoutes(fastify: FastifyInstance) {
     const token = request.headers.authorization?.replace('Bearer ', '');
     if (!token) return reply.status(401).send({ error: 'Unauthorized' });
     const patient = await resolvePatient(fastify, token);
-    if (!patient) return reply.status(403).send({ error: 'Nur Patienten können Anfragen stellen' });
+    if (!patient) return reply.status(403).send({ error: 'Nur angemeldete Nutzer:innen können Anfragen stellen' });
 
     const schema = z.object({
       heilmittel: z.string().min(1),
@@ -429,7 +429,7 @@ export async function inquiryRoutes(fastify: FastifyInstance) {
     const token = request.headers.authorization?.replace('Bearer ', '');
     if (!token) return reply.status(401).send({ error: 'Unauthorized' });
     const patient = await resolvePatient(fastify, token);
-    if (!patient) return reply.status(403).send({ error: 'Nur Patienten' });
+    if (!patient) return reply.status(403).send({ error: 'Nur angemeldete Nutzer:innen' });
 
     const requests = await fastify.prisma.patientRequest.findMany({
       where: { patientUserId: patient.id },
@@ -902,7 +902,7 @@ export async function inquiryRoutes(fastify: FastifyInstance) {
     const token = request.headers.authorization?.replace('Bearer ', '');
     if (!token) return reply.status(401).send({ error: 'Unauthorized' });
     const patient = await resolvePatient(fastify, token);
-    if (!patient) return reply.status(403).send({ error: 'Nur Patienten' });
+    if (!patient) return reply.status(403).send({ error: 'Nur angemeldete Nutzer:innen' });
 
     const { id } = request.params as { id: string };
     const inquiry = await fastify.prisma.inquiry.findUnique({
@@ -929,7 +929,7 @@ export async function inquiryRoutes(fastify: FastifyInstance) {
     const token = request.headers.authorization?.replace('Bearer ', '');
     if (!token) return reply.status(401).send({ error: 'Unauthorized' });
     const patient = await resolvePatient(fastify, token);
-    if (!patient) return reply.status(403).send({ error: 'Nur Patienten' });
+    if (!patient) return reply.status(403).send({ error: 'Nur angemeldete Nutzer:innen' });
 
     const bookings = await fastify.prisma.bookingRequest.findMany({
       where: { patientUserId: patient.id },

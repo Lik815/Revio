@@ -4,7 +4,7 @@ import { Section } from '../../components/section';
 import { patientBenefits } from '../../lib/content';
 
 export const metadata = {
-  title: 'Physiotherapeuten finden – für Patienten',
+  title: 'Physiotherapie finden',
   description:
     'Finde Physiotherapeuten passend zu deinem Beschwerdebild — nach Spezialisierung, Standort und Behandlungsangebot.',
 };
@@ -13,7 +13,7 @@ export default function PatientsPage() {
   return (
     <>
       <Hero
-        eyebrow="Für Patienten"
+        eyebrow="Physio finden"
         title="Passende Physiotherapie ohne Umwege finden"
         body="Revio hilft dabei, Physiotherapeuten nach Spezialisierung, Standort und Angebot klarer zu entdecken."
         primaryHref="/contact"
@@ -25,7 +25,7 @@ export default function PatientsPage() {
 
       <Section
         eyebrow="Was Revio hilft"
-        title="Worauf Patienten sich konzentrieren können"
+        title="Worauf du dich konzentrieren kannst"
         body="Die Website erklärt den Wert des Produkts, ohne einen künstlich komplexen Buchungsprozess zu versprechen."
       >
         <div className="card-grid">
@@ -71,7 +71,7 @@ export default function PatientsPage() {
         <div className="cta-banner">
           <div>
             <h3>Fragen oder frühes Interesse</h3>
-            <p>Wir freuen uns über Hinweise aus echter Versorgungspraxis und echte Bedürfnisse auf Patientenseite.</p>
+            <p>Wir freuen uns über Hinweise aus echter Versorgungspraxis und echte Bedürfnisse bei der Suche nach Physiotherapie.</p>
           </div>
           <div className="cta-banner__actions">
             <Link href="/contact" className="button button--primary">

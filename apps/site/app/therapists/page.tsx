@@ -6,16 +6,16 @@ import { profileIncludes, therapistBenefits } from '../../lib/content';
 export const metadata = {
   title: 'Für Physiotherapeuten – mehr Sichtbarkeit',
   description:
-    'Werde von Patienten gefunden, deren Beschwerdebild zu deiner Spezialisierung passt — mit einem professionellen Revio-Profil.',
+    'Werde von Klient:innen gefunden, deren Beschwerdebild zu deiner Spezialisierung passt — mit einem professionellen Revio-Profil.',
 };
 
 export default function TherapistsPage() {
   return (
     <>
       <Hero
-        eyebrow="Für Therapeuten"
+        eyebrow="Als Therapeut starten"
         title="Ein professionelles Profil für moderne Physiotherapie"
-        body="Revio hilft Therapeuten, sichtbar zu werden und von passenden Patienten besser gefunden zu werden."
+        body="Revio hilft Therapeut:innen, sichtbar zu werden und von passenden Klient:innen besser gefunden zu werden."
         primaryHref="/contact"
         primaryLabel="Interesse anmelden"
         secondaryHref="/about"

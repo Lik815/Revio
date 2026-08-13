@@ -278,7 +278,7 @@ export function BlockedTimesScreen({ c, authToken, onBack }) {
           const names = created.conflicts.slice(0, 3).map((s) => `• ${s.patientName}`).join('\n');
           Alert.alert(
             'Eintrag gespeichert',
-            `Es gibt ${created.conflicts.length} bestehende${created.conflicts.length === 1 ? 'n Termin' : ' Termine'} in diesem Zeitraum:\n\n${names}${created.conflicts.length > 3 ? `\n...und ${created.conflicts.length - 3} weitere` : ''}\n\nBitte informiere deine Patienten.`,
+            `Es gibt ${created.conflicts.length} bestehende${created.conflicts.length === 1 ? 'n Termin' : ' Termine'} in diesem Zeitraum:\n\n${names}${created.conflicts.length > 3 ? `\n...und ${created.conflicts.length - 3} weitere` : ''}\n\nBitte informiere deine Klient:innen.`,
           );
         } else {
           showToast('Gespeichert');

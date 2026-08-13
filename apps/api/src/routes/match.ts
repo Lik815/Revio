@@ -37,7 +37,7 @@ export async function matchRoutes(fastify: FastifyInstance) {
       const token = request.headers.authorization?.replace('Bearer ', '');
       if (!token) return reply.status(401).send({ error: 'Unauthorized' });
       const patient = await fastify.prisma.user.findFirst({ where: { sessionToken: token, role: 'patient' } });
-      if (!patient) return reply.status(403).send({ error: 'Nur Patienten können Matches abrufen' });
+      if (!patient) return reply.status(403).send({ error: 'Nur angemeldete Nutzer:innen können Matches abrufen' });
 
       const { patientRequestId } = request.query as { patientRequestId?: string };
       if (!patientRequestId) return reply.badRequest('patientRequestId fehlt');

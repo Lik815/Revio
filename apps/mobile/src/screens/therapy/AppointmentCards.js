@@ -315,7 +315,7 @@ export function TherapistBookingCard({ c, t, request, onRespond, onCancel }) {
         <Pressable
           onPress={() => Alert.alert(
             'Termin absagen',
-            'Möchtest du diesen bestätigten Termin wirklich absagen? Der Patient wird benachrichtigt.',
+            'Möchtest du diesen bestätigten Termin wirklich absagen? Die Klientin oder der Klient wird benachrichtigt.',
             [
               { text: 'Nein', style: 'cancel' },
               { text: 'Absagen', style: 'destructive', onPress: onCancel },

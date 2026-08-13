@@ -5,7 +5,7 @@ import { siteConfig } from '../../lib/content';
 
 export const metadata = {
   title: 'Kontakt',
-  description: 'Fragen zu Revio, als Patient oder Therapeut? Schreib uns über das Kontaktformular.',
+  description: 'Fragen zu Revio oder Interesse an Physiotherapie? Schreib uns über das Kontaktformular.',
 };
 
 type ContactSearchParams = Promise<{ practiceId?: string; practiceName?: string }>;
@@ -29,7 +29,7 @@ export default async function ContactPage({
       <Hero
         eyebrow="Kontakt"
         title="Interesse an Revio"
-        body="Ob als Patient oder Therapeut: Wir freuen uns über Interesse und Austausch."
+        body="Ob du Physiotherapie suchst oder therapeutisch arbeitest: Wir freuen uns über Interesse und Austausch."
         primaryHref={`mailto:${siteConfig.contactEmail}`}
         primaryLabel="Direkt per E-Mail"
         secondaryHref="/about"

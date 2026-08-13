@@ -274,7 +274,7 @@ export function WorkingHoursScreen({ c, authToken, onBack }) {
         <>
           <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 4, paddingBottom: 16, gap: 12 }} showsVerticalScrollIndicator={false}>
             <Text style={{ fontSize: 13, color: c.muted, lineHeight: 18 }}>
-              Lege deine wiederkehrenden Arbeitszeiten fest. Daraus berechnet Revio buchbare Zeitfenster für Patient:innen — je nach gewähltem Heilmittel und der Dauer, die du unter „Leistungen" konfiguriert hast.
+              Lege deine wiederkehrenden Arbeitszeiten fest. Daraus berechnet Revio buchbare Zeitfenster für Klient:innen — je nach gewähltem Heilmittel und der Dauer, die du unter „Leistungen" konfiguriert hast.
             </Text>
 
             {blocks.map((block) => (

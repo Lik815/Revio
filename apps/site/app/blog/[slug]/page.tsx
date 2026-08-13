@@ -265,9 +265,9 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
 
           <div className="blog-article__cta">
             <div className="blog-cta-card">
-              <p className="eyebrow">Für Therapeuten</p>
+              <p className="eyebrow">Als Therapeut starten</p>
               <h3 className="blog-cta-card__heading">Revio — Ihre Praxis, digital gefunden.</h3>
-              <p className="blog-cta-card__body">Erstellen Sie in wenigen Minuten Ihr kostenloses Profil und lassen Sie sich von Patienten in Ihrer Region entdecken.</p>
+              <p className="blog-cta-card__body">Erstellen Sie in wenigen Minuten Ihr kostenloses Profil und lassen Sie sich von Klient:innen in Ihrer Region entdecken.</p>
               <div className="blog-cta-card__actions">
                 <Link href="/therapists" className="button button--primary">
                   Jetzt registrieren

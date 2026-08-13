@@ -87,7 +87,7 @@ export function TherapistPatientDetailScreen({ authToken, patientId, onBack, onS
     setHistoryLoading(true);
     loadPatientDetail(authToken, patientId).then((data) => {
       if (cancelled) return;
-      if (!data && !patient) setHardError('Patient:in konnte nicht geladen werden.');
+      if (!data && !patient) setHardError('Klient:in konnte nicht geladen werden.');
       else setHardError('');
     }).finally(() => { if (!cancelled) setHistoryLoading(false); });
     return () => { cancelled = true; };
@@ -166,7 +166,7 @@ export function TherapistPatientDetailScreen({ authToken, patientId, onBack, onS
 
   return (
     <View style={{ flex: 1 }}>
-      <TabHeader c={c} title={patient?.fullName ?? 'Patient:in'} />
+      <TabHeader c={c} title={patient?.fullName ?? 'Klient:in'} />
       <FlatList
         data={patient ? appointments : []}
         keyExtractor={(item) => item.id}

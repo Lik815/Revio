@@ -46,11 +46,11 @@ const RADIUS_OPTIONS = [5, 10, 15, 20, 30, 50];
 const KASSENART_CHOICES = kassenartOptions.filter((option) => option.key);
 
 const STEP_META = {
-  photo: { title: 'Profilfoto', sub: 'Ein Foto schafft Vertrauen bei Patient:innen.' },
+  photo: { title: 'Profilfoto', sub: 'Ein Foto schafft Vertrauen bei Klient:innen.' },
   document: { title: 'Nachweis hochladen', sub: 'Lade deine Berufsurkunde oder einen Nachweis für die Prüfung hoch.' },
   certifications: { title: 'Fortbildungen', sub: 'Wähle deine Qualifikationen und Fortbildungen.' },
   kassenart: { title: 'Abrechnungsart', sub: 'Du kannst mehrere Kassenarten auswählen.' },
-  phone: { title: 'Telefonnummer', sub: 'So können Patient:innen dich bei Rückfragen erreichen.' },
+  phone: { title: 'Telefonnummer', sub: 'So können Klient:innen dich bei Rückfragen erreichen.' },
   homeVisitRadius: { title: 'Hausbesuche', sub: 'Bietest du Hausbesuche an? In welchem Umkreis?' },
   address: { title: 'Adresse', sub: 'Deine Praxis- oder Arbeitsadresse.' },
   specializations: { title: 'Spezialisierungen', sub: 'Wähle deine fachlichen Schwerpunkte.' },

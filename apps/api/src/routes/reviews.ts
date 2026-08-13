@@ -19,7 +19,7 @@ function deriveDisplayName(firstName: string | null, lastName: string | null) {
   const lastInitial = lastName?.trim()?.[0];
   if (first && lastInitial) return `${first} ${lastInitial}.`;
   if (first) return first;
-  return 'Patient';
+  return 'Nutzer:in';
 }
 
 function isBookingReviewable(booking: {
@@ -71,7 +71,7 @@ export async function reviewRoutes(fastify: FastifyInstance) {
     const token = request.headers.authorization?.replace('Bearer ', '');
     if (!token) return reply.status(401).send({ error: 'Unauthorized' });
     const patient = await resolvePatient(fastify, token);
-    if (!patient) return reply.status(403).send({ error: 'Only patients can review bookings' });
+    if (!patient) return reply.status(403).send({ error: 'Only registered users can review bookings' });
 
     const { id } = request.params as { id: string };
     const bookings = await fastify.prisma.bookingRequest.findMany({
@@ -102,7 +102,7 @@ export async function reviewRoutes(fastify: FastifyInstance) {
     const token = request.headers.authorization?.replace('Bearer ', '');
     if (!token) return reply.status(401).send({ error: 'Unauthorized' });
     const patient = await resolvePatient(fastify, token);
-    if (!patient) return reply.status(403).send({ error: 'Only patients can review bookings' });
+    if (!patient) return reply.status(403).send({ error: 'Only registered users can review bookings' });
 
     const { id } = request.params as { id: string };
     const booking = await fastify.prisma.bookingRequest.findUnique({
@@ -127,7 +127,7 @@ export async function reviewRoutes(fastify: FastifyInstance) {
     const token = request.headers.authorization?.replace('Bearer ', '');
     if (!token) return reply.status(401).send({ error: 'Unauthorized' });
     const patient = await resolvePatient(fastify, token);
-    if (!patient) return reply.status(403).send({ error: 'Only patients can review bookings' });
+    if (!patient) return reply.status(403).send({ error: 'Only registered users can review bookings' });
 
     const schema = z.object({
       rating: z.number().int().min(1).max(5),

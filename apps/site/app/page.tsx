@@ -19,9 +19,9 @@ export default async function HomePage() {
         body="Physiotherapeuten in deiner Nähe — nach Beschwerde, Spezialisierung und Standort."
         mobileBody="Freiberufliche Physiotherapeut:innen in deiner Nähe – finde die passende Expertise für dein Anliegen."
         primaryHref="/patients"
-        primaryLabel="Für Patienten"
+        primaryLabel="Physio finden"
         secondaryHref="/therapists"
-        secondaryLabel="Für Therapeuten"
+        secondaryLabel="Als Therapeut starten"
         searchPlaceholder="Wobei brauchst du Hilfe?"
         chips={['Rückenschmerzen', 'Kniereha', 'Sportphysiotherapie']}
         hideImage={!siteSettings.appBookingEnabled}
@@ -29,7 +29,7 @@ export default async function HomePage() {
       />
 
       <Section
-        eyebrow="Für Patienten"
+        eyebrow="Physio finden"
         title="Passende Physiotherapie ohne Umwege"
         body="Ob Rückenschmerzen, Reha oder neurologische Beschwerden: Revio zeigt dir Therapeuten nach Fachgebiet, Standort und Behandlungsangebot."
       >
@@ -48,16 +48,16 @@ export default async function HomePage() {
               Beschwerde eingeben. Passende Physios finden. Direkt anfragen — ohne komplizierte Terminlogik oder zehn offene Tabs.
             </p>
             <Link href="/patients" className="button button--ghost" style={{ marginTop: 16 }}>
-              Mehr für Patienten
+              Physio finden
             </Link>
           </div>
         </div>
       </Section>
 
       <Section
-        eyebrow="Für Therapeuten"
+        eyebrow="Als Therapeut starten"
         title="Sichtbar werden. Professionell auftreten."
-        body="Revio gibt Physiotherapeuten einen klaren, medizinisch glaubwürdigen digitalen Auftritt — und bringt sie mit Patienten zusammen, deren Beschwerden zur eigenen Expertise passen."
+        body="Revio gibt Physiotherapeut:innen einen klaren, medizinisch glaubwürdigen digitalen Auftritt — und bringt sie mit Klient:innen zusammen, deren Beschwerden zur eigenen Expertise passen."
       >
         <div className="split-panel">
           <div className="surface-card surface-card--tall">
@@ -73,7 +73,7 @@ export default async function HomePage() {
               Finde Therapeuten nach Spezialisierung, Ort, Hausbesuch und Behandlungsangebot — in einem Umfeld, das Expertise sichtbar macht statt zu überfordern.
             </p>
             <Link href="/therapists" className="button button--ghost" style={{ marginTop: 16 }}>
-              Mehr für Therapeuten
+              Als Therapeut starten
             </Link>
           </div>
         </div>

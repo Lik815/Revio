@@ -19,7 +19,7 @@ export default function AboutPage() {
         primaryHref="/contact"
         primaryLabel="Kontakt"
         secondaryHref="/patients"
-        secondaryLabel="Für Patienten"
+        secondaryLabel="Physio finden"
         hideImage
       />
 
@@ -46,7 +46,7 @@ export default function AboutPage() {
         <div className="cta-banner">
           <div>
             <h3>Interesse oder Fragen?</h3>
-            <p>Wir freuen uns über Austausch — ob als Patient, Therapeut oder einfach aus Interesse.</p>
+            <p>Wir freuen uns über Austausch — ob du Physiotherapie suchst, therapeutisch arbeitest oder einfach interessiert bist.</p>
           </div>
           <div className="cta-banner__actions">
             <Link href="/contact" className="button button--primary">
@@ -84,7 +84,7 @@ export default function AboutPage() {
       <Section
         eyebrow="Kontakt"
         title="Interesse an Revio?"
-        body="Ob als Patient, Therapeut oder mit allgemeiner Frage — wir freuen uns über Nachrichten."
+        body="Ob du Physiotherapie suchst, therapeutisch arbeitest oder eine allgemeine Frage hast — wir freuen uns über Nachrichten."
       >
         <div className="cta-banner">
           <div>
@@ -96,7 +96,7 @@ export default function AboutPage() {
               Nachricht senden
             </Link>
             <Link href="/patients" className="button button--ghost">
-              Für Patienten
+              Physio finden
             </Link>
           </div>
         </div>

@@ -110,7 +110,7 @@ export function TherapistAppointmentDetail({
     ? startsAt.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
     : null;
 
-  const patientName = patient?.fullName ?? appointment?.patientName ?? 'Patient';
+  const patientName = patient?.fullName ?? appointment?.patientName ?? 'Klient:in';
   const patientInitials = getInitials(patientName);
 
   const handleRespond = async (action, declinedReason) => {
@@ -174,7 +174,7 @@ export function TherapistAppointmentDetail({
                 onPress={() => onOpenPatient(appointment.patientUserId)}
                 style={{ flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 99, borderWidth: 1, borderColor: c.border, paddingHorizontal: 10, paddingVertical: 6 }}
               >
-                <Text style={{ fontSize: 12, fontWeight: '600', color: c.text }}>Patient oeffnen</Text>
+                <Text style={{ fontSize: 12, fontWeight: '600', color: c.text }}>Klientenprofil öffnen</Text>
                 <Ionicons name="chevron-forward" size={12} color={c.muted} />
               </Pressable>
             ) : null}
@@ -207,8 +207,8 @@ export function TherapistAppointmentDetail({
         />
       </View>
 
-      {/* Patient-Sektion */}
-      <SectionCard icon="person-outline" label="Patient" c={c}>
+      {/* Klient:innen-Sektion */}
+      <SectionCard icon="person-outline" label="Klient:in" c={c}>
         <InfoRow
           icon="call-outline"
           value={patient?.phone ?? 'Keine Telefonnummer'}
@@ -261,7 +261,7 @@ export function TherapistAppointmentDetail({
         </SectionCard>
       ) : null}
 
-      {/* Nachricht des Patienten */}
+      {/* Nachricht der Klientin oder des Klienten */}
       {typeof appointment?.message === 'string' && appointment.message.trim().length > 0 ? (
         <SectionCard icon="chatbubble-outline" label="Nachricht" c={c}>
           <View style={{ padding: 16 }}>

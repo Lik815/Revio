@@ -222,7 +222,7 @@ function StatusCard({ agendaState, nextFreeGap, now, servicesByKey = {}, c }) {
           <View style={{ flex: 1 }}>
             <Text style={{ fontSize: 17, fontWeight: '800', color: activeAccent }}>Läuft gerade</Text>
             <Text style={{ fontSize: 13, color: c.text, marginTop: 4 }} numberOfLines={1}>
-              {`${fmtTime(start)} · ${b?.patientName ?? 'Patient'} · ${b?.heilmittel ?? ''} · ${durationMin} Min`}
+              {`${fmtTime(start)} · ${b?.patientName ?? 'Klient:in'} · ${b?.heilmittel ?? ''} · ${durationMin} Min`}
             </Text>
             <ProgressBar progress={progress} color={activeAccent} c={c} />
             <Text style={{ fontSize: 12, color: c.muted, marginTop: 4 }}>
@@ -258,7 +258,7 @@ function StatusCard({ agendaState, nextFreeGap, now, servicesByKey = {}, c }) {
           )}
           {nextItem && b && (
             <Text style={{ fontSize: 13, fontWeight: '600', color: c.primary, marginTop: 4 }} numberOfLines={1}>
-              {`${fmtTime(nextItem.startsAt)} · ${b.patientName ?? 'Patient'} · ${b.heilmittel ?? ''} · ${nextDuration} Min`}
+              {`${fmtTime(nextItem.startsAt)} · ${b.patientName ?? 'Klient:in'} · ${b.heilmittel ?? ''} · ${nextDuration} Min`}
             </Text>
           )}
           {!nextItem && (
@@ -302,7 +302,7 @@ function AgendaBookingRow({ item, isHighlighted, onPress, servicesByKey = {}, c 
       </Text>
       <View style={{ flex: 1, paddingLeft: 6 }}>
         <Text style={{ fontSize: 14, fontWeight: '600', color: c.text }} numberOfLines={1}>
-          {b?.patientName ?? 'Patient'}
+          {b?.patientName ?? 'Klient:in'}
         </Text>
         {b?.heilmittel ? (
           <Text style={{ fontSize: 12, color: c.muted, marginTop: 1 }} numberOfLines={1}>{b.heilmittel}</Text>

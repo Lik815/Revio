@@ -27,7 +27,7 @@ export function AccountCreateStep({
         <Text style={[LABEL_STYLE, { color: c.muted, marginBottom: 8 }]}>ICH BIN</Text>
         <View style={{ flexDirection: 'row', backgroundColor: c.mutedBg ?? c.card, borderRadius: RADIUS.md, padding: 3, borderWidth: 1, borderColor: c.border }}>
           {[
-            { key: 'patient', label: 'Patient:in' },
+            { key: 'patient', label: 'Nutzer:in' },
             { key: 'therapist', label: 'Physiotherapeut:in' },
           ].map((item) => (
             <Pressable
