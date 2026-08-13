@@ -197,6 +197,30 @@ export type AdminLink = {
   };
 };
 
+export type PatientSummary = {
+  id: string;
+  firstName: string | null;
+  lastName: string | null;
+  email: string;
+  phone: string | null;
+  kassenart: string | null;
+  createdAt: string;
+};
+
+export type PatientSearchResult =
+  | ({ type: 'patient' } & PatientSummary)
+  | { type: 'guest_booking'; bookingId: string; patientName: string; patientEmail: string | null; patientPhone: string | null; status: string };
+
+export type PatientDetail = PatientSummary & {
+  bookings: {
+    id: string;
+    status: string;
+    startsAt: string | null;
+    createdAt: string;
+    therapistFullName: string;
+  }[];
+};
+
 export const api = {
   getAppFeedback: () => adminFetch<AppFeedback[]>('/admin/feedback'),
   getStats: () => adminFetch<AdminStats>('/admin/stats'),
@@ -212,4 +236,6 @@ export const api = {
   getCertificationOptions: () => adminFetch<{ certifications: CertificationOption[] }>('/admin/certifications'),
   getSpecializationOptions: () => adminFetch<{ specializations: SpecializationOption[] }>('/admin/specializations'),
   getHeilmittelOptions: () => adminFetch<{ heilmittel: HeilmittelOption[] }>('/admin/heilmittel'),
+  searchPatients: (q: string) => adminFetch<{ results: PatientSearchResult[] }>(`/admin/patients/search?q=${encodeURIComponent(q)}`),
+  getPatient: (id: string) => adminFetch<PatientDetail>(`/admin/patients/${id}`),
 };

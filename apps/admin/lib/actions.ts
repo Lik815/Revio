@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { getApiBaseCandidates } from './api-base';
+import type { PatientSearchResult } from './api';
 
 export type LoginState = {
   error: string | null;
@@ -741,4 +742,31 @@ export async function toggleBlogPostPublish(id: string) {
 export async function deleteBlogPost(id: string) {
   await adminRequest(`/admin/blog-posts/${id}/delete`);
   revalidatePath('/blog');
+}
+
+export type PatientSearchState = {
+  query: string;
+  results: PatientSearchResult[];
+  error: string | null;
+};
+
+// Suche läuft bewusst als Server Action statt als GET-Formular: das
+// Ergebnis wird über React-State gerendert, nicht über die URL — der
+// Suchbegriff (oft eine E-Mail-Adresse) taucht so nirgendwo in Browser-
+// Historie, Proxy- oder Access-Logs auf (DS-65).
+export async function searchPatientsAction(
+  _prevState: PatientSearchState,
+  formData: FormData,
+): Promise<PatientSearchState> {
+  const query = String(formData.get('q') ?? '').trim();
+  if (query.length < 2) {
+    return { query, results: [], error: query ? 'Bitte mindestens 2 Zeichen eingeben.' : null };
+  }
+
+  try {
+    const data = await adminRequest('/admin/patients/search', { body: { q: query } });
+    return { query, results: (data?.results ?? []) as PatientSearchResult[], error: null };
+  } catch (error) {
+    return { query, results: [], error: error instanceof Error ? error.message : 'Suche fehlgeschlagen.' };
+  }
 }

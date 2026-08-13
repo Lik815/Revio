@@ -1205,6 +1205,114 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
     return { qualifikationenStatus: (t as any).qualifikationenStatus, qualifikationenVerifiziertAt: (t as any).qualifikationenVerifiziertAt?.toISOString() ?? null };
   });
 
+  // Patients
+  //
+  // Bewusst KEINE Listen-/Browse-Route für alle Patient:innen (DS-20:
+  // kein Feld/Feature ohne konkreten Use Case) — Support braucht im
+  // Einzelfall einen gezielten Lookup, kein Scrollen durch alle
+  // Patientendaten. Jede Suche und jede Detailansicht wird protokolliert
+  // (DS-74: Zugriff auf Produktionsdaten durch Mitarbeitende ist
+  // protokolliert). Da es aktuell nur einen geteilten Admin-Zugang gibt
+  // (DS-73 ist hier noch offen), kann das Protokoll nicht "wer" erfassen —
+  // nur "was" und "wann". Sobald es individuelle Admin-Logins gibt, sollte
+  // targetUserId/action um eine echte Actor-Spalte ergänzt werden.
+  const logAdminAccess = (action: string, opts: { query?: string; targetUserId?: string } = {}) =>
+    fastify.prisma.adminAccessLog.create({
+      data: { action, query: opts.query, targetUserId: opts.targetUserId },
+    }).catch(() => undefined); // Logging darf die eigentliche Anfrage nie blockieren.
+
+  function mapPatientSummary(u: { id: string; firstName: string | null; lastName: string | null; email: string; phone: string | null; kassenart: string | null; createdAt: Date }) {
+    return {
+      id: u.id,
+      firstName: u.firstName,
+      lastName: u.lastName,
+      email: u.email,
+      phone: u.phone,
+      kassenart: u.kassenart,
+      createdAt: u.createdAt.toISOString(),
+    };
+  }
+
+  // POST statt GET mit ?q= — der Suchbegriff kann eine E-Mail-Adresse sein,
+  // und DS-65 verbietet personenbezogene Daten in URLs/Query-Strings (landen
+  // sonst in Access-/Proxy-Logs). Im Body statt in der URL.
+  fastify.post('/patients/search', async (request, reply) => {
+    const { q } = (request.body ?? {}) as { q?: string };
+    const query = (q ?? '').trim();
+    if (query.length < 2) return reply.badRequest('Bitte mindestens 2 Zeichen eingeben.');
+
+    const [matches, exactBooking] = await Promise.all([
+      fastify.prisma.user.findMany({
+        where: {
+          role: 'patient',
+          OR: [
+            { email: { contains: query } },
+            { firstName: { contains: query } },
+            { lastName: { contains: query } },
+          ],
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 10,
+      }),
+      fastify.prisma.bookingRequest.findUnique({ where: { id: query } }),
+    ]);
+
+    type PatientSearchResult =
+      | ({ type: 'patient' } & ReturnType<typeof mapPatientSummary>)
+      | { type: 'guest_booking'; bookingId: string; patientName: string; patientEmail: string | null; patientPhone: string | null; status: string };
+
+    const results: PatientSearchResult[] = matches.map((u) => ({ type: 'patient', ...mapPatientSummary(u) }));
+
+    // Buchungs-ID-Treffer: nur anhängen, wenn die Person nicht schon über
+    // die Textsuche gefunden wurde. Gastbuchungen (kein verknüpftes Konto)
+    // werden aus den auf der Buchung gespeicherten Feldern dargestellt,
+    // ohne klickbaren Patienten-Datensatz.
+    if (exactBooking && !results.some((r) => r.type === 'patient' && r.id === exactBooking.patientUserId)) {
+      if (exactBooking.patientUserId) {
+        const bookingPatient = await fastify.prisma.user.findUnique({ where: { id: exactBooking.patientUserId } });
+        if (bookingPatient) results.push({ type: 'patient' as const, ...mapPatientSummary(bookingPatient) });
+      } else {
+        results.push({
+          type: 'guest_booking' as const,
+          bookingId: exactBooking.id,
+          patientName: exactBooking.patientName,
+          patientEmail: exactBooking.patientEmail,
+          patientPhone: exactBooking.patientPhone,
+          status: exactBooking.status,
+        });
+      }
+    }
+
+    await logAdminAccess('patient_search', { query });
+    return { results };
+  });
+
+  fastify.get('/patients/:id', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const patient = await fastify.prisma.user.findFirst({ where: { id, role: 'patient' } });
+    if (!patient) return reply.notFound('Patient not found');
+
+    const bookings = await fastify.prisma.bookingRequest.findMany({
+      where: { patientUserId: id },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+      include: { therapist: { select: { fullName: true } } },
+    });
+
+    await logAdminAccess('patient_view', { targetUserId: id });
+
+    return {
+      ...mapPatientSummary(patient),
+      bookings: bookings.map((b) => ({
+        id: b.id,
+        status: b.status,
+        startsAt: b.startsAt?.toISOString() ?? null,
+        createdAt: b.createdAt.toISOString(),
+        therapistFullName: b.therapist.fullName,
+      })),
+    };
+  });
+
   // Practices
   fastify.get('/practices', async (request) => {
     const { status } = request.query as { status?: string };

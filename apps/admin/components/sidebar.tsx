@@ -25,6 +25,7 @@ const navGroups = [
       { href: '/practices', label: 'Praxen', icon: 'M4 21V9l8-6 8 6v12M9 21v-6h6v6M4 11h16' },
       { href: '/links', label: 'Verknüpfungen', icon: 'M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71' },
       { href: '/feedback', label: 'Feedback', icon: 'M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z' },
+      { href: '/patients', label: 'Patienten', icon: 'M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM22 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75' },
     ],
   },
   {
