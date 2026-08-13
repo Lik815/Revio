@@ -19,7 +19,7 @@ export async function generateMetadata({
   params: Promise<{ stadt: string }>;
 }): Promise<Metadata> {
   const { stadt } = await params;
-  const description = `Geprüfte Physiotherapeuten und Praxen in ${stadt} finden — nach Beschwerde, Spezialisierung und Verfügbarkeit.`;
+  const description = `Physiotherapeuten und Praxen in ${stadt} finden — nach Beschwerde, Spezialisierung und Standort.`;
   return {
     title: `Physiotherapie in ${stadt}`,
     description,
@@ -69,7 +69,7 @@ export default async function StadtPage({ params }: { params: Promise<{ stadt: s
           <h1>Physiotherapeuten &amp; Praxen in {stadt}</h1>
           <p className="section-copy">
             {therapists.length + practices.length > 0
-              ? `${therapists.length + practices.length} geprüfte Profile in ${stadt}.`
+              ? `${therapists.length + practices.length} Profile in ${stadt}.`
               : `Noch keine Profile in ${stadt} — schau bald wieder vorbei.`}
           </p>
         </div>

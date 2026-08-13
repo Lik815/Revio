@@ -22,7 +22,7 @@ export const homeHighlights = [
   },
   {
     title: 'Passende Physios finden',
-    body: 'Geprüfte Therapeuten nach Fachgebiet, Standort, Hausbesuch und Verfügbarkeit.',
+    body: 'Therapeuten nach Fachgebiet, Standort, Hausbesuch und Behandlungsangebot.',
   },
   {
     title: 'Profile vergleichen',

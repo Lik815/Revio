@@ -3,6 +3,12 @@ import { Hero } from '../../components/hero';
 import { Section } from '../../components/section';
 import { patientBenefits } from '../../lib/content';
 
+export const metadata = {
+  title: 'Physiotherapeuten finden – für Patienten',
+  description:
+    'Finde Physiotherapeuten passend zu deinem Beschwerdebild — nach Spezialisierung, Standort und Behandlungsangebot.',
+};
+
 export default function PatientsPage() {
   return (
     <>

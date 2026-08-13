@@ -1,5 +1,11 @@
 import { Section } from '../../components/section';
 
+export const metadata = {
+  title: 'Datenschutz',
+  description: 'Informationen zur Verarbeitung personenbezogener Daten bei Revio.',
+  robots: { index: false, follow: true },
+};
+
 export default function DatenschutzPage() {
   return (
     <Section

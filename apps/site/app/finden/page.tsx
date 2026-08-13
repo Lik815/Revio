@@ -6,7 +6,7 @@ import { PracticeResultCard } from '../../components/practice-result-card';
 
 export const metadata: Metadata = {
   title: 'Physiotherapeuten finden',
-  description: 'Suche geprüfte Physiotherapeuten nach Beschwerde, Spezialisierung und Ort.',
+  description: 'Suche Physiotherapeuten nach Beschwerde, Spezialisierung und Ort.',
 };
 
 type FindenSearchParams = {
@@ -37,7 +37,7 @@ export default async function FindenPage({
             <div className="eyebrow">Suche</div>
             <h1>Physiotherapeuten finden</h1>
             <p className="section-copy">
-              Gib an, wobei du Hilfe brauchst und in welcher Stadt — wir zeigen dir geprüfte Therapeuten in deiner Nähe.
+              Gib an, wobei du Hilfe brauchst und in welcher Stadt — wir zeigen dir passende Therapeuten in deiner Nähe.
             </p>
           </div>
           <SearchBar defaultQuery={query} />

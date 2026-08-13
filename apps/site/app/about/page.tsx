@@ -3,6 +3,12 @@ import { Hero } from '../../components/hero';
 import { Section } from '../../components/section';
 import { principles } from '../../lib/content';
 
+export const metadata = {
+  title: 'Über Revio',
+  description:
+    'Warum es Revio gibt: klarer, vertrauenswürdiger Zugang zu passender Physiotherapie statt unübersichtlicher Suche.',
+};
+
 export default function AboutPage() {
   return (
     <>

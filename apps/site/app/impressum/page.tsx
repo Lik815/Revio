@@ -1,5 +1,11 @@
 import { Section } from '../../components/section';
 
+export const metadata = {
+  title: 'Impressum',
+  description: 'Anbieterkennzeichnung gemäß § 5 DDG.',
+  robots: { index: false, follow: true },
+};
+
 export default function ImpressumPage() {
   return (
     <Section

@@ -3,6 +3,11 @@ import { Hero } from '../../components/hero';
 import { Section } from '../../components/section';
 import { siteConfig } from '../../lib/content';
 
+export const metadata = {
+  title: 'Kontakt',
+  description: 'Fragen zu Revio, als Patient oder Therapeut? Schreib uns über das Kontaktformular.',
+};
+
 type ContactSearchParams = Promise<{ practiceId?: string; practiceName?: string }>;
 
 export default async function ContactPage({

@@ -3,6 +3,12 @@ import { Hero } from '../../components/hero';
 import { Section } from '../../components/section';
 import { profileIncludes, therapistBenefits } from '../../lib/content';
 
+export const metadata = {
+  title: 'Für Physiotherapeuten – mehr Sichtbarkeit',
+  description:
+    'Werde von Patienten gefunden, deren Beschwerdebild zu deiner Spezialisierung passt — mit einem professionellen Revio-Profil.',
+};
+
 export default function TherapistsPage() {
   return (
     <>
