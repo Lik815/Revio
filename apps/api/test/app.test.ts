@@ -584,6 +584,9 @@ describe('POST /search', () => {
         name: 'Near Praxis',
         city: 'Berlin',
         address: 'Mitte 1',
+        street: 'Mitte',
+        houseNumber: '1',
+        postalCode: '10115',
         lat: 52.5200,
         lng: 13.4050,
         reviewStatus: 'APPROVED',
@@ -594,6 +597,9 @@ describe('POST /search', () => {
         name: 'Far Praxis',
         city: 'Hamburg',
         address: 'Elbe 1',
+        street: 'Elbe',
+        houseNumber: '1',
+        postalCode: '20095',
         lat: 53.5753,
         lng: 10.0153,
         reviewStatus: 'APPROVED',
@@ -659,6 +665,9 @@ describe('POST /search', () => {
         name: 'Near Praxis',
         city: 'Berlin',
         address: 'Mitte 1',
+        street: 'Mitte',
+        houseNumber: '1',
+        postalCode: '10115',
         lat: 52.5200,
         lng: 13.4050,
         reviewStatus: 'APPROVED',
@@ -669,6 +678,9 @@ describe('POST /search', () => {
         name: 'Far Praxis',
         city: 'Leipzig',
         address: 'Ring 1',
+        street: 'Ring',
+        houseNumber: '1',
+        postalCode: '04109',
         lat: 51.3397,
         lng: 12.3731,
         reviewStatus: 'APPROVED',
@@ -823,6 +835,12 @@ describe('GET /practice-detail/:id', () => {
       data: {
         name: 'Praxis Detail',
         city: 'Köln',
+        address: 'Domstraße 1',
+        street: 'Domstraße',
+        houseNumber: '1',
+        postalCode: '50667',
+        lat: 50.9413,
+        lng: 6.9583,
         reviewStatus: 'APPROVED',
       },
     });
@@ -2341,12 +2359,14 @@ describe('End-to-End: Register → Admin Approve → Visible in Search', () => {
     });
     expect(approveRes.statusCode).toBe(200);
 
-    // 5. Admin: Praxis freigeben + Link bestätigen
+    // 5. Admin: erst Link bestätigen, dann Praxis freigeben.
     const links = await app.inject({ method: 'GET', url: '/admin/links', headers: AUTH });
     const link = links.json().find((l: { therapistId: string }) => l.therapistId === therapistId);
     const practiceId = link.practiceId;
-    await app.inject({ method: 'POST', url: `/admin/practices/${practiceId}/approve`, headers: AUTH });
-    await app.inject({ method: 'POST', url: `/admin/links/${link.id}/confirm`, headers: AUTH });
+    const confirmRes = await app.inject({ method: 'POST', url: `/admin/links/${link.id}/confirm`, headers: AUTH });
+    expect(confirmRes.statusCode).toBe(200);
+    const approvePracticeRes = await app.inject({ method: 'POST', url: `/admin/practices/${practiceId}/approve`, headers: AUTH });
+    expect(approvePracticeRes.statusCode).toBe(200);
 
     const searchAfter = await app.inject({
       method: 'POST',
