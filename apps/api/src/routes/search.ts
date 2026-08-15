@@ -4,6 +4,12 @@ import { z } from 'zod';
 import type { SearchInput, SearchTherapist, SearchPractice } from '@revio/shared';
 import { normalizeText, scoreMatch, levenshtein } from '../utils/search-utils.js';
 import { getTherapistPublicationState, getTherapistRequestabilityState } from '../utils/profile-completeness.js';
+import {
+  getPracticeVisibilityState,
+  getPublicPracticeLinks,
+  practiceVisibilityInclude,
+  publicPracticeWhere,
+} from '../utils/practice-visibility.js';
 import { expireStaleBookings } from '../utils/booking-expiry.js';
 import { normalizeKassenarten } from '../utils/kassenarten.js';
 import { generateAvailableSlots } from '../utils/slot-generator.js';
@@ -183,12 +189,12 @@ const SEARCH_CACHE_TTL_MS = 60_000;
 // typical per-city result counts, so today's UX is unaffected.
 const SEARCH_RESULT_LIMIT = 200;
 
+// Alle CONFIRMED-Links werden geladen; ob die jeweilige Praxis öffentlich ist,
+// entscheidet ausschließlich die zentrale Regel in practice-visibility.ts
+// (siehe loadPublicPractices / publicPracticeIds unten).
 const searchTherapistInclude = {
   links: {
-    where: {
-      status: 'CONFIRMED',
-      practice: { reviewStatus: 'APPROVED' },
-    },
+    where: { status: 'CONFIRMED' },
     include: { practice: true },
   },
 } satisfies Prisma.TherapistInclude;
@@ -197,19 +203,18 @@ type SearchableTherapist = Prisma.TherapistGetPayload<{ include: typeof searchTh
 
 let searchTherapistCache: { data: SearchableTherapist[]; loadedAt: number } | null = null;
 
-// Directory-First-Refactor (P2): Praxen im Zustand LISTED sind öffentlich
-// sichtbar, aber unbeansprucht/nicht geprüft — sie haben keinen verknüpften
-// Therapeuten und tauchen daher NICHT im therapeuten-abgeleiteten practiceMap
-// weiter unten auf. Eigener, unabhängiger Lade-Zweig + eigener Cache.
-type ListedPractice = Prisma.PracticeGetPayload<Record<string, never>>;
-let searchListedPracticesCache: { data: ListedPractice[]; loadedAt: number } | null = null;
+// Öffentlich sichtbare Praxen (APPROVED und LISTED) nach der zentralen Regel.
+// Dient doppelt: als eigenständiger Ergebniszweig (Praxen ohne passenden
+// Therapeuten-Treffer) und als Gate für die Praxen auf Therapeuten-Karten.
+type PublicPractice = Prisma.PracticeGetPayload<{ include: typeof practiceVisibilityInclude }>;
+let searchPublicPracticesCache: { data: PublicPractice[]; loadedAt: number } | null = null;
 
 // Drops the cached lists so the next search reloads from the DB. Used by tests to
 // keep search isolated between cases; could also be called after admin approval
 // to make a therapist/practice searchable immediately instead of within the TTL window.
 export function resetSearchCache(): void {
   searchTherapistCache = null;
-  searchListedPracticesCache = null;
+  searchPublicPracticesCache = null;
 }
 
 async function loadSearchableTherapists(fastify: FastifyInstance): Promise<SearchableTherapist[]> {
@@ -229,27 +234,19 @@ async function loadSearchableTherapists(fastify: FastifyInstance): Promise<Searc
   return therapists;
 }
 
-async function loadListedPractices(fastify: FastifyInstance): Promise<ListedPractice[]> {
-  if (searchListedPracticesCache && Date.now() - searchListedPracticesCache.loadedAt < SEARCH_CACHE_TTL_MS) {
-    return searchListedPracticesCache.data;
+async function loadPublicPractices(fastify: FastifyInstance): Promise<PublicPractice[]> {
+  if (searchPublicPracticesCache && Date.now() - searchPublicPracticesCache.loadedAt < SEARCH_CACHE_TTL_MS) {
+    return searchPublicPracticesCache.data;
   }
-  // Live-Gate (docs/praxis-pflichtdaten-umsetzung.md, Abschnitt 5): eine Praxis
-  // erscheint öffentlich nur mit vollständiger Adresse und mindestens einem
-  // bestätigten (CONFIRMED) Therapeuten-Link.
+  // Vorfilter in der DB, endgültige Entscheidung in getPracticeVisibilityState()
+  // (Geokodierung + Trim-Semantik lassen sich nicht sinnvoll in SQLite prüfen).
   const practices = await fastify.prisma.practice.findMany({
-    where: {
-      reviewStatus: 'LISTED',
-      street: { not: null },
-      houseNumber: { not: null },
-      postalCode: { not: null },
-      links: { some: { status: 'CONFIRMED' } },
-    },
+    where: publicPracticeWhere,
+    include: practiceVisibilityInclude,
   });
-  const fullyAddressed = practices.filter((p) =>
-    p.street?.trim() && p.houseNumber?.trim() && p.postalCode?.trim(),
-  );
-  searchListedPracticesCache = { data: fullyAddressed, loadedAt: Date.now() };
-  return fullyAddressed;
+  const publicPractices = practices.filter((p) => getPracticeVisibilityState(p, p.links).isPublic);
+  searchPublicPracticesCache = { data: publicPractices, loadedAt: Date.now() };
+  return publicPractices;
 }
 
 // ── Routes ─────────────────────────────────────────────────────────────────
@@ -295,7 +292,13 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
     // Load all approved, publicly-visible therapists (cached ~60s — see
     // loadSearchableTherapists). Invited/manager-onboarding profiles still need an
     // explicit publication confirmation before appearing, enforced below.
-    const therapists = await loadSearchableTherapists(fastify);
+    const [therapists, publicPractices] = await Promise.all([
+      loadSearchableTherapists(fastify),
+      loadPublicPractices(fastify),
+    ]);
+    // Einheitliches Gate: nur öffentliche Praxen dürfen auf Therapeuten-Karten
+    // erscheinen (zentrale Regel, siehe practice-visibility.ts).
+    const publicPracticeIds = new Set(publicPractices.map((p) => p.id));
 
     const normalizedCity = input.city ? normalizeText(input.city) : null;
     const passesFilters = (t: typeof therapists[number]) => {
@@ -331,7 +334,8 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
     const requestableFilter = (parsed.data as any).requestable as boolean | undefined;
 
     filteredTherapists.forEach((t) => {
-      const practiceNames = t.links.map((l) => l.practice.name);
+      const publicLinks = t.links.filter((l) => publicPracticeIds.has(l.practiceId));
+      const practiceNames = publicLinks.map((l) => l.practice.name);
       const relevance = scoreTherapist(t, input.query, practiceNames, input.homeVisit);
       const requestability = getTherapistRequestabilityState(t, { links: t.links });
       const specializations = splitList(t.specializations);
@@ -343,7 +347,7 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
           ? haversine(input.origin.lat, input.origin.lng, tAny.homeLat, tAny.homeLng)
           : undefined;
 
-      const allPractices: SearchPractice[] = t.links
+      const allPractices: SearchPractice[] = publicLinks
         .map((link) => {
           let photos: string[] | undefined;
           if (link.practice.photos) {
@@ -367,9 +371,9 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
             distKm,
             logo: link.practice.logo ?? undefined,
             photos,
-            // Nur APPROVED-Praxen erreichen diesen Zweig (siehe
-            // searchTherapistInclude.links.where.practice.reviewStatus).
-            verified: true,
+            // "Geprüft" ist APPROVED vorbehalten — öffentliche LISTED-Praxen
+            // erscheinen bewusst ohne dieses Signal.
+            verified: link.practice.reviewStatus === 'APPROVED',
             claimed: Boolean((link.practice as any).ownerId),
           };
         })
@@ -461,12 +465,11 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
       practiceMap.set(p.id, p);
     }));
 
-    // Directory-First-Refactor (P2): LISTED-Praxen ohne verknüpften Therapeuten
-    // separat einmischen. Kein Kassenart-/Heilmittel-/Spezialisierungs-Matching
-    // möglich (keine Therapeuten-Daten) — nur Stadt + Freitext auf Name/Beschreibung.
+    // Öffentliche Praxen, die über keinen Therapeuten-Treffer in die Ergebnisse
+    // gekommen sind, separat einmischen. Kein Kassenart-/Heilmittel-/
+    // Spezialisierungs-Matching — nur Stadt + Freitext auf Name/Beschreibung.
     const normalizedQuery = normalizeText(input.query);
-    const listedPractices = await loadListedPractices(fastify);
-    listedPractices.forEach((p) => {
+    publicPractices.forEach((p) => {
       if (practiceMap.has(p.id)) return;
       if (normalizedCity && normalizeText(p.city) !== normalizedCity) return;
       const haystack = normalizeText(`${p.name} ${p.description ?? ''}`);
@@ -493,10 +496,9 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
         distKm,
         logo: p.logo ?? undefined,
         photos,
-        // Dieser Zweig lädt ausschließlich reviewStatus: LISTED — nie APPROVED
-        // (siehe loadListedPractices). Kann aber bereits geclaimt sein (R5),
-        // ownerId ändert reviewStatus nicht automatisch.
-        verified: false,
+        // "Geprüft" nur bei APPROVED; LISTED-Praxen bleiben ungeprüft. Geclaimt
+        // (R5) ist davon unabhängig — ownerId ändert reviewStatus nicht.
+        verified: p.reviewStatus === 'APPROVED',
         claimed: Boolean((p as any).ownerId),
       });
     });
@@ -517,7 +519,10 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
         include: {
           links: {
             where: { status: 'CONFIRMED' },
-            include: { practice: true },
+            // Die Praxis wird samt ihrer eigenen Links geladen, damit
+            // getPracticeVisibilityState() Bedingung 4 (öffentliche:r Therapeut:in)
+            // prüfen kann.
+            include: { practice: { include: practiceVisibilityInclude } },
           },
         },
       }),
@@ -531,17 +536,21 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
     const publication = getTherapistPublicationState(t, { links: t.links });
     if (!publication.publicSearchEligible) return reply.notFound('Therapeut nicht gefunden');
     const requestability = getTherapistRequestabilityState(t, { links: t.links });
-    const practices = t.links.map((link) => {
-      let photos: string[] | undefined;
-      if (link.practice.photos) { try { photos = JSON.parse(link.practice.photos); } catch {} }
-      return {
-        id: link.practice.id, name: link.practice.name, city: link.practice.city,
-        address: link.practice.address ?? undefined, phone: link.practice.phone ?? undefined,
-        hours: link.practice.hours ?? undefined, description: link.practice.description ?? undefined,
-        lat: link.practice.lat, lng: link.practice.lng,
-        logo: link.practice.logo ?? undefined, photos,
-      };
-    });
+    // Nur öffentlich sichtbare Praxen erscheinen auf dem Profil (zentrale Regel).
+    const practices = t.links
+      .filter((link) => getPracticeVisibilityState(link.practice, link.practice.links).isPublic)
+      .map((link) => {
+        let photos: string[] | undefined;
+        if (link.practice.photos) { try { photos = JSON.parse(link.practice.photos); } catch {} }
+        return {
+          id: link.practice.id, name: link.practice.name, city: link.practice.city,
+          address: link.practice.address ?? undefined, phone: link.practice.phone ?? undefined,
+          hours: link.practice.hours ?? undefined, description: link.practice.description ?? undefined,
+          lat: link.practice.lat, lng: link.practice.lng,
+          logo: link.practice.logo ?? undefined, photos,
+          verified: link.practice.reviewStatus === 'APPROVED',
+        };
+      });
     const reviewCount: number = reviewAgg?._count?.id ?? 0;
     const avgRating: number | null = reviewCount > 0 ? (reviewAgg?._avg?.rating ?? null) : null;
     return {
@@ -575,15 +584,7 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
       where: { id },
       include: {
         links: {
-          where: {
-            status: 'CONFIRMED',
-            therapist: {
-              reviewStatus: 'APPROVED',
-              isVisible: true,
-              employmentStatus: 'SELF_EMPLOYED',
-              archivedAt: null,
-            },
-          },
+          where: { status: 'CONFIRMED' },
           include: {
             therapist: {
               select: {
@@ -591,10 +592,12 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
                 photo: true, specializations: true, city: true,
                 homeVisit: true, bio: true,
                 languages: true,
+                bookingMode: true,
                 reviewStatus: true,
                 isVisible: true,
                 isPublished: true,
                 employmentStatus: true,
+                archivedAt: true,
               },
             },
           },
@@ -602,35 +605,44 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
       },
     });
     if (!practice) return reply.notFound('Praxis nicht gefunden');
+
+    // Zentrale Sichtbarkeitsregel — eine nicht öffentliche Praxis wird nie
+    // ausgeliefert, auch nicht über die direkte URL.
+    const visibility = getPracticeVisibilityState(practice, practice.links);
+    if (!visibility.isPublic) return reply.notFound('Praxis nicht gefunden');
+
     let photos: string[] | undefined;
     if (practice.photos) { try { photos = JSON.parse(practice.photos); } catch {} }
     return {
       practice: {
         id: practice.id, name: practice.name, city: practice.city,
         address: practice.address ?? undefined, phone: practice.phone ?? undefined,
+        street: practice.street ?? undefined, houseNumber: practice.houseNumber ?? undefined,
+        postalCode: practice.postalCode ?? undefined,
+        email: practice.email ?? undefined, website: practice.website ?? undefined,
+        wheelchairAccessible: practice.wheelchairAccessible,
+        parkingAvailable: practice.parkingAvailable,
+        publicTransportNote: practice.publicTransportNote ?? undefined,
         hours: practice.hours ?? undefined, description: practice.description ?? undefined,
+        homeVisit: practice.homeVisit,
         lat: practice.lat, lng: practice.lng,
         logo: practice.logo ?? undefined, photos,
-        verified: practice.reviewStatus === 'APPROVED',
+        verified: visibility.verified,
         claimed: Boolean((practice as any).ownerId),
       },
-      therapists: practice.links
-        .filter((l) =>
-          getTherapistPublicationState(l.therapist, {
-            links: [{ status: l.status, practice: { reviewStatus: practice.reviewStatus } }],
-          }).publicSearchEligible,
-        )
-        .map((l) => {
-        return ({
+      // Nur tatsächlich öffentliche Therapeut:innen (zentrale Regel).
+      therapists: getPublicPracticeLinks(practice.links).map((l) => ({
         id: l.therapist.id,
         fullName: l.therapist.fullName,
         professionalTitle: l.therapist.professionalTitle,
         photo: l.therapist.photo ?? undefined,
         specializations: splitList(l.therapist.specializations),
+        languages: splitList(l.therapist.languages),
         city: l.therapist.city,
         homeVisit: l.therapist.homeVisit,
         bio: l.therapist.bio ?? undefined,
-      })}),
+        bookingMode: l.therapist.bookingMode ?? 'DIRECTORY_ONLY',
+      })),
     };
   });
 
@@ -680,11 +692,9 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
   // realem Inhalt (keine spekulativen/leeren Seiten, kein Thin Content).
   fastify.get('/cities', async () => {
     const [practices, therapists] = await Promise.all([
-      fastify.prisma.practice.findMany({
-        where: { reviewStatus: { in: ['APPROVED', 'LISTED'] } },
-        select: { city: true },
-        distinct: ['city'],
-      }),
+      // Nur öffentliche Praxen nach der zentralen Regel — sonst entstünden
+      // Stadtseiten, auf denen die Praxis gar nicht auffindbar ist.
+      loadPublicPractices(fastify),
       fastify.prisma.therapist.findMany({
         where: { reviewStatus: 'APPROVED', isVisible: true, employmentStatus: 'SELF_EMPLOYED', archivedAt: null },
         select: { city: true },
@@ -700,8 +710,12 @@ export const searchRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   // ── GET /practices/search?q=... ──────────────────────────────────────────
-  // Used during registration to find an existing practice by name/city
-
+  // Used during registration to find an existing practice by name/city.
+  //
+  // Bewusst NICHT über isPublicPractice(): dieser Picker muss auch Praxen finden,
+  // die (noch) nicht öffentlich sind — sonst könnte sich niemand mit einer Praxis
+  // verknüpfen, die noch keinen öffentlichen Therapeuten hat (Henne-Ei). Er gibt
+  // nur bereits öffentlich bekannte Stammdaten zurück, keine Sichtbarkeit.
   fastify.get('/practices/search', async (request, reply) => {
     const { q } = request.query as { q?: string };
     if (!q || q.trim().length < 2) return { practices: [] };
