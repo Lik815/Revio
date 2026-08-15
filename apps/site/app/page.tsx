@@ -22,7 +22,7 @@ export default async function HomePage() {
   return (
     <>
       <Hero
-        title="Den richtigen Physio für dein Problem finden."
+        title="Den richtigen Physio finden."
         body="Physiotherapeuten in deiner Nähe — nach Beschwerde, Spezialisierung und Standort."
         mobileBody="Freiberufliche Physiotherapeut:innen in deiner Nähe – finde die passende Expertise für dein Anliegen."
         primaryHref="/patients"
