@@ -4,7 +4,7 @@ import { sendContactMessageEmail } from '../utils/mailer.js';
 
 // Rollen bewusst als geschlossene Liste: Freitext an dieser Stelle würde
 // ungeprüft in den Betreff der Benachrichtigungsmail wandern.
-const ROLES = ['Physio finden', 'Therapeut:in'] as const;
+const ROLES = ['Physio finden', 'Therapeut:in', 'Allgemeine Frage'] as const;
 
 const contactSchema = z.object({
   name: z.string().trim().max(120).optional(),

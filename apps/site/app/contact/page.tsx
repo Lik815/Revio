@@ -1,6 +1,4 @@
 import { ContactForm } from '../../components/contact-form';
-import { Hero } from '../../components/hero';
-import { Section } from '../../components/section';
 import { siteConfig } from '../../lib/content';
 
 export const metadata = {
@@ -28,35 +26,22 @@ export default async function ContactPage({
     // Dezente Eintritts-Animation nur auf Mobil (siehe globals.css) — greift
     // bei jedem Neu-Mount dieser Seite, also sowohl bei einem Klick auf
     // „Kontakt" in der MobileBottomNav als auch bei Browser-Vor/Zurück.
-    <div className="page-enter-mobile">
-      <Hero
-        eyebrow="Kontakt"
-        title="Interesse an Revio"
-        body="Ob du Physiotherapie suchst oder therapeutisch arbeitest: Wir freuen uns über Interesse und Austausch."
-        primaryHref={`mailto:${siteConfig.contactEmail}`}
-        primaryLabel="Direkt per E-Mail"
-        secondaryHref="/about"
-        secondaryLabel="Mehr erfahren"
-        hideImage
-      />
-
-      <Section
-        eyebrow="Kontakt"
-        title="Einfach und direkt"
-        body="Stell uns eine Frage, meld dein Interesse an oder teile uns deine Erfahrung mit."
-      >
-        <div className="contact-layout">
-          <div className="surface-card">
-            <div className="eyebrow">Direkter Kontakt</div>
-            <h3>{siteConfig.contactEmail}</h3>
-            <p>
-              Du erreichst uns auch direkt per E-Mail — wir antworten so schnell wie möglich.
-            </p>
-          </div>
+    <div className="page-enter-mobile contact-page">
+      <div className="shell">
+        <div className="contact-page__inner">
+          <h1>Wie können wir helfen?</h1>
+          <p className="contact-page__intro">
+            Schreib uns kurz, worum es geht. Wir melden uns so schnell wie möglich.
+          </p>
 
           <ContactForm defaultMessage={defaultMessage} />
+
+          <p className="form-note contact-form__alt">
+            Lieber direkt per E-Mail?{' '}
+            <a href={`mailto:${siteConfig.contactEmail}`}>{siteConfig.contactEmail}</a>
+          </p>
         </div>
-      </Section>
+      </div>
     </div>
   );
 }

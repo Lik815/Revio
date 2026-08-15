@@ -33,8 +33,9 @@ export function MobileBottomNav() {
   const isHome = pathname === '/';
   const isSearchActive = pathname === '/finden';
   const isContactActive = pathname === '/contact';
-  const searchVariant = isContactActive ? 'ghost' : 'primary';
-  const contactVariant = isContactActive ? 'primary' : 'ghost';
+  // Auf /contact ist Kontakt-Button ausgeblendet (siehe unten) — Suche bleibt
+  // dort die einzige Aktion und damit immer primär gefüllt.
+  const searchVariant = 'primary';
 
   return (
     <nav className="mobile-bottom-nav" aria-label="Schnellnavigation">
@@ -61,24 +62,34 @@ export function MobileBottomNav() {
           <SearchIcon />
           <span>Suche</span>
         </Link>
+      ) : isSearchActive ? (
+        <button
+          type="submit"
+          form="find-search-form"
+          className={`mobile-bottom-nav__action mobile-bottom-nav__action--${searchVariant}`}
+          aria-current="page"
+        >
+          <SearchIcon />
+          <span>Suche</span>
+        </button>
       ) : (
         <Link
           href="/finden"
           className={`mobile-bottom-nav__action mobile-bottom-nav__action--${searchVariant}`}
-          aria-current={isSearchActive ? 'page' : undefined}
         >
           <SearchIcon />
           <span>Suche</span>
         </Link>
       )}
-      <Link
-        href="/contact"
-        className={`mobile-bottom-nav__action mobile-bottom-nav__action--${contactVariant}`}
-        aria-current={isContactActive ? 'page' : undefined}
-      >
-        <ContactIcon />
-        <span>Kontakt</span>
-      </Link>
+      {isContactActive ? null : (
+        <Link
+          href="/contact"
+          className="mobile-bottom-nav__action mobile-bottom-nav__action--ghost"
+        >
+          <ContactIcon />
+          <span>Kontakt</span>
+        </Link>
+      )}
     </nav>
   );
 }

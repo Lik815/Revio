@@ -86,6 +86,9 @@ export type PublicTherapist = {
   bookingMode?: string;
   requestable: boolean;
   nextFreeSlotAt?: string | null;
+  availability?: string;
+  cityMatch?: boolean;
+  radiusMatch?: boolean;
   phone?: string | null;
   email?: string;
   distKm?: number;
@@ -138,6 +141,9 @@ function normalizeTherapist(raw: any): PublicTherapist {
     bookingMode: raw.bookingMode,
     requestable: Boolean(raw.requestable),
     nextFreeSlotAt: raw.nextFreeSlotAt ?? null,
+    availability: typeof raw.availability === 'string' ? raw.availability : undefined,
+    cityMatch: typeof raw.cityMatch === 'boolean' ? raw.cityMatch : undefined,
+    radiusMatch: typeof raw.radiusMatch === 'boolean' ? raw.radiusMatch : undefined,
     phone: raw.phone ?? null,
     email: raw.email || undefined,
     distKm: typeof raw.distKm === 'number' ? raw.distKm : undefined,
@@ -147,8 +153,18 @@ function normalizeTherapist(raw: any): PublicTherapist {
 export type SearchInput = {
   query: string;
   city?: string;
+  origin?: {
+    lat: number;
+    lng: number;
+  };
+  radiusKm?: number;
+  language?: string;
   homeVisit?: boolean;
+  specialization?: string;
+  heilmittel?: string;
   kassenart?: string;
+  gender?: 'female' | 'male';
+  requestable?: boolean;
 };
 
 export type SearchResult = {
@@ -156,19 +172,36 @@ export type SearchResult = {
   practices: PublicPractice[];
 };
 
+type SearchOptions = {
+  throwOnFailure?: boolean;
+};
+
 // A location improves ordering, but a query can also be searched nationwide.
-export async function searchTherapists(input: SearchInput): Promise<SearchResult> {
+export async function searchTherapists(
+  input: SearchInput,
+  options: SearchOptions = {},
+): Promise<SearchResult> {
   const data = await fetchFromApi('/search', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       query: input.query,
       city: input.city || undefined,
-      homeVisit: input.homeVisit || undefined,
+      origin: input.origin,
+      radiusKm: input.radiusKm,
+      language: input.language || undefined,
+      homeVisit: input.homeVisit,
+      specialization: input.specialization || undefined,
+      heilmittel: input.heilmittel || undefined,
       kassenart: input.kassenart || undefined,
+      gender: input.gender,
+      requestable: input.requestable,
     }),
   });
-  if (!data) return { therapists: [], practices: [] };
+  if (!data) {
+    if (options.throwOnFailure) throw new Error('SEARCH_API_UNAVAILABLE');
+    return { therapists: [], practices: [] };
+  }
   return {
     therapists: Array.isArray(data.therapists) ? data.therapists.map(normalizeTherapist) : [],
     practices: Array.isArray(data.practices) ? data.practices.map(normalizePractice) : [],
