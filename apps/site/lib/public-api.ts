@@ -45,12 +45,23 @@ export type PublicPractice = {
   name: string;
   city: string;
   address?: string;
+  street?: string;
+  houseNumber?: string;
+  postalCode?: string;
   phone?: string;
+  email?: string;
+  website?: string;
   hours?: string;
   description?: string;
   logo?: string;
   photos?: string[];
   distKm?: number;
+  // Zusatzdaten (docs/praxis-zusatzdaten-umsetzung.md, Teil B.1) — nur auf dem
+  // Praxis-Detail gefüllt, in Suchergebnissen bewusst nicht (Feldminimierung).
+  wheelchairAccessible?: boolean;
+  parkingAvailable?: boolean;
+  publicTransportNote?: string;
+  homeVisit?: boolean;
   // Directory-First-Refactor (R3): true nur bei geprüften (APPROVED) Praxen.
   verified?: boolean;
   // Directory-First-Refactor (R5): true sobald jemand die Praxis übernommen hat.
@@ -86,9 +97,18 @@ function normalizePractice(raw: any): PublicPractice {
     name: raw.name ?? '',
     city: raw.city ?? '',
     address: raw.address || undefined,
+    street: raw.street || undefined,
+    houseNumber: raw.houseNumber || undefined,
+    postalCode: raw.postalCode || undefined,
     phone: raw.phone || undefined,
+    email: raw.email || undefined,
+    website: raw.website || undefined,
     hours: raw.hours || undefined,
     description: raw.description || undefined,
+    wheelchairAccessible: raw.wheelchairAccessible ?? undefined,
+    parkingAvailable: raw.parkingAvailable ?? undefined,
+    publicTransportNote: raw.publicTransportNote || undefined,
+    homeVisit: raw.homeVisit ?? undefined,
     logo: resolveMediaUrl(raw.logo),
     photos: Array.isArray(raw.photos)
       ? (raw.photos.map((p: string) => resolveMediaUrl(p)).filter(Boolean) as string[])

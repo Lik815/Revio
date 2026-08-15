@@ -46,7 +46,11 @@ export function PracticeProfileScreen() {
         if (data.practice) setPractice((prev) => ({ ...prev, ...data.practice }));
         setTherapists((data.therapists ?? []).map(mapApiTherapist));
       })
-      .catch(() => setError(t('alertNoConnection')))
+      .catch((status) => {
+        // 404 heisst hier: die Praxis ist nicht (mehr) oeffentlich sichtbar —
+        // das ist kein Verbindungsfehler und soll auch nicht so aussehen.
+        setError(status === 404 ? 'Diese Praxis ist derzeit nicht verfuegbar.' : t('alertNoConnection'));
+      })
       .finally(() => setLoading(false));
   }, [practice?.id]);
 

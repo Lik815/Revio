@@ -12,7 +12,13 @@ import {
   deleteTherapist,
   archiveTherapist,
   unarchiveTherapist,
+  confirmLink,
+  rejectLink,
+  disputeLink,
+  linkPracticeToTherapist,
 } from '../../../../lib/actions';
+import { AddLinkForm } from '../../../../components/add-link-form';
+import { LinkedEntitiesSection } from '../../../../components/linked-entities-section';
 import { api } from '../../../../lib/api';
 import { getAdminVisibilityIssues } from '../../../../lib/visibility';
 import { humanizeBlockingReason } from '../../../../lib/review-status';
@@ -29,7 +35,7 @@ function getPublicProfileUrl(therapistId: string) {
 
 type Props = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ source?: string; issue?: string; photoError?: string; photoOk?: string; restored?: string }>;
+  searchParams: Promise<{ source?: string; issue?: string; photoError?: string; photoOk?: string; restored?: string; linked?: string; linkError?: string }>;
 };
 
 const statusLabel: Record<string, string> = {
@@ -82,10 +88,17 @@ export default async function TherapistDetailPage({ params, searchParams }: Prop
   const { id } = await params;
   const query = await searchParams;
 
-  const [therapist, documents] = await Promise.all([
+  const [therapist, documents, allPractices] = await Promise.all([
     api.getTherapist(id),
     api.getTherapistDocuments(id),
+    api.getPractices().catch(() => []),
   ]);
+
+  const links = therapist.links ?? [];
+  const linkedPracticeIds = new Set(links.map((l) => l.practice.id));
+  const practiceOptions = allPractices
+    .filter((p) => !linkedPracticeIds.has(p.id))
+    .map((p) => ({ value: p.id, label: p.name, sublabel: p.city }));
   const publicVisibilityBadge =
     therapist.reviewStatus === 'APPROVED' && therapist.isVisible
       ? { label: 'Öffentlich sichtbar', className: 'badge badge--APPROVED' }
@@ -435,6 +448,45 @@ export default async function TherapistDetailPage({ params, searchParams }: Prop
           )}
         </div>
       </section>
+
+      {query.linked ? (
+        <AdminNotice title="Verknüpft" tone="success">Die Verknüpfung wurde angelegt und ist sofort bestätigt.</AdminNotice>
+      ) : null}
+      {query.linkError ? (
+        <AdminNotice title="Verknüpfen fehlgeschlagen" tone="warning">{query.linkError}</AdminNotice>
+      ) : null}
+
+      <LinkedEntitiesSection
+        kicker="Verknüpfungen"
+        title="Verknüpfte Praxen"
+        description="Auf dem öffentlichen Profil erscheinen nur bestätigte Verknüpfungen zu öffentlich sichtbaren Praxen."
+        rows={links.map((l) => ({
+          linkId: l.id,
+          status: l.status,
+          name: l.practice.name,
+          sublabel: l.practice.city,
+          href: `/practices/${l.practice.id}`,
+          reviewStatus: l.practice.reviewStatus,
+          publiclyVisible: l.practice.publiclyVisible,
+        }))}
+        emptyLabel="Noch keine Praxen verknüpft."
+        linkActions={{ confirm: confirmLink, reject: rejectLink, dispute: disputeLink }}
+      >
+        {therapist.archivedAt ? (
+          <p className="table-note" style={{ margin: 0 }}>
+            Archivierte Profile können nicht neu verknüpft werden.
+          </p>
+        ) : (
+          <AddLinkForm
+            name="practiceId"
+            placeholder="Praxis suchen…"
+            submitLabel="Verknüpfen"
+            options={practiceOptions}
+            action={linkPracticeToTherapist.bind(null, therapist.id)}
+            emptyHint="Keine weiteren Praxen verfügbar — alle sind bereits verknüpft."
+          />
+        )}
+      </LinkedEntitiesSection>
     </PageShell>
   );
 }

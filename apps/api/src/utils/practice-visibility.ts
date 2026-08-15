@@ -166,9 +166,11 @@ export const practiceVisibilityInclude = {
   links: {
     where: { status: 'CONFIRMED' },
     select: {
+      id: true,
       status: true,
       therapist: {
         select: {
+          id: true,
           reviewStatus: true,
           isVisible: true,
           employmentStatus: true,

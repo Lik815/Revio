@@ -277,11 +277,22 @@ export interface TherapistVisibility {
   blockingReasons: string[];
 }
 
+// Praxis-Sichtbarkeit nach der zentralen Regel
+// (apps/api/src/utils/practice-visibility.ts). Optional, weil sie nur berechnet
+// werden kann, wenn die Links der Praxis mitgeladen wurden.
+export interface PracticeVisibilityFields {
+  addressComplete?: boolean;
+  geocoded?: boolean;
+  publiclyVisible?: boolean;
+  visibilityBlockingReasons?: string[];
+  publicTherapistCount?: number;
+}
+
 export interface TherapistWithLinks extends Therapist {
   links: Array<{
     id: string;
     status: LinkStatus;
-    practice: Practice;
+    practice: Practice & PracticeVisibilityFields;
   }>;
   visibility: TherapistVisibility;
 }

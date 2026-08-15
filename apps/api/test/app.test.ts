@@ -903,6 +903,336 @@ describe('GET /practice-detail/:id', () => {
   });
 });
 
+// ─── Praxis-Sichtbarkeit (zentrale Regel) ─────────────────────────────────────
+// Eine Praxis ist öffentlich nur mit APPROVED/LISTED + vollständiger,
+// geokodierter Adresse + CONFIRMED-Link + mindestens einem öffentlich
+// sichtbaren Therapeut:innenprofil (apps/api/src/utils/practice-visibility.ts).
+
+describe('Praxis-Sichtbarkeit', () => {
+  const PRACTICE_BASE = {
+    name: 'Sichtbarkeits-Praxis',
+    city: 'Köln',
+    address: 'Domstraße 1, 50667 Köln',
+    street: 'Domstraße',
+    houseNumber: '1',
+    postalCode: '50667',
+    lat: 50.9413,
+    lng: 6.9583,
+    reviewStatus: 'APPROVED' as const,
+  };
+
+  const THERAPIST_BASE = {
+    fullName: 'Sicht Therapeutin',
+    professionalTitle: 'Physiotherapeutin',
+    city: 'Köln',
+    bio: 'Vollständiges Profil.',
+    specializations: 'Rückenschmerzen',
+    languages: 'de',
+    certifications: '',
+    reviewStatus: 'APPROVED' as const,
+    isVisible: true,
+    isPublished: true,
+  };
+
+  async function createPractice(overrides: Record<string, unknown> = {}) {
+    return prisma.practice.create({ data: { ...PRACTICE_BASE, ...overrides } });
+  }
+
+  async function createLinkedTherapist(
+    practiceId: string,
+    { email, status = 'CONFIRMED', ...overrides }: Record<string, any>,
+  ) {
+    return prisma.therapist.create({
+      data: {
+        ...THERAPIST_BASE,
+        ...overrides,
+        email,
+        links: { create: { practiceId, status } },
+      },
+    });
+  }
+
+  it('hält eine Praxis privat, solange der Link nur PROPOSED ist', async () => {
+    const practice = await createPractice();
+    await createLinkedTherapist(practice.id, {
+      email: 'proposed-link@test.com',
+      status: 'PROPOSED',
+    });
+    resetSearchCache();
+
+    const detail = await app.inject({ method: 'GET', url: `/practice-detail/${practice.id}` });
+    expect(detail.statusCode).toBe(404);
+
+    const search = await app.inject({
+      method: 'POST',
+      url: '/search',
+      payload: { query: 'Rückenschmerzen', city: 'Köln' },
+    });
+    expect(search.json().practices).toHaveLength(0);
+    // Der Therapeut selbst bleibt sichtbar, nur ohne Praxis auf der Karte.
+    const therapistResult = search.json().therapists[0];
+    expect(therapistResult?.practices ?? []).toHaveLength(0);
+  });
+
+  it('zeigt einen bestätigten Link auf beiden Profilseiten, wenn beide öffentlich sind', async () => {
+    const practice = await createPractice();
+    const therapist = await createLinkedTherapist(practice.id, { email: 'confirmed-both@test.com' });
+    resetSearchCache();
+
+    const practiceDetail = await app.inject({ method: 'GET', url: `/practice-detail/${practice.id}` });
+    expect(practiceDetail.statusCode).toBe(200);
+    expect(practiceDetail.json().therapists.map((t: { id: string }) => t.id)).toEqual([therapist.id]);
+    expect(practiceDetail.json().practice.verified).toBe(true);
+
+    const therapistDetail = await app.inject({ method: 'GET', url: `/therapist/${therapist.id}` });
+    expect(therapistDetail.statusCode).toBe(200);
+    expect(therapistDetail.json().therapist.practices.map((p: { id: string }) => p.id)).toEqual([practice.id]);
+  });
+
+  it('blendet versteckte Therapeut:innen auf dem Praxisprofil aus', async () => {
+    const practice = await createPractice();
+    const visible = await createLinkedTherapist(practice.id, { email: 'visible-on-practice@test.com' });
+    await createLinkedTherapist(practice.id, {
+      email: 'hidden-on-practice@test.com',
+      fullName: 'Versteckte Therapeutin',
+      isVisible: false,
+    });
+    resetSearchCache();
+
+    const res = await app.inject({ method: 'GET', url: `/practice-detail/${practice.id}` });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().therapists.map((t: { id: string }) => t.id)).toEqual([visible.id]);
+  });
+
+  it('macht die Praxis privat (404), sobald der letzte sichtbare Therapeut versteckt wird', async () => {
+    const practice = await createPractice();
+    const therapist = await createLinkedTherapist(practice.id, { email: 'last-visible@test.com' });
+    resetSearchCache();
+
+    expect((await app.inject({ method: 'GET', url: `/practice-detail/${practice.id}` })).statusCode).toBe(200);
+
+    await prisma.therapist.update({ where: { id: therapist.id }, data: { isVisible: false } });
+    resetSearchCache();
+
+    const afterHide = await app.inject({ method: 'GET', url: `/practice-detail/${practice.id}` });
+    expect(afterHide.statusCode).toBe(404);
+
+    const search = await app.inject({
+      method: 'POST',
+      url: '/search',
+      payload: { query: 'Rückenschmerzen', city: 'Köln' },
+    });
+    expect(search.json().practices).toHaveLength(0);
+  });
+
+  it('macht die Praxis privat (404), sobald der letzte Link entfernt wird', async () => {
+    const practice = await createPractice();
+    const therapist = await createLinkedTherapist(practice.id, { email: 'last-link@test.com' });
+    resetSearchCache();
+
+    expect((await app.inject({ method: 'GET', url: `/practice-detail/${practice.id}` })).statusCode).toBe(200);
+
+    await prisma.therapistPracticeLink.deleteMany({ where: { therapistId: therapist.id } });
+    resetSearchCache();
+
+    expect((await app.inject({ method: 'GET', url: `/practice-detail/${practice.id}` })).statusCode).toBe(404);
+  });
+
+  it('liefert 404 für eine Praxis ohne Geokodierung', async () => {
+    const practice = await createPractice({ lat: 0, lng: 0 });
+    await createLinkedTherapist(practice.id, { email: 'not-geocoded@test.com' });
+    resetSearchCache();
+
+    expect((await app.inject({ method: 'GET', url: `/practice-detail/${practice.id}` })).statusCode).toBe(404);
+  });
+
+  it('liefert 404 für eine Praxis mit unvollständiger Adresse', async () => {
+    const practice = await createPractice({ houseNumber: null });
+    await createLinkedTherapist(practice.id, { email: 'incomplete-address@test.com' });
+    resetSearchCache();
+
+    expect((await app.inject({ method: 'GET', url: `/practice-detail/${practice.id}` })).statusCode).toBe(404);
+  });
+
+  it('liefert 404 für eine Praxis im Status PENDING_REVIEW', async () => {
+    const practice = await createPractice({ reviewStatus: 'PENDING_REVIEW' });
+    await createLinkedTherapist(practice.id, { email: 'pending-practice@test.com' });
+    resetSearchCache();
+
+    expect((await app.inject({ method: 'GET', url: `/practice-detail/${practice.id}` })).statusCode).toBe(404);
+  });
+
+  it('zeigt eine LISTED-Praxis öffentlich, aber ohne Verifizierungssignal', async () => {
+    const practice = await createPractice({ reviewStatus: 'LISTED' });
+    await createLinkedTherapist(practice.id, { email: 'listed-practice@test.com' });
+    resetSearchCache();
+
+    const res = await app.inject({ method: 'GET', url: `/practice-detail/${practice.id}` });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().practice.verified).toBe(false);
+  });
+});
+
+describe('Praxis-Freigabe-Gates', () => {
+  async function createApprovableSetup(practiceOverrides: Record<string, unknown> = {}) {
+    const practice = await prisma.practice.create({
+      data: {
+        name: 'Gate Praxis',
+        city: 'Köln',
+        street: 'Domstraße',
+        houseNumber: '1',
+        postalCode: '50667',
+        lat: 50.9413,
+        lng: 6.9583,
+        reviewStatus: 'PENDING_REVIEW',
+        ...practiceOverrides,
+      },
+    });
+    return practice;
+  }
+
+  async function createPublicTherapist(email: string, overrides: Record<string, unknown> = {}) {
+    return prisma.therapist.create({
+      data: {
+        email,
+        fullName: 'Gate Therapeutin',
+        professionalTitle: 'Physiotherapeutin',
+        city: 'Köln',
+        specializations: 'Rückenschmerzen',
+        languages: 'de',
+        certifications: '',
+        reviewStatus: 'APPROVED',
+        isVisible: true,
+        isPublished: true,
+        ...overrides,
+      },
+    });
+  }
+
+  it('weist die Freigabe ohne vollständige Adresse ab', async () => {
+    const practice = await createApprovableSetup({ houseNumber: null });
+    const therapist = await createPublicTherapist('gate-address@test.com');
+    await prisma.therapistPracticeLink.create({
+      data: { therapistId: therapist.id, practiceId: practice.id, status: 'CONFIRMED' },
+    });
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/admin/practices/${practice.id}/approve`,
+      headers: AUTH,
+    });
+    expect(res.statusCode).toBe(400);
+    const stored = await prisma.practice.findUnique({ where: { id: practice.id } });
+    expect(stored?.reviewStatus).toBe('PENDING_REVIEW');
+  });
+
+  it('weist die Freigabe ohne Geokodierung ab', async () => {
+    const practice = await createApprovableSetup({ lat: 0, lng: 0 });
+    const therapist = await createPublicTherapist('gate-geo@test.com');
+    await prisma.therapistPracticeLink.create({
+      data: { therapistId: therapist.id, practiceId: practice.id, status: 'CONFIRMED' },
+    });
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/admin/practices/${practice.id}/approve`,
+      headers: AUTH,
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('weist die Freigabe ohne bestätigten Link ab', async () => {
+    const practice = await createApprovableSetup();
+    const therapist = await createPublicTherapist('gate-link@test.com');
+    await prisma.therapistPracticeLink.create({
+      data: { therapistId: therapist.id, practiceId: practice.id, status: 'PROPOSED' },
+    });
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/admin/practices/${practice.id}/approve`,
+      headers: AUTH,
+    });
+    expect(res.statusCode).toBe(400);
+    const stored = await prisma.practice.findUnique({ where: { id: practice.id } });
+    expect(stored?.reviewStatus).toBe('PENDING_REVIEW');
+  });
+
+  it('weist die Freigabe ab, wenn kein verknüpftes Profil öffentlich sichtbar ist', async () => {
+    const practice = await createApprovableSetup();
+    const therapist = await createPublicTherapist('gate-nonpublic@test.com', {
+      reviewStatus: 'PENDING_REVIEW',
+      isVisible: false,
+    });
+    await prisma.therapistPracticeLink.create({
+      data: { therapistId: therapist.id, practiceId: practice.id, status: 'CONFIRMED' },
+    });
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/admin/practices/${practice.id}/approve`,
+      headers: AUTH,
+    });
+    expect(res.statusCode).toBe(400);
+    const stored = await prisma.practice.findUnique({ where: { id: practice.id } });
+    expect(stored?.reviewStatus).toBe('PENDING_REVIEW');
+  });
+
+  it('gibt die Praxis frei, wenn alle Bedingungen erfüllt sind', async () => {
+    const practice = await createApprovableSetup();
+    const therapist = await createPublicTherapist('gate-ok@test.com');
+    await prisma.therapistPracticeLink.create({
+      data: { therapistId: therapist.id, practiceId: practice.id, status: 'CONFIRMED' },
+    });
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/admin/practices/${practice.id}/approve`,
+      headers: AUTH,
+    });
+    expect(res.statusCode).toBe(200);
+    const stored = await prisma.practice.findUnique({ where: { id: practice.id } });
+    expect(stored?.reviewStatus).toBe('APPROVED');
+  });
+
+  it('umgeht die Praxis-Gates nicht über die Therapeuten-Freigabe', async () => {
+    const practice = await createApprovableSetup();
+    const therapist = await prisma.therapist.create({
+      data: {
+        email: 'cascade-check@test.com',
+        fullName: 'Cascade Therapeut',
+        professionalTitle: 'Physiotherapeut',
+        city: 'Köln',
+        specializations: 'Rückenschmerzen',
+        languages: 'de',
+        certifications: '',
+        reviewStatus: 'PENDING_REVIEW',
+      },
+    });
+    await prisma.therapistPracticeLink.create({
+      data: { therapistId: therapist.id, practiceId: practice.id, status: 'PROPOSED' },
+    });
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/admin/therapists/${therapist.id}/approve`,
+      headers: AUTH,
+    });
+    expect(res.statusCode).toBe(200);
+
+    // Weder die Praxis noch der vorgeschlagene Link dürfen mitgezogen werden.
+    const storedPractice = await prisma.practice.findUnique({ where: { id: practice.id } });
+    expect(storedPractice?.reviewStatus).toBe('PENDING_REVIEW');
+    const storedLink = await prisma.therapistPracticeLink.findFirst({
+      where: { therapistId: therapist.id, practiceId: practice.id },
+    });
+    expect(storedLink?.status).toBe('PROPOSED');
+
+    resetSearchCache();
+    expect((await app.inject({ method: 'GET', url: `/practice-detail/${practice.id}` })).statusCode).toBe(404);
+  });
+});
+
 // ─── Registration ─────────────────────────────────────────────────────────────
 
 // ─── OTP Endpoints ────────────────────────────────────────────────────────────
@@ -2164,7 +2494,8 @@ describe('Admin practice routes', () => {
 
   it('POST /admin/practices/:id/approve sets APPROVED', async () => {
     // Freigabe verlangt vollständige Adresse + Geokoordinaten + mindestens
-    // einen bestätigten Therapeuten (Praxis-Pflichtdaten-Gate).
+    // einen bestätigten Link auf ein öffentlich sichtbares Profil
+    // (Praxis-Pflichtdaten-Gate, siehe practice-visibility.ts).
     await prisma.practice.update({
       where: { id: practiceId },
       data: { street: 'Domkloster', houseNumber: '4', postalCode: '50667', lat: 50.94, lng: 6.96 },
@@ -2175,8 +2506,11 @@ describe('Admin practice routes', () => {
         fullName: 'Link Therapeut',
         professionalTitle: 'PT',
         city: 'Köln',
-        specializations: '',
+        specializations: 'Rückenschmerzen',
         languages: 'de',
+        reviewStatus: 'APPROVED',
+        isVisible: true,
+        isPublished: true,
       },
     });
     await prisma.therapistPracticeLink.create({
@@ -2269,6 +2603,56 @@ describe('Admin link routes', () => {
       headers: AUTH,
     });
     expect(res.statusCode).toBe(404);
+  });
+
+  it('lehnt eine doppelte Verknüpfung mit 409 ab', async () => {
+    const existing = await prisma.therapistPracticeLink.findUnique({ where: { id: linkId } });
+    const res = await app.inject({
+      method: 'POST',
+      url: '/admin/links',
+      headers: AUTH,
+      payload: { therapistId: existing!.therapistId, practiceId: existing!.practiceId },
+    });
+    expect(res.statusCode).toBe(409);
+  });
+
+  it('lehnt das Verknüpfen archivierter Therapeut:innen ab', async () => {
+    const practice = await prisma.practice.create({ data: { name: 'Archiv Praxis', city: 'Köln' } });
+    const archived = await prisma.therapist.create({
+      data: {
+        email: 'archived-link@test.com',
+        fullName: 'Archivierte Therapeutin',
+        professionalTitle: 'PT',
+        city: 'Köln',
+        specializations: 'test',
+        languages: 'de',
+        certifications: '',
+        archivedAt: new Date(),
+      },
+    });
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/admin/links',
+      headers: AUTH,
+      payload: { therapistId: archived.id, practiceId: practice.id },
+    });
+    expect(res.statusCode).toBe(400);
+    const links = await prisma.therapistPracticeLink.findMany({ where: { therapistId: archived.id } });
+    expect(links).toHaveLength(0);
+  });
+
+  it('lehnt das Bestätigen eines Links auf ein archiviertes Profil ab', async () => {
+    const existing = await prisma.therapistPracticeLink.findUnique({ where: { id: linkId } });
+    await prisma.therapist.update({
+      where: { id: existing!.therapistId },
+      data: { archivedAt: new Date() },
+    });
+
+    const res = await app.inject({ method: 'POST', url: `/admin/links/${linkId}/confirm`, headers: AUTH });
+    expect(res.statusCode).toBe(400);
+    const l = await prisma.therapistPracticeLink.findUnique({ where: { id: linkId } });
+    expect(l?.status).toBe('PROPOSED');
   });
 });
 

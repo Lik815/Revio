@@ -519,11 +519,55 @@ export async function removePracticePhoto(id: string, url: string) {
   revalidatePath(`/practices/${id}`);
 }
 
+// Verknüpfungen beeinflussen auch die Detailseiten (Sektion "Verknüpfte
+// Therapeut:innen/Praxen") — deshalb layout-weit revalidieren, sonst zeigen
+// /practices/[id] und /therapists/[id] veraltete Daten.
+function revalidateLinkViews() {
+  revalidatePath('/links');
+  revalidatePath('/therapists', 'layout');
+  revalidatePath('/practices', 'layout');
+}
+
 export async function confirmLink(id: string) {
   await adminRequest(`/admin/links/${id}/confirm`);
-  revalidatePath('/links');
-  revalidatePath('/therapists');
-  revalidatePath('/practices');
+  revalidateLinkViews();
+}
+
+// Verknüpfen direkt von der Praxis-Detailseite aus. Fehler (Dublette,
+// archiviertes Profil) landen als Meldung auf derselben Seite statt auf /links.
+export async function linkTherapistToPractice(practiceId: string, formData: FormData) {
+  const therapistId = String(formData.get('therapistId') ?? '').trim();
+  if (!therapistId) {
+    redirect(`/practices/${practiceId}?linkError=` + encodeURIComponent('Bitte eine:n Therapeut:in auswählen.'));
+  }
+
+  try {
+    await adminRequest('/admin/links', { body: { therapistId, practiceId } });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Verknüpfen fehlgeschlagen.';
+    redirect(`/practices/${practiceId}?linkError=` + encodeURIComponent(message));
+  }
+
+  revalidateLinkViews();
+  redirect(`/practices/${practiceId}?linked=1`);
+}
+
+// Gegenstück auf der Therapeuten-Detailseite.
+export async function linkPracticeToTherapist(therapistId: string, formData: FormData) {
+  const practiceId = String(formData.get('practiceId') ?? '').trim();
+  if (!practiceId) {
+    redirect(`/therapists/${therapistId}?linkError=` + encodeURIComponent('Bitte eine Praxis auswählen.'));
+  }
+
+  try {
+    await adminRequest('/admin/links', { body: { therapistId, practiceId } });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Verknüpfen fehlgeschlagen.';
+    redirect(`/therapists/${therapistId}?linkError=` + encodeURIComponent(message));
+  }
+
+  revalidateLinkViews();
+  redirect(`/therapists/${therapistId}?linked=1`);
 }
 
 // Directory-First-Refactor (R2): Admin verknüpft eine bestehende Praxis mit
@@ -544,24 +588,18 @@ export async function createLink(formData: FormData) {
     redirect('/links?linkError=' + encodeURIComponent(message));
   }
 
-  revalidatePath('/links');
-  revalidatePath('/therapists');
-  revalidatePath('/practices');
+  revalidateLinkViews();
   redirect('/links?linked=1');
 }
 
 export async function rejectLink(id: string) {
   await adminRequest(`/admin/links/${id}/reject`);
-  revalidatePath('/links');
-  revalidatePath('/therapists');
-  revalidatePath('/practices');
+  revalidateLinkViews();
 }
 
 export async function disputeLink(id: string) {
   await adminRequest(`/admin/links/${id}/dispute`);
-  revalidatePath('/links');
-  revalidatePath('/therapists');
-  revalidatePath('/practices');
+  revalidateLinkViews();
 }
 
 // Certification option actions

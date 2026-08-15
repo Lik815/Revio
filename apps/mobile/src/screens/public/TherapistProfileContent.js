@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ROOT_ROUTES } from '../../navigation/route-names';
 import { BackButton } from '../../components/BackButton';
 import { ReviewComposerModal } from '../../components/ReviewComposerModal';
 import { ReviewsSection } from '../../components/ReviewsSection';
@@ -75,6 +77,7 @@ export function TherapistProfileContent(props) {
 
   const thWithSlots = availableSlots !== undefined ? { ...th, availableSlots } : th;
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation();
 
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState(null);
@@ -187,28 +190,56 @@ export function TherapistProfileContent(props) {
             <Text style={{ color: c.muted, fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 10 }}>
               {th.practices.length > 1 ? 'Praxen' : 'Praxis'}
             </Text>
-            {th.practices.map((practice, index) => (
-              <View
-                key={practice.id ?? index}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'flex-start',
-                  gap: 10,
-                  ...(index > 0 ? { marginTop: 12, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.border } : {}),
-                }}
-              >
-                <Ionicons name="business-outline" size={18} color={c.muted} style={{ marginTop: 2 }} />
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 15, fontWeight: '700', color: c.text }}>{practice.name}</Text>
-                  {practice.address ? (
-                    <Text style={{ fontSize: 14, color: c.muted, marginTop: 2 }}>{practice.address}</Text>
+            {th.practices.map((practice, index) => {
+              // Die API liefert auf dem Profil ausschliesslich oeffentlich
+              // sichtbare Praxen — eine Zeile ohne id kann trotzdem aus
+              // aelteren, zwischengespeicherten Suchdaten stammen und bleibt
+              // dann bewusst nicht navigierbar.
+              const navigable = Boolean(practice.id);
+              const rowStyle = {
+                flexDirection: 'row',
+                alignItems: 'flex-start',
+                gap: 10,
+                ...(index > 0 ? { marginTop: 12, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.border } : {}),
+              };
+              const rowContent = (
+                <>
+                  <Ionicons name="business-outline" size={18} color={c.muted} style={{ marginTop: 2 }} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 15, fontWeight: '700', color: c.text }}>{practice.name}</Text>
+                    {practice.address ? (
+                      <Text style={{ fontSize: 14, color: c.muted, marginTop: 2 }}>{practice.address}</Text>
+                    ) : null}
+                    {practice.city ? (
+                      <Text style={{ fontSize: 14, color: c.muted, marginTop: 2 }}>{practice.city}</Text>
+                    ) : null}
+                  </View>
+                  {navigable ? (
+                    <Ionicons name="chevron-forward" size={18} color={c.muted} style={{ marginTop: 2 }} />
                   ) : null}
-                  {practice.city ? (
-                    <Text style={{ fontSize: 14, color: c.muted, marginTop: 2 }}>{practice.city}</Text>
-                  ) : null}
-                </View>
-              </View>
-            ))}
+                </>
+              );
+
+              if (!navigable) {
+                return (
+                  <View key={practice.id ?? index} style={rowStyle}>
+                    {rowContent}
+                  </View>
+                );
+              }
+
+              return (
+                <Pressable
+                  key={practice.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Praxis ${practice.name} oeffnen`}
+                  onPress={() => navigation.navigate(ROOT_ROUTES.PRACTICE_PROFILE, { practice })}
+                  style={({ pressed }) => [rowStyle, pressed ? { opacity: 0.6 } : null]}
+                >
+                  {rowContent}
+                </Pressable>
+              );
+            })}
           </View>
         ) : null}
 

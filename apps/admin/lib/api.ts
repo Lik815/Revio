@@ -165,6 +165,11 @@ export type AdminPractice = {
   ownerId?: string | null;
   // Live-Gate (docs/praxis-pflichtdaten-umsetzung.md): true wenn Straße/Hausnummer/PLZ/Stadt gesetzt sind.
   addressComplete?: boolean;
+  // Zentrale Sichtbarkeitsregel (apps/api/src/utils/practice-visibility.ts).
+  geocoded?: boolean;
+  publiclyVisible?: boolean;
+  visibilityBlockingReasons?: string[];
+  publicTherapistCount?: number;
   createdAt: string;
   links?: Array<{
     id: string;
@@ -173,6 +178,10 @@ export type AdminPractice = {
       id: string;
       fullName: string;
       professionalTitle: string;
+      reviewStatus?: string;
+      archivedAt?: string | null;
+      // Ist dieses Profil selbst öffentlich sichtbar?
+      publiclyVisible?: boolean;
     };
   }>;
 };

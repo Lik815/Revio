@@ -23,6 +23,7 @@ import {
   hasFullPracticeAddress,
   isPracticeGeocoded,
   isPublicTherapist,
+  practiceVisibilityInclude,
 } from '../utils/practice-visibility.js';
 import { resetSearchCache } from './search.js';
 import { sendProfileApprovedEmail, sendProfileRejectedEmail, sendProfileChangesRequestedEmail } from '../utils/mailer.js';
@@ -53,7 +54,25 @@ type TherapistRow = {
   bookingMode?: string | null; nextFreeSlotAt?: Date | null;
   qualifikationenStatus?: string | null; qualifikationenVerifiziertAt?: Date | null;
   createdAt: Date; updatedAt: Date;
-  links?: Array<{ id: string; status: string; practice: { id: string; name: string; city: string; address: string | null; phone: string | null; hours: string | null; lat: number; lng: number; reviewStatus: string; createdAt: Date; updatedAt: Date } }>;
+  links?: Array<{
+    id: string; status: string;
+    practice: {
+      id: string; name: string; city: string; address: string | null;
+      phone: string | null; hours: string | null; lat: number; lng: number;
+      reviewStatus: string; createdAt: Date; updatedAt: Date;
+      // Mitgeladen über practiceVisibilityInclude, damit die zentrale
+      // Sichtbarkeitsregel auch auf der Therapeuten-Detailseite gilt.
+      links?: Array<{
+        id: string; status: string;
+        therapist: {
+          id: string; fullName: string; professionalTitle: string;
+          reviewStatus?: string | null; isVisible?: boolean | null;
+          employmentStatus?: string | null; archivedAt?: Date | null;
+          city?: string | null; specializations?: string | null; languages?: string | null;
+        };
+      }>;
+    };
+  }>;
 };
 
 function computeVisibility(t: TherapistRow) {
@@ -124,8 +143,19 @@ function mapPractice(p: {
   logo?: string | null; photos?: string | null;
   lat: number; lng: number; reviewStatus: string; ownerId?: string | null;
   createdAt: Date; updatedAt: Date;
-  links?: Array<{ id: string; status: string; therapist: { id: string; fullName: string; professionalTitle: string } }>;
+  links?: Array<{
+    id: string; status: string;
+    therapist: {
+      id: string; fullName: string; professionalTitle: string;
+      reviewStatus?: string | null; isVisible?: boolean | null;
+      employmentStatus?: string | null; archivedAt?: Date | null;
+      city?: string | null; specializations?: string | null; languages?: string | null;
+    };
+  }>;
 }) {
+  // Zentrale Sichtbarkeitsregel — nur berechenbar, wenn die Links mitgeladen
+  // wurden (Praxis-Liste/-Detail). Sonst bleibt das Feld undefined statt zu lügen.
+  const publicVisibility = p.links ? getPracticeVisibilityState(p, p.links) : undefined;
   return {
     id: p.id, name: p.name, city: p.city,
     address: p.address ?? undefined, phone: p.phone ?? undefined,
@@ -142,12 +172,25 @@ function mapPractice(p: {
     // Directory-First-Refactor (P2): null = unbeansprucht, im Admin-Bereich frei bearbeitbar.
     ownerId: p.ownerId ?? null,
     // Live-Schaltung setzt volle Adresse + mind. einen bestätigten Therapeuten voraus
-    // (siehe /practices/:id/approve und search.ts loadListedPractices).
+    // (zentrale Regel: utils/practice-visibility.ts).
     addressComplete: hasFullAddress(p),
+    geocoded: isPracticeGeocoded(p),
+    // Ist diese Praxis nach der zentralen Regel öffentlich sichtbar?
+    publiclyVisible: publicVisibility?.isPublic,
+    visibilityBlockingReasons: publicVisibility?.blockingReasons,
+    publicTherapistCount: publicVisibility?.publicTherapistCount,
     createdAt: p.createdAt.toISOString(),
     links: p.links?.map((l) => ({
       id: l.id, status: l.status,
-      therapist: { id: l.therapist.id, fullName: l.therapist.fullName, professionalTitle: l.therapist.professionalTitle },
+      therapist: {
+        id: l.therapist.id,
+        fullName: l.therapist.fullName,
+        professionalTitle: l.therapist.professionalTitle,
+        reviewStatus: l.therapist.reviewStatus ?? undefined,
+        archivedAt: l.therapist.archivedAt?.toISOString() ?? null,
+        // Freigabestatus für die Admin-Sektion "Verknüpfte Therapeut:innen".
+        publiclyVisible: isPublicTherapist(l.therapist),
+      },
     })),
   };
 }
@@ -849,7 +892,7 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
     const { status } = request.query as { status?: string };
     const therapists = await fastify.prisma.therapist.findMany({
       where: status ? { reviewStatus: status as never } : undefined,
-      include: { links: { include: { practice: true } } },
+      include: { links: { include: { practice: { include: practiceVisibilityInclude } } } },
       orderBy: { createdAt: 'desc' },
     });
     return therapists.map(mapTherapist);
@@ -857,7 +900,7 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
 
   fastify.get('/therapists/:id', async (request, reply) => {
     const { id } = request.params as { id: string };
-    const therapist = await fastify.prisma.therapist.findUnique({ where: { id }, include: { links: { include: { practice: true } } } });
+    const therapist = await fastify.prisma.therapist.findUnique({ where: { id }, include: { links: { include: { practice: { include: practiceVisibilityInclude } } } } });
     if (!therapist) return reply.notFound('Therapist not found');
     return mapTherapist(therapist);
   });
@@ -944,7 +987,7 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
 
     const therapist = await fastify.prisma.therapist.findUnique({
       where: { id: created.id },
-      include: { links: { include: { practice: true } } },
+      include: { links: { include: { practice: { include: practiceVisibilityInclude } } } },
     });
 
     resetSearchCache();
@@ -985,7 +1028,7 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
         ...(data.city !== undefined && { city: data.city }),
         ...(data.bio !== undefined && { bio: data.bio }),
       },
-      include: { links: { include: { practice: true } } },
+      include: { links: { include: { practice: { include: practiceVisibilityInclude } } } },
     }).catch(() => null);
     if (!therapist) return reply.notFound('Therapist not found');
 
@@ -1086,7 +1129,7 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
       // Approval is the publish moment — profiles register as a private DRAFT
       // (isVisible: false); approving a complete, self-employed profile makes it live.
       data: { reviewStatus: 'APPROVED', isVisible: true },
-      include: { links: { include: { practice: true } } },
+      include: { links: { include: { practice: { include: practiceVisibilityInclude } } } },
     }).catch(() => null);
     if (!t) return reply.notFound('Therapist not found');
 
@@ -1389,8 +1432,8 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
         // kein zusätzlicher Freigabeschritt, du bist bereits der vertrauenswürdige
         // Akteur. Unterscheidet sich bewusst von der Selbstregistrierung
         // (PENDING_REVIEW), die weiterhin manuelle Prüfung durchläuft. Öffentlich
-        // sichtbar wird sie trotzdem erst mit voller Adresse + Therapeut, siehe
-        // loadListedPractices() in search.ts.
+        // sichtbar wird sie trotzdem erst nach der zentralen Regel in
+        // utils/practice-visibility.ts (Adresse, Geokodierung, öffentlicher Link).
         reviewStatus: 'LISTED',
       },
     });
@@ -1640,26 +1683,64 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
 
   // Live-Gate (docs/praxis-pflichtdaten-umsetzung.md, Abschnitt 5): eine Praxis
   // darf erst APPROVED werden, wenn sie eine vollständige, geokodierte Adresse
-  // hat UND mindestens einen bestätigten (CONFIRMED) Therapeuten-Link.
+  // hat UND mindestens einen bestätigten (CONFIRMED) Link auf ein öffentlich
+  // sichtbares Therapeut:innenprofil. Prüfung und Statuswechsel laufen in einer
+  // Transaktion, damit zwischen Check und Update kein Link/Profil wegfallen kann.
   fastify.post('/practices/:id/approve', async (request, reply) => {
     const { id } = request.params as { id: string };
-    const existing = await fastify.prisma.practice.findUnique({
-      where: { id },
-      include: { links: { where: { status: 'CONFIRMED' } } },
+
+    const result = await fastify.prisma.$transaction(async (tx) => {
+      const existing = await tx.practice.findUnique({
+        where: { id },
+        include: {
+          links: {
+            where: { status: 'CONFIRMED' },
+            select: {
+              status: true,
+              therapist: {
+                select: {
+                  reviewStatus: true, isVisible: true, employmentStatus: true, archivedAt: true,
+                  fullName: true, professionalTitle: true, city: true,
+                  specializations: true, languages: true,
+                },
+              },
+            },
+          },
+        },
+      });
+      if (!existing) return { error: 'not_found' as const };
+
+      if (!hasFullAddress(existing)) {
+        return { error: 'address' as const };
+      }
+      if (!isPracticeGeocoded(existing)) {
+        return { error: 'geocode' as const };
+      }
+      if (existing.links.length === 0) {
+        return { error: 'no_link' as const };
+      }
+      if (!existing.links.some((l) => isPublicTherapist(l.therapist))) {
+        return { error: 'no_public_therapist' as const };
+      }
+
+      await tx.practice.update({ where: { id }, data: { reviewStatus: 'APPROVED' } });
+      return { error: null };
     });
-    if (!existing) return reply.notFound('Practice not found');
-    if (!hasFullAddress(existing)) {
+
+    if (result.error === 'not_found') return reply.notFound('Practice not found');
+    if (result.error === 'address') {
       return reply.badRequest('Praxis kann nicht freigegeben werden: Straße, Hausnummer, PLZ und Stadt müssen vollständig gesetzt sein.');
     }
-    if (existing.lat === 0 && existing.lng === 0) {
+    if (result.error === 'geocode') {
       return reply.badRequest('Praxis kann nicht freigegeben werden: Adresse konnte nicht geokodiert werden.');
     }
-    if (existing.links.length === 0) {
+    if (result.error === 'no_link') {
       return reply.badRequest('Praxis kann nicht freigegeben werden: mindestens ein bestätigter Therapeut ist erforderlich.');
     }
+    if (result.error === 'no_public_therapist') {
+      return reply.badRequest('Praxis kann nicht freigegeben werden: mindestens ein bestätigt verknüpftes Therapeut:innenprofil muss öffentlich sichtbar sein.');
+    }
 
-    const p = await fastify.prisma.practice.update({ where: { id }, data: { reviewStatus: 'APPROVED' } }).catch(() => null);
-    if (!p) return reply.notFound('Practice not found');
     resetSearchCache();
     return { message: 'Practice approved.' };
   });
@@ -1715,23 +1796,41 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
     }
     const { therapistId, practiceId } = parsed.data;
 
-    const therapist = await fastify.prisma.therapist.findUnique({ where: { id: therapistId } });
-    if (!therapist) return reply.notFound('Therapeut nicht gefunden.');
-    const practice = await fastify.prisma.practice.findUnique({ where: { id: practiceId } });
-    if (!practice) return reply.notFound('Praxis nicht gefunden.');
+    // Prüfung und Anlage transaktional, damit zwischen Dubletten-Check und
+    // Create keine konkurrierende Verknüpfung entstehen kann.
+    const result = await fastify.prisma.$transaction(async (tx) => {
+      const therapist = await tx.therapist.findUnique({ where: { id: therapistId } });
+      if (!therapist) return { error: 'therapist_not_found' as const };
+      // Archivierte Profile dürfen nicht neu verknüpft werden — sie sind nie
+      // öffentlich und würden nur tote Verknüpfungen erzeugen.
+      if (therapist.archivedAt) return { error: 'therapist_archived' as const };
 
-    const existing = await fastify.prisma.therapistPracticeLink.findUnique({
-      where: { therapistId_practiceId: { therapistId, practiceId } },
-    });
-    if (existing) return reply.conflict('Diese Verknüpfung existiert bereits.');
+      const practice = await tx.practice.findUnique({ where: { id: practiceId } });
+      if (!practice) return { error: 'practice_not_found' as const };
 
-    const link = await fastify.prisma.therapistPracticeLink.create({
-      data: { therapistId, practiceId, status: 'CONFIRMED', initiatedBy: 'ADMIN' },
-      include: {
-        therapist: { select: { id: true, fullName: true, professionalTitle: true } },
-        practice: { select: { id: true, name: true, city: true } },
-      },
+      const existing = await tx.therapistPracticeLink.findUnique({
+        where: { therapistId_practiceId: { therapistId, practiceId } },
+      });
+      if (existing) return { error: 'duplicate' as const };
+
+      const created = await tx.therapistPracticeLink.create({
+        data: { therapistId, practiceId, status: 'CONFIRMED', initiatedBy: 'ADMIN' },
+        include: {
+          therapist: { select: { id: true, fullName: true, professionalTitle: true } },
+          practice: { select: { id: true, name: true, city: true } },
+        },
+      });
+      return { error: null, created };
     });
+
+    if (result.error === 'therapist_not_found') return reply.notFound('Therapeut nicht gefunden.');
+    if (result.error === 'therapist_archived') {
+      return reply.badRequest('Archivierte Therapeut:innen können nicht verknüpft werden.');
+    }
+    if (result.error === 'practice_not_found') return reply.notFound('Praxis nicht gefunden.');
+    if (result.error === 'duplicate') return reply.conflict('Diese Verknüpfung existiert bereits.');
+
+    const link = result.created!;
 
     resetSearchCache();
     return {
@@ -1743,6 +1842,15 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
 
   fastify.post('/links/:id/confirm', async (request, reply) => {
     const { id } = request.params as { id: string };
+    const existing = await fastify.prisma.therapistPracticeLink.findUnique({
+      where: { id },
+      include: { therapist: { select: { archivedAt: true } } },
+    });
+    if (!existing) return reply.notFound('Link not found');
+    // Archivierte Profile werden nie bestätigt (siehe POST /admin/links).
+    if (existing.therapist.archivedAt) {
+      return reply.badRequest('Verknüpfung archivierter Therapeut:innen kann nicht bestätigt werden.');
+    }
     const l = await fastify.prisma.therapistPracticeLink.update({ where: { id }, data: { status: 'CONFIRMED' } }).catch(() => null);
     if (!l) return reply.notFound('Link not found');
     resetSearchCache();

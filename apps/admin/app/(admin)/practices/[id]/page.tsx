@@ -2,27 +2,52 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { PageShell } from '../../../../components/page-shell';
 import { AdminNotice } from '../../../../components/admin-notice';
+import { AddLinkForm } from '../../../../components/add-link-form';
+import { LinkedEntitiesSection } from '../../../../components/linked-entities-section';
 import { api } from '../../../../lib/api';
-import { updatePractice, uploadPracticeLogo, uploadPracticePhoto, removePracticePhoto } from '../../../../lib/actions';
+import {
+  updatePractice, uploadPracticeLogo, uploadPracticePhoto, removePracticePhoto,
+  confirmLink, rejectLink, disputeLink, linkTherapistToPractice,
+} from '../../../../lib/actions';
 
 // Logo/Fotos liegen als relative URL (/uploads/practice-…/...) auf der API —
 // fürs Anzeigen im Admin die öffentliche API-Basis davorsetzen (analog zum
 // Therapeuten-Profilfoto).
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000').replace(/\/$/, '');
 
+// Gründe aus getPracticeVisibilityState() (apps/api/src/utils/practice-visibility.ts).
+const VISIBILITY_REASON_LABEL: Record<string, string> = {
+  not_approved: 'nicht freigegeben',
+  address_incomplete: 'Adresse unvollständig',
+  not_geocoded: 'nicht geokodiert',
+  no_confirmed_link: 'kein bestätigter Therapeuten-Link',
+  no_public_therapist: 'kein öffentlich sichtbares Therapeut:innenprofil',
+};
+
 type Props = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ mediaError?: string; mediaOk?: string }>;
+  searchParams: Promise<{ mediaError?: string; mediaOk?: string; linked?: string; linkError?: string }>;
 };
 
 export default async function PracticeEditPage({ params, searchParams }: Props) {
   const { id } = await params;
   const query = await searchParams;
-  const practice = await api.getPractice(id).catch(() => null);
+  const [practice, allTherapists] = await Promise.all([
+    api.getPractice(id).catch(() => null),
+    api.getTherapists().catch(() => []),
+  ]);
   if (!practice) notFound();
 
   const claimed = Boolean(practice.ownerId);
   const photos = practice.photos ?? [];
+
+  const links = practice.links ?? [];
+  const linkedTherapistIds = new Set(links.map((l) => l.therapist.id));
+  // Archivierte Profile und bereits verknüpfte Therapeut:innen gehören nicht in
+  // die Auswahl — die API lehnt beides ab (400/409).
+  const therapistOptions = allTherapists
+    .filter((t) => !t.archivedAt && !linkedTherapistIds.has(t.id))
+    .map((t) => ({ value: t.id, label: t.fullName, sublabel: `${t.professionalTitle} · ${t.city}` }));
 
   return (
     <PageShell
@@ -55,6 +80,16 @@ export default async function PracticeEditPage({ params, searchParams }: Props) 
           <p style={{ margin: '0 0 12px', color: 'var(--warning, #b45309)', fontSize: 13 }}>
             Adresse unvollständig — Straße, Hausnummer und PLZ fehlen. Ohne vollständige Adresse und
             mindestens einen bestätigten Therapeuten kann diese Praxis nicht freigegeben werden.
+          </p>
+        ) : null}
+
+        {practice.publiclyVisible === false ? (
+          <p style={{ margin: '0 0 12px', color: 'var(--warning, #b45309)', fontSize: 13 }}>
+            Diese Praxis ist aktuell nicht öffentlich sichtbar
+            {practice.visibilityBlockingReasons?.length
+              ? ` (${practice.visibilityBlockingReasons.map((r) => VISIBILITY_REASON_LABEL[r] ?? r).join(', ')})`
+              : ''}
+            .
           </p>
         ) : null}
 
@@ -124,6 +159,40 @@ export default async function PracticeEditPage({ params, searchParams }: Props) 
           </fieldset>
         </form>
       </article>
+
+      {query.linked ? (
+        <AdminNotice title="Verknüpft" tone="success">Die Verknüpfung wurde angelegt und ist sofort bestätigt.</AdminNotice>
+      ) : null}
+      {query.linkError ? (
+        <AdminNotice title="Verknüpfen fehlgeschlagen" tone="warning">{query.linkError}</AdminNotice>
+      ) : null}
+
+      <LinkedEntitiesSection
+        kicker="Verknüpfungen"
+        title="Verknüpfte Therapeut:innen"
+        description="Die Praxis ist öffentlich nur sichtbar, wenn mindestens eine bestätigte Verknüpfung auf ein öffentlich sichtbares Profil zeigt."
+        rows={links.map((l) => ({
+          linkId: l.id,
+          status: l.status,
+          name: l.therapist.fullName,
+          sublabel: l.therapist.professionalTitle,
+          href: `/therapists/${l.therapist.id}`,
+          reviewStatus: l.therapist.reviewStatus,
+          publiclyVisible: l.therapist.publiclyVisible,
+          archived: Boolean(l.therapist.archivedAt),
+        }))}
+        emptyLabel="Noch keine Therapeut:innen verknüpft."
+        linkActions={{ confirm: confirmLink, reject: rejectLink, dispute: disputeLink }}
+      >
+        <AddLinkForm
+          name="therapistId"
+          placeholder="Therapeut:in suchen…"
+          submitLabel="Verknüpfen"
+          options={therapistOptions}
+          action={linkTherapistToPractice.bind(null, practice.id)}
+          emptyHint="Keine weiteren Therapeut:innen verfügbar — alle sind bereits verknüpft oder archiviert."
+        />
+      </LinkedEntitiesSection>
 
       {!claimed ? (
         <article className="panel panel--compact" style={{ marginTop: 20 }}>
