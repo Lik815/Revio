@@ -18,6 +18,12 @@ import {
 } from '../utils/practice-media.js';
 import { serializeKassenarten } from '../utils/kassenarten.js';
 import { getTherapistPublicationState, getTherapistRequestabilityState } from '../utils/profile-completeness.js';
+import {
+  getPracticeVisibilityState,
+  hasFullPracticeAddress,
+  isPracticeGeocoded,
+  isPublicTherapist,
+} from '../utils/practice-visibility.js';
 import { resetSearchCache } from './search.js';
 import { sendProfileApprovedEmail, sendProfileRejectedEmail, sendProfileChangesRequestedEmail } from '../utils/mailer.js';
 import { sendPushNotification } from '../utils/push.js';
@@ -106,10 +112,8 @@ function mapTherapist(t: TherapistRow) {
 
 // "Volle Adresse" (siehe docs/praxis-pflichtdaten-umsetzung.md, Abschnitt 4):
 // Straße, Hausnummer, PLZ und Stadt müssen gesetzt sein — Voraussetzung für die
-// Live-Schaltung einer Praxis (Approve-Gate + Suche, siehe unten).
-function hasFullAddress(p: { street?: string | null; houseNumber?: string | null; postalCode?: string | null; city?: string | null }): boolean {
-  return Boolean(p.street?.trim() && p.houseNumber?.trim() && p.postalCode?.trim() && p.city?.trim());
-}
+// Live-Schaltung einer Praxis. Die Regel selbst liegt in practice-visibility.ts.
+const hasFullAddress = hasFullPracticeAddress;
 
 function mapPractice(p: {
   id: string; name: string; city: string; address: string | null;
@@ -1086,18 +1090,11 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
     }).catch(() => null);
     if (!t) return reply.notFound('Therapist not found');
 
-    // Cascade: approve PENDING_REVIEW practices and PROPOSED links for this therapist
-    const practiceIds = t.links.map((l) => l.practiceId);
-    const [updatedPractices, updatedLinks] = await Promise.all([
-      fastify.prisma.practice.updateMany({
-        where: { id: { in: practiceIds }, reviewStatus: { in: ['PENDING_REVIEW', 'DRAFT'] } },
-        data: { reviewStatus: 'APPROVED' },
-      }),
-      fastify.prisma.therapistPracticeLink.updateMany({
-        where: { therapistId: id, status: 'PROPOSED' },
-        data: { status: 'CONFIRMED' },
-      }),
-    ]);
+    // Kein Cascade mehr: Die Therapeuten-Freigabe bestätigt KEINE vorgeschlagenen
+    // Links und gibt KEINE Praxen frei. Beides sind eigenständige Prüfschritte
+    // (POST /admin/links/:id/confirm bzw. POST /admin/practices/:id/approve mit
+    // Adress-/Geokodierungs-/Link-Gate) — sonst umginge die Therapeuten-Freigabe
+    // genau die Regeln, die eine Praxis öffentlich machen.
 
     // Therapist just became publicly visible — drop the cached search list so
     // they appear immediately instead of after the cache TTL.
@@ -1124,9 +1121,11 @@ export const adminRoutes: FastifyPluginAsync = async (fastify) => {
 
     return {
       message: 'Therapeut freigegeben.',
+      // Feld bleibt für bestehende Clients erhalten, ist aber konstant 0 —
+      // die Freigabe hat keine Seiteneffekte mehr (siehe Kommentar oben).
       sideEffects: {
-        practicesApproved: updatedPractices.count,
-        linksConfirmed: updatedLinks.count,
+        practicesApproved: 0,
+        linksConfirmed: 0,
       },
     };
   });
