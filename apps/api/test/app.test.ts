@@ -2363,6 +2363,20 @@ describe('End-to-End: Register → Admin Approve → Visible in Search', () => {
     const links = await app.inject({ method: 'GET', url: '/admin/links', headers: AUTH });
     const link = links.json().find((l: { therapistId: string }) => l.therapistId === therapistId);
     const practiceId = link.practiceId;
+    // Die Registrierung legt nur die Basisdaten der Praxis an. Vor der
+    // Live-Schaltung ergänzt der Admin die für das Praxis-Gate nötige,
+    // geokodierte Adresse.
+    await prisma.practice.update({
+      where: { id: practiceId },
+      data: {
+        address: 'Domstraße 1, 50667 Köln',
+        street: 'Domstraße',
+        houseNumber: '1',
+        postalCode: '50667',
+        lat: 50.9413,
+        lng: 6.9583,
+      },
+    });
     const confirmRes = await app.inject({ method: 'POST', url: `/admin/links/${link.id}/confirm`, headers: AUTH });
     expect(confirmRes.statusCode).toBe(200);
     const approvePracticeRes = await app.inject({ method: 'POST', url: `/admin/practices/${practiceId}/approve`, headers: AUTH });
