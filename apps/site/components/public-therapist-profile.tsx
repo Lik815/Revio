@@ -1,6 +1,7 @@
 import Link from 'next/link';
-import type { PublicTherapist } from '../lib/public-api';
+import type { PublicPractice, PublicTherapist } from '../lib/public-api';
 import { AppOnlyCta } from './app-only-cta';
+import { ProfileMediaImage } from './profile-media-image';
 
 const LANGUAGE_LABELS: Record<string, string> = {
   DE: 'Deutsch', EN: 'Englisch', FR: 'Französisch', ES: 'Spanisch', IT: 'Italienisch',
@@ -35,6 +36,10 @@ function formatNextSlot(value?: string | null) {
   });
 }
 
+function practiceLocation(practice: PublicPractice) {
+  return practice.city || practice.address || 'Standort ansehen';
+}
+
 function ProfileIcon({
   path,
   className,
@@ -58,6 +63,55 @@ function ProfileIcon({
   );
 }
 
+function PracticeShowcase({ practice }: { practice: PublicPractice }) {
+  const coverPhoto = practice.photos?.[0];
+
+  return (
+    <article className="surface-card profile-practice-showcase">
+      <div className="profile-practice-showcase__cover">
+        <div className="profile-practice-showcase__cover-fallback" aria-hidden="true" />
+        {coverPhoto ? (
+          <ProfileMediaImage
+            src={coverPhoto}
+            alt={`Praxisräume von ${practice.name}`}
+            className="profile-practice-showcase__cover-image"
+          />
+        ) : null}
+        <div className="profile-practice-showcase__cover-shade" aria-hidden="true" />
+        <span className="profile-practice-showcase__eyebrow">
+          {practice.verified ? 'Geprüfte Praxis' : 'Praxis'}
+        </span>
+      </div>
+
+      <div className="profile-practice-showcase__body">
+        <div className="profile-practice-showcase__logo">
+          <span aria-hidden="true">{initials(practice.name)}</span>
+          {practice.logo ? (
+            <ProfileMediaImage
+              src={practice.logo}
+              alt={`Logo von ${practice.name}`}
+              className="profile-practice-showcase__logo-image"
+            />
+          ) : null}
+        </div>
+
+        <div className="profile-practice-showcase__copy">
+          <h2>{practice.name}</h2>
+          <p>{practiceLocation(practice)}</p>
+        </div>
+
+        <Link
+          href={`/praxis/${practice.id}`}
+          className="button button--ghost profile-practice-showcase__link"
+          aria-label={`Praxis ${practice.name} ansehen`}
+        >
+          Praxis ansehen <span aria-hidden="true">→</span>
+        </Link>
+      </div>
+    </article>
+  );
+}
+
 export function PublicTherapistProfile({
   therapist,
   appBookingEnabled = false,
@@ -73,9 +127,20 @@ export function PublicTherapistProfile({
         <Link href="/finden" className="page-back-link">← Zurück zur Suche</Link>
 
         <div className="profile-stack">
+          {therapist.practices.length > 0 ? (
+            <section
+              className="profile-practice-showcases"
+              aria-label={therapist.practices.length === 1 ? 'Praxis' : 'Praxen'}
+            >
+              {therapist.practices.map((practice) => (
+                <PracticeShowcase key={practice.id} practice={practice} />
+              ))}
+            </section>
+          ) : null}
+
           <div className="surface-card profile-hero">
             <div className="profile-hero__topbar">
-              <div className="eyebrow">Geprueftes Profil</div>
+              <div className="eyebrow">Physio-Profil</div>
               {therapist.requestable ? (
                 <span className="profile-status-badge">Terminanfrage moeglich</span>
               ) : null}
@@ -234,24 +299,6 @@ export function PublicTherapistProfile({
                   </div>
                 </section>
               ) : null}
-            </div>
-          ) : null}
-
-          {therapist.practices.length > 0 ? (
-            <div className="surface-card profile-practice-card">
-              <div className="profile-card-heading">
-                <h3>Praxen</h3>
-                <p>Weitere Standorte und zugehoerige Praxen dieses Profils.</p>
-              </div>
-              <div className="profile-practice-list">
-                {therapist.practices.map((practice) => (
-                  <Link key={practice.id} href={`/praxis/${practice.id}`} className="profile-practice-link">
-                    <span className="profile-practice-link__name">{practice.name}</span>
-                    <span className="profile-practice-link__meta">{practice.city || 'Standort offen'}</span>
-                    <span className="profile-practice-link__chevron">›</span>
-                  </Link>
-                ))}
-              </div>
             </div>
           ) : null}
 

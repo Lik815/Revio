@@ -1995,6 +1995,138 @@ h3 {
   gap: 20px;
 }
 
+.profile-practice-showcases {
+  display: grid;
+  gap: 20px;
+}
+
+.profile-practice-showcase {
+  padding: 0;
+  overflow: hidden;
+  border-radius: 30px;
+  border-color: rgba(62, 98, 113, 0.16);
+  box-shadow: 0 22px 45px rgba(19, 39, 47, 0.1);
+}
+
+.profile-practice-showcase__cover {
+  position: relative;
+  height: clamp(210px, 29vw, 320px);
+  overflow: hidden;
+  background: linear-gradient(135deg, #6f8995, #294957);
+}
+
+.profile-practice-showcase__cover-image,
+.profile-practice-showcase__cover-fallback {
+  width: 100%;
+  height: 100%;
+}
+
+.profile-practice-showcase__cover-image {
+  position: absolute;
+  inset: 0;
+  display: block;
+  object-fit: cover;
+}
+
+.profile-practice-showcase__cover-fallback {
+  background:
+    radial-gradient(circle at 16% 28%, rgba(255, 255, 255, 0.2), transparent 26%),
+    radial-gradient(circle at 82% 20%, rgba(255, 255, 255, 0.1), transparent 30%),
+    linear-gradient(135deg, #78919c, #294957);
+}
+
+.profile-practice-showcase__cover-shade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(14, 31, 38, 0.05) 42%, rgba(14, 31, 38, 0.48));
+  pointer-events: none;
+}
+
+.profile-practice-showcase__eyebrow {
+  position: absolute;
+  top: 20px;
+  left: 22px;
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 13px;
+  border: 1px solid rgba(255, 255, 255, 0.46);
+  border-radius: 999px;
+  background: rgba(20, 42, 51, 0.58);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.profile-practice-showcase__body {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 20px;
+  padding: 0 28px 24px;
+  background: var(--surface);
+}
+
+.profile-practice-showcase__logo {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 104px;
+  height: 104px;
+  margin-top: -42px;
+  overflow: hidden;
+  border: 5px solid #fff;
+  border-radius: 24px;
+  background: #fff;
+  color: var(--accent);
+  box-shadow: 0 14px 28px rgba(19, 39, 47, 0.16);
+  font-size: 1.55rem;
+  font-weight: 750;
+}
+
+.profile-practice-showcase__logo-image {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.profile-practice-showcase__copy,
+.profile-practice-showcase__link {
+  margin-top: 20px;
+}
+
+.profile-practice-showcase__copy {
+  min-width: 0;
+}
+
+.profile-practice-showcase__copy h2 {
+  margin: 0;
+  font-size: clamp(1.45rem, 2.4vw, 2rem);
+  line-height: 1.12;
+}
+
+.profile-practice-showcase__copy p {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.profile-practice-showcase__link {
+  min-height: 42px;
+  gap: 8px;
+  padding: 0 17px;
+  white-space: nowrap;
+}
+
 .profile-hero {
   padding: 28px;
   border-radius: 30px;
@@ -2387,6 +2519,39 @@ h3 {
 }
 
 @media (max-width: 720px) {
+  .profile-practice-showcase {
+    border-radius: 24px;
+  }
+
+  .profile-practice-showcase__cover {
+    height: 220px;
+  }
+
+  .profile-practice-showcase__body {
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 16px;
+    padding: 0 22px 22px;
+  }
+
+  .profile-practice-showcase__logo {
+    width: 88px;
+    height: 88px;
+    margin-top: -34px;
+    border-width: 4px;
+    border-radius: 20px;
+    font-size: 1.3rem;
+  }
+
+  .profile-practice-showcase__copy {
+    margin-top: 16px;
+  }
+
+  .profile-practice-showcase__link {
+    grid-column: 1 / -1;
+    width: 100%;
+    margin-top: 0;
+  }
+
   .profile-hero {
     padding: 22px;
     border-radius: 24px;
@@ -2433,6 +2598,33 @@ h3 {
 }
 
 @media (max-width: 560px) {
+  .profile-practice-showcase__cover {
+    height: 190px;
+  }
+
+  .profile-practice-showcase__eyebrow {
+    top: 16px;
+    left: 16px;
+  }
+
+  .profile-practice-showcase__body {
+    padding-right: 18px;
+    padding-bottom: 18px;
+    padding-left: 18px;
+  }
+
+  .profile-practice-showcase__logo {
+    width: 78px;
+    height: 78px;
+    margin-top: -28px;
+    border-radius: 18px;
+    font-size: 1.15rem;
+  }
+
+  .profile-practice-showcase__copy h2 {
+    font-size: 1.35rem;
+  }
+
   .profile-header {
     flex-direction: column;
   }
